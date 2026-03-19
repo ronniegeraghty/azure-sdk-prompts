@@ -103,13 +103,16 @@ def _build_eval_cmd(prompt_text, output_dir, model=None, timeout=None, verbose=F
 
 
 def run_single_eval_worker(prompt_id, prompt_text, tmp_output_dir, report_subdir,
-                           model, timeout, verbose):
+                           model, timeout, verbose, eval_number=0, total=0):
     """
     Run one eval in its own subprocess. Designed to be called from
     ProcessPoolExecutor — all arguments are picklable primitives/Paths.
 
     Returns a result dict with prompt_id, status, report_path, stdout, stderr.
     """
+    if eval_number and total:
+        print(f"▶️  [{eval_number}/{total}] Starting: {prompt_id}", flush=True)
+
     tmp_output = Path(tmp_output_dir)
     tmp_output.mkdir(parents=True, exist_ok=True)
 
@@ -327,8 +330,6 @@ def main():
             for idx, item in enumerate(work_items, 1):
                 eval_numbers[item["prompt_id"]] = idx
                 eval_start_times[item["prompt_id"]] = time.monotonic()
-                with print_lock:
-                    print(f"▶️  [{idx}/{total_work}] Starting: {item['prompt_id']}", flush=True)
                 future = executor.submit(
                     run_single_eval_worker,
                     prompt_id=item["prompt_id"],
@@ -338,6 +339,8 @@ def main():
                     model=args.model,
                     timeout=args.timeout,
                     verbose=args.verbose,
+                    eval_number=idx,
+                    total=total_work,
                 )
                 future_to_id[future] = item["prompt_id"]
 
