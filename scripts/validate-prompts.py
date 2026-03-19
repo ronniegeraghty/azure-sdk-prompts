@@ -21,7 +21,7 @@ REQUIRED_FIELDS = [
 VALID_SERVICES = [
     "storage", "key-vault", "cosmos-db", "event-hubs",
     "app-configuration", "purview", "digital-twins",
-    "identity", "resource-manager",
+    "identity", "resource-manager", "service-bus",
 ]
 VALID_PLANES = ["data-plane", "management-plane"]
 VALID_LANGUAGES = ["dotnet", "java", "js-ts", "python", "go", "rust", "cpp"]
