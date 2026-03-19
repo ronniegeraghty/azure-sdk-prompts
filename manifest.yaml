@@ -1,5 +1,5 @@
-generated_at: '2026-03-19T00:57:07.901536+00:00'
-prompt_count: 56
+generated_at: '2026-03-19T00:59:32.278518+00:00'
+prompt_count: 57
 services:
 - app-configuration
 - cosmos-db
@@ -1026,6 +1026,26 @@ prompts:
   created: 2025-07-28
   author: ronniegeraghty
   path: prompts/service-bus/data-plane/python/send-receive-messages.prompt.md
+- id: storage-dp-cpp-crud
+  service: storage
+  plane: data-plane
+  language: cpp
+  category: crud
+  difficulty: basic
+  description: 'Can a developer upload, download, list, and delete blobs in Azure
+    Blob Storage using the C++ SDK based on the documentation alone?
+
+    '
+  sdk_package: azure-storage-blobs-cpp
+  api_version: '2024-11-04'
+  doc_url: https://github.com/Azure/azure-sdk-for-cpp/tree/main/sdk/storage/azure-storage-blobs
+  tags:
+  - blobs
+  - crud
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/storage/data-plane/cpp/crud-blobs.prompt.md
 - id: storage-dp-dotnet-auth
   service: storage
   plane: data-plane
