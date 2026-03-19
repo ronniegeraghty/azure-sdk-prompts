@@ -1,0 +1,49 @@
+---
+id: identity-dp-java-service-principal
+service: identity
+plane: data-plane
+language: java
+category: auth
+difficulty: intermediate
+description: >
+  Can a developer authenticate with a Service Principal (client secret)
+  using the Java SDK documentation?
+sdk_package: azure-identity
+api_version: "1.x"
+doc_url: https://learn.microsoft.com/en-us/azure/developer/java/sdk/identity
+tags:
+  - authentication
+  - service-principal
+  - client-secret
+created: 2025-07-28
+author: ronniegeraghty
+---
+
+# Service Principal Authentication: Azure Identity (Java)
+
+## Prompt
+
+Using only the Azure SDK for Java documentation, show me how to authenticate
+to Azure using a Service Principal with client secret in Java. I need:
+1. Required Maven dependencies
+2. How to create a ClientSecretCredential with ClientSecretCredentialBuilder
+3. Using it with an Azure SDK client
+4. Best practices for secret management
+5. Error handling for invalid credentials
+
+Provide a complete example with proper exception handling.
+
+## Expected Coverage
+
+The documentation should cover:
+- Maven dependency for `azure-identity`
+- `ClientSecretCredentialBuilder` with tenantId, clientId, clientSecret
+- Passing credential to Azure SDK client builders
+- Environment variable patterns for secret storage
+- `AuthenticationException` handling
+
+## Context
+
+Service Principal authentication with client secrets is the most common pattern
+for application-to-application auth in Azure. This tests whether the Java docs
+cover the full setup including credential creation, usage, and secret management best practices.

@@ -1,0 +1,51 @@
+---
+id: identity-dp-go-managed-identity
+service: identity
+plane: data-plane
+language: go
+category: auth
+difficulty: intermediate
+description: >
+  Can a developer use Managed Identity to authenticate Azure SDK clients
+  using the Go SDK documentation?
+sdk_package: github.com/Azure/azure-sdk-for-go/sdk/azidentity
+api_version: "1.x"
+doc_url: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity
+tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+created: 2025-07-28
+author: ronniegeraghty
+---
+
+# Managed Identity Authentication: Azure Identity (Go)
+
+## Prompt
+
+Using only the Azure SDK for Go documentation, show me how to use
+Managed Identity to authenticate Azure SDK clients in Go. Cover:
+1. System-assigned vs user-assigned managed identity
+2. How to create a ManagedIdentityCredential for each type
+3. Using it with Azure SDK clients
+4. Local development fallback strategies
+5. Error handling and troubleshooting
+
+Provide Go examples for both identity types.
+
+## Expected Coverage
+
+The documentation should cover:
+- `azidentity.NewManagedIdentityCredential()` function
+- System-assigned: nil options
+- User-assigned: `ManagedIdentityCredentialOptions{ID: azidentity.ClientID("...")}`
+- Integration with `DefaultAzureCredential` chain
+- Error handling when not running in Azure
+- `azidentity.NewChainedTokenCredential()` for fallback
+
+## Context
+
+Managed Identity is the recommended auth pattern for code running in Azure.
+It eliminates the need for managing secrets entirely. This tests whether the
+Go docs explain both system-assigned and user-assigned identity clearly,
+including the critical local development fallback story.

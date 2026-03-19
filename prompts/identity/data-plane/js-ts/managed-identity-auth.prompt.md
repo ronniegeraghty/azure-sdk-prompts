@@ -1,0 +1,51 @@
+---
+id: identity-dp-js-ts-managed-identity
+service: identity
+plane: data-plane
+language: js-ts
+category: auth
+difficulty: intermediate
+description: >
+  Can a developer use Managed Identity to authenticate Azure SDK clients
+  using the JavaScript/TypeScript SDK documentation?
+sdk_package: "@azure/identity"
+api_version: "1.x"
+doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/identity-readme
+tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+created: 2025-07-28
+author: ronniegeraghty
+---
+
+# Managed Identity Authentication: Azure Identity (JavaScript/TypeScript)
+
+## Prompt
+
+Using only the Azure SDK for JavaScript/TypeScript documentation, show me how to
+use Managed Identity to authenticate Azure SDK clients in Node.js. Cover:
+1. System-assigned vs user-assigned managed identity
+2. How to create a ManagedIdentityCredential for each type
+3. Using it with Azure SDK clients
+4. Local development fallback strategies
+5. Common pitfalls and error handling
+
+Provide TypeScript examples for both identity types.
+
+## Expected Coverage
+
+The documentation should cover:
+- `ManagedIdentityCredential` class from `@azure/identity`
+- System-assigned: no parameters needed
+- User-assigned: passing the client ID in options
+- Integration with `DefaultAzureCredential` chain
+- `CredentialUnavailableError` when not running in Azure
+- `ChainedTokenCredential` for local fallback
+
+## Context
+
+Managed Identity is the recommended auth pattern for code running in Azure.
+It eliminates the need for managing secrets entirely. This tests whether the
+JavaScript/TypeScript docs explain both system-assigned and user-assigned identity clearly,
+including the critical local development fallback story.

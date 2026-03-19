@@ -1,0 +1,49 @@
+---
+id: identity-dp-js-ts-service-principal
+service: identity
+plane: data-plane
+language: js-ts
+category: auth
+difficulty: intermediate
+description: >
+  Can a developer authenticate with a Service Principal (client secret)
+  using the JavaScript/TypeScript SDK documentation?
+sdk_package: "@azure/identity"
+api_version: "1.x"
+doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/identity-readme
+tags:
+  - authentication
+  - service-principal
+  - client-secret
+created: 2025-07-28
+author: ronniegeraghty
+---
+
+# Service Principal Authentication: Azure Identity (JavaScript/TypeScript)
+
+## Prompt
+
+Using only the Azure SDK for JavaScript/TypeScript documentation, show me how to
+authenticate to Azure using a Service Principal with client secret. I need:
+1. Required npm packages
+2. How to create a ClientSecretCredential with tenant ID, client ID, and secret
+3. Using it with an Azure SDK client
+4. Best practices for secret management in Node.js
+5. Error handling for authentication failures
+
+Provide a complete TypeScript example.
+
+## Expected Coverage
+
+The documentation should cover:
+- `@azure/identity` package with `ClientSecretCredential` class
+- Constructor parameters: tenantId, clientId, clientSecret
+- Passing credential to Azure SDK clients
+- dotenv or environment variable patterns
+- `AuthenticationError` handling
+
+## Context
+
+Service Principal authentication with client secrets is the most common pattern
+for application-to-application auth in Azure. This tests whether the JavaScript/TypeScript docs
+cover the full setup including credential creation, usage, and secret management best practices.

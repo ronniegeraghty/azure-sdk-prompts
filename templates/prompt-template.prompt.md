@@ -1,9 +1,9 @@
 ---
 id: <service>-<dp|mp>-<language>-<category-slug>
-service: # storage | key-vault | cosmos-db | event-hubs | app-configuration | purview | digital-twins
+service: # storage | key-vault | cosmos-db | event-hubs | app-configuration | purview | digital-twins | identity | resource-manager
 plane: # data-plane | management-plane
 language: # dotnet | java | js-ts | python | go | rust | cpp
-category: # authentication | pagination | polling | retries | error-handling | crud | batch | streaming
+category: # authentication | pagination | polling | retries | error-handling | crud | batch | streaming | auth | provisioning
 difficulty: # basic | intermediate | advanced
 description: >
   One to three sentences describing what this prompt tests.

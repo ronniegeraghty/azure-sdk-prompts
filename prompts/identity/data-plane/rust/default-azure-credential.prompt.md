@@ -1,0 +1,50 @@
+---
+id: identity-dp-rust-default-credential
+service: identity
+plane: data-plane
+language: rust
+category: auth
+difficulty: basic
+description: >
+  Can a developer set up DefaultAzureCredential for Azure SDK clients
+  using the Rust SDK documentation?
+sdk_package: azure_identity
+api_version: "1.x"
+doc_url: https://docs.rs/azure_identity/latest/azure_identity/
+tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+created: 2025-07-28
+author: ronniegeraghty
+---
+
+# DefaultAzureCredential: Azure Identity (Rust)
+
+## Prompt
+
+Using only the Azure SDK for Rust documentation, show me how to authenticate
+an Azure SDK client using DefaultAzureCredential. Explain:
+1. What Cargo dependencies are needed
+2. How to create and use a DefaultAzureCredential instance
+3. The credential chain and which credentials are tried
+4. How it works in local development vs Azure-hosted environments
+5. How to handle authentication errors
+
+Provide a complete Rust example that creates a Key Vault SecretClient using
+DefaultAzureCredential with proper error handling.
+
+## Expected Coverage
+
+The documentation should cover:
+- Cargo.toml dependencies for `azure_identity`
+- `DefaultAzureCredential::new()` or builder pattern
+- Credential chain order in Rust SDK
+- Passing credential via `Arc<dyn TokenCredential>`
+- Error handling with `azure_core::Error`
+
+## Context
+
+DefaultAzureCredential is the recommended starting point for Azure SDK authentication.
+It abstracts away the complexity of credential selection and works across environments.
+This tests whether the Rust docs explain it clearly enough for first-time users.

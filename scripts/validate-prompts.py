@@ -21,12 +21,14 @@ REQUIRED_FIELDS = [
 VALID_SERVICES = [
     "storage", "key-vault", "cosmos-db", "event-hubs",
     "app-configuration", "purview", "digital-twins",
+    "identity", "resource-manager",
 ]
 VALID_PLANES = ["data-plane", "management-plane"]
 VALID_LANGUAGES = ["dotnet", "java", "js-ts", "python", "go", "rust", "cpp"]
 VALID_CATEGORIES = [
     "authentication", "pagination", "polling", "retries",
     "error-handling", "crud", "batch", "streaming",
+    "auth", "provisioning",
 ]
 VALID_DIFFICULTIES = ["basic", "intermediate", "advanced"]
 

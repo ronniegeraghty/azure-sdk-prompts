@@ -1,16 +1,545 @@
-generated_at: '2026-03-19T00:14:30.048897+00:00'
-prompt_count: 3
+generated_at: '2026-03-19T00:31:18.766320+00:00'
+prompt_count: 35
 services:
+- identity
 - key-vault
+- resource-manager
 - storage
 languages:
+- cpp
 - dotnet
+- go
+- java
+- js-ts
 - python
+- rust
 categories:
+- auth
 - authentication
 - crud
 - pagination
+- provisioning
 prompts:
+- id: identity-dp-cpp-default-credential
+  service: identity
+  plane: data-plane
+  language: cpp
+  category: auth
+  difficulty: basic
+  description: 'Can a developer set up DefaultAzureCredential for Azure SDK clients
+    using the C++ SDK documentation?
+
+    '
+  sdk_package: azure-identity-cpp
+  api_version: 1.x
+  doc_url: https://github.com/Azure/azure-sdk-for-cpp/tree/main/sdk/identity/azure-identity
+  tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/cpp/default-azure-credential.prompt.md
+- id: identity-dp-cpp-managed-identity
+  service: identity
+  plane: data-plane
+  language: cpp
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer use Managed Identity to authenticate Azure SDK clients
+    using the C++ SDK documentation?
+
+    '
+  sdk_package: azure-identity-cpp
+  api_version: 1.x
+  doc_url: https://github.com/Azure/azure-sdk-for-cpp/tree/main/sdk/identity/azure-identity
+  tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/cpp/managed-identity-auth.prompt.md
+- id: identity-dp-cpp-service-principal
+  service: identity
+  plane: data-plane
+  language: cpp
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer authenticate with a Service Principal (client secret)
+    using the C++ SDK documentation?
+
+    '
+  sdk_package: azure-identity-cpp
+  api_version: 1.x
+  doc_url: https://github.com/Azure/azure-sdk-for-cpp/tree/main/sdk/identity/azure-identity
+  tags:
+  - authentication
+  - service-principal
+  - client-secret
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/cpp/service-principal-auth.prompt.md
+- id: identity-dp-dotnet-default-credential
+  service: identity
+  plane: data-plane
+  language: dotnet
+  category: auth
+  difficulty: basic
+  description: 'Can a developer set up DefaultAzureCredential for Azure SDK clients
+    using the .NET SDK documentation?
+
+    '
+  sdk_package: Azure.Identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/dotnet/azure/sdk/authentication/
+  tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/dotnet/default-azure-credential.prompt.md
+- id: identity-dp-dotnet-managed-identity
+  service: identity
+  plane: data-plane
+  language: dotnet
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer use Managed Identity to authenticate Azure SDK clients
+    using the .NET SDK documentation?
+
+    '
+  sdk_package: Azure.Identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/dotnet/azure/sdk/authentication/
+  tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/dotnet/managed-identity-auth.prompt.md
+- id: identity-dp-dotnet-service-principal
+  service: identity
+  plane: data-plane
+  language: dotnet
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer authenticate with a Service Principal (client secret)
+    using the .NET SDK documentation?
+
+    '
+  sdk_package: Azure.Identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/dotnet/azure/sdk/authentication/
+  tags:
+  - authentication
+  - service-principal
+  - client-secret
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/dotnet/service-principal-auth.prompt.md
+- id: identity-dp-go-default-credential
+  service: identity
+  plane: data-plane
+  language: go
+  category: auth
+  difficulty: basic
+  description: 'Can a developer set up DefaultAzureCredential for Azure SDK clients
+    using the Go SDK documentation?
+
+    '
+  sdk_package: github.com/Azure/azure-sdk-for-go/sdk/azidentity
+  api_version: 1.x
+  doc_url: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity
+  tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/go/default-azure-credential.prompt.md
+- id: identity-dp-go-managed-identity
+  service: identity
+  plane: data-plane
+  language: go
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer use Managed Identity to authenticate Azure SDK clients
+    using the Go SDK documentation?
+
+    '
+  sdk_package: github.com/Azure/azure-sdk-for-go/sdk/azidentity
+  api_version: 1.x
+  doc_url: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity
+  tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/go/managed-identity-auth.prompt.md
+- id: identity-dp-go-service-principal
+  service: identity
+  plane: data-plane
+  language: go
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer authenticate with a Service Principal (client secret)
+    using the Go SDK documentation?
+
+    '
+  sdk_package: github.com/Azure/azure-sdk-for-go/sdk/azidentity
+  api_version: 1.x
+  doc_url: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity
+  tags:
+  - authentication
+  - service-principal
+  - client-secret
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/go/service-principal-auth.prompt.md
+- id: identity-dp-java-default-credential
+  service: identity
+  plane: data-plane
+  language: java
+  category: auth
+  difficulty: basic
+  description: 'Can a developer set up DefaultAzureCredential for Azure SDK clients
+    using the Java SDK documentation?
+
+    '
+  sdk_package: azure-identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/azure/developer/java/sdk/identity
+  tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/java/default-azure-credential.prompt.md
+- id: identity-dp-java-managed-identity
+  service: identity
+  plane: data-plane
+  language: java
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer use Managed Identity to authenticate Azure SDK clients
+    using the Java SDK documentation?
+
+    '
+  sdk_package: azure-identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/azure/developer/java/sdk/identity
+  tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/java/managed-identity-auth.prompt.md
+- id: identity-dp-java-service-principal
+  service: identity
+  plane: data-plane
+  language: java
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer authenticate with a Service Principal (client secret)
+    using the Java SDK documentation?
+
+    '
+  sdk_package: azure-identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/azure/developer/java/sdk/identity
+  tags:
+  - authentication
+  - service-principal
+  - client-secret
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/java/service-principal-auth.prompt.md
+- id: identity-dp-js-ts-default-credential
+  service: identity
+  plane: data-plane
+  language: js-ts
+  category: auth
+  difficulty: basic
+  description: 'Can a developer set up DefaultAzureCredential for Azure SDK clients
+    using the JavaScript/TypeScript SDK documentation?
+
+    '
+  sdk_package: '@azure/identity'
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/identity-readme
+  tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/js-ts/default-azure-credential.prompt.md
+- id: identity-dp-js-ts-managed-identity
+  service: identity
+  plane: data-plane
+  language: js-ts
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer use Managed Identity to authenticate Azure SDK clients
+    using the JavaScript/TypeScript SDK documentation?
+
+    '
+  sdk_package: '@azure/identity'
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/identity-readme
+  tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/js-ts/managed-identity-auth.prompt.md
+- id: identity-dp-js-ts-service-principal
+  service: identity
+  plane: data-plane
+  language: js-ts
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer authenticate with a Service Principal (client secret)
+    using the JavaScript/TypeScript SDK documentation?
+
+    '
+  sdk_package: '@azure/identity'
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/identity-readme
+  tags:
+  - authentication
+  - service-principal
+  - client-secret
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/js-ts/service-principal-auth.prompt.md
+- id: identity-dp-python-default-credential
+  service: identity
+  plane: data-plane
+  language: python
+  category: auth
+  difficulty: basic
+  description: 'Can a developer set up DefaultAzureCredential for Azure SDK clients
+    using the Python SDK documentation?
+
+    '
+  sdk_package: azure-identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/identity-readme
+  tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/python/default-azure-credential.prompt.md
+- id: identity-dp-python-managed-identity
+  service: identity
+  plane: data-plane
+  language: python
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer use Managed Identity to authenticate Azure SDK clients
+    using the Python SDK documentation?
+
+    '
+  sdk_package: azure-identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/identity-readme
+  tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/python/managed-identity-auth.prompt.md
+- id: identity-dp-python-service-principal
+  service: identity
+  plane: data-plane
+  language: python
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer authenticate with a Service Principal (client secret)
+    using the Python SDK documentation?
+
+    '
+  sdk_package: azure-identity
+  api_version: 1.x
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/identity-readme
+  tags:
+  - authentication
+  - service-principal
+  - client-secret
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/python/service-principal-auth.prompt.md
+- id: identity-dp-rust-default-credential
+  service: identity
+  plane: data-plane
+  language: rust
+  category: auth
+  difficulty: basic
+  description: 'Can a developer set up DefaultAzureCredential for Azure SDK clients
+    using the Rust SDK documentation?
+
+    '
+  sdk_package: azure_identity
+  api_version: 1.x
+  doc_url: https://docs.rs/azure_identity/latest/azure_identity/
+  tags:
+  - authentication
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/rust/default-azure-credential.prompt.md
+- id: identity-dp-rust-managed-identity
+  service: identity
+  plane: data-plane
+  language: rust
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer use Managed Identity to authenticate Azure SDK clients
+    using the Rust SDK documentation?
+
+    '
+  sdk_package: azure_identity
+  api_version: 1.x
+  doc_url: https://docs.rs/azure_identity/latest/azure_identity/
+  tags:
+  - authentication
+  - managed-identity
+  - azure-hosted
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/rust/managed-identity-auth.prompt.md
+- id: identity-dp-rust-service-principal
+  service: identity
+  plane: data-plane
+  language: rust
+  category: auth
+  difficulty: intermediate
+  description: 'Can a developer authenticate with a Service Principal (client secret)
+    using the Rust SDK documentation?
+
+    '
+  sdk_package: azure_identity
+  api_version: 1.x
+  doc_url: https://docs.rs/azure_identity/latest/azure_identity/
+  tags:
+  - authentication
+  - service-principal
+  - client-secret
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/identity/data-plane/rust/service-principal-auth.prompt.md
+- id: key-vault-dp-cpp-crud
+  service: key-vault
+  plane: data-plane
+  language: cpp
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, read, update, and delete secrets in Azure
+    Key Vault using the C++ SDK based on the documentation alone?
+
+    '
+  sdk_package: azure-security-keyvault-secrets-cpp
+  api_version: '7.5'
+  doc_url: https://github.com/Azure/azure-sdk-for-cpp/tree/main/sdk/keyvault/azure-security-keyvault-secrets
+  tags:
+  - secrets
+  - crud
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/key-vault/data-plane/cpp/crud-secrets.prompt.md
+- id: key-vault-dp-dotnet-crud
+  service: key-vault
+  plane: data-plane
+  language: dotnet
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, read, update, and delete secrets in Azure
+    Key Vault using the .NET SDK based on the documentation alone?
+
+    '
+  sdk_package: Azure.Security.KeyVault.Secrets
+  api_version: '7.5'
+  doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-net
+  tags:
+  - secrets
+  - crud
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/key-vault/data-plane/dotnet/crud-secrets.prompt.md
+- id: key-vault-dp-go-crud
+  service: key-vault
+  plane: data-plane
+  language: go
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, read, update, and delete secrets in Azure
+    Key Vault using the Go SDK based on the documentation alone?
+
+    '
+  sdk_package: github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets
+  api_version: '7.5'
+  doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-go
+  tags:
+  - secrets
+  - crud
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/key-vault/data-plane/go/crud-secrets.prompt.md
+- id: key-vault-dp-java-crud
+  service: key-vault
+  plane: data-plane
+  language: java
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, read, update, and delete secrets in Azure
+    Key Vault using the Java SDK based on the documentation alone?
+
+    '
+  sdk_package: azure-security-keyvault-secrets
+  api_version: '7.5'
+  doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-java
+  tags:
+  - secrets
+  - crud
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/key-vault/data-plane/java/crud-secrets.prompt.md
+- id: key-vault-dp-js-ts-crud
+  service: key-vault
+  plane: data-plane
+  language: js-ts
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, read, update, and delete secrets in Azure
+    Key Vault using the JavaScript/TypeScript SDK based on the documentation alone?
+
+    '
+  sdk_package: '@azure/keyvault-secrets'
+  api_version: '7.5'
+  doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-node
+  tags:
+  - secrets
+  - crud
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/key-vault/data-plane/js-ts/crud-secrets.prompt.md
 - id: key-vault-dp-python-crud
   service: key-vault
   plane: data-plane
@@ -31,6 +560,89 @@ prompts:
   created: 2025-07-27
   author: ronniegeraghty
   path: prompts/key-vault/data-plane/python/crud-secrets.prompt.md
+- id: key-vault-dp-rust-crud
+  service: key-vault
+  plane: data-plane
+  language: rust
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, read, update, and delete secrets in Azure
+    Key Vault using the Rust SDK based on the documentation alone?
+
+    '
+  sdk_package: azure_security_keyvault_secrets
+  api_version: '7.5'
+  doc_url: https://github.com/Azure/azure-sdk-for-rust
+  tags:
+  - secrets
+  - crud
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/key-vault/data-plane/rust/crud-secrets.prompt.md
+- id: resource-manager-mp-dotnet-rg-crud
+  service: resource-manager
+  plane: management-plane
+  language: dotnet
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, list, update, and delete Azure Resource Groups
+    using the .NET management SDK documentation?
+
+    '
+  sdk_package: Azure.ResourceManager
+  api_version: '2024-03-01'
+  doc_url: https://learn.microsoft.com/en-us/dotnet/azure/sdk/resource-management
+  tags:
+  - resource-groups
+  - management-plane
+  - provisioning
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/resource-manager/management-plane/dotnet/resource-group-crud.prompt.md
+- id: resource-manager-mp-java-rg-crud
+  service: resource-manager
+  plane: management-plane
+  language: java
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, list, update, and delete Azure Resource Groups
+    using the Java management SDK documentation?
+
+    '
+  sdk_package: azure-resourcemanager-resources
+  api_version: '2024-03-01'
+  doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/resourcemanager-resources-readme
+  tags:
+  - resource-groups
+  - management-plane
+  - provisioning
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/resource-manager/management-plane/java/resource-group-crud.prompt.md
+- id: resource-manager-mp-python-rg-crud
+  service: resource-manager
+  plane: management-plane
+  language: python
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, list, update, and delete Azure Resource Groups
+    using the Python management SDK documentation?
+
+    '
+  sdk_package: azure-mgmt-resource
+  api_version: '2024-03-01'
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/resourcemanager-resources-readme
+  tags:
+  - resource-groups
+  - management-plane
+  - provisioning
+  - getting-started
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/resource-manager/management-plane/python/resource-group-crud.prompt.md
 - id: storage-dp-dotnet-auth
   service: storage
   plane: data-plane
@@ -72,3 +684,43 @@ prompts:
   created: 2025-07-27
   author: ronniegeraghty
   path: prompts/storage/data-plane/python/pagination-list-blobs.prompt.md
+- id: storage-mp-dotnet-account-mgmt
+  service: storage
+  plane: management-plane
+  language: dotnet
+  category: provisioning
+  difficulty: intermediate
+  description: 'Can a developer create, configure, and manage Azure Storage Accounts
+    using the .NET management SDK documentation?
+
+    '
+  sdk_package: Azure.ResourceManager.Storage
+  api_version: '2023-05-01'
+  doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/resourcemanager.storage-readme
+  tags:
+  - storage-account
+  - management-plane
+  - provisioning
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/storage/management-plane/dotnet/storage-account-mgmt.prompt.md
+- id: storage-mp-python-account-mgmt
+  service: storage
+  plane: management-plane
+  language: python
+  category: provisioning
+  difficulty: intermediate
+  description: 'Can a developer create, configure, and manage Azure Storage Accounts
+    using the Python management SDK documentation?
+
+    '
+  sdk_package: azure-mgmt-storage
+  api_version: '2023-05-01'
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/mgmt-storage-readme
+  tags:
+  - storage-account
+  - management-plane
+  - provisioning
+  created: 2025-07-28
+  author: ronniegeraghty
+  path: prompts/storage/management-plane/python/storage-account-mgmt.prompt.md
