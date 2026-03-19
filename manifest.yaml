@@ -1,0 +1,74 @@
+generated_at: '2026-03-19T00:14:30.048897+00:00'
+prompt_count: 3
+services:
+- key-vault
+- storage
+languages:
+- dotnet
+- python
+categories:
+- authentication
+- crud
+- pagination
+prompts:
+- id: key-vault-dp-python-crud
+  service: key-vault
+  plane: data-plane
+  language: python
+  category: crud
+  difficulty: basic
+  description: 'Can a developer create, read, update, and delete secrets in Azure
+    Key Vault using the Python SDK based on the documentation alone?
+
+    '
+  sdk_package: azure-keyvault-secrets
+  api_version: '7.5'
+  doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-python
+  tags:
+  - secrets
+  - crud
+  - getting-started
+  created: 2025-07-27
+  author: ronniegeraghty
+  path: prompts/key-vault/data-plane/python/crud-secrets.prompt.md
+- id: storage-dp-dotnet-auth
+  service: storage
+  plane: data-plane
+  language: dotnet
+  category: authentication
+  difficulty: basic
+  description: 'Can the docs help a developer authenticate to Azure Blob Storage using
+    DefaultAzureCredential in .NET?
+
+    '
+  sdk_package: Azure.Storage.Blobs
+  api_version: '2024-11-04'
+  doc_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-dotnet-get-started
+  tags:
+  - identity
+  - default-azure-credential
+  - getting-started
+  created: 2025-07-27
+  author: ronniegeraghty
+  path: prompts/storage/data-plane/dotnet/authentication.prompt.md
+- id: storage-dp-python-pagination
+  service: storage
+  plane: data-plane
+  language: python
+  category: pagination
+  difficulty: intermediate
+  description: 'Can a developer correctly paginate through a large list of blobs in
+    Azure Storage using the Python SDK based on docs alone?
+
+    '
+  sdk_package: azure-storage-blob
+  api_version: '2024-11-04'
+  doc_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-list-python
+  tags:
+  - blob
+  - pagination
+  - list-blobs
+  - continuation-token
+  created: 2025-07-27
+  author: ronniegeraghty
+  path: prompts/storage/data-plane/python/pagination-list-blobs.prompt.md
