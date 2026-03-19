@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This plan describes a new Go-based evaluation tool for testing how well AI agents write and update Azure SDK code. It replaces the current approach of using `doc-agent evaluate` (from the doc-review-agent), which suffers from shell-probing loops and is architecturally mismatched — it's designed for testing documentation execution, not code generation quality.
+This plan describes a new Go-based evaluation tool for testing how well AI agents write and update Azure SDK code. The tool is developed directly within the `ronniegeraghty/azure-sdk-prompts` repo alongside the existing prompt library and Python scripts. It replaces the current approach of using `doc-agent evaluate` (from the doc-review-agent), which suffers from shell-probing loops and is architecturally mismatched — it's designed for testing documentation execution, not code generation quality.
 
 The new tool uses the **GitHub Copilot SDK for Go** (`github.com/github/copilot-sdk/go`) to programmatically create Copilot sessions, send prompts, capture generated code, verify builds, optionally generate and run tests, and score results via LLM-as-judge review. A key differentiator is the **tool configuration matrix**: each prompt can be tested against multiple configurations (different MCP servers, skills, tool sets) to measure how tooling affects code quality.
 
@@ -33,16 +33,11 @@ The new tool uses the **GitHub Copilot SDK for Go** (`github.com/github/copilot-
 
 ## 1. Prompt System
 
-### 1.1 Relationship to `azure-sdk-prompts`
+### 1.1 Prompt Library (Same Repo)
 
-The existing `ronniegeraghty/azure-sdk-prompts` repo already has 57+ prompts organized by service/language/plane/category with YAML frontmatter. The new tool should consume these prompts directly rather than duplicating them.
+This repo (`ronniegeraghty/azure-sdk-prompts`) already has 57+ prompts organized by service/language/plane/category with YAML frontmatter. The Go eval tool lives in the same repo and reads prompts directly from the `prompts/` directory — no separate clone or config path required.
 
-**Recommended approach:** Keep `azure-sdk-prompts` as the canonical prompt library but extend its schema. The eval tool reads prompts from a local clone of that repo (or a configurable directory).
-
-```
-# In the eval tool's config:
-prompt_library: ~/projects/azure-sdk-prompts/prompts
-```
+By default the tool looks for `./prompts` relative to the repo root. An override flag (`--prompts`) is available for pointing at alternative prompt directories during development.
 
 ### 1.2 Extended Frontmatter Schema
 
@@ -208,10 +203,10 @@ Write all code to the current working directory.`,
 
 ### 3.1 Matrix Definition (YAML)
 
-Define configurations in a YAML file (`configs.yaml`):
+Define configurations in a YAML file (`configs/default.yaml`):
 
 ```yaml
-# configs.yaml — Tool configuration matrix
+# configs/default.yaml — Tool configuration matrix
 configs:
   - name: baseline
     description: "No MCP servers, no skills — just base Copilot"
@@ -561,7 +556,7 @@ sdk-eval version              # Print version
 
 ```bash
 sdk-eval run \
-  --prompts ~/projects/azure-sdk-prompts/prompts \
+  --prompts ./prompts \
   --service storage \
   --language dotnet \
   --plane data-plane \
@@ -569,7 +564,7 @@ sdk-eval run \
   --tags identity \
   --prompt-id storage-dp-dotnet-auth \
   --config baseline,azure-mcp \
-  --config-file ./configs.yaml \
+  --config-file ./configs/default.yaml \
   --workers 4 \
   --timeout 300 \
   --model claude-sonnet-4.5 \
@@ -590,7 +585,7 @@ sdk-eval run \
 | `--tags` | Filter by tags (comma-separated) | (all) |
 | `--prompt-id` | Run a single prompt by ID | (all) |
 | `--config` | Config name(s) from config file | (all configs) |
-| `--config-file` | Path to configuration YAML | `./configs.yaml` |
+| `--config-file` | Path to configuration YAML | `./configs/default.yaml` |
 | `--workers` | Parallel workers | `4` |
 | `--timeout` | Per-prompt timeout (seconds) | `300` |
 | `--model` | Override model for all configs | (per-config) |
@@ -603,7 +598,7 @@ sdk-eval run \
 ### 8.3 Progress Output
 
 ```
-sdk-eval run --service storage --config baseline,azure-mcp
+sdk-eval run --service storage --config baseline,azure-mcp --config-file ./configs/default.yaml
 
 Running 8 prompts × 2 configs = 16 evaluations (4 workers)
 
@@ -669,72 +664,86 @@ The doc-review-agent uses `gh auth login` credentials (via the `GH_TOKEN` env va
 
 ## 10. Repo Structure
 
-### 10.1 New Repository
+### 10.1 Monorepo Layout
 
-Create `ronniegeraghty/sdk-eval-tool` (or similar) as a standalone Go project.
+The Go eval tool lives in `ronniegeraghty/azure-sdk-prompts` alongside the prompt library, existing Python scripts, and reports. Everything ships from one repo.
 
 ```
-sdk-eval-tool/
-├── README.md
-├── LICENSE
-├── go.mod
-├── go.sum
-├── configs.yaml                    # Default tool configuration matrix
-├── cmd/
+azure-sdk-prompts/                     # ronniegeraghty/azure-sdk-prompts
+├── prompts/                           # Existing prompt library (57+ prompts)
+│   └── storage/
+│       └── data-plane/
+│           └── dotnet/
+│               ├── authentication.prompt.md
+│               ├── authentication.reference/
+│               └── authentication.starter/
+├── scripts/                           # Existing Python scripts
+│   ├── run-evals.py                   # Legacy Python eval runner
+│   └── ...
+├── cmd/                               # Go eval tool CLI entry point
 │   └── sdk-eval/
-│       └── main.go                 # CLI entry point (cobra or similar)
-├── internal/
+│       └── main.go
+├── internal/                          # Go eval tool packages
 │   ├── config/
-│   │   ├── config.go               # Config file parsing
+│   │   ├── config.go                  # Config file parsing
 │   │   └── config_test.go
 │   ├── prompt/
-│   │   ├── loader.go               # Load and filter prompts from directory
-│   │   ├── parser.go               # Parse YAML frontmatter
-│   │   ├── types.go                # Prompt struct definitions
+│   │   ├── loader.go                  # Load and filter prompts from directory
+│   │   ├── parser.go                  # Parse YAML frontmatter
+│   │   ├── types.go                   # Prompt struct definitions
 │   │   └── loader_test.go
-│   ├── eval/
-│   │   ├── engine.go               # Core evaluation orchestrator
-│   │   ├── session.go              # Copilot session management
-│   │   ├── workspace.go            # Workspace setup/teardown
-│   │   ├── events.go               # Event capture and processing
+│   ├── engine/
+│   │   ├── engine.go                  # Core evaluation orchestrator
+│   │   ├── session.go                 # Copilot session management
+│   │   ├── workspace.go               # Workspace setup/teardown
+│   │   ├── events.go                  # Event capture and processing
 │   │   └── engine_test.go
 │   ├── build/
-│   │   ├── verifier.go             # Language-specific build verification
-│   │   ├── languages.go            # Language detection and commands
+│   │   ├── verifier.go                # Language-specific build verification
+│   │   ├── languages.go               # Language detection and commands
 │   │   └── verifier_test.go
 │   ├── review/
-│   │   ├── reviewer.go             # LLM-as-judge review session
-│   │   ├── rubric.go               # Review prompt construction
-│   │   ├── types.go                # ReviewResult types
+│   │   ├── reviewer.go                # LLM-as-judge review session
+│   │   ├── rubric.go                  # Review prompt construction
+│   │   ├── types.go                   # ReviewResult types
 │   │   └── reviewer_test.go
 │   ├── testgen/
-│   │   ├── generator.go            # Auto-test generation (stretch goal)
-│   │   ├── runner.go               # Test execution
+│   │   ├── generator.go               # Auto-test generation (stretch goal)
+│   │   ├── runner.go                  # Test execution
 │   │   └── types.go
 │   └── report/
-│       ├── generator.go            # Report generation
-│       ├── html.go                 # HTML template rendering
-│       ├── markdown.go             # Markdown report generation
-│       ├── summary.go              # Cross-config summary
-│       ├── templates/              # HTML templates
+│       ├── generator.go               # Report generation
+│       ├── html.go                    # HTML template rendering
+│       ├── markdown.go                # Markdown report generation
+│       ├── summary.go                 # Cross-config summary
+│       ├── templates/                 # HTML templates
 │       │   ├── report.html.tmpl
 │       │   └── summary.html.tmpl
 │       └── generator_test.go
-├── skills/                         # Bundled skills for eval configs
+├── configs/                           # Tool configuration matrix YAML files
+│   └── default.yaml
+├── reports/                           # Evaluation reports (existing + new)
+│   └── runs/
+├── docs/                              # Documentation
+│   └── eval-tool-plan.md              # This plan
+├── skills/                            # Bundled skills for eval configs
 │   └── azure-sdk/
 │       └── SKILL.md
-└── testdata/                       # Test fixtures
-    ├── prompts/
-    │   └── sample-prompt.prompt.md
-    └── configs/
-        └── test-config.yaml
+├── testdata/                          # Test fixtures for Go tests
+│   ├── prompts/
+│   │   └── sample-prompt.prompt.md
+│   └── configs/
+│       └── test-config.yaml
+├── go.mod
+├── go.sum
+└── ...
 ```
 
 ### 10.2 Dependencies
 
 ```
 go.mod:
-  module github.com/ronniegeraghty/sdk-eval-tool
+  module github.com/ronniegeraghty/azure-sdk-prompts
 
   require (
       github.com/github/copilot-sdk/go  latest
@@ -743,19 +752,20 @@ go.mod:
   )
 ```
 
-### 10.3 Relationship to azure-sdk-prompts
+### 10.3 Coexistence with Existing Python Scripts
 
-The eval tool and the prompt library are separate repos:
+The existing `scripts/run-evals.py` and the new Go eval tool coexist in the same repo:
 
-| Repo | Purpose |
-|---|---|
-| `ronniegeraghty/azure-sdk-prompts` | Prompt library (YAML frontmatter + prompt text) |
-| `ronniegeraghty/sdk-eval-tool` | Go evaluation engine (this tool) |
+| Component | Path | Purpose |
+|---|---|---|
+| Python eval runner | `scripts/run-evals.py` | Simpler/legacy eval runner — useful as a lightweight fallback |
+| Go eval tool | `cmd/sdk-eval/` + `internal/` | Full-featured eval engine with build verification, LLM-as-judge, and tool matrix |
+| Prompt library | `prompts/` | Shared prompt library consumed by both tools |
+| Reports | `reports/` | Shared output directory for both tools |
 
-The eval tool takes `--prompts` flag pointing to the prompt library. This separation means:
-- Prompts can be updated independently
-- The tool can be used with different prompt libraries
-- Multiple people can contribute prompts without touching the eval engine
+The Go tool is the primary eval runner going forward. The Python script remains available as a simpler alternative for quick one-off evaluations or as a fallback. Both tools read from the same `prompts/` directory and write to the same `reports/` directory.
+
+Over time, the Go tool supersedes the Python script for most use cases, but there is no urgency to remove the Python script — they coexist without conflict.
 
 ---
 
@@ -845,12 +855,14 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 
 ## 13. Implementation Phases
 
+All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
+
 ### Phase 1: Foundation (MVP)
-- [ ] Project scaffolding (Go module, CLI framework, config parsing)
-- [ ] Prompt loader (read and filter prompts from directory)
+- [ ] Project scaffolding (`go.mod`, `cmd/sdk-eval/`, `internal/` packages, CLI framework)
+- [ ] Prompt loader (read and filter prompts from `./prompts`)
 - [ ] Basic evaluation engine (create session, send prompt, capture events)
 - [ ] Build verification (all languages)
-- [ ] JSON report generation
+- [ ] JSON report generation to `./reports`
 - [ ] CLI with filter flags, `--workers`, `--dry-run`
 
 ### Phase 2: Quality Signals
@@ -860,7 +872,7 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 - [ ] Cross-config comparison summary
 
 ### Phase 3: Tool Matrix
-- [ ] Configuration matrix YAML parsing
+- [ ] Configuration matrix YAML parsing (`configs/` directory)
 - [ ] MCP server attachment per config
 - [ ] Skill loading per config
 - [ ] Tool filtering per config
@@ -877,12 +889,13 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 - [ ] `sdk-eval report` command for re-viewing past runs
 - [ ] Progress bars and color output
 - [ ] CI/CD documentation (env var auth)
+- [ ] Deprecation path for `scripts/run-evals.py` (document migration guide)
 
 ---
 
 ## 14. Open Questions
 
-1. **Prompt schema migration:** How to update existing prompts in `azure-sdk-prompts` to include the new fields without breaking the existing `run-evals.py` script? Recommendation: make new fields optional with sensible defaults.
+1. **Prompt schema migration:** The new eval-specific frontmatter fields (`project_context`, `reference_answer`, `timeout`, `expected_packages`) must be optional with sensible defaults so existing prompts work unchanged with both the Python `run-evals.py` and the Go eval tool.
 
 2. **Shared vs. separate Copilot client:** Should all workers share one client (one CLI process, multiple sessions) or each get their own? The SDK supports multiple sessions per client, but isolated clients per worker is simpler and avoids shared state. Start with isolated clients; optimize later if resource usage is a concern.
 
@@ -891,6 +904,8 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 4. **Model selection for review:** Should the review model be the same as the generation model, or always use a specific "reviewer" model? Recommendation: default to the same model but allow override in the config file via a `review_model` field.
 
 5. **Cost management:** Each eval consumes premium requests. With 57 prompts × 3 configs × (generation + review) = ~342 API calls per full run. Add `--budget N` flag to cap total evaluations?
+
+6. **Go module vs. existing repo tooling:** The repo currently has `package.json` / `node_modules` for existing scripts. Adding `go.mod` / `go.sum` at the root creates a polyglot repo. Ensure `.gitignore` covers Go build artifacts and that CI workflows handle both ecosystems.
 
 ---
 
@@ -904,6 +919,7 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 | Generated code has dependencies we can't install | Timeout on `dotnet restore` / `npm install`; record as build failure |
 | Review scoring inconsistency | Use structured JSON output format; validate against schema |
 | Large workspace directories from agent | Set workspace size limit; clean up after each eval |
+| Polyglot repo complexity (Go + Python + Node) | Clear directory boundaries (`cmd/`, `internal/` for Go; `scripts/` for Python); separate CI jobs per ecosystem |
 
 ---
 
