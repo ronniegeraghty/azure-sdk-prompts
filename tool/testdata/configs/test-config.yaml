@@ -1,0 +1,8 @@
+configs:
+  - name: test-only
+    description: "Minimal test configuration"
+    model: "gpt-4"
+    mcp_servers: {}
+    skill_directories: []
+    available_tools: []
+    excluded_tools: []

@@ -87,6 +87,12 @@ azure-sdk-prompts/
 │       └── data-plane/
 │           └── python/
 │               └── crud-secrets.prompt.md
+├── tool/                              # Go eval tool (sdk-eval)
+│   ├── cmd/sdk-eval/main.go           # CLI entry point
+│   ├── configs.yaml                   # Default tool configuration matrix
+│   ├── go.mod / go.sum
+│   ├── internal/                      # config, prompt, eval, build, report
+│   └── testdata/                      # Test fixtures
 ├── scripts/
 │   ├── run-evals.py                   # Evaluation runner with composable filters
 │   ├── generate-manifest.py           # Regenerate manifest.yaml from prompts
@@ -123,11 +129,34 @@ Every prompt uses YAML frontmatter for filtering and indexing:
 | `created` | ✅ | Date (YYYY-MM-DD) |
 | `author` | ✅ | GitHub username |
 
+## SDK Eval Tool (Go)
+
+The `tool/` directory contains a Go-based evaluation engine (`sdk-eval`) that runs prompts through the Copilot SDK, verifies builds, and generates JSON reports. It replaces the Python `run-evals.py` for scenarios requiring configurable MCP servers, multi-config matrix testing, and structured scoring.
+
+### Building and Running
+
+```bash
+cd tool
+go build ./cmd/sdk-eval
+
+# List prompts (uses the parent prompts/ directory)
+./sdk-eval list --prompts ../prompts
+
+# Run evaluations
+./sdk-eval run --prompts ../prompts --language dotnet --config baseline
+
+# See all configs
+./sdk-eval configs
+```
+
+See [`tool/README.md`](tool/README.md) for full CLI reference and configuration details.
+
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.9+ (for scripts)
 - [doc-review-agent](https://github.com/coreai-microsoft/doc-review-agent) CLI (`doc-agent`) installed
 - PyYAML: `pip install pyyaml`
+- Go 1.24+ (for the eval tool in `tool/`)
 
 ## License
 
