@@ -9,7 +9,9 @@ import (
 
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/config"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/eval"
+"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/manifest"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
+"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/validate"
 "github.com/spf13/cobra"
 )
 
@@ -32,8 +34,41 @@ root.AddCommand(runCmd())
 root.AddCommand(listCmd())
 root.AddCommand(configsCmd())
 root.AddCommand(versionCmd())
+root.AddCommand(manifestCmd())
+root.AddCommand(validateCmd())
 
 return root
+}
+
+// resolvePathFlag returns the flag value if explicitly set by the user,
+// otherwise tries the candidate paths in order, falling back to the default.
+func resolvePathFlag(cmd *cobra.Command, flagName string, candidates []string) string {
+if cmd.Flags().Changed(flagName) {
+val, _ := cmd.Flags().GetString(flagName)
+return val
+}
+for _, c := range candidates {
+if info, err := os.Stat(c); err == nil && info.IsDir() || err == nil {
+return c
+}
+}
+val, _ := cmd.Flags().GetString(flagName)
+return val
+}
+
+// resolvePromptsDir resolves the --prompts flag with auto-detection.
+func resolvePromptsDir(cmd *cobra.Command) string {
+return resolvePathFlag(cmd, "prompts", []string{"./prompts", "../prompts"})
+}
+
+// resolveConfigFile resolves the --config-file flag with auto-detection.
+func resolveConfigFile(cmd *cobra.Command) string {
+return resolvePathFlag(cmd, "config-file", []string{"./configs.yaml", "../configs.yaml"})
+}
+
+// resolveOutputFile resolves the --output flag with auto-detection for file paths.
+func resolveOutputFile(cmd *cobra.Command, candidates []string) string {
+return resolvePathFlag(cmd, "output", candidates)
 }
 
 type runFlags struct {
@@ -101,6 +136,9 @@ Use:   "run",
 Short: "Run evaluations",
 Long:  "Run evaluations with optional filters against the prompt library.",
 RunE: func(cmd *cobra.Command, args []string) error {
+f.prompts = resolvePromptsDir(cmd)
+f.configFile = resolveConfigFile(cmd)
+
 // Load config
 cfgFile, err := config.Load(f.configFile)
 if err != nil {
@@ -183,6 +221,8 @@ Use:   "list",
 Short: "List matching prompts",
 Long:  "List prompts matching the given filters (dry-run equivalent).",
 RunE: func(cmd *cobra.Command, args []string) error {
+f.prompts = resolvePromptsDir(cmd)
+
 prompts, err := prompt.LoadPrompts(f.prompts)
 if err != nil {
 return fmt.Errorf("loading prompts: %w", err)
@@ -218,6 +258,8 @@ cmd := &cobra.Command{
 Use:   "configs",
 Short: "List available configurations",
 RunE: func(cmd *cobra.Command, args []string) error {
+configFile = resolveConfigFile(cmd)
+
 cfgFile, err := config.Load(configFile)
 if err != nil {
 return fmt.Errorf("loading config: %w", err)
@@ -240,6 +282,70 @@ return nil
 }
 
 cmd.Flags().StringVar(&configFile, "config-file", "./configs.yaml", "Path to configuration YAML")
+return cmd
+}
+
+func manifestCmd() *cobra.Command {
+var promptsDir string
+var outputPath string
+
+cmd := &cobra.Command{
+Use:   "manifest",
+Short: "Regenerate manifest.yaml from prompt files",
+Long:  "Scan the prompts directory and generate a manifest.yaml with metadata about all prompts.",
+RunE: func(cmd *cobra.Command, args []string) error {
+promptsDir = resolvePromptsDir(cmd)
+outputPath = resolveOutputFile(cmd, []string{"./manifest.yaml", "../manifest.yaml"})
+
+m, err := manifest.Generate(promptsDir)
+if err != nil {
+return fmt.Errorf("generating manifest: %w", err)
+}
+
+data, err := m.Marshal()
+if err != nil {
+return fmt.Errorf("marshaling manifest: %w", err)
+}
+
+if err := os.WriteFile(outputPath, data, 0644); err != nil {
+return fmt.Errorf("writing manifest: %w", err)
+}
+
+fmt.Printf("Generated %s with %d prompt(s)\n", outputPath, m.PromptCount)
+return nil
+},
+}
+
+cmd.Flags().StringVar(&promptsDir, "prompts", "./prompts", "Path to prompt library directory")
+cmd.Flags().StringVar(&outputPath, "output", "./manifest.yaml", "Output path for manifest.yaml")
+return cmd
+}
+
+func validateCmd() *cobra.Command {
+var promptsDir string
+
+cmd := &cobra.Command{
+Use:   "validate",
+Short: "Validate prompt frontmatter",
+Long:  "Validate all prompt files against schema rules and naming conventions.",
+RunE: func(cmd *cobra.Command, args []string) error {
+promptsDir = resolvePromptsDir(cmd)
+
+result, err := validate.Validate(promptsDir)
+if err != nil {
+return fmt.Errorf("validation: %w", err)
+}
+
+fmt.Print(validate.FormatResult(result))
+
+if !result.OK() {
+os.Exit(1)
+}
+return nil
+},
+}
+
+cmd.Flags().StringVar(&promptsDir, "prompts", "./prompts", "Path to prompt library directory")
 return cmd
 }
 
