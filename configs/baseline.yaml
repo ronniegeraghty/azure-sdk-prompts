@@ -1,0 +1,8 @@
+configs:
+  - name: baseline
+    description: "No MCP servers, no skills — just base Copilot"
+    model: "claude-sonnet-4.5"
+    mcp_servers: {}
+    skill_directories: []
+    available_tools: []
+    excluded_tools: []

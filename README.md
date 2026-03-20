@@ -89,18 +89,44 @@ sdk-eval manifest
 
 ### Tool Configurations
 
-Evaluations can run prompts against different Copilot configurations (models, MCP servers, skills) defined in `configs.yaml`:
+Evaluations can run prompts against different Copilot configurations (models, MCP servers, skills) defined in the `configs/` directory:
 
 ```bash
 # List configs
 sdk-eval configs
 
-# Run with a specific config
+# Run with baseline only (no MCP, no skills)
+sdk-eval run --config-file configs/baseline.yaml --prompt-id storage-dp-dotnet-auth
+
+# Run with azure-mcp only
+sdk-eval run --config-file configs/azure-mcp.yaml --prompt-id storage-dp-dotnet-auth
+
+# Run matrix (both configs — default)
+sdk-eval run --prompt-id storage-dp-dotnet-auth
+
+# Run with a specific config name from the default config file
 sdk-eval run --config baseline
 
 # Run multiple configs (produces comparison data)
 sdk-eval run --config baseline,azure-mcp
 ```
+
+#### Custom Configs
+
+Create your own config YAML in the `configs/` directory:
+
+```yaml
+configs:
+  - name: my-custom-config
+    description: "My custom evaluation config"
+    model: "claude-sonnet-4.5"
+    mcp_servers: {}
+    skill_directories: []
+    available_tools: []
+    excluded_tools: []
+```
+
+Then run with: `sdk-eval run --config-file configs/my-custom-config.yaml`
 
 ## Adding a New Prompt
 
@@ -128,6 +154,10 @@ git commit -m "prompt: add <service> <plane> <language> <category>"
 azure-sdk-prompts/
 ├── README.md
 ├── manifest.yaml                      # Auto-generated prompt index
+├── configs/                           # Evaluation config matrix
+│   ├── all.yaml                       # Both configs (default for matrix runs)
+│   ├── baseline.yaml                  # No MCP, no skills — raw Copilot
+│   └── azure-mcp.yaml                # Azure MCP server attached
 ├── prompts/                           # Prompt library
 │   ├── storage/
 │   │   ├── data-plane/
@@ -141,7 +171,6 @@ azure-sdk-prompts/
 │       └── ...
 ├── tool/                              # Go eval tool (sdk-eval)
 │   ├── cmd/sdk-eval/main.go
-│   ├── configs.yaml                   # Tool configuration matrix
 │   ├── go.mod / go.sum
 │   ├── internal/                      # config, prompt, eval, build, report,
 │   │   │                              #   manifest, validate

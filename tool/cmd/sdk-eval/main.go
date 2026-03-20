@@ -63,7 +63,10 @@ return resolvePathFlag(cmd, "prompts", []string{"./prompts", "../prompts"})
 
 // resolveConfigFile resolves the --config-file flag with auto-detection.
 func resolveConfigFile(cmd *cobra.Command) string {
-return resolvePathFlag(cmd, "config-file", []string{"./configs.yaml", "../configs.yaml"})
+return resolvePathFlag(cmd, "config-file", []string{
+"./configs/all.yaml", "../configs/all.yaml",
+"./configs.yaml", "../configs.yaml",
+})
 }
 
 // resolveOutputFile resolves the --output flag with auto-detection for file paths.
@@ -100,7 +103,7 @@ cmd.Flags().StringVar(&f.category, "category", "", "Filter by use-case category"
 cmd.Flags().StringVar(&f.tags, "tags", "", "Filter by tags (comma-separated)")
 cmd.Flags().StringVar(&f.promptID, "prompt-id", "", "Run a single prompt by ID")
 cmd.Flags().StringVar(&f.configName, "config", "", "Config name(s) from config file (comma-separated)")
-cmd.Flags().StringVar(&f.configFile, "config-file", "./configs.yaml", "Path to configuration YAML")
+cmd.Flags().StringVar(&f.configFile, "config-file", "./configs/all.yaml", "Path to configuration YAML")
 cmd.Flags().IntVar(&f.workers, "workers", 4, "Parallel workers")
 cmd.Flags().IntVar(&f.timeout, "timeout", 300, "Per-prompt timeout in seconds")
 cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
@@ -281,7 +284,7 @@ return nil
 },
 }
 
-cmd.Flags().StringVar(&configFile, "config-file", "./configs.yaml", "Path to configuration YAML")
+cmd.Flags().StringVar(&configFile, "config-file", "./configs/all.yaml", "Path to configuration YAML")
 return cmd
 }
 

@@ -40,7 +40,7 @@ sdk-eval run [flags]
 | `--tags` | | Filter by tags (comma-separated) |
 | `--prompt-id` | | Run a single prompt by ID |
 | `--config` | all | Config name(s) (comma-separated) |
-| `--config-file` | `./configs.yaml` (auto-detected) | Path to configuration YAML |
+| `--config-file` | `./configs/all.yaml` (auto-detected) | Path to configuration YAML |
 | `--workers` | `4` | Parallel evaluation workers |
 | `--timeout` | `300` | Per-prompt timeout in seconds |
 | `--model` | | Override model for all configs |
@@ -147,7 +147,28 @@ Print the tool version.
 
 ## Configuration Matrix
 
-Configurations in `configs.yaml` define the Copilot environment for each evaluation:
+Configurations live in the `configs/` directory at the repo root. Each file defines one or more Copilot environments for evaluation:
+
+| File | Description |
+|------|-------------|
+| `configs/all.yaml` | Both configs — used for matrix runs (default) |
+| `configs/baseline.yaml` | No MCP servers, no skills — raw Copilot |
+| `configs/azure-mcp.yaml` | Azure MCP server attached |
+
+**Examples:**
+
+```bash
+# Run with baseline only
+sdk-eval run --config-file configs/baseline.yaml --prompt-id storage-dp-dotnet-auth
+
+# Run with azure-mcp only
+sdk-eval run --config-file configs/azure-mcp.yaml --prompt-id storage-dp-dotnet-auth
+
+# Run matrix (both configs — default)
+sdk-eval run --prompt-id storage-dp-dotnet-auth
+```
+
+**Sample config file:**
 
 ```yaml
 configs:
@@ -158,19 +179,14 @@ configs:
     skill_directories: []
     available_tools: []
     excluded_tools: []
+```
 
-  - name: azure-mcp
-    description: "Azure MCP server attached"
-    model: "claude-sonnet-4.5"
-    mcp_servers:
-      azure:
-        type: local
-        command: npx
-        args: ["-y", "@azure/mcp@latest"]
-        tools: ["*"]
-    skill_directories: []
-    available_tools: []
-    excluded_tools: []
+#### Creating Custom Configs
+
+Add a new YAML file to `configs/` following the same schema. Then reference it:
+
+```bash
+sdk-eval run --config-file configs/my-custom.yaml
 ```
 
 ### Config Fields
@@ -192,7 +208,7 @@ configs:
 | Flag | Candidates checked |
 |------|--------------------|
 | `--prompts` | `./prompts` → `../prompts` |
-| `--config-file` | `./configs.yaml` → `../configs.yaml` |
+| `--config-file` | `./configs/all.yaml` → `../configs/all.yaml` → `./configs.yaml` → `../configs.yaml` |
 | `--output` (manifest) | `./manifest.yaml` → `../manifest.yaml` |
 
 This means running from the repo root or the `tool/` directory both work without extra flags.
@@ -227,7 +243,6 @@ reports/runs/<timestamp>/
 ```
 tool/
 ├── cmd/sdk-eval/main.go        # CLI entry point (cobra)
-├── configs.yaml                 # Default configs
 ├── go.mod / go.sum
 ├── internal/
 │   ├── config/                  # Config file parsing
@@ -239,6 +254,8 @@ tool/
 │   └── validate/                # Prompt frontmatter validation
 └── testdata/                    # Test fixtures
 ```
+
+> **Note:** Config files have moved from `tool/configs.yaml` to the top-level `configs/` directory.
 
 ## Roadmap
 
