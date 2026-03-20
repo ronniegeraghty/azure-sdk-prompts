@@ -18,6 +18,8 @@ go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@latest
 sdk-eval <command> [flags]
 ```
 
+> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@tool/v0.1.0`
+
 ## Commands
 
 ### `sdk-eval run`
