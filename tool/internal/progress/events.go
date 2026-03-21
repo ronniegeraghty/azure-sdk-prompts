@@ -1,0 +1,35 @@
+package progress
+
+// EventType classifies a progress event.
+type EventType int
+
+const (
+	EventStarting      EventType = iota // Eval starting, waiting for session
+	EventSendingPrompt                  // Sending prompt to Copilot
+	EventReasoning                      // LLM is reasoning
+	EventToolStart                      // Tool call initiated
+	EventToolComplete                   // Tool call finished
+	EventWritingFile                    // File write tool call
+	EventWaiting                        // Waiting between events
+	EventPassed                         // Eval passed
+	EventFailed                         // Eval failed
+	EventError                          // Eval errored
+)
+
+// ProgressEvent carries status from the eval engine or Copilot session to the display.
+type ProgressEvent struct {
+	EvalID     string    // Unique eval identifier (promptID/configName)
+	PromptID   string    // Prompt ID
+	ConfigName string    // Config name
+	Type       EventType // What happened
+	Message    string    // Human-readable activity description
+	FileCount  int       // Generated file count (for completion events)
+}
+
+// ProgressFunc receives progress events from evaluators.
+type ProgressFunc func(ProgressEvent)
+
+// Reporter is implemented by evaluators that support live progress updates.
+type Reporter interface {
+	SetProgressFunc(fn ProgressFunc)
+}

@@ -143,8 +143,17 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	start := time.Now()
 
-	// Progress display (disabled in debug mode)
-	bar := progress.New(len(tasks), e.opts.Workers, e.opts.Debug)
+	// Progress display (disabled in debug mode or when stdout is not a terminal)
+	display := progress.NewDisplay(progress.DisplayConfig{
+		Total:    len(tasks),
+		Workers:  e.opts.Workers,
+		Disabled: e.opts.Debug,
+	})
+
+	// Wire progress reporting if evaluator supports it
+	if pr, ok := e.evaluator.(progress.Reporter); ok && !e.opts.Debug {
+		pr.SetProgressFunc(display.HandleEvent)
+	}
 
 	sem := make(chan struct{}, e.opts.Workers)
 	var mu sync.Mutex
@@ -159,12 +168,32 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			defer func() { <-sem }()
 
 			taskName := t.Prompt.ID + "/" + t.Config.Name
-			bar.Start(taskName)
-			taskStart := time.Now()
+			display.HandleEvent(progress.ProgressEvent{
+				EvalID:     taskName,
+				PromptID:   t.Prompt.ID,
+				ConfigName: t.Config.Name,
+				Type:       progress.EventStarting,
+				Message:    "Waiting for session...",
+			})
 
 			evalReport := e.runSingleEval(ctx, t, runID)
 
-			bar.Complete(taskName, evalReport.Success, time.Since(taskStart), evalReport.Error != "")
+			evtType := progress.EventPassed
+			msg := ""
+			if evalReport.Error != "" {
+				evtType = progress.EventError
+				msg = "ERROR"
+			} else if !evalReport.Success {
+				evtType = progress.EventFailed
+			}
+			display.HandleEvent(progress.ProgressEvent{
+				EvalID:     taskName,
+				PromptID:   t.Prompt.ID,
+				ConfigName: t.Config.Name,
+				Type:       evtType,
+				Message:    msg,
+				FileCount:  len(evalReport.GeneratedFiles),
+			})
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -182,7 +211,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	wg.Wait()
-	bar.Done()
+	display.Done()
 
 	summary.Duration = time.Since(start).Seconds()
 

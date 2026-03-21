@@ -12,6 +12,7 @@ import (
 
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/config"
+	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/progress"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/report"
 )
@@ -20,6 +21,12 @@ import (
 type CopilotSDKEvaluator struct {
 	clientOpts *copilot.ClientOptions
 	debug      bool
+	progressFn progress.ProgressFunc
+}
+
+// SetProgressFunc registers a callback for live progress updates.
+func (e *CopilotSDKEvaluator) SetProgressFunc(fn progress.ProgressFunc) {
+	e.progressFn = fn
 }
 
 // CopilotEvalOptions configures the CopilotSDKEvaluator.
@@ -144,6 +151,59 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		sessionRecords = append(sessionRecords, rec)
 		mu.Unlock()
 
+		// Forward progress events to display
+		if e.progressFn != nil {
+			evalID := debugPrefix
+			switch event.Type {
+			case copilot.SessionEventTypeToolExecutionStart:
+				toolName := ""
+				if event.Data.ToolName != nil {
+					toolName = *event.Data.ToolName
+				}
+				if isFileWriteTool(toolName) {
+					arg := toolArgSummary(event)
+					e.progressFn(progress.ProgressEvent{
+						EvalID: evalID, PromptID: p.ID, ConfigName: cfg.Name,
+						Type:    progress.EventWritingFile,
+						Message: toolName + " → " + arg,
+					})
+				} else {
+					arg := toolArgSummary(event)
+					msg := toolName
+					if arg != "" {
+						msg = toolName + " → " + arg
+					}
+					e.progressFn(progress.ProgressEvent{
+						EvalID: evalID, PromptID: p.ID, ConfigName: cfg.Name,
+						Type:    progress.EventToolStart,
+						Message: msg,
+					})
+				}
+			case copilot.SessionEventTypeToolExecutionComplete:
+				toolName := ""
+				if event.Data.ToolName != nil {
+					toolName = *event.Data.ToolName
+				}
+				e.progressFn(progress.ProgressEvent{
+					EvalID: evalID, PromptID: p.ID, ConfigName: cfg.Name,
+					Type:    progress.EventToolComplete,
+					Message: toolName,
+				})
+			case copilot.SessionEventTypeAssistantMessage:
+				content := ""
+				if event.Data.Content != nil {
+					content = *event.Data.Content
+				}
+				if content != "" {
+					e.progressFn(progress.ProgressEvent{
+						EvalID: evalID, PromptID: p.ID, ConfigName: cfg.Name,
+						Type:    progress.EventReasoning,
+						Message: "Reasoning...",
+					})
+				}
+			}
+		}
+
 		// Debug logging to stderr — all event types
 		if e.debug {
 			switch event.Type {
@@ -199,6 +259,13 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	defer unsub()
 
 	// Send the prompt
+	if e.progressFn != nil {
+		e.progressFn(progress.ProgressEvent{
+			EvalID: debugPrefix, PromptID: p.ID, ConfigName: cfg.Name,
+			Type:    progress.EventSendingPrompt,
+			Message: fmt.Sprintf("Sending prompt (%d chars)...", len(p.PromptText)),
+		})
+	}
 	if e.debug {
 		log.Printf("[DEBUG] %s: → Sending prompt (%d chars)...", debugPrefix, len(p.PromptText))
 	}
@@ -409,4 +476,36 @@ func copyDir(src, dst string) error {
 		}
 		return os.WriteFile(target, data, info.Mode())
 	})
+}
+
+// isFileWriteTool returns true for tools that create or modify files.
+func isFileWriteTool(name string) bool {
+	switch name {
+	case "create", "edit", "write_file", "create_file",
+		"insert_edit_into_file", "write_to_file":
+		return true
+	}
+	return false
+}
+
+// toolArgSummary extracts a short summary of the tool's primary argument.
+func toolArgSummary(event copilot.SessionEvent) string {
+	if event.Data.Path != nil && *event.Data.Path != "" {
+		return filepath.Base(*event.Data.Path)
+	}
+	if event.Data.Arguments != nil {
+		if args, ok := event.Data.Arguments.(map[string]interface{}); ok {
+			for _, key := range []string{"path", "file", "command"} {
+				if v, ok := args[key]; ok {
+					if s, ok := v.(string); ok && s != "" {
+						if key == "path" || key == "file" {
+							return filepath.Base(s)
+						}
+						return truncateStr(s, 40)
+					}
+				}
+			}
+		}
+	}
+	return ""
 }
