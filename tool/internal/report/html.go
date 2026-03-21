@@ -86,12 +86,15 @@ type MatrixData struct {
 
 // MatrixCell holds the data for one cell in the matrix.
 type MatrixCell struct {
-	Success   bool
-	Score     int
-	BuildPass bool
-	HasReview bool
-	Duration  float64
-	Error     string
+	Success    bool
+	Score      int
+	BuildPass  bool
+	HasReview  bool
+	Duration   float64
+	Error      string
+	FileCount  int
+	ToolCalls  []string
+	ReportLink string
 }
 
 func buildMatrix(s *RunSummary) *MatrixData {
@@ -117,9 +120,11 @@ func buildMatrix(s *RunSummary) *MatrixData {
 		}
 
 		cell := &MatrixCell{
-			Success:  r.Success,
-			Duration: r.Duration,
-			Error:    r.Error,
+			Success:   r.Success,
+			Duration:  r.Duration,
+			Error:     r.Error,
+			FileCount: len(r.GeneratedFiles),
+			ToolCalls: r.ToolCalls,
 		}
 		if r.Build != nil {
 			cell.BuildPass = r.Build.Success
@@ -127,6 +132,14 @@ func buildMatrix(s *RunSummary) *MatrixData {
 		if r.Review != nil {
 			cell.Score = r.Review.OverallScore
 			cell.HasReview = true
+		}
+		// Build relative link from summary.html to individual report
+		service, _ := r.PromptMeta["service"].(string)
+		plane, _ := r.PromptMeta["plane"].(string)
+		language, _ := r.PromptMeta["language"].(string)
+		category, _ := r.PromptMeta["category"].(string)
+		if service != "" && plane != "" && language != "" && category != "" {
+			cell.ReportLink = filepath.Join("results", service, plane, language, category, r.ConfigName, "report.html")
 		}
 		m.Cells[r.PromptID][r.ConfigName] = cell
 	}
@@ -146,9 +159,14 @@ type ReportTemplateData struct {
 
 // ToolAction represents one tool invocation extracted from session events.
 type ToolAction struct {
-	Index    int
-	ToolName string
-	Args     string
+	Index     int
+	ToolName  string
+	Args      string
+	Result    string
+	Error     string
+	Success   *bool
+	Duration  float64
+	MCPServer string
 }
 
 // buildReportData extracts structured sections from session events.
@@ -178,10 +196,21 @@ func buildReportData(r *EvalReport) *ReportTemplateData {
 		case "tool.execution_start":
 			if ev.ToolName != "" {
 				d.ToolActions = append(d.ToolActions, ToolAction{
-					Index:    len(d.ToolActions) + 1,
-					ToolName: ev.ToolName,
-					Args:     ev.ToolArgs,
+					Index:     len(d.ToolActions) + 1,
+					ToolName:  ev.ToolName,
+					Args:      ev.ToolArgs,
+					MCPServer: ev.MCPServerName,
 				})
+			}
+		case "tool.execution_complete":
+			for i := len(d.ToolActions) - 1; i >= 0; i-- {
+				if d.ToolActions[i].ToolName == ev.ToolName && d.ToolActions[i].Result == "" && d.ToolActions[i].Error == "" {
+					d.ToolActions[i].Result = ev.ToolResult
+					d.ToolActions[i].Error = ev.Error
+					d.ToolActions[i].Success = ev.ToolSuccess
+					d.ToolActions[i].Duration = ev.Duration
+					break
+				}
 			}
 		}
 	}
@@ -223,6 +252,57 @@ func htmlFuncMap() template.FuncMap {
 			}
 			return s[:n] + "…"
 		},
+		"langClass": func(filename string) string {
+			ext := filepath.Ext(filename)
+			switch ext {
+			case ".py":
+				return "python"
+			case ".cs":
+				return "csharp"
+			case ".go":
+				return "go"
+			case ".js":
+				return "javascript"
+			case ".ts":
+				return "typescript"
+			case ".java":
+				return "java"
+			case ".json":
+				return "json"
+			case ".yaml", ".yml":
+				return "yaml"
+			case ".xml":
+				return "xml"
+			case ".md":
+				return "markdown"
+			case ".sh":
+				return "bash"
+			case ".ps1":
+				return "powershell"
+			default:
+				return ""
+			}
+		},
+		"hasPrefix": strings.HasPrefix,
+		"boolStr": func(b *bool) string {
+			if b == nil {
+				return ""
+			}
+			if *b {
+				return "✅"
+			}
+			return "❌"
+		},
+		"reportLink": func(r *EvalReport) string {
+			service, _ := r.PromptMeta["service"].(string)
+			plane, _ := r.PromptMeta["plane"].(string)
+			language, _ := r.PromptMeta["language"].(string)
+			category, _ := r.PromptMeta["category"].(string)
+			if service == "" || plane == "" || language == "" || category == "" {
+				return ""
+			}
+			return filepath.Join("results", service, plane, language, category, r.ConfigName, "report.html")
+		},
 	}
 }
 
@@ -233,9 +313,19 @@ const reportTemplate = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Eval Report: {{.PromptID}} / {{.ConfigName}}</title>
 <style>
-  :root { --green: #22c55e; --red: #ef4444; --yellow: #eab308; --orange: #f97316; --gray: #6b7280; --bg: #f8fafc; --card-bg: #fff; --border: #e2e8f0; --text: #0f172a; --text-muted: #64748b; }
+  :root { 
+    --green: #22c55e; --red: #ef4444; --yellow: #eab308; --orange: #f97316; 
+    --gray: #6b7280; --bg: #f8fafc; --card-bg: #fff; --border: #e2e8f0; 
+    --text: #0f172a; --text-muted: #64748b; --purple: #7c3aed; --blue: #2563eb;
+    --indigo: #4f46e5;
+  }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 960px; margin: 0 auto; padding: 2rem 1rem; color: var(--text); background: var(--bg); line-height: 1.6; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1000px; margin: 0 auto; padding: 2rem 1rem; color: var(--text); background: var(--bg); line-height: 1.6; }
+
+  /* Navigation */
+  .nav { margin-bottom: 1.5rem; }
+  .nav a { color: var(--blue); text-decoration: none; font-size: 0.9rem; }
+  .nav a:hover { text-decoration: underline; }
 
   /* Header */
   .report-header { margin-bottom: 2rem; }
@@ -266,13 +356,30 @@ const reportTemplate = `<!DOCTYPE html>
   /* Collapsible content */
   details { margin: 0.5rem 0; }
   details > summary { cursor: pointer; font-weight: 600; padding: 0.4rem 0; color: var(--text); user-select: none; }
-  details > summary:hover { color: #2563eb; }
+  details > summary:hover { color: var(--blue); }
   details[open] > summary { margin-bottom: 0.5rem; }
 
   /* Code / pre */
-  pre { background: #f1f5f9; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; margin: 0.5rem 0; white-space: pre-wrap; word-break: break-word; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; margin: 0.5rem 0; white-space: pre-wrap; word-break: break-word; }
   code { font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 0.85em; }
-  p code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+  p code, li code { background: #f1f5f9; color: var(--indigo); padding: 1px 5px; border-radius: 3px; }
+
+  /* Tool call cards */
+  .tool-card { background: #fafbfc; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.75rem; overflow: hidden; }
+  .tool-card-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; background: #f8fafc; }
+  .tool-card-header .tool-index { background: var(--indigo); color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+  .tool-card-header .tool-name { font-family: monospace; font-weight: 700; color: var(--purple); font-size: 0.95rem; }
+  .tool-card-header .tool-meta { margin-left: auto; display: flex; gap: 0.75rem; align-items: center; font-size: 0.8rem; color: var(--text-muted); }
+  .tool-card-body { padding: 0.75rem 1rem; }
+  .tool-card-body .tool-section-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  .tool-card-body pre { font-size: 0.8rem; margin: 0.25rem 0 0.75rem 0; max-height: 200px; overflow-y: auto; }
+  .tool-card-body details pre { max-height: 400px; }
+
+  /* File cards */
+  .file-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.75rem; overflow: hidden; }
+  .file-card-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: #1e293b; color: #e2e8f0; font-family: monospace; font-size: 0.85rem; }
+  .file-card-header .file-icon { opacity: 0.7; }
+  .file-card pre { margin: 0; border-radius: 0; }
 
   /* Scores grid */
   .scores-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
@@ -283,23 +390,15 @@ const reportTemplate = `<!DOCTYPE html>
   .overall-score .value { font-size: 2.5rem; font-weight: 700; }
   .overall-score .label { font-size: 0.85rem; color: var(--text-muted); }
 
-  /* Tool calls list */
-  .tool-list { list-style: none; padding: 0; margin: 0; }
-  .tool-list li { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
-  .tool-list li:last-child { border-bottom: none; }
-  .tool-num { color: var(--text-muted); font-size: 0.8rem; min-width: 1.5rem; }
-  .tool-name { font-family: monospace; font-weight: 600; color: #7c3aed; }
-  .tool-args { color: var(--text-muted); font-size: 0.85rem; }
-
-  /* Files list */
-  .files-list { list-style: none; padding: 0; margin: 0; }
-  .files-list li { padding: 0.3rem 0; font-family: monospace; font-size: 0.9rem; }
+  /* Strengths / issues */
+  .findings-list { padding-left: 1.25rem; margin: 0.5rem 0; }
+  .findings-list li { padding: 0.2rem 0; font-size: 0.9rem; }
 
   /* Event transcript */
   .event-row { display: flex; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; align-items: baseline; }
   .event-row:last-child { border-bottom: none; }
   .ev-type { font-weight: 600; color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; min-width: 10rem; flex-shrink: 0; }
-  .ev-tool { color: #7c3aed; font-weight: 600; }
+  .ev-tool { color: var(--purple); font-weight: 600; }
   .ev-content { color: var(--text); flex: 1; min-width: 0; }
   .ev-content pre { margin: 0.25rem 0; padding: 0.5rem; font-size: 0.8rem; }
   .ev-error { color: var(--red); }
@@ -313,12 +412,15 @@ const reportTemplate = `<!DOCTYPE html>
   .meta-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
   .meta-table td:first-child { font-weight: 600; width: 120px; color: var(--text-muted); }
 
-  /* Strengths / issues */
-  .findings-list { padding-left: 1.25rem; margin: 0.5rem 0; }
-  .findings-list li { padding: 0.2rem 0; font-size: 0.9rem; }
+  /* Verification */
+  .verify-banner { padding: 1rem; border-radius: 6px; margin-bottom: 0.75rem; }
+  .verify-pass { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .verify-fail { background: #fef2f2; border: 1px solid #fecaca; }
 </style>
 </head>
 <body>
+
+<div class="nav"><a href="../../../../../../summary.html">← Back to Summary</a></div>
 
 <div class="report-header">
   <h1>📋 {{.PromptID}}</h1>
@@ -337,6 +439,7 @@ const reportTemplate = `<!DOCTYPE html>
   {{if .Review}}<span class="meta-item">Score: <strong style="color:{{scoreColor .Review.OverallScore}}">{{.Review.OverallScore}}/10</strong></span>{{end}}
   <span class="meta-item">Duration: <strong>{{fmtDuration .Duration}}</strong></span>
   <span class="meta-item">Files: <strong>{{.FileCount}}</strong></span>
+  <span class="meta-item">Tool Calls: <strong>{{len .ToolActions}}</strong></span>
   {{if .IsStub}}<span class="badge badge-stub">STUB</span>{{end}}
 </div>
 
@@ -366,39 +469,80 @@ const reportTemplate = `<!DOCTYPE html>
     </details>
     {{end}}
 
-    {{if .ToolActions}}
-    <details open>
-      <summary>🔧 Tool Calls ({{len .ToolActions}})</summary>
-      <ol class="tool-list">
-        {{range .ToolActions}}<li><span class="tool-num">{{.Index}}.</span> <span class="tool-name">{{.ToolName}}</span>{{if .Args}} <span class="tool-args">{{.Args}}</span>{{end}}</li>{{end}}
-      </ol>
-    </details>
-    {{end}}
-
     {{if .FinalReply}}
     <details>
       <summary>💬 Copilot's Reply</summary>
       <pre>{{.FinalReply}}</pre>
     </details>
     {{end}}
-
-    {{if .GeneratedFiles}}
-    <details open>
-      <summary>📁 Generated Files ({{.FileCount}})</summary>
-      <p style="font-size:0.85rem;color:var(--text-muted)">Files are saved in the <code>generated-code/</code> subdirectory alongside this report.</p>
-      <ul class="files-list">{{range .GeneratedFiles}}<li>📄 {{.}}</li>{{end}}</ul>
-    </details>
-    {{else}}<p style="color:var(--text-muted)">No files generated.</p>{{end}}
   </div>
 </div>
+
+<!-- ━━ Tool Calls ━━ -->
+{{if .ToolActions}}
+<div class="section">
+  <div class="section-header"><span class="icon">🔧</span><h2>Tool Calls ({{len .ToolActions}})</h2></div>
+  <div class="section-body">
+    {{range .ToolActions}}
+    <div class="tool-card">
+      <div class="tool-card-header">
+        <span class="tool-index">{{.Index}}</span>
+        <span class="tool-name">{{.ToolName}}</span>
+        {{if .MCPServer}}<span style="font-size:0.8rem;color:var(--text-muted)">via {{.MCPServer}}</span>{{end}}
+        <div class="tool-meta">
+          {{if .Success}}{{boolStr .Success}}{{end}}
+          {{if gt .Duration 0.0}}<span>{{printf "%.0fms" .Duration}}</span>{{end}}
+        </div>
+      </div>
+      <div class="tool-card-body">
+        {{if .Args}}
+        <div class="tool-section-label">Input</div>
+        <details><summary style="font-size:0.85rem">Show arguments</summary><pre>{{.Args}}</pre></details>
+        {{end}}
+        {{if .Result}}
+        <div class="tool-section-label">Output</div>
+        <details><summary style="font-size:0.85rem">Show result</summary><pre>{{.Result}}</pre></details>
+        {{end}}
+        {{if .Error}}
+        <div class="tool-section-label" style="color:var(--red)">Error</div>
+        <pre style="background:#fef2f2;color:#991b1b">{{.Error}}</pre>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- ━━ Generated Files ━━ -->
+{{if .GeneratedFiles}}
+<div class="section">
+  <div class="section-header"><span class="icon">📁</span><h2>Generated Files ({{.FileCount}})</h2></div>
+  <div class="section-body">
+    <p style="font-size:0.85rem;color:var(--text-muted)">Files are saved in the <code>generated-code/</code> subdirectory alongside this report.</p>
+    {{range .GeneratedFiles}}
+    <div class="file-card">
+      <div class="file-card-header"><span class="file-icon">📄</span> {{.}}</div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
 
 <!-- ━━ Verification ━━ -->
 {{if .Verification}}
 <div class="section">
   <div class="section-header"><span class="icon">🔍</span><h2>Verification</h2><span style="margin-left:auto">{{if .Verification.Pass}}<span class="badge badge-pass">PASS</span>{{else}}<span class="badge badge-fail">FAIL</span>{{end}}</span></div>
   <div class="section-body">
-    {{if .Verification.Summary}}<p><strong>{{.Verification.Summary}}</strong></p>{{end}}
-    {{if .Verification.Reasoning}}<details open><summary>💭 Verifier's Reasoning</summary><pre>{{.Verification.Reasoning}}</pre></details>{{end}}
+    <div class="verify-banner {{if .Verification.Pass}}verify-pass{{else}}verify-fail{{end}}">
+      {{if .Verification.Pass}}✅{{else}}❌{{end}} <strong>{{if .Verification.Summary}}{{.Verification.Summary}}{{else}}{{if .Verification.Pass}}Verification passed{{else}}Verification failed{{end}}{{end}}</strong>
+    </div>
+    {{if .Verification.Reasoning}}
+    <details open>
+      <summary>💭 Verifier's Reasoning</summary>
+      <pre>{{.Verification.Reasoning}}</pre>
+    </details>
+    {{end}}
   </div>
 </div>
 {{end}}
@@ -466,8 +610,9 @@ const reportTemplate = `<!DOCTYPE html>
         <span class="ev-type">{{.Type}}</span>
         <div class="ev-content">
           {{if .ToolName}}<span class="ev-tool">{{.ToolName}}</span>{{end}}
-          {{if .ToolArgs}} <span style="color:var(--text-muted)">({{.ToolArgs}})</span>{{end}}
-          {{if .Content}}<pre>{{.Content}}</pre>{{end}}
+          {{if .ToolArgs}} <span style="color:var(--text-muted)">({{truncate .ToolArgs 120}})</span>{{end}}
+          {{if .Content}}<pre>{{truncate .Content 500}}</pre>{{end}}
+          {{if .ToolResult}}<pre style="background:#f0fdf4;color:#166534">{{truncate .ToolResult 300}}</pre>{{end}}
           {{if .Error}}<span class="ev-error">{{.Error}}</span>{{end}}
         </div>
       </div>
@@ -487,11 +632,13 @@ const summaryTemplate = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Evaluation Summary — {{.Summary.RunID}}</title>
 <style>
-  :root { --green: #22c55e; --red: #ef4444; --yellow: #eab308; --bg: #f8fafc; --text: #0f172a; --text-muted: #64748b; --border: #e2e8f0; }
+  :root { --green: #22c55e; --red: #ef4444; --yellow: #eab308; --bg: #f8fafc; --text: #0f172a; --text-muted: #64748b; --border: #e2e8f0; --blue: #2563eb; --purple: #7c3aed; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; color: var(--text); background: var(--bg); line-height: 1.6; }
   h1 { margin: 0 0 0.25rem 0; }
   h2 { margin: 1.5rem 0 0.75rem 0; }
   .subtitle { color: var(--text-muted); margin-bottom: 1.5rem; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
   .stats { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.25rem 0; }
   .stat { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; text-align: center; min-width: 110px; }
   .stat-value { font-size: 1.5rem; font-weight: 700; }
@@ -499,7 +646,7 @@ const summaryTemplate = `<!DOCTYPE html>
   table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   th { background: #f8fafc; padding: 0.75rem; text-align: center; font-size: 0.85rem; color: var(--text-muted); border-bottom: 2px solid var(--border); }
   th:first-child { text-align: left; }
-  td { padding: 0.75rem; border-bottom: 1px solid #f1f5f9; text-align: center; }
+  td { padding: 0.75rem; border-bottom: 1px solid #f1f5f9; text-align: center; vertical-align: top; }
   td:first-child { text-align: left; }
   .cell-pass { color: var(--green); }
   .cell-fail { color: var(--red); }
@@ -507,6 +654,13 @@ const summaryTemplate = `<!DOCTYPE html>
   .cell-score { font-weight: 700; font-size: 0.9rem; }
   .cell-error { color: #991b1b; font-size: 0.8rem; }
   .cell-duration { font-size: 0.75rem; color: var(--text-muted); }
+  .cell-files { font-size: 0.75rem; color: var(--text-muted); }
+  .cell-tools { font-size: 0.7rem; color: var(--purple); font-family: monospace; }
+  .cell-link { font-size: 0.75rem; margin-top: 0.25rem; }
+  .detail-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 2rem; }
+  .detail-table th { background: #f8fafc; padding: 0.6rem 0.75rem; text-align: left; font-size: 0.8rem; color: var(--text-muted); border-bottom: 2px solid var(--border); }
+  .detail-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; vertical-align: top; }
+  .tool-tag { display: inline-block; background: #f3f0ff; color: var(--purple); padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-family: monospace; margin: 1px; }
 </style>
 </head>
 <body>
@@ -542,10 +696,46 @@ const summaryTemplate = `<!DOCTYPE html>
             <div class="cell-icon">{{statusIcon .Success}}</div>
             {{if .HasReview}}<div class="cell-score" style="color:{{scoreColor .Score}}">{{.Score}}/10</div>{{end}}
             <div class="cell-duration">{{fmtDuration .Duration}}</div>
+            <div class="cell-files">{{.FileCount}} files</div>
+            {{if .ToolCalls}}<div class="cell-tools">{{join .ToolCalls ", "}}</div>{{end}}
+            {{if .ReportLink}}<div class="cell-link"><a href="{{.ReportLink}}">View Report →</a></div>{{end}}
           {{end}}
         {{else}}<span style="color:#d1d5db">—</span>{{end}}
       </td>
       {{end}}
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+
+<!-- ━━ Detailed Results ━━ -->
+{{if .Summary.Results}}
+<h2>Detailed Results</h2>
+<table class="detail-table">
+  <thead>
+    <tr>
+      <th>Prompt</th>
+      <th>Config</th>
+      <th>Status</th>
+      <th>Score</th>
+      <th>Duration</th>
+      <th>Files</th>
+      <th>Tool Calls</th>
+      <th>Report</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Summary.Results}}
+    <tr>
+      <td><code>{{.PromptID}}</code></td>
+      <td>{{.ConfigName}}</td>
+      <td>{{statusIcon .Success}}</td>
+      <td>{{if .Review}}<span style="color:{{scoreColor .Review.OverallScore}};font-weight:700">{{.Review.OverallScore}}/10</span>{{else}}—{{end}}</td>
+      <td>{{fmtDuration .Duration}}</td>
+      <td>{{len .GeneratedFiles}}</td>
+      <td>{{range .ToolCalls}}<span class="tool-tag">{{.}}</span>{{end}}</td>
+      <td>{{if not .Error}}{{with reportLink .}}<a href="{{.}}">View →</a>{{end}}{{end}}</td>
     </tr>
     {{end}}
   </tbody>

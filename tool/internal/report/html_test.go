@@ -13,6 +13,7 @@ import (
 func TestWriteHTMLReport(t *testing.T) {
 	dir := t.TempDir()
 
+	boolTrue := true
 	r := &EvalReport{
 		PromptID:   "test-prompt",
 		ConfigName: "baseline",
@@ -44,7 +45,8 @@ func TestWriteHTMLReport(t *testing.T) {
 		SessionEvents: []SessionEventRecord{
 			{Type: "user.message", Content: "Write a dotnet storage auth sample"},
 			{Type: "assistant.reasoning", Content: "I need to create an auth sample"},
-			{Type: "tool.execution_start", ToolName: "create"},
+			{Type: "tool.execution_start", ToolName: "create", ToolArgs: `{"path":"Program.cs"}`},
+			{Type: "tool.execution_complete", ToolName: "create", ToolResult: "File created", ToolSuccess: &boolTrue, Duration: 150.5},
 			{Type: "assistant.message", Content: "Here is your sample"},
 		},
 		EventCount: 15,
@@ -78,6 +80,10 @@ func TestWriteHTMLReport(t *testing.T) {
 		"Code Review",
 		"Clean code structure",
 		"Missing retry logic",
+		"Tool Calls",
+		"Back to Summary",
+		"File created",
+		"150ms",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
@@ -198,13 +204,14 @@ func TestWriteSummaryHTML(t *testing.T) {
 	}
 
 	// Verify the summary uses Success field: 3 passed should show ✅, 1 failed should show ❌
+	// Matrix has 3 pass + 1 fail, detailed results table also has 3 pass + 1 fail
 	passCount := strings.Count(content, "✅")
 	failCount := strings.Count(content, "❌")
-	if passCount != 3 {
-		t.Errorf("expected 3 ✅ icons for 3 passed evals, got %d", passCount)
+	if passCount != 6 {
+		t.Errorf("expected 6 ✅ icons (3 matrix + 3 detail), got %d", passCount)
 	}
-	if failCount != 1 {
-		t.Errorf("expected 1 ❌ icon for 1 failed eval, got %d", failCount)
+	if failCount != 2 {
+		t.Errorf("expected 2 ❌ icons (1 matrix + 1 detail), got %d", failCount)
 	}
 }
 
@@ -237,13 +244,14 @@ func TestWriteSummaryHTMLNoBuild(t *testing.T) {
 	}
 
 	content := string(data)
+	// Matrix has 2 pass + 1 fail, detailed results table also has 2 pass + 1 fail
 	passCount := strings.Count(content, "✅")
 	failCount := strings.Count(content, "❌")
-	if passCount != 2 {
-		t.Errorf("expected 2 ✅ for passed evals (no Build), got %d", passCount)
+	if passCount != 4 {
+		t.Errorf("expected 4 ✅ (2 matrix + 2 detail), got %d", passCount)
 	}
-	if failCount != 1 {
-		t.Errorf("expected 1 ❌ for failed eval (no Build), got %d", failCount)
+	if failCount != 2 {
+		t.Errorf("expected 2 ❌ (1 matrix + 1 detail), got %d", failCount)
 	}
 }
 
@@ -297,6 +305,7 @@ func TestBuildMatrix(t *testing.T) {
 }
 
 func TestBuildReportData(t *testing.T) {
+	boolTrue := true
 	r := &EvalReport{
 		PromptID:       "test-prompt",
 		GeneratedFiles: []string{"main.py", "requirements.txt"},
@@ -304,8 +313,10 @@ func TestBuildReportData(t *testing.T) {
 			{Type: "session.start"},
 			{Type: "user.message", Content: "Write a Python script"},
 			{Type: "assistant.reasoning", Content: "I should create a script"},
-			{Type: "tool.execution_start", ToolName: "create"},
-			{Type: "tool.execution_start", ToolName: "create"},
+			{Type: "tool.execution_start", ToolName: "create", ToolArgs: `{"path":"main.py"}`, MCPServerName: "fs-server"},
+			{Type: "tool.execution_complete", ToolName: "create", ToolResult: "File created successfully", ToolSuccess: &boolTrue, Duration: 42.5},
+			{Type: "tool.execution_start", ToolName: "create", ToolArgs: `{"path":"requirements.txt"}`},
+			{Type: "tool.execution_complete", ToolName: "create", ToolResult: "File created successfully", ToolSuccess: &boolTrue, Duration: 10.0},
 			{Type: "assistant.message", Content: "Done! Here are your files."},
 		},
 	}
@@ -326,6 +337,24 @@ func TestBuildReportData(t *testing.T) {
 	}
 	if d.ToolActions[0].Index != 1 || d.ToolActions[0].ToolName != "create" {
 		t.Errorf("unexpected first tool action: %+v", d.ToolActions[0])
+	}
+	if d.ToolActions[0].Args != `{"path":"main.py"}` {
+		t.Errorf("expected tool args, got %q", d.ToolActions[0].Args)
+	}
+	if d.ToolActions[0].MCPServer != "fs-server" {
+		t.Errorf("expected MCP server 'fs-server', got %q", d.ToolActions[0].MCPServer)
+	}
+	if d.ToolActions[0].Result != "File created successfully" {
+		t.Errorf("expected tool result from completion, got %q", d.ToolActions[0].Result)
+	}
+	if d.ToolActions[0].Success == nil || !*d.ToolActions[0].Success {
+		t.Error("expected tool success=true")
+	}
+	if d.ToolActions[0].Duration != 42.5 {
+		t.Errorf("expected duration 42.5, got %f", d.ToolActions[0].Duration)
+	}
+	if d.ToolActions[1].Result != "File created successfully" {
+		t.Errorf("expected second tool result, got %q", d.ToolActions[1].Result)
 	}
 	if d.FileCount != 2 {
 		t.Errorf("expected file count 2, got %d", d.FileCount)

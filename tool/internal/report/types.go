@@ -7,11 +7,17 @@ import (
 
 // SessionEventRecord is a serializable representation of a Copilot session event.
 type SessionEventRecord struct {
-Type     string `json:"type"`
-ToolName string `json:"tool_name,omitempty"`
-ToolArgs string `json:"tool_args,omitempty"`
-Content  string `json:"content,omitempty"`
-Error    string `json:"error,omitempty"`
+	Type          string  `json:"type"`
+	ToolName      string  `json:"tool_name,omitempty"`
+	ToolArgs      string  `json:"tool_args,omitempty"`
+	Content       string  `json:"content,omitempty"`
+	Error         string  `json:"error,omitempty"`
+	ToolResult    string  `json:"tool_result,omitempty"`
+	ToolSuccess   *bool   `json:"tool_success,omitempty"`
+	Duration      float64 `json:"duration_ms,omitempty"`
+	MCPServerName string  `json:"mcp_server_name,omitempty"`
+	MCPToolName   string  `json:"mcp_tool_name,omitempty"`
+	FilePath      string  `json:"file_path,omitempty"`
 }
 
 // VerifyResult holds the outcome of Copilot-based code verification.

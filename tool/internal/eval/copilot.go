@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -104,6 +105,40 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		}
 		if event.Data.Content != nil {
 			rec.Content = *event.Data.Content
+		}
+		if event.Data.Arguments != nil {
+			if argsBytes, err := json.Marshal(event.Data.Arguments); err == nil {
+				rec.ToolArgs = string(argsBytes)
+			}
+		}
+		if event.Data.Result != nil {
+			if event.Data.Result.DetailedContent != nil {
+				rec.ToolResult = *event.Data.Result.DetailedContent
+			} else if event.Data.Result.Content != nil {
+				rec.ToolResult = *event.Data.Result.Content
+			}
+		}
+		if event.Data.Error != nil {
+			if event.Data.Error.ErrorClass != nil {
+				rec.Error = event.Data.Error.ErrorClass.Message
+			} else if event.Data.Error.String != nil {
+				rec.Error = *event.Data.Error.String
+			}
+		}
+		if event.Data.Success != nil {
+			rec.ToolSuccess = event.Data.Success
+		}
+		if event.Data.Duration != nil {
+			rec.Duration = *event.Data.Duration
+		}
+		if event.Data.MCPServerName != nil {
+			rec.MCPServerName = *event.Data.MCPServerName
+		}
+		if event.Data.MCPToolName != nil {
+			rec.MCPToolName = *event.Data.MCPToolName
+		}
+		if event.Data.Path != nil {
+			rec.FilePath = *event.Data.Path
 		}
 		sessionRecords = append(sessionRecords, rec)
 		mu.Unlock()
