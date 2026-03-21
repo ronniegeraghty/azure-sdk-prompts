@@ -15,9 +15,10 @@ import (
 
 // CopilotVerifier uses a separate Copilot session to verify generated code against requirements.
 type CopilotVerifier struct {
-	clientOpts *copilot.ClientOptions
-	model      string
-	debug      bool
+	clientOpts       *copilot.ClientOptions
+	model            string
+	debug            bool
+	skillDirectories []string
 }
 
 // NewCopilotVerifier creates a verifier that spawns its own Copilot client per verification.
@@ -26,6 +27,11 @@ func NewCopilotVerifier(clientOpts *copilot.ClientOptions, model string, debug b
 		model = "claude-sonnet-4.5"
 	}
 	return &CopilotVerifier{clientOpts: clientOpts, model: model, debug: debug}
+}
+
+// SetSkillDirectories configures skill directories for the verification session.
+func (v *CopilotVerifier) SetSkillDirectories(dirs []string) {
+	v.skillDirectories = dirs
 }
 
 // Verify creates a separate Copilot session to evaluate whether generated code meets requirements.
@@ -61,6 +67,7 @@ func (v *CopilotVerifier) Verify(ctx context.Context, originalPrompt string, wor
 		},
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		SkillDirectories:    v.skillDirectories,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating verification session: %w", err)

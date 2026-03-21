@@ -19,8 +19,9 @@ type Reviewer interface {
 
 // CopilotReviewer uses a Copilot session to perform code reviews.
 type CopilotReviewer struct {
-	client *copilot.Client
-	model  string
+	client           *copilot.Client
+	model            string
+	skillDirectories []string
 }
 
 // NewCopilotReviewer creates a reviewer backed by the given Copilot client.
@@ -29,6 +30,11 @@ func NewCopilotReviewer(client *copilot.Client, model string) *CopilotReviewer {
 		model = "claude-sonnet-4.5"
 	}
 	return &CopilotReviewer{client: client, model: model}
+}
+
+// SetSkillDirectories configures skill directories for the review session.
+func (r *CopilotReviewer) SetSkillDirectories(dirs []string) {
+	r.skillDirectories = dirs
 }
 
 // Review creates a separate Copilot session, sends the review prompt, and parses results.
@@ -60,6 +66,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		},
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		SkillDirectories:    r.skillDirectories,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating review session: %w", err)

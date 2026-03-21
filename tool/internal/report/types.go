@@ -1,8 +1,8 @@
 package report
 
 import (
-"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/build"
-"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/review"
+	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/build"
+	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/review"
 )
 
 // SessionEventRecord is a serializable representation of a Copilot session event.
@@ -22,43 +22,54 @@ type SessionEventRecord struct {
 
 // VerifyResult holds the outcome of Copilot-based code verification.
 type VerifyResult struct {
-Pass      bool   `json:"pass"`
-Reasoning string `json:"reasoning"`
-Summary   string `json:"summary"`
+	Pass      bool   `json:"pass"`
+	Reasoning string `json:"reasoning"`
+	Summary   string `json:"summary"`
+}
+
+// ToolUsageResult holds the comparison of expected vs actual tool usage.
+type ToolUsageResult struct {
+	ExpectedTools []string `json:"expected_tools"`
+	ActualTools   []string `json:"actual_tools"`
+	MatchedTools  []string `json:"matched_tools"`
+	MissingTools  []string `json:"missing_tools"`
+	ExtraTools    []string `json:"extra_tools"`
+	Match         bool     `json:"tool_usage_match"`
 }
 
 // EvalReport contains the results of a single prompt evaluation.
 type EvalReport struct {
-PromptID       string               `json:"prompt_id"`
-ConfigName     string               `json:"config_name"`
-Timestamp      string               `json:"timestamp"`
-Duration       float64              `json:"duration_seconds"`
-PromptMeta     map[string]any       `json:"prompt_metadata"`
-ConfigUsed     map[string]any       `json:"config_used"`
-GeneratedFiles []string             `json:"generated_files"`
-Build          *build.BuildResult   `json:"build,omitempty"`
-Verification   *VerifyResult        `json:"verification,omitempty"`
-Review         *review.ReviewResult `json:"review,omitempty"`
-SessionEvents  []SessionEventRecord `json:"session_events,omitempty"`
-EventCount     int                  `json:"event_count"`
-ToolCalls      []string             `json:"tool_calls"`
-Success        bool                 `json:"success"`
-Error          string               `json:"error,omitempty"`
-ErrorDetails   string               `json:"error_details,omitempty"`
-IsStub         bool                 `json:"is_stub,omitempty"`
+	PromptID       string               `json:"prompt_id"`
+	ConfigName     string               `json:"config_name"`
+	Timestamp      string               `json:"timestamp"`
+	Duration       float64              `json:"duration_seconds"`
+	PromptMeta     map[string]any       `json:"prompt_metadata"`
+	ConfigUsed     map[string]any       `json:"config_used"`
+	GeneratedFiles []string             `json:"generated_files"`
+	Build          *build.BuildResult   `json:"build,omitempty"`
+	Verification   *VerifyResult        `json:"verification,omitempty"`
+	Review         *review.ReviewResult `json:"review,omitempty"`
+	ToolUsage      *ToolUsageResult     `json:"tool_usage,omitempty"`
+	SessionEvents  []SessionEventRecord `json:"session_events,omitempty"`
+	EventCount     int                  `json:"event_count"`
+	ToolCalls      []string             `json:"tool_calls"`
+	Success        bool                 `json:"success"`
+	Error          string               `json:"error,omitempty"`
+	ErrorDetails   string               `json:"error_details,omitempty"`
+	IsStub         bool                 `json:"is_stub,omitempty"`
 }
 
 // RunSummary contains aggregate statistics for an evaluation run.
 type RunSummary struct {
-RunID        string        `json:"run_id"`
-Timestamp    string        `json:"timestamp"`
-TotalPrompts int           `json:"total_prompts"`
-TotalConfigs int           `json:"total_configs"`
-TotalEvals   int           `json:"total_evaluations"`
-Passed       int           `json:"passed"`
-Failed       int           `json:"failed"`
-Errors       int           `json:"errors"`
-Duration     float64       `json:"duration_seconds"`
-Reports      []string      `json:"report_paths"`
-Results      []*EvalReport `json:"results,omitempty"`
+	RunID        string        `json:"run_id"`
+	Timestamp    string        `json:"timestamp"`
+	TotalPrompts int           `json:"total_prompts"`
+	TotalConfigs int           `json:"total_configs"`
+	TotalEvals   int           `json:"total_evaluations"`
+	Passed       int           `json:"passed"`
+	Failed       int           `json:"failed"`
+	Errors       int           `json:"errors"`
+	Duration     float64       `json:"duration_seconds"`
+	Reports      []string      `json:"report_paths"`
+	Results      []*EvalReport `json:"results,omitempty"`
 }

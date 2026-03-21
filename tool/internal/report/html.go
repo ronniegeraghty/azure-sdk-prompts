@@ -547,6 +547,25 @@ const reportTemplate = `<!DOCTYPE html>
 </div>
 {{end}}
 
+<!-- ━━ Tool Usage Evaluation ━━ -->
+{{if .ToolUsage}}
+<div class="section">
+  <div class="section-header"><span class="icon">🔧</span><h2>Tool Usage Evaluation</h2><span style="margin-left:auto">{{if .ToolUsage.Match}}<span class="badge badge-pass">MATCH</span>{{else}}<span class="badge badge-fail">MISMATCH</span>{{end}}</span></div>
+  <div class="section-body">
+    <div class="verify-banner {{if .ToolUsage.Match}}verify-pass{{else}}verify-fail{{end}}">
+      {{if .ToolUsage.Match}}✅ All expected tools were used{{else}}⚠️ Some expected tools were not used during generation{{end}}
+    </div>
+    <table class="meta-table">
+      <tr><td>Expected</td><td>{{join .ToolUsage.ExpectedTools ", "}}</td></tr>
+      <tr><td>Actual</td><td>{{join .ToolUsage.ActualTools ", "}}</td></tr>
+      {{if .ToolUsage.MatchedTools}}<tr><td>Matched</td><td style="color:var(--green)">{{join .ToolUsage.MatchedTools ", "}}</td></tr>{{end}}
+      {{if .ToolUsage.MissingTools}}<tr><td>Missing</td><td style="color:var(--red);font-weight:600">{{join .ToolUsage.MissingTools ", "}}</td></tr>{{end}}
+      {{if .ToolUsage.ExtraTools}}<tr><td>Extra</td><td style="color:var(--text-muted)">{{join .ToolUsage.ExtraTools ", "}}</td></tr>{{end}}
+    </table>
+  </div>
+</div>
+{{end}}
+
 <!-- ━━ Code Review ━━ -->
 {{if .Review}}
 <div class="section">

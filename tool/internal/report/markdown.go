@@ -152,6 +152,31 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		}
 	}
 
+	// Tool usage evaluation
+	if r.ToolUsage != nil {
+		b.WriteString("## Tool Usage Evaluation\n\n")
+		matchResult := "❌ MISMATCH"
+		if r.ToolUsage.Match {
+			matchResult = "✅ MATCH"
+		}
+		fmt.Fprintf(&b, "**Result:** %s\n\n", matchResult)
+
+		b.WriteString("| Category | Tools |\n")
+		b.WriteString("|----------|-------|\n")
+		fmt.Fprintf(&b, "| Expected | %s |\n", strings.Join(r.ToolUsage.ExpectedTools, ", "))
+		fmt.Fprintf(&b, "| Actual | %s |\n", strings.Join(r.ToolUsage.ActualTools, ", "))
+		if len(r.ToolUsage.MatchedTools) > 0 {
+			fmt.Fprintf(&b, "| Matched | %s |\n", strings.Join(r.ToolUsage.MatchedTools, ", "))
+		}
+		if len(r.ToolUsage.MissingTools) > 0 {
+			fmt.Fprintf(&b, "| ⚠️ Missing | %s |\n", strings.Join(r.ToolUsage.MissingTools, ", "))
+		}
+		if len(r.ToolUsage.ExtraTools) > 0 {
+			fmt.Fprintf(&b, "| Extra | %s |\n", strings.Join(r.ToolUsage.ExtraTools, ", "))
+		}
+		b.WriteString("\n")
+	}
+
 	// Build
 	if r.Build != nil {
 		b.WriteString("## Build Verification\n\n")

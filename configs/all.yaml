@@ -15,3 +15,6 @@ configs:
         command: npx
         args: ["-y", "@azure/mcp@latest"]
         tools: ["*"]
+    # Skills loaded for reviewer/verifier sessions
+    skill_directories:
+      - "./skills"

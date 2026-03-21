@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,12 +15,13 @@ import (
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/manifest"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/review"
+	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/trends"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/validate"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/verify"
 	"github.com/spf13/cobra"
 )
 
-var version = "0.4.0"
+var version = "0.5.0"
 
 func main() {
 	if err := rootCmd().Execute(); err != nil {
@@ -41,6 +43,7 @@ func rootCmd() *cobra.Command {
 	root.AddCommand(manifestCmd())
 	root.AddCommand(validateCmd())
 	root.AddCommand(checkEnvCmd())
+	root.AddCommand(trendsCmd())
 
 	return root
 }
@@ -122,6 +125,21 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().BoolVar(&f.debug, "debug", false, "Verbose output")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
 	cmd.Flags().BoolVar(&f.useStub, "stub", false, "Use stub evaluator (no Copilot SDK)")
+}
+
+// resolveSkillsDirs finds the skills directory relative to the prompts directory.
+func resolveSkillsDirs(promptsDir string) []string {
+	for _, candidate := range []string{
+		filepath.Join(filepath.Dir(promptsDir), "skills"),
+		"./skills",
+		"../skills",
+	} {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			abs, _ := filepath.Abs(candidate)
+			return []string{abs}
+		}
+	}
+	return nil
 }
 
 func buildFilter(f *runFlags) prompt.Filter {
@@ -229,7 +247,14 @@ func runCmd() *cobra.Command {
 					if f.debug {
 						clientOpts.LogLevel = "debug"
 					}
-					verifier = verify.NewCopilotVerifier(clientOpts, f.model, f.debug)
+					copilotVerifier := verify.NewCopilotVerifier(clientOpts, f.model, f.debug)
+
+					// Wire skills directory for reviewer/verifier sessions
+					skillsDirs := resolveSkillsDirs(f.prompts)
+					if len(skillsDirs) > 0 {
+						copilotVerifier.SetSkillDirectories(skillsDirs)
+					}
+					verifier = copilotVerifier
 				}
 			}
 
@@ -416,12 +441,65 @@ func versionCmd() *cobra.Command {
 }
 
 func checkEnvCmd() *cobra.Command {
-return &cobra.Command{
-Use:   "check-env",
-Short: "Check for required language toolchains and tools",
-Long:  "Tests if language toolchains (dotnet, python, go, node, java, rust, cargo, cmake, etc.), Copilot CLI, and MCP prerequisites are installed.",
-Run: func(cmd *cobra.Command, args []string) {
-checkenv.Run()
-},
+	return &cobra.Command{
+		Use:   "check-env",
+		Short: "Check for required language toolchains and tools",
+		Long:  "Tests if language toolchains (dotnet, python, go, node, java, rust, cargo, cmake, etc.), Copilot CLI, and MCP prerequisites are installed.",
+		Run: func(cmd *cobra.Command, args []string) {
+			checkenv.Run()
+		},
+	}
 }
+
+func trendsCmd() *cobra.Command {
+	var promptID, service, language, reportsDir, output string
+
+	cmd := &cobra.Command{
+		Use:   "trends",
+		Short: "Generate historical trend reports from past evaluation runs",
+		Long:  "Scans all past runs in reports/ directory and generates a trend report with score changes, config comparisons, regressions, and improvements.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			reportsDir = resolvePathFlag(cmd, "reports-dir", []string{"./reports", "../reports"})
+			output = resolvePathFlag(cmd, "output", []string{"./reports/trends", "../reports/trends"})
+
+			tr, err := trends.Generate(trends.TrendOptions{
+				ReportsDir: reportsDir,
+				PromptID:   promptID,
+				Service:    service,
+				Language:   language,
+				OutputDir:  output,
+			})
+			if err != nil {
+				return fmt.Errorf("generating trends: %w", err)
+			}
+
+			if tr.TotalRuns == 0 {
+				fmt.Println("No historical data found matching the given filters.")
+				return nil
+			}
+
+			mdPath, err := trends.WriteMarkdown(tr, output)
+			if err != nil {
+				return fmt.Errorf("writing markdown trends: %w", err)
+			}
+			fmt.Printf("Markdown trend report: %s\n", mdPath)
+
+			htmlPath, err := trends.WriteHTML(tr, output)
+			if err != nil {
+				return fmt.Errorf("writing HTML trends: %w", err)
+			}
+			fmt.Printf("HTML trend report:     %s\n", htmlPath)
+			fmt.Printf("\nAnalyzed %d historical evaluation(s)\n", tr.TotalRuns)
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&promptID, "prompt-id", "", "Filter trends by prompt ID")
+	cmd.Flags().StringVar(&service, "service", "", "Filter trends by Azure service")
+	cmd.Flags().StringVar(&language, "language", "", "Filter trends by programming language")
+	cmd.Flags().StringVar(&reportsDir, "reports-dir", "./reports", "Directory containing past evaluation reports")
+	cmd.Flags().StringVar(&output, "output", "./reports/trends", "Output directory for trend reports")
+
+	return cmd
 }
