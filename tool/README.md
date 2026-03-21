@@ -127,7 +127,7 @@ Takes the same filter flags as `run`. Output shows prompt ID, service/plane/lang
 
 ### `azsdk-prompt-eval manifest`
 
-Regenerate `manifest.yaml` from prompt files.
+(Optional) Generate a `manifest.yaml` snapshot from prompt files. The tool discovers prompts directly from the `prompts/` directory at runtime — this command is only needed to produce a static index for external tooling or documentation.
 
 ```bash
 azsdk-prompt-eval manifest [flags]
@@ -274,7 +274,7 @@ configs:
 |------|--------------------|
 | `--prompts` | `./prompts` → `../prompts` |
 | `--config-file` | `./configs/all.yaml` → `../configs/all.yaml` → `./configs.yaml` → `../configs.yaml` |
-| `--output` (manifest) | `./manifest.yaml` → `../manifest.yaml` |
+| `--output` (manifest) | `./manifest.yaml` → `../manifest.yaml` (optional snapshot only) |
 
 ## Project Structure
 
@@ -291,7 +291,7 @@ tool/
 │   ├── report/                  # JSON + HTML report generation
 │   ├── review/                  # LLM-as-judge code review
 │   ├── verify/                  # Copilot-based code verification
-│   ├── manifest/                # Manifest generation from prompts
+│   ├── manifest/                # Optional manifest snapshot generation
 │   └── validate/                # Prompt frontmatter validation
 └── testdata/                    # Test fixtures
 ```

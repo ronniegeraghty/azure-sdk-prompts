@@ -52,7 +52,7 @@ azsdk-prompt-eval run --prompts ~/projects/azure-sdk-prompts/prompts
 | `azsdk-prompt-eval run` | Run evaluations against prompts |
 | `azsdk-prompt-eval list` | List prompts matching filters |
 | `azsdk-prompt-eval configs` | Show available tool configurations |
-| `azsdk-prompt-eval manifest` | Regenerate manifest.yaml from prompt files |
+| `azsdk-prompt-eval manifest` | (Optional) Generate manifest.yaml snapshot for external tooling |
 | `azsdk-prompt-eval validate` | Validate prompt frontmatter against schema |
 | `azsdk-prompt-eval check-env` | Check for required language toolchains and tools |
 | `azsdk-prompt-eval version` | Print version |
@@ -89,9 +89,6 @@ azsdk-prompt-eval run --service storage --dry-run
 ```bash
 # Validate all prompts
 azsdk-prompt-eval validate
-
-# Regenerate the manifest
-azsdk-prompt-eval manifest
 ```
 
 ### Tool Configurations
@@ -137,6 +134,8 @@ Then run with: `azsdk-prompt-eval run --config-file configs/my-custom-config.yam
 
 ## Adding a New Prompt
 
+Add a `.prompt.md` file to `prompts/` and run the tool — it discovers prompts automatically.
+
 ```bash
 # 1. Copy the template
 cp templates/prompt-template.prompt.md \
@@ -147,11 +146,8 @@ cp templates/prompt-template.prompt.md \
 # 3. Validate
 go run ./tool/cmd/azsdk-prompt-eval validate
 
-# 4. Regenerate the manifest
-go run ./tool/cmd/azsdk-prompt-eval manifest
-
-# 5. Commit
-git add prompts/ manifest.yaml
+# 4. Commit
+git add prompts/
 git commit -m "prompt: add <service> <plane> <language> <category>"
 ```
 
@@ -160,7 +156,7 @@ git commit -m "prompt: add <service> <plane> <language> <category>"
 ```
 azure-sdk-prompts/
 ├── README.md
-├── manifest.yaml                      # Auto-generated prompt index
+├── manifest.yaml                      # Optional snapshot (not used by the tool at runtime)
 ├── configs/                           # Evaluation config matrix
 │   ├── all.yaml                       # Both configs (default for matrix runs)
 │   ├── baseline.yaml                  # No MCP, no skills — raw Copilot

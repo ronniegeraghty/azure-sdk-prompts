@@ -372,8 +372,8 @@ func manifestCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "manifest",
-		Short: "Regenerate manifest.yaml from prompt files",
-		Long:  "Scan the prompts directory and generate a manifest.yaml with metadata about all prompts.",
+		Short: "(Optional) Generate manifest.yaml snapshot from prompt files",
+		Long:  "Generate a manifest.yaml snapshot from prompt files. This is optional — the tool discovers prompts directly from the prompts/ directory. Use this to produce a static index for external tooling or documentation.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptsDir = resolvePromptsDir(cmd)
 			outputPath = resolveOutputFile(cmd, []string{"./manifest.yaml", "../manifest.yaml"})
