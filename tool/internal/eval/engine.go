@@ -19,8 +19,11 @@ type EvalResult struct {
 GeneratedFiles []string
 EventCount     int
 ToolCalls      []string
+SessionEvents  []report.SessionEventRecord
 Success        bool
 Error          string
+ErrorDetails   string
+IsStub         bool
 }
 
 // CopilotEvaluator defines the interface for running evaluations.
@@ -37,36 +40,57 @@ return &EvalResult{
 GeneratedFiles: []string{"stub_output.txt"},
 EventCount:     0,
 ToolCalls:      []string{},
+SessionEvents:  nil,
 Success:        true,
 Error:          "",
+IsStub:         true,
 }, nil
 }
 
 // EngineOptions configures the evaluation engine.
 type EngineOptions struct {
-Workers    int
-Timeout    time.Duration
-OutputDir  string
-SkipTests  bool
-SkipReview bool
-Debug      bool
-DryRun     bool
+Workers     int
+Timeout     time.Duration
+OutputDir   string
+SkipTests   bool
+SkipReview  bool
+VerifyBuild bool
+Debug       bool
+DryRun      bool
+}
+
+// Verifier evaluates generated code against prompt requirements.
+type Verifier interface {
+Verify(ctx context.Context, originalPrompt string, workDir string, expectedCoverage string) (*report.VerifyResult, error)
+}
+
+// StubVerifier returns a placeholder pass result.
+type StubVerifier struct{}
+
+// Verify returns a stub verification pass.
+func (s *StubVerifier) Verify(_ context.Context, _ string, _ string, _ string) (*report.VerifyResult, error) {
+return &report.VerifyResult{
+Pass:      true,
+Reasoning: "Verification skipped (stub mode)",
+Summary:   "Stub mode — no Copilot verification performed",
+}, nil
 }
 
 // Engine orchestrates evaluation runs.
 type Engine struct {
 evaluator CopilotEvaluator
 reviewer  review.Reviewer
+verifier  Verifier
 opts      EngineOptions
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
 func NewEngine(evaluator CopilotEvaluator, opts EngineOptions) *Engine {
-return NewEngineWithReviewer(evaluator, nil, opts)
+return NewEngineWithReviewer(evaluator, nil, nil, opts)
 }
 
-// NewEngineWithReviewer creates a new Engine with an evaluator and reviewer.
-func NewEngineWithReviewer(evaluator CopilotEvaluator, reviewer review.Reviewer, opts EngineOptions) *Engine {
+// NewEngineWithReviewer creates a new Engine with an evaluator, verifier, and reviewer.
+func NewEngineWithReviewer(evaluator CopilotEvaluator, verifier Verifier, reviewer review.Reviewer, opts EngineOptions) *Engine {
 if opts.Workers <= 0 {
 opts.Workers = 4
 }
@@ -79,6 +103,7 @@ opts.OutputDir = "./reports"
 return &Engine{
 evaluator: evaluator,
 reviewer:  reviewer,
+verifier:  verifier,
 opts:      opts,
 }
 }
@@ -182,10 +207,15 @@ ConfigUsed: map[string]any{
 },
 }
 
+if e.opts.Debug {
+log.Printf("[DEBUG] Starting Copilot session for %s with config %s...", task.Prompt.ID, task.Config.Name)
+}
+
 // Setup workspace
 ws, err := NewWorkspace(e.opts.OutputDir, task.Prompt.ID, task.Config.Name)
 if err != nil {
 evalReport.Error = fmt.Sprintf("workspace setup failed: %v", err)
+evalReport.ErrorDetails = err.Error()
 evalReport.Duration = time.Since(start).Seconds()
 return evalReport
 }
@@ -194,26 +224,73 @@ return evalReport
 result, err := e.evaluator.Evaluate(evalCtx, task.Prompt, &task.Config, ws.Dir)
 if err != nil {
 evalReport.Error = fmt.Sprintf("evaluation failed: %v", err)
+evalReport.ErrorDetails = err.Error()
 evalReport.Duration = time.Since(start).Seconds()
+// Capture whatever session events were collected before failure
+if result != nil {
+evalReport.SessionEvents = result.SessionEvents
+evalReport.EventCount = result.EventCount
+evalReport.ToolCalls = result.ToolCalls
+evalReport.IsStub = result.IsStub
+}
 return evalReport
 }
 
 evalReport.GeneratedFiles = result.GeneratedFiles
 evalReport.EventCount = result.EventCount
 evalReport.ToolCalls = result.ToolCalls
+evalReport.SessionEvents = result.SessionEvents
+evalReport.IsStub = result.IsStub
+evalReport.Success = result.Success
 
-// Build verification
+if e.opts.Debug {
+log.Printf("[DEBUG] Session complete: %d tool calls, %d files generated, %s",
+len(result.ToolCalls), len(result.GeneratedFiles), time.Since(start).Truncate(time.Millisecond))
+}
+
+// Copilot-based verification (default, unless stub mode has its own stub verifier)
+if e.verifier != nil {
+if e.opts.Debug {
+log.Printf("[DEBUG] Starting verification session...")
+}
+verifyResult, err := e.verifier.Verify(evalCtx, task.Prompt.PromptText, ws.Dir, task.Prompt.ExpectedCoverage)
+if err != nil {
+if e.opts.Debug {
+log.Printf("[DEBUG] ERROR: verification failed: %v", err)
+}
+} else {
+evalReport.Verification = verifyResult
+evalReport.Success = verifyResult.Pass
+if e.opts.Debug {
+passStr := "FAIL"
+if verifyResult.Pass {
+passStr = "PASS"
+}
+log.Printf("[DEBUG] Verification: %s — %s", passStr, verifyResult.Summary)
+}
+}
+}
+
+// Optional build verification (--verify-build flag)
+if e.opts.VerifyBuild {
 buildResult, err := build.Verify(evalCtx, task.Prompt.Language, ws.Dir)
 if err != nil {
-evalReport.Error = fmt.Sprintf("build verification failed: %v", err)
-evalReport.Duration = time.Since(start).Seconds()
-return evalReport
+if e.opts.Debug {
+log.Printf("[DEBUG] ERROR: build verification failed: %v", err)
 }
+} else {
 evalReport.Build = buildResult
-evalReport.Success = result.Success && (buildResult == nil || buildResult.Success)
+if !buildResult.Success {
+evalReport.Success = false
+}
+}
+}
 
 // Code review (unless skipped)
 if !e.opts.SkipReview && e.reviewer != nil {
+if e.opts.Debug {
+log.Printf("[DEBUG] Starting review session...")
+}
 referenceDir := ""
 if task.Prompt.ReferenceAnswer != "" {
 referenceDir = task.Prompt.ReferenceAnswer
@@ -221,10 +298,13 @@ referenceDir = task.Prompt.ReferenceAnswer
 reviewResult, err := e.reviewer.Review(evalCtx, task.Prompt.PromptText, ws.Dir, referenceDir)
 if err != nil {
 if e.opts.Debug {
-log.Printf("code review failed for %s/%s: %v", task.Prompt.ID, task.Config.Name, err)
+log.Printf("[DEBUG] ERROR: code review failed for %s/%s: %v", task.Prompt.ID, task.Config.Name, err)
 }
 } else {
 evalReport.Review = reviewResult
+if e.opts.Debug {
+log.Printf("[DEBUG] Review score: %d/10", reviewResult.OverallScore)
+}
 }
 }
 
@@ -234,17 +314,17 @@ evalReport.Duration = time.Since(start).Seconds()
 reportPath, err := report.WriteReport(evalReport, e.opts.OutputDir, runID, task.Prompt)
 if err != nil {
 if e.opts.Debug {
-log.Printf("failed to write report: %v", err)
+log.Printf("[DEBUG] ERROR: failed to write report: %v", err)
 }
 } else if e.opts.Debug {
-log.Printf("report written to %s", reportPath)
+log.Printf("[DEBUG] report written to %s", reportPath)
 }
 
 // Write HTML report
 if _, err := report.WriteHTMLReport(evalReport, e.opts.OutputDir, runID,
 task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
 if e.opts.Debug {
-log.Printf("failed to write HTML report: %v", err)
+log.Printf("[DEBUG] ERROR: failed to write HTML report: %v", err)
 }
 }
 

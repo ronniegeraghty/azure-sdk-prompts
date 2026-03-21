@@ -69,7 +69,7 @@ t.Error("expected success to be true")
 }
 
 // Verify directory structure
-expectedDir := filepath.Join(dir, "runs", "20240115-100000", "results", "storage", "data-plane", "dotnet", "authentication", "baseline")
+expectedDir := filepath.Join(dir, "20240115-100000", "results", "storage", "data-plane", "dotnet", "authentication", "baseline")
 if _, err := os.Stat(expectedDir); err != nil {
 t.Errorf("expected directory %s to exist", expectedDir)
 }

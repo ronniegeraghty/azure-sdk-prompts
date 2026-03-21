@@ -9,6 +9,7 @@ import (
 )
 
 var promptSectionRe = regexp.MustCompile(`(?m)^## Prompt\s*\n`)
+var expectedCoverageRe = regexp.MustCompile(`(?m)^## Expected Coverage\s*\n`)
 
 // ParsePromptFile parses a .prompt.md file's content into a Prompt struct.
 func ParsePromptFile(content []byte, filePath string) (*Prompt, error) {
@@ -38,6 +39,18 @@ if nextLoc != nil {
 promptBody = promptBody[:nextLoc[0]]
 }
 p.PromptText = strings.TrimSpace(promptBody)
+}
+
+// Extract ## Expected Coverage section
+covLoc := expectedCoverageRe.FindStringIndex(body)
+if covLoc != nil {
+covBody := body[covLoc[1]:]
+nextHeading := regexp.MustCompile(`(?m)^## `)
+nextLoc := nextHeading.FindStringIndex(covBody)
+if nextLoc != nil {
+covBody = covBody[:nextLoc[0]]
+}
+p.ExpectedCoverage = strings.TrimSpace(covBody)
 }
 
 p.FilePath = filePath

@@ -24,6 +24,9 @@ ExpectedPkgs    []string          `yaml:"expected_packages" json:"expected_packa
 // The prompt text extracted from the ## Prompt section
 PromptText string `yaml:"-" json:"prompt_text"`
 
+// The expected coverage text extracted from the ## Expected Coverage section
+ExpectedCoverage string `yaml:"-" json:"expected_coverage,omitempty"`
+
 // Source file path
 FilePath string `yaml:"-" json:"file_path"`
 }

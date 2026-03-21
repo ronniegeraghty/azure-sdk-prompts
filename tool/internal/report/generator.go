@@ -12,7 +12,7 @@ import (
 // WriteReport writes an EvalReport as JSON to the appropriate directory.
 func WriteReport(r *EvalReport, outputDir string, runID string, p *prompt.Prompt) (string, error) {
 reportDir := filepath.Join(
-outputDir, "runs", runID, "results",
+outputDir, runID, "results",
 p.Service, p.Plane, p.Language, p.Category, r.ConfigName,
 )
 
@@ -36,7 +36,7 @@ return reportPath, nil
 
 // WriteSummary writes a RunSummary as JSON.
 func WriteSummary(s *RunSummary, outputDir string) (string, error) {
-summaryDir := filepath.Join(outputDir, "runs", s.RunID)
+summaryDir := filepath.Join(outputDir, s.RunID)
 if err := os.MkdirAll(summaryDir, 0755); err != nil {
 return "", fmt.Errorf("creating summary directory: %w", err)
 }

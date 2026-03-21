@@ -5,6 +5,22 @@ import (
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/review"
 )
 
+// SessionEventRecord is a serializable representation of a Copilot session event.
+type SessionEventRecord struct {
+Type     string `json:"type"`
+ToolName string `json:"tool_name,omitempty"`
+ToolArgs string `json:"tool_args,omitempty"`
+Content  string `json:"content,omitempty"`
+Error    string `json:"error,omitempty"`
+}
+
+// VerifyResult holds the outcome of Copilot-based code verification.
+type VerifyResult struct {
+Pass      bool   `json:"pass"`
+Reasoning string `json:"reasoning"`
+Summary   string `json:"summary"`
+}
+
 // EvalReport contains the results of a single prompt evaluation.
 type EvalReport struct {
 PromptID       string               `json:"prompt_id"`
@@ -14,12 +30,16 @@ Duration       float64              `json:"duration_seconds"`
 PromptMeta     map[string]any       `json:"prompt_metadata"`
 ConfigUsed     map[string]any       `json:"config_used"`
 GeneratedFiles []string             `json:"generated_files"`
-Build          *build.BuildResult   `json:"build"`
+Build          *build.BuildResult   `json:"build,omitempty"`
+Verification   *VerifyResult        `json:"verification,omitempty"`
 Review         *review.ReviewResult `json:"review,omitempty"`
+SessionEvents  []SessionEventRecord `json:"session_events,omitempty"`
 EventCount     int                  `json:"event_count"`
 ToolCalls      []string             `json:"tool_calls"`
 Success        bool                 `json:"success"`
 Error          string               `json:"error,omitempty"`
+ErrorDetails   string               `json:"error_details,omitempty"`
+IsStub         bool                 `json:"is_stub,omitempty"`
 }
 
 // RunSummary contains aggregate statistics for an evaluation run.

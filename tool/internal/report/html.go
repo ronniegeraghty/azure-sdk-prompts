@@ -11,7 +11,7 @@ import (
 // WriteHTMLReport writes an individual evaluation report as HTML.
 func WriteHTMLReport(r *EvalReport, outputDir string, runID string, service, plane, language, category string) (string, error) {
 	reportDir := filepath.Join(
-		outputDir, "runs", runID, "results",
+		outputDir, runID, "results",
 		service, plane, language, category, r.ConfigName,
 	)
 	if err := os.MkdirAll(reportDir, 0755); err != nil {
@@ -40,7 +40,7 @@ func WriteHTMLReport(r *EvalReport, outputDir string, runID string, service, pla
 
 // WriteSummaryHTML writes a cross-config comparison summary as HTML.
 func WriteSummaryHTML(s *RunSummary, outputDir string) (string, error) {
-	summaryDir := filepath.Join(outputDir, "runs", s.RunID)
+	summaryDir := filepath.Join(outputDir, s.RunID)
 	if err := os.MkdirAll(summaryDir, 0755); err != nil {
 		return "", fmt.Errorf("creating summary directory: %w", err)
 	}
@@ -172,6 +172,7 @@ const reportTemplate = `<!DOCTYPE html>
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; font-weight: 600; }
   .badge-pass { background: #dcfce7; color: #166534; }
   .badge-fail { background: #fef2f2; color: #991b1b; }
+  .badge-stub { background: #fef3c7; color: #92400e; }
   .card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
   .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; }
   .score-item { text-align: center; padding: 0.5rem; border-radius: 4px; background: #f9fafb; }
@@ -185,21 +186,50 @@ const reportTemplate = `<!DOCTYPE html>
   .meta-table td:first-child { font-weight: 600; width: 140px; color: #6b7280; }
   .files-list { list-style: none; padding: 0; }
   .files-list li { padding: 0.25rem 0; font-family: monospace; font-size: 0.9rem; }
+  .event { padding: 0.25rem 0; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; }
+  .event-type { font-weight: 600; color: #6b7280; font-size: 0.75rem; text-transform: uppercase; }
+  .event-tool { color: #7c3aed; }
+  .event-assistant { color: #0369a1; }
+  .event-error { color: #dc2626; }
+  .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
 </style>
 </head>
 <body>
 <h1>{{.PromptID}} <span style="color:#6b7280">/ {{.ConfigName}}</span></h1>
 
+{{if .IsStub}}
+<div class="card" style="background:#fffbeb;border-color:#fde68a">
+  <h2>⚠️ Stub Mode</h2>
+  <p>Running in stub mode — no Copilot session was created. Results are placeholders.</p>
+</div>
+{{end}}
+
 <div class="card">
   <h2>Overview</h2>
   <table class="meta-table">
-    <tr><td>Status</td><td>{{if .Success}}<span class="badge badge-pass">PASS</span>{{else}}<span class="badge badge-fail">FAIL</span>{{end}}</td></tr>
+    <tr><td>Status</td><td>{{if .Success}}<span class="badge badge-pass">PASS</span>{{else}}<span class="badge badge-fail">FAIL</span>{{end}}{{if .IsStub}} <span class="badge badge-stub">STUB</span>{{end}}</td></tr>
     <tr><td>Duration</td><td>{{fmtDuration .Duration}}</td></tr>
     <tr><td>Timestamp</td><td>{{.Timestamp}}</td></tr>
     <tr><td>Events</td><td>{{.EventCount}}</td></tr>
     {{if .Error}}<tr><td>Error</td><td style="color:#991b1b">{{.Error}}</td></tr>{{end}}
   </table>
 </div>
+
+{{if .Error}}
+<div class="error-box">
+  <h2>❌ Error Details</h2>
+  <p><strong>{{.Error}}</strong></p>
+  {{if .ErrorDetails}}<details open><summary>Full Error</summary><pre>{{.ErrorDetails}}</pre></details>{{end}}
+</div>
+{{end}}
+
+{{if .Verification}}
+<div class="card">
+  <h2>Verification {{if .Verification.Pass}}<span class="badge badge-pass">PASS</span>{{else}}<span class="badge badge-fail">FAIL</span>{{end}}</h2>
+  <p><strong>{{.Verification.Summary}}</strong></p>
+  {{if .Verification.Reasoning}}<details open><summary>Reasoning</summary><pre>{{.Verification.Reasoning}}</pre></details>{{end}}
+</div>
+{{end}}
 
 {{if .Review}}
 <div class="card">
@@ -251,6 +281,24 @@ const reportTemplate = `<!DOCTYPE html>
 <div class="card">
   <h2>Tool Calls</h2>
   <p>{{join .ToolCalls ", "}}</p>
+</div>
+{{end}}
+
+{{if .SessionEvents}}
+<div class="card">
+  <h2>Session Transcript</h2>
+  <p>{{.EventCount}} events captured</p>
+  <details><summary>Show all events</summary>
+  {{range .SessionEvents}}
+  <div class="event">
+    <span class="event-type">{{.Type}}</span>
+    {{if .ToolName}}<span class="event-tool"> {{.ToolName}}</span>{{end}}
+    {{if .ToolArgs}}<span style="color:#6b7280"> ({{.ToolArgs}})</span>{{end}}
+    {{if .Content}}<pre style="margin:0.25rem 0;padding:0.5rem">{{.Content}}</pre>{{end}}
+    {{if .Error}}<span class="event-error">{{.Error}}</span>{{end}}
+  </div>
+  {{end}}
+  </details>
 </div>
 {{end}}
 

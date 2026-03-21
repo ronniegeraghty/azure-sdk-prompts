@@ -17,7 +17,7 @@ copilot "github.com/github/copilot-sdk/go"
 "github.com/spf13/cobra"
 )
 
-var version = "0.2.0"
+var version = "0.3.0"
 
 func main() {
 if err := rootCmd().Execute(); err != nil {
@@ -78,24 +78,25 @@ return resolvePathFlag(cmd, "output", candidates)
 }
 
 type runFlags struct {
-prompts    string
-service    string
-language   string
-plane      string
-category   string
-tags       string
-promptID   string
-configName string
-configFile string
-workers    int
-timeout    int
-model      string
-output     string
-skipTests  bool
-skipReview bool
-debug      bool
-dryRun     bool
-useStub    bool
+prompts     string
+service     string
+language    string
+plane       string
+category    string
+tags        string
+promptID    string
+configName  string
+configFile  string
+workers     int
+timeout     int
+model       string
+output      string
+skipTests   bool
+skipReview  bool
+verifyBuild bool
+debug       bool
+dryRun      bool
+useStub     bool
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -114,6 +115,7 @@ cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
 cmd.Flags().StringVar(&f.output, "output", "./reports", "Report output directory")
 cmd.Flags().BoolVar(&f.skipTests, "skip-tests", false, "Skip test generation")
 cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
+cmd.Flags().BoolVar(&f.verifyBuild, "verify-build", false, "Also run build verification (in addition to Copilot verification)")
 cmd.Flags().BoolVar(&f.debug, "debug", false, "Verbose output")
 cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
 cmd.Flags().BoolVar(&f.useStub, "stub", false, "Use stub evaluator (no Copilot SDK)")
@@ -191,14 +193,16 @@ return nil
 fmt.Printf("Found %d prompt(s), %d config(s) → %d evaluation(s)\n",
 len(filtered), len(configs), len(filtered)*len(configs))
 
-// Select evaluator and reviewer
+// Select evaluator, verifier, and reviewer
 var evaluator eval.CopilotEvaluator
 var reviewer review.Reviewer
+var verifier eval.Verifier
 
 if f.useStub {
 fmt.Println("Using stub evaluator (--stub flag)")
 evaluator = &eval.StubEvaluator{}
 reviewer = &review.StubReviewer{}
+verifier = &eval.StubVerifier{}
 } else {
 // Try to create a real Copilot SDK evaluator
 sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
@@ -212,13 +216,14 @@ if err := client.Start(context.Background()); err != nil {
 fmt.Printf("⚠️  Copilot SDK unavailable (%v), falling back to stub evaluator\n", err)
 evaluator = &eval.StubEvaluator{}
 reviewer = &review.StubReviewer{}
+verifier = &eval.StubVerifier{}
 } else {
 client.Stop()
 fmt.Println("Using Copilot SDK evaluator")
 if !f.skipReview {
-// Reviewer will create its own sessions per review
 reviewer = nil // engine will get reviewer from copilot evaluator
 }
+verifier = nil // engine will get verifier from copilot evaluator
 }
 }
 
@@ -227,14 +232,15 @@ reviewer = nil
 }
 
 // Create and run engine
-engine := eval.NewEngineWithReviewer(evaluator, reviewer, eval.EngineOptions{
-Workers:    f.workers,
-Timeout:    time.Duration(f.timeout) * time.Second,
-OutputDir:  f.output,
-SkipTests:  f.skipTests,
-SkipReview: f.skipReview,
-Debug:      f.debug,
-DryRun:     f.dryRun,
+engine := eval.NewEngineWithReviewer(evaluator, verifier, reviewer, eval.EngineOptions{
+Workers:     f.workers,
+Timeout:     time.Duration(f.timeout) * time.Second,
+OutputDir:   f.output,
+SkipTests:   f.skipTests,
+SkipReview:  f.skipReview,
+VerifyBuild: f.verifyBuild,
+Debug:       f.debug,
+DryRun:      f.dryRun,
 })
 
 summary, err := engine.Run(context.Background(), filtered, configs)

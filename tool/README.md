@@ -1,6 +1,6 @@
 # sdk-eval — CLI Reference
 
-The `sdk-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying builds, scoring code via LLM-as-judge review, and generating JSON + HTML reports.
+The `sdk-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying code with Copilot-based verification, scoring code via LLM-as-judge review, and generating JSON + HTML reports.
 
 ## Installation
 
@@ -18,7 +18,7 @@ go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@latest
 sdk-eval <command> [flags]
 ```
 
-> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@tool/v0.2.0`
+> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@tool/v0.3.0`
 
 ## Features
 
@@ -35,6 +35,15 @@ sdk-eval <command> [flags]
 - **HTML reports** — Per-evaluation reports with score visualization and collapsible build output
 - **Summary dashboard** — Cross-config comparison matrix (prompt × config) with scores and build status
 - **Graceful fallback** — Falls back to stub evaluator if Copilot CLI is unavailable
+
+### Phase 2.1 (v0.3.0) ✅
+- **Copilot-based verification** — Separate Copilot session verifies code meets requirements (replaces build-only verification as default)
+- **Build verification optional** — Use `--verify-build` to also run language-specific build checks
+- **Session transcripts** — Full event capture (tool calls, assistant messages, errors) in JSON + HTML reports
+- **Failure diagnostics** — Failed evals show detailed error info, session events, and stub mode indicator
+- **Debug mode** — `--debug` streams real-time session events to stderr (tool calls, messages, verification/review status)
+- **Flat report structure** — Reports write to `reports/{timestamp}/` instead of `reports/runs/{timestamp}/`
+- **Expected Coverage** — Parser extracts `## Expected Coverage` sections from prompt files for verification
 
 ## Authentication
 
@@ -72,6 +81,7 @@ sdk-eval run [flags]
 | `--output` | `./reports` | Report output directory |
 | `--skip-tests` | `false` | Skip test generation |
 | `--skip-review` | `false` | Skip LLM-as-judge code review |
+| `--verify-build` | `false` | Also run build verification (in addition to Copilot verification) |
 | `--stub` | `false` | Force stub evaluator (no Copilot SDK) |
 | `--debug` | `false` | Verbose output |
 | `--dry-run` | `false` | List matches without executing |
@@ -165,7 +175,7 @@ If a prompt has a `reference_answer` field pointing to a directory of reference 
 ### JSON (machine-readable)
 
 ```
-reports/runs/<timestamp>/
+reports/<timestamp>/
 ├── summary.json          # Aggregate run statistics
 └── results/
     └── <service>/<plane>/<language>/<category>/<config>/
@@ -175,7 +185,7 @@ reports/runs/<timestamp>/
 ### HTML (human-readable)
 
 ```
-reports/runs/<timestamp>/
+reports/<timestamp>/
 ├── summary.html          # Cross-config comparison matrix dashboard
 └── results/
     └── <service>/<plane>/<language>/<category>/<config>/
@@ -247,6 +257,7 @@ tool/
 │   ├── build/                   # Build verification per language
 │   ├── report/                  # JSON + HTML report generation
 │   ├── review/                  # LLM-as-judge code review
+│   ├── verify/                  # Copilot-based code verification
 │   ├── manifest/                # Manifest generation from prompts
 │   └── validate/                # Prompt frontmatter validation
 └── testdata/                    # Test fixtures
@@ -258,4 +269,5 @@ tool/
 |-------|--------|-------------|
 | Phase 1 | ✅ Done | Prompt library, build verification, JSON reports (stub evaluator) |
 | Phase 2 | ✅ Done | Copilot SDK integration, LLM-as-judge review, HTML reports |
+| Phase 2.1 | ✅ Done | Copilot verification, session transcripts, debug mode, failure diagnostics |
 | Phase 3 | Planned | Auto-generated tests, historical trend tracking, event trace reports |

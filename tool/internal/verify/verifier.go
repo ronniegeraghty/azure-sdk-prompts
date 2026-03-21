@@ -1,0 +1,189 @@
+package verify
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	copilot "github.com/github/copilot-sdk/go"
+	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/report"
+)
+
+// CopilotVerifier uses a separate Copilot session to verify generated code against requirements.
+type CopilotVerifier struct {
+	client *copilot.Client
+	model  string
+}
+
+// NewCopilotVerifier creates a verifier backed by the given Copilot client.
+func NewCopilotVerifier(client *copilot.Client, model string) *CopilotVerifier {
+	if model == "" {
+		model = "claude-sonnet-4.5"
+	}
+	return &CopilotVerifier{client: client, model: model}
+}
+
+// Verify creates a separate Copilot session to evaluate whether generated code meets requirements.
+func (v *CopilotVerifier) Verify(ctx context.Context, originalPrompt string, workDir string, expectedCoverage string) (*report.VerifyResult, error) {
+	generatedFiles, err := readDirFiles(workDir)
+	if err != nil {
+		return nil, fmt.Errorf("reading generated files: %w", err)
+	}
+	if len(generatedFiles) == 0 {
+		return &report.VerifyResult{
+			Pass:      false,
+			Reasoning: "No files were generated.",
+			Summary:   "FAIL — no output files found",
+		}, nil
+	}
+
+	verifyPrompt := buildVerifyPrompt(originalPrompt, generatedFiles, expectedCoverage)
+
+	session, err := v.client.CreateSession(ctx, &copilot.SessionConfig{
+		Model: v.model,
+		SystemMessage: &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: "You are a code verification judge. Respond with ONLY valid JSON. No markdown, no explanation.",
+		},
+		WorkingDirectory:    workDir,
+		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating verification session: %w", err)
+	}
+	defer session.Disconnect()
+
+	var assistantContent strings.Builder
+	var mu sync.Mutex
+	unsub := session.On(func(event copilot.SessionEvent) {
+		if event.Type == copilot.SessionEventTypeAssistantMessage && event.Data.Content != nil {
+			mu.Lock()
+			assistantContent.WriteString(*event.Data.Content)
+			mu.Unlock()
+		}
+	})
+	defer unsub()
+
+	_, err = session.SendAndWait(ctx, copilot.MessageOptions{
+		Prompt: verifyPrompt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("verification session send: %w", err)
+	}
+
+	mu.Lock()
+	responseText := assistantContent.String()
+	mu.Unlock()
+
+	return parseVerifyResponse(responseText)
+}
+
+func buildVerifyPrompt(originalPrompt string, generatedFiles map[string]string, expectedCoverage string) string {
+	var b strings.Builder
+
+	b.WriteString("You are a code verification judge. Evaluate whether the generated code meets the requirements.\n\n")
+
+	b.WriteString("## Original Prompt\n\n")
+	b.WriteString(originalPrompt)
+	b.WriteString("\n\n")
+
+	if expectedCoverage != "" {
+		b.WriteString("## Expected Coverage\n\n")
+		b.WriteString(expectedCoverage)
+		b.WriteString("\n\n")
+	}
+
+	b.WriteString("## Generated Code\n\n")
+	for name, content := range generatedFiles {
+		fmt.Fprintf(&b, "### %s\n```\n%s\n```\n\n", name, content)
+	}
+
+	b.WriteString(`## Evaluation Criteria
+
+Determine if this code meets the prompt's requirements:
+1. Does it address the main task described in the prompt?
+2. Does it use the correct SDK/packages mentioned?
+3. Is it syntactically valid and likely to compile/run?
+4. Does it handle the key scenarios mentioned?
+
+## Output Format
+
+Respond with ONLY a JSON object:
+{"pass": true/false, "reasoning": "Detailed explanation of what was checked and why it passes or fails", "summary": "One-line summary"}
+`)
+
+	return b.String()
+}
+
+func parseVerifyResponse(text string) (*report.VerifyResult, error) {
+	jsonStr := extractJSON(text)
+	if jsonStr == "" {
+		return nil, fmt.Errorf("no JSON found in verification response: %.200s", text)
+	}
+
+	var result report.VerifyResult
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("parsing verification JSON: %w (response: %.200s)", err, jsonStr)
+	}
+	return &result, nil
+}
+
+func extractJSON(text string) string {
+	text = strings.TrimSpace(text)
+	if strings.HasPrefix(text, "```json") {
+		text = strings.TrimPrefix(text, "```json")
+		if idx := strings.LastIndex(text, "```"); idx >= 0 {
+			text = text[:idx]
+		}
+	} else if strings.HasPrefix(text, "```") {
+		text = strings.TrimPrefix(text, "```")
+		if idx := strings.LastIndex(text, "```"); idx >= 0 {
+			text = text[:idx]
+		}
+	}
+	text = strings.TrimSpace(text)
+
+	start := strings.Index(text, "{")
+	end := strings.LastIndex(text, "}")
+	if start >= 0 && end > start {
+		return text[start : end+1]
+	}
+	return ""
+}
+
+func readDirFiles(dir string) (map[string]string, error) {
+	files := make(map[string]string)
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			name := info.Name()
+			if strings.HasPrefix(name, ".") && path != dir {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Size() > 1<<20 {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return nil
+		}
+		if strings.HasPrefix(filepath.Base(rel), ".") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		files[rel] = string(data)
+		return nil
+	})
+	return files, err
+}

@@ -12,6 +12,7 @@ import (
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/config"
 	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
+	"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/report"
 )
 
 // CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.
@@ -67,7 +68,10 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	client := copilot.NewClient(&opts)
 
 	if err := client.Start(ctx); err != nil {
-		return nil, fmt.Errorf("starting copilot client: %w", err)
+		return &EvalResult{
+			Error:        fmt.Sprintf("copilot client start failed: %v", err),
+			ErrorDetails: err.Error(),
+		}, fmt.Errorf("starting copilot client: %w", err)
 	}
 	defer client.Stop()
 
@@ -76,32 +80,95 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 
 	session, err := client.CreateSession(ctx, sessionCfg)
 	if err != nil {
-		return nil, fmt.Errorf("creating session: %w", err)
+		return &EvalResult{
+			Error:        fmt.Sprintf("session creation failed: %v", err),
+			ErrorDetails: err.Error(),
+		}, fmt.Errorf("creating session: %w", err)
 	}
 	defer session.Disconnect()
 
-	// Subscribe to events
+	// Subscribe to events with detailed capture and debug logging
 	var events []copilot.SessionEvent
+	var sessionRecords []report.SessionEventRecord
 	var mu sync.Mutex
 	unsub := session.On(func(event copilot.SessionEvent) {
 		mu.Lock()
 		events = append(events, event)
+
+		// Build serializable event record
+		rec := report.SessionEventRecord{
+			Type: string(event.Type),
+		}
+		if event.Data.ToolName != nil {
+			rec.ToolName = *event.Data.ToolName
+		}
+		if event.Data.Content != nil {
+			rec.Content = *event.Data.Content
+		}
+		sessionRecords = append(sessionRecords, rec)
 		mu.Unlock()
+
+		// Debug logging to stderr
+		if e.debug {
+			switch event.Type {
+			case copilot.SessionEventTypeToolExecutionStart:
+				toolName := ""
+				if event.Data.ToolName != nil {
+					toolName = *event.Data.ToolName
+				}
+				log.Printf("[DEBUG] ← Tool call: %s", toolName)
+			case copilot.SessionEventTypeToolExecutionComplete:
+				content := ""
+				if event.Data.Content != nil {
+					content = truncateStr(*event.Data.Content, 200)
+				}
+				log.Printf("[DEBUG] → Tool result: %s", content)
+			case copilot.SessionEventTypeAssistantMessage:
+				content := ""
+				if event.Data.Content != nil {
+					content = truncateStr(*event.Data.Content, 200)
+				}
+				if content != "" {
+					log.Printf("[DEBUG] ← Assistant: %s", content)
+				}
+			case copilot.SessionEventTypeSessionError:
+				content := ""
+				if event.Data.Content != nil {
+					content = *event.Data.Content
+				}
+				log.Printf("[DEBUG] ERROR: %s", content)
+			}
+		}
 	})
 	defer unsub()
 
 	// Send the prompt
+	if e.debug {
+		log.Printf("[DEBUG] → Sending prompt (%d chars)...", len(p.PromptText))
+	}
 	_, err = session.SendAndWait(ctx, copilot.MessageOptions{
 		Prompt: p.PromptText,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("sending prompt: %w", err)
+		mu.Lock()
+		captured := make([]report.SessionEventRecord, len(sessionRecords))
+		copy(captured, sessionRecords)
+		mu.Unlock()
+		return &EvalResult{
+			SessionEvents: captured,
+			EventCount:    len(captured),
+			ToolCalls:     extractToolCalls(events),
+			Error:         fmt.Sprintf("prompt send failed: %v", err),
+			ErrorDetails:  err.Error(),
+		}, fmt.Errorf("sending prompt: %w", err)
 	}
 
 	// Collect results
 	mu.Lock()
 	capturedEvents := make([]copilot.SessionEvent, len(events))
 	copy(capturedEvents, events)
+	capturedRecords := make([]report.SessionEventRecord, len(sessionRecords))
+	copy(capturedRecords, sessionRecords)
 	mu.Unlock()
 
 	generatedFiles := listWorkspaceFiles(workDir)
@@ -109,7 +176,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	hasError := hasSessionError(capturedEvents)
 
 	if e.debug {
-		log.Printf("[copilot] %s/%s: %d events, %d tool calls, %d files",
+		log.Printf("[DEBUG] %s/%s: %d events, %d tool calls, %d files",
 			p.ID, cfg.Name, len(capturedEvents), len(toolCalls), len(generatedFiles))
 	}
 
@@ -117,9 +184,18 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		GeneratedFiles: generatedFiles,
 		EventCount:     len(capturedEvents),
 		ToolCalls:      toolCalls,
+		SessionEvents:  capturedRecords,
 		Success:        !hasError,
 		Error:          "",
 	}, nil
+}
+
+// truncateStr truncates a string to maxLen characters, appending "..." if truncated.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // Client returns a new Copilot client for the given working directory.
