@@ -281,9 +281,17 @@ Write all code to the current working directory.`,
 		},
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
-		AvailableTools:      cfg.AvailableTools,
-		ExcludedTools:       cfg.ExcludedTools,
 		SkillDirectories:    cfg.SkillDirectories,
+	}
+
+	// Only set AvailableTools/ExcludedTools when non-empty.
+	// An empty slice serializes as JSON [] which tells the CLI "zero tools" —
+	// nil serializes as null which means "all default tools available."
+	if len(cfg.AvailableTools) > 0 {
+		sc.AvailableTools = cfg.AvailableTools
+	}
+	if len(cfg.ExcludedTools) > 0 {
+		sc.ExcludedTools = cfg.ExcludedTools
 	}
 
 	// Map MCP servers

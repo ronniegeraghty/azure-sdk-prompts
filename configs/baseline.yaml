@@ -1,8 +1,7 @@
+# Baseline: no MCP servers, no skills — all default Copilot tools available
 configs:
   - name: baseline
     description: "No MCP servers, no skills — just base Copilot"
     model: "claude-sonnet-4.5"
-    mcp_servers: {}
-    skill_directories: []
-    available_tools: []
-    excluded_tools: []
+    # Omit available_tools/excluded_tools to get all default tools (create, edit, bash, etc.)
+    # Setting available_tools: [] would disable ALL tools.

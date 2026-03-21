@@ -8,6 +8,4 @@ configs:
         command: npx
         args: ["-y", "@azure/mcp@latest"]
         tools: ["*"]
-    skill_directories: []
-    available_tools: []
-    excluded_tools: []
+    # Omit available_tools/excluded_tools to get all default tools
