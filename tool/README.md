@@ -1,6 +1,6 @@
-# sdk-eval — CLI Reference
+# azsdk-prompt-eval — CLI Reference
 
-The `sdk-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying code with Copilot-based verification, scoring code via LLM-as-judge review, and generating JSON, HTML, and Markdown reports.
+The `azsdk-prompt-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying code with Copilot-based verification, scoring code via LLM-as-judge review, and generating JSON, HTML, and Markdown reports.
 
 ## Prerequisites
 
@@ -18,17 +18,17 @@ The `sdk-eval` tool evaluates AI agent code generation quality by running prompt
 
 ```bash
 cd azure-sdk-prompts
-go run ./tool/cmd/sdk-eval <command> [flags]
+go run ./tool/cmd/azsdk-prompt-eval <command> [flags]
 ```
 
 ### Install globally
 
 ```bash
-go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@latest
-sdk-eval <command> [flags]
+go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/azsdk-prompt-eval@latest
+azsdk-prompt-eval <command> [flags]
 ```
 
-> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@tool/v0.3.0`
+> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/azsdk-prompt-eval@tool/v0.3.0`
 
 ## Features
 
@@ -66,12 +66,12 @@ Use `--stub` to explicitly skip SDK initialization and use the stub evaluator.
 
 ## Commands
 
-### `sdk-eval run`
+### `azsdk-prompt-eval run`
 
 Run evaluations against the prompt library.
 
 ```bash
-sdk-eval run [flags]
+azsdk-prompt-eval run [flags]
 ```
 
 | Flag | Default | Description |
@@ -100,37 +100,37 @@ sdk-eval run [flags]
 
 ```bash
 # Run all prompts with all configs (real Copilot SDK)
-sdk-eval run
+azsdk-prompt-eval run
 
 # Run with stub evaluator (no SDK needed)
-sdk-eval run --stub
+azsdk-prompt-eval run --stub
 
 # Run storage prompts with the baseline config, skip review
-sdk-eval run --service storage --config baseline --skip-review
+azsdk-prompt-eval run --service storage --config baseline --skip-review
 
 # Run a single prompt
-sdk-eval run --prompt-id storage-dp-dotnet-auth
+azsdk-prompt-eval run --prompt-id storage-dp-dotnet-auth
 
 # Compare configs
-sdk-eval run --service storage --config baseline,azure-mcp
+azsdk-prompt-eval run --service storage --config baseline,azure-mcp
 ```
 
-### `sdk-eval list`
+### `azsdk-prompt-eval list`
 
 List prompts matching the given filters (no evaluation).
 
 ```bash
-sdk-eval list [flags]
+azsdk-prompt-eval list [flags]
 ```
 
 Takes the same filter flags as `run`. Output shows prompt ID, service/plane/language, category, and description.
 
-### `sdk-eval manifest`
+### `azsdk-prompt-eval manifest`
 
 Regenerate `manifest.yaml` from prompt files.
 
 ```bash
-sdk-eval manifest [flags]
+azsdk-prompt-eval manifest [flags]
 ```
 
 | Flag | Default | Description |
@@ -138,31 +138,41 @@ sdk-eval manifest [flags]
 | `--prompts` | `./prompts` (auto-detected) | Path to prompt library directory |
 | `--output` | `./manifest.yaml` (auto-detected) | Output path for manifest |
 
-### `sdk-eval validate`
+### `azsdk-prompt-eval validate`
 
 Validate prompt frontmatter against the schema.
 
 ```bash
-sdk-eval validate [flags]
+azsdk-prompt-eval validate [flags]
 ```
 
 Checks required fields, enum values, ID naming conventions, and `## Prompt` section presence. Exits with code 1 on validation failure.
 
-### `sdk-eval configs`
+### `azsdk-prompt-eval configs`
 
 List available tool configurations.
 
 ```bash
-sdk-eval configs [--config-file PATH]
+azsdk-prompt-eval configs [--config-file PATH]
 ```
 
-### `sdk-eval version`
+### `azsdk-prompt-eval version`
 
 Print the tool version.
 
+### `azsdk-prompt-eval check-env`
+
+Check for required language toolchains and tools.
+
+```bash
+azsdk-prompt-eval check-env
+```
+
+Reports availability of Python, .NET, Go, Node.js, Java, Rust, C/C++, Copilot CLI, gh authentication, and npx (for Azure MCP server). Uses ✅/❌ indicators with version strings.
+
 ## Code Review (LLM-as-Judge)
 
-After code generation, `sdk-eval` creates a **separate** Copilot session to review the generated code. This avoids self-bias — the reviewer didn't generate the code.
+After code generation, `azsdk-prompt-eval` creates a **separate** Copilot session to review the generated code. This avoids self-bias — the reviewer didn't generate the code.
 
 ### Scoring Dimensions (1-10)
 
@@ -258,7 +268,7 @@ configs:
 
 ## Smart Path Detection
 
-`sdk-eval` automatically resolves paths when flags aren't explicitly set:
+`azsdk-prompt-eval` automatically resolves paths when flags aren't explicitly set:
 
 | Flag | Candidates checked |
 |------|--------------------|
@@ -270,9 +280,10 @@ configs:
 
 ```
 tool/
-├── cmd/sdk-eval/main.go        # CLI entry point (cobra)
+├── cmd/azsdk-prompt-eval/main.go        # CLI entry point (cobra)
 ├── go.mod / go.sum
 ├── internal/
+│   ├── checkenv/                # Environment check (check-env command)
 │   ├── config/                  # Config file parsing
 │   ├── prompt/                  # Prompt loading, parsing, filtering
 │   ├── eval/                    # Engine, workspace, CopilotSDKEvaluator
@@ -292,4 +303,6 @@ tool/
 | Phase 1 | ✅ Done | Prompt library, build verification, JSON reports (stub evaluator) |
 | Phase 2 | ✅ Done | Copilot SDK integration, LLM-as-judge review, HTML reports |
 | Phase 2.1 | ✅ Done | Copilot verification, session transcripts, debug mode, failure diagnostics |
-| Phase 3 | Planned | Auto-generated tests, historical trend tracking, event trace reports |
+| Phase 3 | ✅ Done | Tool matrix, MCP server attachment, skill loading, cross-config comparison |
+| Phase 4 | In Progress | Evaluation quality — check-env, expected_tools, reviewer skills |
+| Phase 5 | Planned | Polish — report re-rendering, embedded CLI, progress bars |

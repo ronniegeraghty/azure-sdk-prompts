@@ -13,6 +13,7 @@ doc_url: # https://learn.microsoft.com/...
 tags: []
 created: # YYYY-MM-DD
 author: # GitHub username
+# expected_tools: []  # Optional: tool names the generation session should use (e.g., create_file, run_terminal_command, azure_mcp)
 ---
 
 # <Title>: <Service> (<Language>)

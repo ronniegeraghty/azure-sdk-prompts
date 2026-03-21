@@ -5,16 +5,16 @@
 **Requested by:** Ronnie Geraghty
 
 > **⚠️ UPDATE 2026-07-28:** Implementation complete. Python scripts removed. The Go
-> `sdk-eval` tool is the sole evaluation approach. Tool lives in `tool/` subdirectory
+> `azsdk-prompt-eval` tool is the sole evaluation approach. Tool lives in `tool/` subdirectory
 > with configs at `configs/` (repo root) and reports at `reports/` (repo root). The
-> standalone `sdk-eval-tool` repo has been deleted. Sections referencing Python scripts,
+> standalone `azsdk-prompt-eval-tool` repo has been deleted. Sections referencing Python scripts,
 > `doc-agent evaluate`, `scripts/`, or the separate repo are historical context only.
 
 ---
 
 ## Executive Summary
 
-This plan describes the Go-based evaluation tool for testing how well AI agents write and update Azure SDK code. The tool lives in the `ronniegeraghty/azure-sdk-prompts` monorepo alongside the prompt library. Python scripts and the `doc-agent evaluate` workflow have been removed — `sdk-eval` is the sole evaluation approach.
+This plan describes the Go-based evaluation tool for testing how well AI agents write and update Azure SDK code. The tool lives in the `ronniegeraghty/azure-sdk-prompts` monorepo alongside the prompt library. Python scripts and the `doc-agent evaluate` workflow have been removed — `azsdk-prompt-eval` is the sole evaluation approach.
 
 The new tool uses the **GitHub Copilot SDK for Go** (`github.com/github/copilot-sdk/go`) to programmatically create Copilot sessions, send prompts, capture generated code, verify builds, optionally generate and run tests, and score results via LLM-as-judge review. A key differentiator is the **tool configuration matrix**: each prompt can be tested against multiple configurations (different MCP servers, skills, tool sets) to measure how tooling affects code quality.
 
@@ -550,18 +550,18 @@ Future enhancement: A `trends.html` page showing score trends over time per prom
 ### 8.1 Command Structure
 
 ```bash
-# Binary name: sdk-eval
-sdk-eval run [flags]          # Run evaluations
-sdk-eval list [flags]         # List matching prompts (dry run)
-sdk-eval report [run-id]      # Open/regenerate report for a past run
-sdk-eval configs              # List available configurations
-sdk-eval version              # Print version
+# Binary name: azsdk-prompt-eval
+azsdk-prompt-eval run [flags]          # Run evaluations
+azsdk-prompt-eval list [flags]         # List matching prompts (dry run)
+azsdk-prompt-eval report [run-id]      # Open/regenerate report for a past run
+azsdk-prompt-eval configs              # List available configurations
+azsdk-prompt-eval version              # Print version
 ```
 
 ### 8.2 Filter Flags
 
 ```bash
-sdk-eval run \
+azsdk-prompt-eval run \
   --prompts ./prompts \
   --service storage \
   --language dotnet \
@@ -604,7 +604,7 @@ sdk-eval run \
 ### 8.3 Progress Output
 
 ```
-sdk-eval run --service storage --config baseline,azure-mcp --config-file ./configs/default.yaml
+azsdk-prompt-eval run --service storage --config baseline,azure-mcp --config-file ./configs/default.yaml
 
 Running 8 prompts × 2 configs = 16 evaluations (4 workers)
 
@@ -672,7 +672,7 @@ The doc-review-agent uses `gh auth login` credentials (via the `GH_TOKEN` env va
 
 ### 10.1 Monorepo Layout
 
-The Go eval tool lives in `ronniegeraghty/azure-sdk-prompts` alongside the prompt library and reports. Everything ships from one repo. Python scripts have been removed — `sdk-eval` is the sole evaluation tool.
+The Go eval tool lives in `ronniegeraghty/azure-sdk-prompts` alongside the prompt library and reports. Everything ships from one repo. Python scripts have been removed — `azsdk-prompt-eval` is the sole evaluation tool.
 
 ```
 azure-sdk-prompts/                     # ronniegeraghty/azure-sdk-prompts
@@ -688,9 +688,9 @@ azure-sdk-prompts/                     # ronniegeraghty/azure-sdk-prompts
 │       └── data-plane/
 │           └── dotnet/
 │               └── authentication.prompt.md
-├── tool/                              # Go eval tool (sdk-eval)
+├── tool/                              # Go eval tool (azsdk-prompt-eval)
 │   ├── README.md                      # CLI reference
-│   ├── cmd/sdk-eval/main.go           # CLI entry point (cobra)
+│   ├── cmd/azsdk-prompt-eval/main.go           # CLI entry point (cobra)
 │   ├── go.mod / go.sum
 │   ├── internal/                      # Go packages
 │   │   ├── config/                    # Config file parsing
@@ -725,13 +725,13 @@ tool/go.mod:
 
 ### 10.3 Tool as Sole Evaluation Approach
 
-Python scripts (`run-evals.py`, `generate-manifest.py`, `validate-prompts.py`) have been removed. The Go `sdk-eval` tool replaces all their functionality:
+Python scripts (`run-evals.py`, `generate-manifest.py`, `validate-prompts.py`) have been removed. The Go `azsdk-prompt-eval` tool replaces all their functionality:
 
 | Removed Python Script | Go Replacement |
 |---|---|
-| `scripts/run-evals.py` | `sdk-eval run` |
-| `scripts/generate-manifest.py` | `sdk-eval manifest` |
-| `scripts/validate-prompts.py` | `sdk-eval validate` |
+| `scripts/run-evals.py` | `azsdk-prompt-eval run` |
+| `scripts/generate-manifest.py` | `azsdk-prompt-eval manifest` |
+| `scripts/validate-prompts.py` | `azsdk-prompt-eval validate` |
 
 The tool uses smart path detection — running from the repo root or the `tool/` directory both work without extra flags.
 
@@ -826,7 +826,7 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
 
 ### Phase 1: Foundation (MVP) ✅
-- [x] Project scaffolding (`go.mod`, `cmd/sdk-eval/`, `internal/` packages, CLI framework)
+- [x] Project scaffolding (`go.mod`, `cmd/azsdk-prompt-eval/`, `internal/` packages, CLI framework)
 - [x] Prompt loader (read and filter prompts from `./prompts`)
 - [x] Basic evaluation engine (create session, send prompt, capture events)
 - [x] Build verification (all languages)
@@ -846,23 +846,24 @@ All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
 - [x] Tool filtering per config
 - [x] Matrix execution (prompt × config cross-product)
 
-### Phase 4: Stretch Goals
-- [ ] Auto-generated test support
-- [ ] Test execution and result capture
-- [ ] Historical trend tracking
-- [ ] Existing project context support (starter projects)
+### Phase 4: Evaluation Quality
+- [x] Rename CLI to `azsdk-prompt-eval`
+- [x] `check-env` command — tests if language toolchains are installed (dotnet, python, go, node, java, rust, cargo, cmake, etc.) and reports availability
+- [x] `expected_tools` field in prompt frontmatter — reviewer checks if generation session used those tools
+- [ ] Reviewer build skill — a skill the reviewing Copilot session loads that knows how to set up build environments and attempt builds without modifying generated code
+- [ ] SDK version checking skill — skill for reviewer that checks if generated code uses latest Azure SDK package versions
+- [ ] Tool usage evaluation criteria — reviewer checks generation session tool calls against `expected_tools`
+- [ ] Historical trend command — `azsdk-prompt-eval trends --prompt-id X` uses Copilot SDK to analyze past runs and generate trend reports
 
-> **Status:** Not started. These remain future work.
+> **Status:** In progress. CLI renamed, check-env implemented, expected_tools field added. Reviewer skills and trend command remain.
 
-### Phase 5: Polish — Partial
-- [ ] Embedded CLI binary support (using SDK's bundler)
-- [ ] `sdk-eval report` command for re-viewing past runs
-- [ ] Progress bars and color output
-- [ ] CI/CD documentation (env var auth)
-- [x] ~~Deprecation path for `scripts/run-evals.py`~~ (removed — Go tool is sole approach)
-- [x] Markdown report generation (`report.md` + `summary.md` alongside HTML/JSON)
+### Phase 5: Polish
+- [ ] `azsdk-prompt-eval report` command — re-render HTML/MD from existing report.json (no Copilot SDK, purely template-based)
+- [ ] Embedded CLI binary — use SDK bundler to embed Copilot CLI inside Go binary
+- [ ] Progress bars and color output for terminal UX
+- [ ] Starter project support — `project_context: existing` + `starter_project:` in prompt frontmatter
 
-> **Status:** Partial — Python scripts removed, Markdown reports added. Copilot-based verification and session transcripts were delivered as Phase 2.1 (v0.3.0). Embedded CLI, `report` command, and progress bars remain.
+> **Status:** Not started.
 
 ---
 

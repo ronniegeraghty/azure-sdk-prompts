@@ -1,5 +1,5 @@
 # Use this config to run prompts against both baseline and azure-mcp
-# sdk-eval run --config-file configs/all.yaml
+# azsdk-prompt-eval run --config-file configs/all.yaml
 configs:
   - name: baseline
     description: "No MCP servers, no skills — just base Copilot"

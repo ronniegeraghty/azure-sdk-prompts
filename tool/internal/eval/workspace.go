@@ -17,7 +17,7 @@ type Workspace struct {
 // The workspace is ephemeral — generated files should be copied out
 // before calling Cleanup.
 func NewWorkspace(promptID, configName string) (*Workspace, error) {
-	prefix := fmt.Sprintf("sdk-eval-%s-%s-", promptID, configName)
+	prefix := fmt.Sprintf("azsdk-prompt-eval-%s-%s-", promptID, configName)
 	dir, err := os.MkdirTemp("", prefix)
 	if err != nil {
 		return nil, fmt.Errorf("creating temp workspace: %w", err)

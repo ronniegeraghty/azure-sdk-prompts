@@ -1,6 +1,6 @@
 # azure-sdk-prompts
 
-A curated library of prompts for evaluating how well AI agents generate Azure SDK code, paired with a Go evaluation tool (`sdk-eval`) that runs prompts through the Copilot SDK, verifies builds, and produces scored reports.
+A curated library of prompts for evaluating how well AI agents generate Azure SDK code, paired with a Go evaluation tool (`azsdk-prompt-eval`) that runs prompts through the Copilot SDK, verifies builds, and produces scored reports.
 
 ## Quick Start
 
@@ -21,40 +21,41 @@ git clone https://github.com/ronniegeraghty/azure-sdk-prompts.git
 cd azure-sdk-prompts
 
 # List prompts
-go run ./tool/cmd/sdk-eval list
+go run ./tool/cmd/azsdk-prompt-eval list
 
 # Run all evaluations
-go run ./tool/cmd/sdk-eval run
+go run ./tool/cmd/azsdk-prompt-eval run
 
 # Filter by service and language
-go run ./tool/cmd/sdk-eval run --service storage --language dotnet
+go run ./tool/cmd/azsdk-prompt-eval run --service storage --language dotnet
 ```
 
 ### Install as a CLI
 
 ```bash
-go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@latest
+go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/azsdk-prompt-eval@latest
 
 # When run from the repo root, prompts are auto-detected
 cd azure-sdk-prompts
-sdk-eval run --service storage
+azsdk-prompt-eval run --service storage
 
 # Or specify the prompts path explicitly
-sdk-eval run --prompts ~/projects/azure-sdk-prompts/prompts
+azsdk-prompt-eval run --prompts ~/projects/azure-sdk-prompts/prompts
 ```
 
-> **Smart path detection:** `sdk-eval` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `tool/` directory both work without extra flags.
+> **Smart path detection:** `azsdk-prompt-eval` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `tool/` directory both work without extra flags.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `sdk-eval run` | Run evaluations against prompts |
-| `sdk-eval list` | List prompts matching filters |
-| `sdk-eval configs` | Show available tool configurations |
-| `sdk-eval manifest` | Regenerate manifest.yaml from prompt files |
-| `sdk-eval validate` | Validate prompt frontmatter against schema |
-| `sdk-eval version` | Print version |
+| `azsdk-prompt-eval run` | Run evaluations against prompts |
+| `azsdk-prompt-eval list` | List prompts matching filters |
+| `azsdk-prompt-eval configs` | Show available tool configurations |
+| `azsdk-prompt-eval manifest` | Regenerate manifest.yaml from prompt files |
+| `azsdk-prompt-eval validate` | Validate prompt frontmatter against schema |
+| `azsdk-prompt-eval check-env` | Check for required language toolchains and tools |
+| `azsdk-prompt-eval version` | Print version |
 
 ### Filtering
 
@@ -62,35 +63,35 @@ All filter flags work with `run`, `list`, and other prompt-aware commands:
 
 ```bash
 # By service
-sdk-eval run --service storage
+azsdk-prompt-eval run --service storage
 
 # By language
-sdk-eval run --language dotnet
+azsdk-prompt-eval run --language dotnet
 
 # Combine filters (AND logic)
-sdk-eval run --service storage --language dotnet --plane data-plane
+azsdk-prompt-eval run --service storage --language dotnet --plane data-plane
 
 # By category
-sdk-eval run --category authentication
+azsdk-prompt-eval run --category authentication
 
 # By tags
-sdk-eval run --tags identity
+azsdk-prompt-eval run --tags identity
 
 # Single prompt by ID
-sdk-eval run --prompt-id storage-dp-dotnet-auth
+azsdk-prompt-eval run --prompt-id storage-dp-dotnet-auth
 
 # Dry run — list matches without executing
-sdk-eval run --service storage --dry-run
+azsdk-prompt-eval run --service storage --dry-run
 ```
 
 ### Validating Prompts
 
 ```bash
 # Validate all prompts
-sdk-eval validate
+azsdk-prompt-eval validate
 
 # Regenerate the manifest
-sdk-eval manifest
+azsdk-prompt-eval manifest
 ```
 
 ### Tool Configurations
@@ -99,22 +100,22 @@ Evaluations can run prompts against different Copilot configurations (models, MC
 
 ```bash
 # List configs
-sdk-eval configs
+azsdk-prompt-eval configs
 
 # Run with baseline only (no MCP, no skills)
-sdk-eval run --config-file configs/baseline.yaml --prompt-id storage-dp-dotnet-auth
+azsdk-prompt-eval run --config-file configs/baseline.yaml --prompt-id storage-dp-dotnet-auth
 
 # Run with azure-mcp only
-sdk-eval run --config-file configs/azure-mcp.yaml --prompt-id storage-dp-dotnet-auth
+azsdk-prompt-eval run --config-file configs/azure-mcp.yaml --prompt-id storage-dp-dotnet-auth
 
 # Run matrix (both configs — default)
-sdk-eval run --prompt-id storage-dp-dotnet-auth
+azsdk-prompt-eval run --prompt-id storage-dp-dotnet-auth
 
 # Run with a specific config name from the default config file
-sdk-eval run --config baseline
+azsdk-prompt-eval run --config baseline
 
 # Run multiple configs (produces comparison data)
-sdk-eval run --config baseline,azure-mcp
+azsdk-prompt-eval run --config baseline,azure-mcp
 ```
 
 #### Custom Configs
@@ -132,7 +133,7 @@ configs:
     excluded_tools: []
 ```
 
-Then run with: `sdk-eval run --config-file configs/my-custom-config.yaml`
+Then run with: `azsdk-prompt-eval run --config-file configs/my-custom-config.yaml`
 
 ## Adding a New Prompt
 
@@ -144,10 +145,10 @@ cp templates/prompt-template.prompt.md \
 # 2. Edit the file — fill in frontmatter and write your prompt
 
 # 3. Validate
-go run ./tool/cmd/sdk-eval validate
+go run ./tool/cmd/azsdk-prompt-eval validate
 
 # 4. Regenerate the manifest
-go run ./tool/cmd/sdk-eval manifest
+go run ./tool/cmd/azsdk-prompt-eval manifest
 
 # 5. Commit
 git add prompts/ manifest.yaml
@@ -175,8 +176,8 @@ azure-sdk-prompts/
 │   │       └── ...
 │   └── key-vault/
 │       └── ...
-├── tool/                              # Go eval tool (sdk-eval)
-│   ├── cmd/sdk-eval/main.go
+├── tool/                              # Go eval tool (azsdk-prompt-eval)
+│   ├── cmd/azsdk-prompt-eval/main.go
 │   ├── go.mod / go.sum
 │   ├── internal/                      # config, prompt, eval, build, report,
 │   │   │                              #   manifest, validate
@@ -218,8 +219,11 @@ Every prompt uses YAML frontmatter:
 
 ## Roadmap
 
-- **Phase 1 (current):** Prompt library, build verification, report generation with stub evaluator
-- **Phase 2:** Copilot SDK integration — live agent evaluation with code generation and LLM-as-judge scoring
+- **Phase 1:** ✅ Prompt library, build verification, report generation with stub evaluator
+- **Phase 2:** ✅ Copilot SDK integration — live agent evaluation with code generation and LLM-as-judge scoring
+- **Phase 3:** ✅ Tool matrix, MCP server attachment, skill loading, cross-config comparison
+- **Phase 4:** In progress — Evaluation quality (check-env, expected_tools, reviewer skills)
+- **Phase 5:** Planned — Polish (report re-rendering, embedded CLI, progress bars)
 
 See [`tool/README.md`](tool/README.md) for full CLI reference and configuration docs.
 
