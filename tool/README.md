@@ -1,6 +1,16 @@
 # sdk-eval — CLI Reference
 
-The `sdk-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying code with Copilot-based verification, scoring code via LLM-as-judge review, and generating JSON + HTML reports.
+The `sdk-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying code with Copilot-based verification, scoring code via LLM-as-judge review, and generating JSON, HTML, and Markdown reports.
+
+## Prerequisites
+
+- **Go 1.24.5+** — to build and run the tool
+- **GitHub Copilot CLI** — the SDK communicates with Copilot via the CLI in server mode. Must be installed and authenticated:
+  - Install: follow [GitHub Copilot CLI setup](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
+  - Authenticate: run `copilot` once to complete OAuth device flow, or set `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` env var
+  - Without this, the tool falls back to stub mode (no real evaluations)
+- **GitHub CLI (`gh`)** — optional but recommended for auth token management
+- **For `azure-mcp` config:** `npx` (Node.js) must be available since the Azure MCP server is launched via `npx -y @azure/mcp@latest`
 
 ## Installation
 
@@ -198,6 +208,18 @@ The **summary.html** shows a matrix of prompt × config with overall scores and 
 |---|---|---|---|
 | storage-dp-dotnet-auth | 6/10 ✅ | 8/10 ✅ | 9/10 ✅ |
 | storage-dp-python-crud | 5/10 ❌ | 7/10 ✅ | 8/10 ✅ |
+
+### Markdown (portable, git-friendly)
+
+```
+reports/<timestamp>/
+├── summary.md            # Cross-config comparison matrix (Markdown)
+└── results/
+    └── <service>/<plane>/<language>/<category>/<config>/
+        └── report.md     # Individual evaluation report (Markdown)
+```
+
+Markdown reports contain the same information as HTML reports (scores, tool calls, verification, review) in a clean, readable format suitable for viewing in GitHub, VS Code, or any Markdown renderer.
 
 ## Configuration Matrix
 

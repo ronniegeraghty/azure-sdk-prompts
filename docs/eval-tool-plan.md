@@ -825,26 +825,26 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 
 All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
 
-### Phase 1: Foundation (MVP)
-- [ ] Project scaffolding (`go.mod`, `cmd/sdk-eval/`, `internal/` packages, CLI framework)
-- [ ] Prompt loader (read and filter prompts from `./prompts`)
-- [ ] Basic evaluation engine (create session, send prompt, capture events)
-- [ ] Build verification (all languages)
-- [ ] JSON report generation to `./reports`
-- [ ] CLI with filter flags, `--workers`, `--dry-run`
+### Phase 1: Foundation (MVP) ✅
+- [x] Project scaffolding (`go.mod`, `cmd/sdk-eval/`, `internal/` packages, CLI framework)
+- [x] Prompt loader (read and filter prompts from `./prompts`)
+- [x] Basic evaluation engine (create session, send prompt, capture events)
+- [x] Build verification (all languages)
+- [x] JSON report generation to `./reports`
+- [x] CLI with filter flags, `--workers`, `--dry-run`
 
-### Phase 2: Quality Signals
-- [ ] Code review via separate Copilot session (LLM-as-judge)
-- [ ] Reference answer comparison
-- [ ] HTML report generation with comparison dashboard
-- [ ] Cross-config comparison summary
+### Phase 2: Quality Signals ✅
+- [x] Code review via separate Copilot session (LLM-as-judge)
+- [x] Reference answer comparison
+- [x] HTML report generation with comparison dashboard
+- [x] Cross-config comparison summary
 
-### Phase 3: Tool Matrix
-- [ ] Configuration matrix YAML parsing (`configs/` directory)
-- [ ] MCP server attachment per config
-- [ ] Skill loading per config
-- [ ] Tool filtering per config
-- [ ] Matrix execution (prompt × config cross-product)
+### Phase 3: Tool Matrix ✅
+- [x] Configuration matrix YAML parsing (`configs/` directory)
+- [x] MCP server attachment per config
+- [x] Skill loading per config
+- [x] Tool filtering per config
+- [x] Matrix execution (prompt × config cross-product)
 
 ### Phase 4: Stretch Goals
 - [ ] Auto-generated test support
@@ -852,12 +852,17 @@ All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
 - [ ] Historical trend tracking
 - [ ] Existing project context support (starter projects)
 
-### Phase 5: Polish
+> **Status:** Not started. These remain future work.
+
+### Phase 5: Polish — Partial
 - [ ] Embedded CLI binary support (using SDK's bundler)
 - [ ] `sdk-eval report` command for re-viewing past runs
 - [ ] Progress bars and color output
 - [ ] CI/CD documentation (env var auth)
 - [x] ~~Deprecation path for `scripts/run-evals.py`~~ (removed — Go tool is sole approach)
+- [x] Markdown report generation (`report.md` + `summary.md` alongside HTML/JSON)
+
+> **Status:** Partial — Python scripts removed, Markdown reports added. Copilot-based verification and session transcripts were delivered as Phase 2.1 (v0.3.0). Embedded CLI, `report` command, and progress bars remain.
 
 ---
 

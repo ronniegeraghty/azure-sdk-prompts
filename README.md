@@ -6,7 +6,13 @@ A curated library of prompts for evaluating how well AI agents generate Azure SD
 
 ### Prerequisites
 
-- Go 1.24.5+
+- **Go 1.24.5+** — to build and run the tool
+- **GitHub Copilot CLI** — the SDK communicates with Copilot via the CLI in server mode. Must be installed and authenticated:
+  - Install: follow [GitHub Copilot CLI setup](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
+  - Authenticate: run `copilot` once to complete OAuth device flow, or set `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` env var
+  - Without this, the tool falls back to stub mode (no real evaluations)
+- **GitHub CLI (`gh`)** — optional but recommended for auth token management
+- **For `azure-mcp` config:** `npx` (Node.js) must be available since the Azure MCP server is launched via `npx -y @azure/mcp@latest`
 
 ### Run from the repo (recommended)
 

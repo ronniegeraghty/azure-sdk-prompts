@@ -183,6 +183,11 @@ if _, err := report.WriteSummaryHTML(summary, e.opts.OutputDir); err != nil && e
 log.Printf("failed to write HTML summary: %v", err)
 }
 
+// Write Markdown summary
+if _, err := report.WriteSummaryMarkdown(summary, e.opts.OutputDir); err != nil && e.opts.Debug {
+log.Printf("failed to write Markdown summary: %v", err)
+}
+
 return summary, nil
 }
 
@@ -349,6 +354,14 @@ if _, err := report.WriteHTMLReport(evalReport, e.opts.OutputDir, runID,
 task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
 if e.opts.Debug {
 log.Printf("[DEBUG] ERROR: failed to write HTML report: %v", err)
+}
+}
+
+// Write Markdown report
+if _, err := report.WriteMarkdownReport(evalReport, e.opts.OutputDir, runID,
+task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
+if e.opts.Debug {
+log.Printf("[DEBUG] ERROR: failed to write Markdown report: %v", err)
 }
 }
 
