@@ -4,6 +4,7 @@ import (
 "context"
 "fmt"
 "log"
+"path/filepath"
 "sync"
 "time"
 
@@ -211,13 +212,18 @@ if e.opts.Debug {
 log.Printf("[DEBUG] Starting Copilot session for %s with config %s...", task.Prompt.ID, task.Config.Name)
 }
 
-// Setup workspace
-ws, err := NewWorkspace(e.opts.OutputDir, task.Prompt.ID, task.Config.Name)
+// Setup workspace in OS temp dir (ephemeral)
+ws, err := NewWorkspace(task.Prompt.ID, task.Config.Name)
 if err != nil {
 evalReport.Error = fmt.Sprintf("workspace setup failed: %v", err)
 evalReport.ErrorDetails = err.Error()
 evalReport.Duration = time.Since(start).Seconds()
 return evalReport
+}
+defer ws.Cleanup()
+
+if e.opts.Debug {
+log.Printf("[DEBUG] Workspace: %s", ws.Dir)
 }
 
 // Run evaluation
@@ -236,19 +242,22 @@ evalReport.IsStub = result.IsStub
 return evalReport
 }
 
-evalReport.GeneratedFiles = result.GeneratedFiles
 evalReport.EventCount = result.EventCount
 evalReport.ToolCalls = result.ToolCalls
 evalReport.SessionEvents = result.SessionEvents
 evalReport.IsStub = result.IsStub
 evalReport.Success = result.Success
 
+// Collect generated files from workspace
+generatedFiles, _ := ws.ListFiles()
+evalReport.GeneratedFiles = generatedFiles
+
 if e.opts.Debug {
 log.Printf("[DEBUG] Session complete: %d tool calls, %d files generated, %s",
-len(result.ToolCalls), len(result.GeneratedFiles), time.Since(start).Truncate(time.Millisecond))
+len(result.ToolCalls), len(generatedFiles), time.Since(start).Truncate(time.Millisecond))
 }
 
-// Copilot-based verification (default, unless stub mode has its own stub verifier)
+// Copilot-based verification
 if e.verifier != nil {
 if e.opts.Debug {
 log.Printf("[DEBUG] Starting verification session...")
@@ -309,6 +318,21 @@ log.Printf("[DEBUG] Review score: %d/10", reviewResult.OverallScore)
 }
 
 evalReport.Duration = time.Since(start).Seconds()
+
+// Build the report directory path (includes config name)
+reportDir := filepath.Join(report.ReportDir(e.opts.OutputDir, runID, task.Prompt), task.Config.Name)
+
+// Copy generated files from temp workspace into report under generated-code/
+if len(generatedFiles) > 0 {
+codeDir := filepath.Join(reportDir, "generated-code")
+if _, err := ws.CopyFilesTo(codeDir); err != nil {
+if e.opts.Debug {
+log.Printf("[DEBUG] ERROR: failed to copy generated files: %v", err)
+}
+} else if e.opts.Debug {
+log.Printf("[DEBUG] Copied %d generated files to %s", len(generatedFiles), codeDir)
+}
+}
 
 // Write JSON report
 reportPath, err := report.WriteReport(evalReport, e.opts.OutputDir, runID, task.Prompt)

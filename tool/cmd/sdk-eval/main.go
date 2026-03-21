@@ -14,6 +14,7 @@ copilot "github.com/github/copilot-sdk/go"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/review"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/validate"
+"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/verify"
 "github.com/spf13/cobra"
 )
 
@@ -220,10 +221,13 @@ verifier = &eval.StubVerifier{}
 } else {
 client.Stop()
 fmt.Println("Using Copilot SDK evaluator")
-if !f.skipReview {
-reviewer = nil // engine will get reviewer from copilot evaluator
+
+// Create a real CopilotVerifier with its own client options
+clientOpts := &copilot.ClientOptions{}
+if f.debug {
+clientOpts.LogLevel = "debug"
 }
-verifier = nil // engine will get verifier from copilot evaluator
+verifier = verify.NewCopilotVerifier(clientOpts, f.model, f.debug)
 }
 }
 

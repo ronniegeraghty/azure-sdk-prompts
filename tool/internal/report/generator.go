@@ -9,11 +9,18 @@ import (
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
 )
 
+// ReportDir returns the directory path for a specific evaluation report.
+func ReportDir(outputDir string, runID string, p *prompt.Prompt) string {
+	return filepath.Join(
+		outputDir, runID, "results",
+		p.Service, p.Plane, p.Language, p.Category,
+	)
+}
+
 // WriteReport writes an EvalReport as JSON to the appropriate directory.
 func WriteReport(r *EvalReport, outputDir string, runID string, p *prompt.Prompt) (string, error) {
 reportDir := filepath.Join(
-outputDir, runID, "results",
-p.Service, p.Plane, p.Language, p.Category, r.ConfigName,
+ReportDir(outputDir, runID, p), r.ConfigName,
 )
 
 if err := os.MkdirAll(reportDir, 0755); err != nil {

@@ -108,7 +108,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		sessionRecords = append(sessionRecords, rec)
 		mu.Unlock()
 
-		// Debug logging to stderr
+		// Debug logging to stderr — all event types
 		if e.debug {
 			switch event.Type {
 			case copilot.SessionEventTypeToolExecutionStart:
@@ -116,27 +116,47 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				if event.Data.ToolName != nil {
 					toolName = *event.Data.ToolName
 				}
-				log.Printf("[DEBUG] ← Tool call: %s", toolName)
+				log.Printf("[DEBUG] ⚙ Tool start: %s", toolName)
 			case copilot.SessionEventTypeToolExecutionComplete:
+				toolName := ""
+				if event.Data.ToolName != nil {
+					toolName = *event.Data.ToolName
+				}
 				content := ""
 				if event.Data.Content != nil {
 					content = truncateStr(*event.Data.Content, 200)
 				}
-				log.Printf("[DEBUG] → Tool result: %s", content)
+				log.Printf("[DEBUG] ✓ Tool done: %s → %s", toolName, content)
 			case copilot.SessionEventTypeAssistantMessage:
 				content := ""
 				if event.Data.Content != nil {
-					content = truncateStr(*event.Data.Content, 200)
+					content = *event.Data.Content
 				}
 				if content != "" {
-					log.Printf("[DEBUG] ← Assistant: %s", content)
+					// Detect file creation patterns
+					if summary := detectFileCreation(content); summary != "" {
+						log.Printf("[DEBUG] ← Assistant creating file: %s", summary)
+					} else {
+						log.Printf("[DEBUG] ← Assistant: %s", truncateStr(content, 200))
+					}
 				}
 			case copilot.SessionEventTypeSessionError:
 				content := ""
 				if event.Data.Content != nil {
 					content = *event.Data.Content
 				}
-				log.Printf("[DEBUG] ERROR: %s", content)
+				log.Printf("[DEBUG] ✗ Session error: %s", content)
+			default:
+				// Log all other events (session.start, session.idle, user.message, assistant.turn_end, etc.)
+				content := ""
+				if event.Data.Content != nil {
+					content = truncateStr(*event.Data.Content, 100)
+				}
+				if content != "" {
+					log.Printf("[DEBUG]   Event %s: %s", event.Type, content)
+				} else {
+					log.Printf("[DEBUG]   Event %s", event.Type)
+				}
 			}
 		}
 	})
@@ -196,6 +216,45 @@ func truncateStr(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// detectFileCreation checks if assistant content looks like file creation
+// and returns a summary like "key_vault_crud.py (89 lines)".
+func detectFileCreation(content string) string {
+	lines := strings.Split(content, "\n")
+	// Look for patterns like "```python", file path references, or create_file tool patterns
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Detect "Creating file: filename" or "Writing filename" patterns
+		for _, prefix := range []string{"creating file:", "writing file:", "creating ", "writing "} {
+			lower := strings.ToLower(trimmed)
+			if strings.HasPrefix(lower, prefix) {
+				filename := strings.TrimSpace(trimmed[len(prefix):])
+				if filename != "" && !strings.Contains(filename, " ") {
+					lineCount := len(lines)
+					return fmt.Sprintf("%s (%d lines)", filename, lineCount)
+				}
+			}
+		}
+	}
+	// If content is very long (likely code), summarize by line count
+	if len(lines) > 20 {
+		// Try to find a filename from a markdown code fence
+		for _, line := range lines[:min(5, len(lines))] {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "```") && len(trimmed) > 3 {
+				return fmt.Sprintf("code block (%d lines)", len(lines))
+			}
+		}
+	}
+	return ""
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Client returns a new Copilot client for the given working directory.

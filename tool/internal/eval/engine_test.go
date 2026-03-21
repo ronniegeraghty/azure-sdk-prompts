@@ -3,6 +3,8 @@ package eval
 import (
 "context"
 "os"
+"path/filepath"
+"strings"
 "testing"
 "time"
 
@@ -99,8 +101,7 @@ t.Errorf("expected 1 evaluation, got %d", summary.TotalEvals)
 }
 
 func TestNewWorkspace(t *testing.T) {
-baseDir := t.TempDir()
-ws, err := NewWorkspace(baseDir, "test-prompt", "test-config")
+ws, err := NewWorkspace("test-prompt", "test-config")
 if err != nil {
 t.Fatalf("unexpected error: %v", err)
 }
@@ -114,6 +115,51 @@ t.Fatalf("workspace dir does not exist: %v", err)
 }
 if !info.IsDir() {
 t.Error("expected workspace to be a directory")
+}
+
+// Verify it's in temp dir, not in reports
+if !strings.HasPrefix(ws.Dir, os.TempDir()) {
+t.Errorf("expected workspace in temp dir, got %s", ws.Dir)
+}
+
+// Test ListFiles on empty workspace
+files, err := ws.ListFiles()
+if err != nil {
+t.Fatalf("ListFiles failed: %v", err)
+}
+if len(files) != 0 {
+t.Errorf("expected 0 files in empty workspace, got %d", len(files))
+}
+
+// Create a test file and verify ListFiles
+testFile := filepath.Join(ws.Dir, "test.py")
+if err := os.WriteFile(testFile, []byte("print('hello')"), 0644); err != nil {
+t.Fatalf("failed to write test file: %v", err)
+}
+files, err = ws.ListFiles()
+if err != nil {
+t.Fatalf("ListFiles failed: %v", err)
+}
+if len(files) != 1 || files[0] != "test.py" {
+t.Errorf("expected [test.py], got %v", files)
+}
+
+// Test CopyFilesTo
+destDir := t.TempDir()
+copied, err := ws.CopyFilesTo(destDir)
+if err != nil {
+t.Fatalf("CopyFilesTo failed: %v", err)
+}
+if len(copied) != 1 || copied[0] != "test.py" {
+t.Errorf("expected [test.py] copied, got %v", copied)
+}
+destFile := filepath.Join(destDir, "test.py")
+data, err := os.ReadFile(destFile)
+if err != nil {
+t.Fatalf("failed to read copied file: %v", err)
+}
+if string(data) != "print('hello')" {
+t.Errorf("unexpected file content: %s", data)
 }
 
 // Cleanup

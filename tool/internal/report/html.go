@@ -260,6 +260,7 @@ const reportTemplate = `<!DOCTYPE html>
 <div class="card">
   <h2>Generated Files</h2>
   {{if .GeneratedFiles}}
+  <p>Files are saved in the <code>generated-code/</code> subdirectory alongside this report.</p>
   <ul class="files-list">{{range .GeneratedFiles}}<li>📄 {{.}}</li>{{end}}</ul>
   {{else}}<p>No files generated.</p>{{end}}
 </div>

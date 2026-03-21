@@ -1,52 +1,91 @@
 package eval
 
 import (
-"fmt"
-"os"
-"path/filepath"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 // Workspace manages a temporary directory for an evaluation run.
 type Workspace struct {
-BaseDir string
-Dir     string
+	BaseDir string
+	Dir     string
 }
 
-// NewWorkspace creates a new workspace directory under baseDir.
-func NewWorkspace(baseDir, promptID, configName string) (*Workspace, error) {
-dirName := fmt.Sprintf("%s_%s", promptID, configName)
-dir := filepath.Join(baseDir, dirName)
+// NewWorkspace creates a new workspace in the OS temp directory.
+// The workspace is ephemeral — generated files should be copied out
+// before calling Cleanup.
+func NewWorkspace(promptID, configName string) (*Workspace, error) {
+	prefix := fmt.Sprintf("sdk-eval-%s-%s-", promptID, configName)
+	dir, err := os.MkdirTemp("", prefix)
+	if err != nil {
+		return nil, fmt.Errorf("creating temp workspace: %w", err)
+	}
 
-if err := os.MkdirAll(dir, 0755); err != nil {
-return nil, fmt.Errorf("creating workspace directory: %w", err)
-}
-
-return &Workspace{
-BaseDir: baseDir,
-Dir:     dir,
-}, nil
+	return &Workspace{
+		BaseDir: os.TempDir(),
+		Dir:     dir,
+	}, nil
 }
 
 // Cleanup removes the workspace directory.
 func (w *Workspace) Cleanup() error {
-return os.RemoveAll(w.Dir)
+	return os.RemoveAll(w.Dir)
 }
 
-// ListFiles returns all files in the workspace.
+// ListFiles returns all non-hidden files in the workspace, relative to its root.
 func (w *Workspace) ListFiles() ([]string, error) {
-var files []string
-err := filepath.Walk(w.Dir, func(path string, info os.FileInfo, err error) error {
-if err != nil {
-return err
+	var files []string
+	err := filepath.Walk(w.Dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if strings.HasPrefix(info.Name(), ".") && path != w.Dir {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasPrefix(filepath.Base(path), ".") {
+			return nil
+		}
+		rel, err := filepath.Rel(w.Dir, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, rel)
+		return nil
+	})
+	return files, err
 }
-if !info.IsDir() {
-rel, err := filepath.Rel(w.Dir, path)
-if err != nil {
-return err
-}
-files = append(files, rel)
-}
-return nil
-})
-return files, err
+
+// CopyFilesTo copies all non-hidden workspace files into destDir,
+// preserving relative paths. Returns the list of files copied.
+func (w *Workspace) CopyFilesTo(destDir string) ([]string, error) {
+	files, err := w.ListFiles()
+	if err != nil {
+		return nil, fmt.Errorf("listing workspace files: %w", err)
+	}
+	if len(files) == 0 {
+		return nil, nil
+	}
+
+	for _, rel := range files {
+		src := filepath.Join(w.Dir, rel)
+		dst := filepath.Join(destDir, rel)
+
+		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+			return nil, fmt.Errorf("creating dir for %s: %w", rel, err)
+		}
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", rel, err)
+		}
+		if err := os.WriteFile(dst, data, 0644); err != nil {
+			return nil, fmt.Errorf("writing %s: %w", rel, err)
+		}
+	}
+
+	return files, nil
 }

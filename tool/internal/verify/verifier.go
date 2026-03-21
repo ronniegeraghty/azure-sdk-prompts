@@ -15,16 +15,17 @@ import (
 
 // CopilotVerifier uses a separate Copilot session to verify generated code against requirements.
 type CopilotVerifier struct {
-	client *copilot.Client
-	model  string
+	clientOpts *copilot.ClientOptions
+	model      string
+	debug      bool
 }
 
-// NewCopilotVerifier creates a verifier backed by the given Copilot client.
-func NewCopilotVerifier(client *copilot.Client, model string) *CopilotVerifier {
+// NewCopilotVerifier creates a verifier that spawns its own Copilot client per verification.
+func NewCopilotVerifier(clientOpts *copilot.ClientOptions, model string, debug bool) *CopilotVerifier {
 	if model == "" {
 		model = "claude-sonnet-4.5"
 	}
-	return &CopilotVerifier{client: client, model: model}
+	return &CopilotVerifier{clientOpts: clientOpts, model: model, debug: debug}
 }
 
 // Verify creates a separate Copilot session to evaluate whether generated code meets requirements.
@@ -43,7 +44,16 @@ func (v *CopilotVerifier) Verify(ctx context.Context, originalPrompt string, wor
 
 	verifyPrompt := buildVerifyPrompt(originalPrompt, generatedFiles, expectedCoverage)
 
-	session, err := v.client.CreateSession(ctx, &copilot.SessionConfig{
+	// Create a fresh Copilot client for verification
+	opts := *v.clientOpts
+	opts.Cwd = workDir
+	client := copilot.NewClient(&opts)
+	if err := client.Start(ctx); err != nil {
+		return nil, fmt.Errorf("starting verification client: %w", err)
+	}
+	defer client.Stop()
+
+	session, err := client.CreateSession(ctx, &copilot.SessionConfig{
 		Model: v.model,
 		SystemMessage: &copilot.SystemMessageConfig{
 			Mode:    "append",
