@@ -6,7 +6,7 @@ A curated library of prompts for evaluating how well AI agents generate Azure SD
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.24.5+
 
 ### Run from the repo (recommended)
 
