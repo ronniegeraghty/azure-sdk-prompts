@@ -7,15 +7,17 @@ import (
 "strings"
 "time"
 
+copilot "github.com/github/copilot-sdk/go"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/config"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/eval"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/manifest"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
+"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/review"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/validate"
 "github.com/spf13/cobra"
 )
 
-var version = "0.1.0"
+var version = "0.2.0"
 
 func main() {
 if err := rootCmd().Execute(); err != nil {
@@ -56,12 +58,10 @@ val, _ := cmd.Flags().GetString(flagName)
 return val
 }
 
-// resolvePromptsDir resolves the --prompts flag with auto-detection.
 func resolvePromptsDir(cmd *cobra.Command) string {
 return resolvePathFlag(cmd, "prompts", []string{"./prompts", "../prompts"})
 }
 
-// resolveConfigFile resolves the --config-file flag with auto-detection.
 func resolveConfigFile(cmd *cobra.Command) string {
 return resolvePathFlag(cmd, "config-file", []string{
 "./configs/all.yaml", "../configs/all.yaml",
@@ -69,12 +69,10 @@ return resolvePathFlag(cmd, "config-file", []string{
 })
 }
 
-// resolveOutputDir resolves the --output flag with auto-detection.
 func resolveOutputDir(cmd *cobra.Command) string {
 return resolvePathFlag(cmd, "output", []string{"./reports", "../reports"})
 }
 
-// resolveOutputFile resolves the --output flag with auto-detection for file paths.
 func resolveOutputFile(cmd *cobra.Command, candidates []string) string {
 return resolvePathFlag(cmd, "output", candidates)
 }
@@ -97,6 +95,7 @@ skipTests  bool
 skipReview bool
 debug      bool
 dryRun     bool
+useStub    bool
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -109,7 +108,7 @@ cmd.Flags().StringVar(&f.tags, "tags", "", "Filter by tags (comma-separated)")
 cmd.Flags().StringVar(&f.promptID, "prompt-id", "", "Run a single prompt by ID")
 cmd.Flags().StringVar(&f.configName, "config", "", "Config name(s) from config file (comma-separated)")
 cmd.Flags().StringVar(&f.configFile, "config-file", "./configs/all.yaml", "Path to configuration YAML")
-cmd.Flags().IntVar(&f.workers, "workers", 4, "Parallel workers")
+cmd.Flags().IntVar(&f.workers, "workers", 4, "Parallel evaluation workers")
 cmd.Flags().IntVar(&f.timeout, "timeout", 300, "Per-prompt timeout in seconds")
 cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
 cmd.Flags().StringVar(&f.output, "output", "./reports", "Report output directory")
@@ -117,6 +116,7 @@ cmd.Flags().BoolVar(&f.skipTests, "skip-tests", false, "Skip test generation")
 cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
 cmd.Flags().BoolVar(&f.debug, "debug", false, "Verbose output")
 cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
+cmd.Flags().BoolVar(&f.useStub, "stub", false, "Use stub evaluator (no Copilot SDK)")
 }
 
 func buildFilter(f *runFlags) prompt.Filter {
@@ -191,8 +191,43 @@ return nil
 fmt.Printf("Found %d prompt(s), %d config(s) → %d evaluation(s)\n",
 len(filtered), len(configs), len(filtered)*len(configs))
 
+// Select evaluator and reviewer
+var evaluator eval.CopilotEvaluator
+var reviewer review.Reviewer
+
+if f.useStub {
+fmt.Println("Using stub evaluator (--stub flag)")
+evaluator = &eval.StubEvaluator{}
+reviewer = &review.StubReviewer{}
+} else {
+// Try to create a real Copilot SDK evaluator
+sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
+Debug: f.debug,
+})
+evaluator = sdkEval
+
+// Verify Copilot CLI is available
+client := copilot.NewClient(nil)
+if err := client.Start(context.Background()); err != nil {
+fmt.Printf("⚠️  Copilot SDK unavailable (%v), falling back to stub evaluator\n", err)
+evaluator = &eval.StubEvaluator{}
+reviewer = &review.StubReviewer{}
+} else {
+client.Stop()
+fmt.Println("Using Copilot SDK evaluator")
+if !f.skipReview {
+// Reviewer will create its own sessions per review
+reviewer = nil // engine will get reviewer from copilot evaluator
+}
+}
+}
+
+if f.skipReview {
+reviewer = nil
+}
+
 // Create and run engine
-engine := eval.NewEngine(&eval.StubEvaluator{}, eval.EngineOptions{
+engine := eval.NewEngineWithReviewer(evaluator, reviewer, eval.EngineOptions{
 Workers:    f.workers,
 Timeout:    time.Duration(f.timeout) * time.Second,
 OutputDir:  f.output,

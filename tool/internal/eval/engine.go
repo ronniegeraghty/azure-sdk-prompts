@@ -11,6 +11,7 @@ import (
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/config"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/prompt"
 "github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/report"
+"github.com/ronniegeraghty/azure-sdk-prompts/tool/internal/review"
 )
 
 // EvalResult holds the raw output from a Copilot evaluation.
@@ -55,11 +56,17 @@ DryRun     bool
 // Engine orchestrates evaluation runs.
 type Engine struct {
 evaluator CopilotEvaluator
+reviewer  review.Reviewer
 opts      EngineOptions
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
 func NewEngine(evaluator CopilotEvaluator, opts EngineOptions) *Engine {
+return NewEngineWithReviewer(evaluator, nil, opts)
+}
+
+// NewEngineWithReviewer creates a new Engine with an evaluator and reviewer.
+func NewEngineWithReviewer(evaluator CopilotEvaluator, reviewer review.Reviewer, opts EngineOptions) *Engine {
 if opts.Workers <= 0 {
 opts.Workers = 4
 }
@@ -71,6 +78,7 @@ opts.OutputDir = "./reports"
 }
 return &Engine{
 evaluator: evaluator,
+reviewer:  reviewer,
 opts:      opts,
 }
 }
@@ -123,6 +131,8 @@ evalReport := e.runSingleEval(ctx, t, runID)
 mu.Lock()
 defer mu.Unlock()
 
+summary.Results = append(summary.Results, evalReport)
+
 if evalReport.Success {
 summary.Passed++
 } else if evalReport.Error != "" {
@@ -137,10 +147,16 @@ wg.Wait()
 
 summary.Duration = time.Since(start).Seconds()
 
-	// Write run summary
-	if _, err := report.WriteSummary(summary, e.opts.OutputDir); err != nil && e.opts.Debug {
-		log.Printf("failed to write run summary: %v", err)
-	}
+// Write JSON summary
+if _, err := report.WriteSummary(summary, e.opts.OutputDir); err != nil && e.opts.Debug {
+log.Printf("failed to write run summary: %v", err)
+}
+
+// Write HTML summary
+if _, err := report.WriteSummaryHTML(summary, e.opts.OutputDir); err != nil && e.opts.Debug {
+log.Printf("failed to write HTML summary: %v", err)
+}
+
 return summary, nil
 }
 
@@ -174,7 +190,7 @@ evalReport.Duration = time.Since(start).Seconds()
 return evalReport
 }
 
-// Run evaluation (stub)
+// Run evaluation
 result, err := e.evaluator.Evaluate(evalCtx, task.Prompt, &task.Config, ws.Dir)
 if err != nil {
 evalReport.Error = fmt.Sprintf("evaluation failed: %v", err)
@@ -196,9 +212,25 @@ return evalReport
 evalReport.Build = buildResult
 evalReport.Success = result.Success && (buildResult == nil || buildResult.Success)
 
+// Code review (unless skipped)
+if !e.opts.SkipReview && e.reviewer != nil {
+referenceDir := ""
+if task.Prompt.ReferenceAnswer != "" {
+referenceDir = task.Prompt.ReferenceAnswer
+}
+reviewResult, err := e.reviewer.Review(evalCtx, task.Prompt.PromptText, ws.Dir, referenceDir)
+if err != nil {
+if e.opts.Debug {
+log.Printf("code review failed for %s/%s: %v", task.Prompt.ID, task.Config.Name, err)
+}
+} else {
+evalReport.Review = reviewResult
+}
+}
+
 evalReport.Duration = time.Since(start).Seconds()
 
-// Write report
+// Write JSON report
 reportPath, err := report.WriteReport(evalReport, e.opts.OutputDir, runID, task.Prompt)
 if err != nil {
 if e.opts.Debug {
@@ -206,6 +238,14 @@ log.Printf("failed to write report: %v", err)
 }
 } else if e.opts.Debug {
 log.Printf("report written to %s", reportPath)
+}
+
+// Write HTML report
+if _, err := report.WriteHTMLReport(evalReport, e.opts.OutputDir, runID,
+task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
+if e.opts.Debug {
+log.Printf("failed to write HTML report: %v", err)
+}
 }
 
 return evalReport

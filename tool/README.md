@@ -1,6 +1,6 @@
 # sdk-eval — CLI Reference
 
-The `sdk-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying builds, and generating scored JSON reports.
+The `sdk-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying builds, scoring code via LLM-as-judge review, and generating JSON + HTML reports.
 
 ## Installation
 
@@ -18,7 +18,32 @@ go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@latest
 sdk-eval <command> [flags]
 ```
 
-> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@tool/v0.1.0`
+> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/sdk-eval@tool/v0.2.0`
+
+## Features
+
+### Phase 1 (v0.1.0) ✅
+- Prompt library loading, filtering, and validation
+- Build verification for 9 languages (dotnet, Python, Go, Java, JS, TS, Rust, C++)
+- JSON report generation with directory hierarchy
+- Manifest generation and prompt validation
+
+### Phase 2 (v0.2.0) ✅
+- **Copilot SDK integration** — Real code generation via `github.com/github/copilot-sdk/go`
+- **LLM-as-judge code review** — Separate Copilot session scores generated code on 7 dimensions
+- **Reference answer comparison** — Optional reference code included in review prompt
+- **HTML reports** — Per-evaluation reports with score visualization and collapsible build output
+- **Summary dashboard** — Cross-config comparison matrix (prompt × config) with scores and build status
+- **Graceful fallback** — Falls back to stub evaluator if Copilot CLI is unavailable
+
+## Authentication
+
+The Copilot SDK evaluator requires a running Copilot CLI with valid authentication. The SDK will:
+1. Try `GITHUB_TOKEN` environment variable
+2. Try the logged-in user's GitHub CLI (`gh`) auth token
+3. If neither is available, fall back to the stub evaluator with a warning
+
+Use `--stub` to explicitly skip SDK initialization and use the stub evaluator.
 
 ## Commands
 
@@ -46,18 +71,22 @@ sdk-eval run [flags]
 | `--model` | | Override model for all configs |
 | `--output` | `./reports` | Report output directory |
 | `--skip-tests` | `false` | Skip test generation |
-| `--skip-review` | `false` | Skip code review |
+| `--skip-review` | `false` | Skip LLM-as-judge code review |
+| `--stub` | `false` | Force stub evaluator (no Copilot SDK) |
 | `--debug` | `false` | Verbose output |
 | `--dry-run` | `false` | List matches without executing |
 
 **Examples:**
 
 ```bash
-# Run all prompts with all configs
+# Run all prompts with all configs (real Copilot SDK)
 sdk-eval run
 
-# Run storage prompts with the baseline config
-sdk-eval run --service storage --config baseline
+# Run with stub evaluator (no SDK needed)
+sdk-eval run --stub
+
+# Run storage prompts with the baseline config, skip review
+sdk-eval run --service storage --config baseline --skip-review
 
 # Run a single prompt
 sdk-eval run --prompt-id storage-dp-dotnet-auth
@@ -76,13 +105,6 @@ sdk-eval list [flags]
 
 Takes the same filter flags as `run`. Output shows prompt ID, service/plane/language, category, and description.
 
-**Examples:**
-
-```bash
-sdk-eval list
-sdk-eval list --service storage --language dotnet
-```
-
 ### `sdk-eval manifest`
 
 Regenerate `manifest.yaml` from prompt files.
@@ -96,16 +118,6 @@ sdk-eval manifest [flags]
 | `--prompts` | `./prompts` (auto-detected) | Path to prompt library directory |
 | `--output` | `./manifest.yaml` (auto-detected) | Output path for manifest |
 
-**Examples:**
-
-```bash
-# From repo root
-sdk-eval manifest
-
-# Explicit paths
-sdk-eval manifest --prompts ./prompts --output ./manifest.yaml
-```
-
 ### `sdk-eval validate`
 
 Validate prompt frontmatter against the schema.
@@ -114,24 +126,7 @@ Validate prompt frontmatter against the schema.
 sdk-eval validate [flags]
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--prompts` | `./prompts` (auto-detected) | Path to prompt library directory |
-
-Checks:
-- Required fields present (id, service, plane, language, category, difficulty, description, created, author)
-- Enum values valid (service, plane, language, category, difficulty)
-- ID naming convention (`{service}-{dp|mp}-{language}-...`)
-- `## Prompt` section present with content
-
-Exits with code 1 on validation failure.
-
-**Examples:**
-
-```bash
-sdk-eval validate
-sdk-eval validate --prompts ./prompts
-```
+Checks required fields, enum values, ID naming conventions, and `## Prompt` section presence. Exits with code 1 on validation failure.
 
 ### `sdk-eval configs`
 
@@ -145,28 +140,64 @@ sdk-eval configs [--config-file PATH]
 
 Print the tool version.
 
+## Code Review (LLM-as-Judge)
+
+After code generation, `sdk-eval` creates a **separate** Copilot session to review the generated code. This avoids self-bias — the reviewer didn't generate the code.
+
+### Scoring Dimensions (1-10)
+
+| Dimension | What it measures |
+|-----------|-----------------|
+| Correctness | Does the code correctly implement the prompt? |
+| Completeness | Are all requirements addressed? |
+| Best Practices | Azure SDK patterns (DefaultAzureCredential, disposal, async) |
+| Error Handling | Proper error handling, retries, timeouts |
+| Package Usage | Correct and up-to-date SDK packages |
+| Code Quality | Clean, readable, well-structured code |
+| Reference Similarity | Match to reference answer (if provided) |
+
+### Reference Answers
+
+If a prompt has a `reference_answer` field pointing to a directory of reference code, that code is included in the review prompt for comparison.
+
+## Report Formats
+
+### JSON (machine-readable)
+
+```
+reports/runs/<timestamp>/
+├── summary.json          # Aggregate run statistics
+└── results/
+    └── <service>/<plane>/<language>/<category>/<config>/
+        └── report.json   # Individual evaluation result (with review scores)
+```
+
+### HTML (human-readable)
+
+```
+reports/runs/<timestamp>/
+├── summary.html          # Cross-config comparison matrix dashboard
+└── results/
+    └── <service>/<plane>/<language>/<category>/<config>/
+        └── report.html   # Individual report with score visualization
+```
+
+The **summary.html** shows a matrix of prompt × config with overall scores and build pass/fail indicators:
+
+| Prompt | baseline | azure-mcp | azure-mcp-plus-skills |
+|---|---|---|---|
+| storage-dp-dotnet-auth | 6/10 ✅ | 8/10 ✅ | 9/10 ✅ |
+| storage-dp-python-crud | 5/10 ❌ | 7/10 ✅ | 8/10 ✅ |
+
 ## Configuration Matrix
 
-Configurations live in the `configs/` directory at the repo root. Each file defines one or more Copilot environments for evaluation:
+Configurations live in the `configs/` directory at the repo root:
 
 | File | Description |
 |------|-------------|
 | `configs/all.yaml` | Both configs — used for matrix runs (default) |
 | `configs/baseline.yaml` | No MCP servers, no skills — raw Copilot |
 | `configs/azure-mcp.yaml` | Azure MCP server attached |
-
-**Examples:**
-
-```bash
-# Run with baseline only
-sdk-eval run --config-file configs/baseline.yaml --prompt-id storage-dp-dotnet-auth
-
-# Run with azure-mcp only
-sdk-eval run --config-file configs/azure-mcp.yaml --prompt-id storage-dp-dotnet-auth
-
-# Run matrix (both configs — default)
-sdk-eval run --prompt-id storage-dp-dotnet-auth
-```
 
 **Sample config file:**
 
@@ -181,25 +212,17 @@ configs:
     excluded_tools: []
 ```
 
-#### Creating Custom Configs
-
-Add a new YAML file to `configs/` following the same schema. Then reference it:
-
-```bash
-sdk-eval run --config-file configs/my-custom.yaml
-```
-
 ### Config Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Unique config identifier |
-| `description` | string | Human-readable description |
-| `model` | string | AI model to use |
-| `mcp_servers` | map | MCP server definitions |
-| `skill_directories` | list | Paths to skill directories |
-| `available_tools` | list | Allowed tool names |
-| `excluded_tools` | list | Blocked tool names |
+| Field | Type | SDK Mapping | Description |
+|-------|------|-------------|-------------|
+| `name` | string | — | Unique config identifier |
+| `description` | string | — | Human-readable description |
+| `model` | string | `SessionConfig.Model` | AI model to use |
+| `mcp_servers` | map | `SessionConfig.MCPServers` | MCP server definitions |
+| `skill_directories` | list | `SessionConfig.SkillDirectories` | Paths to skill directories |
+| `available_tools` | list | `SessionConfig.AvailableTools` | Allowed tool names |
+| `excluded_tools` | list | `SessionConfig.ExcludedTools` | Blocked tool names |
 
 ## Smart Path Detection
 
@@ -211,33 +234,6 @@ sdk-eval run --config-file configs/my-custom.yaml
 | `--config-file` | `./configs/all.yaml` → `../configs/all.yaml` → `./configs.yaml` → `../configs.yaml` |
 | `--output` (manifest) | `./manifest.yaml` → `../manifest.yaml` |
 
-This means running from the repo root or the `tool/` directory both work without extra flags.
-
-## Report Format
-
-Evaluations produce JSON reports:
-
-```
-reports/runs/<timestamp>/
-├── summary.json          # Aggregate run statistics
-└── results/
-    └── <service>/<plane>/<language>/<category>/<config>/
-        └── report.json   # Individual evaluation result
-```
-
-### `report.json` fields
-
-| Field | Description |
-|-------|-------------|
-| `prompt_id` | Prompt identifier |
-| `config_name` | Configuration used |
-| `timestamp` | Evaluation start time |
-| `duration_seconds` | Wall-clock time |
-| `generated_files` | Files created by the agent |
-| `build` | Build verification result |
-| `success` | Overall pass/fail |
-| `error` | Error message (if any) |
-
 ## Project Structure
 
 ```
@@ -247,19 +243,19 @@ tool/
 ├── internal/
 │   ├── config/                  # Config file parsing
 │   ├── prompt/                  # Prompt loading, parsing, filtering
-│   ├── eval/                    # Evaluation engine + workspace
+│   ├── eval/                    # Engine, workspace, CopilotSDKEvaluator
 │   ├── build/                   # Build verification per language
-│   ├── report/                  # JSON report generation
+│   ├── report/                  # JSON + HTML report generation
+│   ├── review/                  # LLM-as-judge code review
 │   ├── manifest/                # Manifest generation from prompts
 │   └── validate/                # Prompt frontmatter validation
 └── testdata/                    # Test fixtures
 ```
 
-> **Note:** Config files have moved from `tool/configs.yaml` to the top-level `configs/` directory.
-
 ## Roadmap
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| Phase 1 | ✅ Current | Prompt library, build verification, report generation (stub evaluator) |
-| Phase 2 | Planned | Copilot SDK integration — live agent evaluation, code generation, LLM-as-judge scoring |
+| Phase 1 | ✅ Done | Prompt library, build verification, JSON reports (stub evaluator) |
+| Phase 2 | ✅ Done | Copilot SDK integration, LLM-as-judge review, HTML reports |
+| Phase 3 | Planned | Auto-generated tests, historical trend tracking, event trace reports |
