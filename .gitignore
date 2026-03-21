@@ -21,4 +21,5 @@ reports/runs/_tmp_eval/
 .env.local
 
 # Tool evaluation output
-tool/reports/
+# Evaluation reports
+reports/runs/

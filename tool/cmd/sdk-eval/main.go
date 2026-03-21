@@ -69,6 +69,11 @@ return resolvePathFlag(cmd, "config-file", []string{
 })
 }
 
+// resolveOutputDir resolves the --output flag with auto-detection.
+func resolveOutputDir(cmd *cobra.Command) string {
+return resolvePathFlag(cmd, "output", []string{"./reports", "../reports"})
+}
+
 // resolveOutputFile resolves the --output flag with auto-detection for file paths.
 func resolveOutputFile(cmd *cobra.Command, candidates []string) string {
 return resolvePathFlag(cmd, "output", candidates)
@@ -141,6 +146,7 @@ Long:  "Run evaluations with optional filters against the prompt library.",
 RunE: func(cmd *cobra.Command, args []string) error {
 f.prompts = resolvePromptsDir(cmd)
 f.configFile = resolveConfigFile(cmd)
+f.output = resolveOutputDir(cmd)
 
 // Load config
 cfgFile, err := config.Load(f.configFile)
