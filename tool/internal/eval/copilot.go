@@ -307,13 +307,7 @@ func (e *CopilotSDKEvaluator) Client(ctx context.Context, workDir string) (*copi
 func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string) *copilot.SessionConfig {
 	sc := &copilot.SessionConfig{
 		Model: cfg.Model,
-		SystemMessage: &copilot.SystemMessageConfig{
-			Mode: "append",
-			Content: `You are being evaluated on code generation quality.
-Write complete, working code. Use the specified SDK packages.
-Do not ask clarifying questions — make reasonable assumptions.
-Write all code to the current working directory.`,
-		},
+		// No system message — test the LLM's native ability with just the prompt.
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 		SkillDirectories:    cfg.SkillDirectories,
