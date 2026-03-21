@@ -195,6 +195,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	evalCtx, cancel := context.WithTimeout(ctx, e.opts.Timeout)
 	defer cancel()
 
+	debugPrefix := task.Prompt.ID + "/" + task.Config.Name
 	start := time.Now()
 
 	evalReport := &report.EvalReport{
@@ -214,7 +215,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	}
 
 	if e.opts.Debug {
-		log.Printf("[DEBUG] Starting Copilot session for %s with config %s...", task.Prompt.ID, task.Config.Name)
+		log.Printf("[DEBUG] %s: Starting Copilot session...", debugPrefix)
 	}
 
 	// Setup workspace in OS temp dir (ephemeral)
@@ -228,7 +229,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	defer ws.Cleanup()
 
 	if e.opts.Debug {
-		log.Printf("[DEBUG] Workspace: %s", ws.Dir)
+		log.Printf("[DEBUG] %s: Workspace: %s", debugPrefix, ws.Dir)
 	}
 
 	// Run evaluation
@@ -258,19 +259,19 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	evalReport.GeneratedFiles = generatedFiles
 
 	if e.opts.Debug {
-		log.Printf("[DEBUG] Session complete: %d tool calls, %d files generated, %s",
-			len(result.ToolCalls), len(generatedFiles), time.Since(start).Truncate(time.Millisecond))
+		log.Printf("[DEBUG] %s: Session complete: %d tool calls, %d files generated, %s",
+			debugPrefix, len(result.ToolCalls), len(generatedFiles), time.Since(start).Truncate(time.Millisecond))
 	}
 
 	// Copilot-based verification
 	if e.verifier != nil {
 		if e.opts.Debug {
-			log.Printf("[DEBUG] Starting verification session...")
+			log.Printf("[DEBUG] %s: Starting verification session...", debugPrefix)
 		}
 		verifyResult, err := e.verifier.Verify(evalCtx, task.Prompt.PromptText, ws.Dir, task.Prompt.ExpectedCoverage)
 		if err != nil {
 			if e.opts.Debug {
-				log.Printf("[DEBUG] ERROR: verification failed: %v", err)
+				log.Printf("[DEBUG] %s: ERROR: verification failed: %v", debugPrefix, err)
 			}
 		} else {
 			evalReport.Verification = verifyResult
@@ -280,7 +281,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 				if verifyResult.Pass {
 					passStr = "PASS"
 				}
-				log.Printf("[DEBUG] Verification: %s — %s", passStr, verifyResult.Summary)
+				log.Printf("[DEBUG] %s: Verification: %s — %s", debugPrefix, passStr, verifyResult.Summary)
 			}
 		}
 	}
@@ -290,7 +291,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 		buildResult, err := build.Verify(evalCtx, task.Prompt.Language, ws.Dir)
 		if err != nil {
 			if e.opts.Debug {
-				log.Printf("[DEBUG] ERROR: build verification failed: %v", err)
+				log.Printf("[DEBUG] %s: ERROR: build verification failed: %v", debugPrefix, err)
 			}
 		} else {
 			evalReport.Build = buildResult
@@ -303,7 +304,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	// Code review (unless skipped)
 	if !e.opts.SkipReview && e.reviewer != nil {
 		if e.opts.Debug {
-			log.Printf("[DEBUG] Starting review session...")
+			log.Printf("[DEBUG] %s: Starting review session...", debugPrefix)
 		}
 		referenceDir := ""
 		if task.Prompt.ReferenceAnswer != "" {
@@ -312,12 +313,12 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 		reviewResult, err := e.reviewer.Review(evalCtx, task.Prompt.PromptText, ws.Dir, referenceDir)
 		if err != nil {
 			if e.opts.Debug {
-				log.Printf("[DEBUG] ERROR: code review failed for %s/%s: %v", task.Prompt.ID, task.Config.Name, err)
+				log.Printf("[DEBUG] %s: ERROR: code review failed: %v", debugPrefix, err)
 			}
 		} else {
 			evalReport.Review = reviewResult
 			if e.opts.Debug {
-				log.Printf("[DEBUG] Review score: %d/10", reviewResult.OverallScore)
+				log.Printf("[DEBUG] %s: Review score: %d/10", debugPrefix, reviewResult.OverallScore)
 			}
 		}
 	}
@@ -326,8 +327,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	if len(task.Prompt.ExpectedTools) > 0 {
 		evalReport.ToolUsage = evaluateToolUsage(task.Prompt.ExpectedTools, result.ToolCalls)
 		if e.opts.Debug {
-			log.Printf("[DEBUG] Tool usage: match=%v, matched=%v, missing=%v",
-				evalReport.ToolUsage.Match, evalReport.ToolUsage.MatchedTools, evalReport.ToolUsage.MissingTools)
+			log.Printf("[DEBUG] %s: Tool usage: match=%v, matched=%v, missing=%v",
+				debugPrefix, evalReport.ToolUsage.Match, evalReport.ToolUsage.MatchedTools, evalReport.ToolUsage.MissingTools)
 		}
 	}
 
@@ -341,10 +342,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 		codeDir := filepath.Join(reportDir, "generated-code")
 		if _, err := ws.CopyFilesTo(codeDir); err != nil {
 			if e.opts.Debug {
-				log.Printf("[DEBUG] ERROR: failed to copy generated files: %v", err)
+				log.Printf("[DEBUG] %s: ERROR: failed to copy generated files: %v", debugPrefix, err)
 			}
 		} else if e.opts.Debug {
-			log.Printf("[DEBUG] Copied %d generated files to %s", len(generatedFiles), codeDir)
+			log.Printf("[DEBUG] %s: Copied %d generated files to %s", debugPrefix, len(generatedFiles), codeDir)
 		}
 	}
 
@@ -352,17 +353,17 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	reportPath, err := report.WriteReport(evalReport, e.opts.OutputDir, runID, task.Prompt)
 	if err != nil {
 		if e.opts.Debug {
-			log.Printf("[DEBUG] ERROR: failed to write report: %v", err)
+			log.Printf("[DEBUG] %s: ERROR: failed to write report: %v", debugPrefix, err)
 		}
 	} else if e.opts.Debug {
-		log.Printf("[DEBUG] report written to %s", reportPath)
+		log.Printf("[DEBUG] %s: report written to %s", debugPrefix, reportPath)
 	}
 
 	// Write HTML report
 	if _, err := report.WriteHTMLReport(evalReport, e.opts.OutputDir, runID,
 		task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
 		if e.opts.Debug {
-			log.Printf("[DEBUG] ERROR: failed to write HTML report: %v", err)
+			log.Printf("[DEBUG] %s: ERROR: failed to write HTML report: %v", debugPrefix, err)
 		}
 	}
 
@@ -370,7 +371,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	if _, err := report.WriteMarkdownReport(evalReport, e.opts.OutputDir, runID,
 		task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
 		if e.opts.Debug {
-			log.Printf("[DEBUG] ERROR: failed to write Markdown report: %v", err)
+			log.Printf("[DEBUG] %s: ERROR: failed to write Markdown report: %v", debugPrefix, err)
 		}
 	}
 

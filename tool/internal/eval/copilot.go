@@ -92,6 +92,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	var events []copilot.SessionEvent
 	var sessionRecords []report.SessionEventRecord
 	var mu sync.Mutex
+	debugPrefix := p.ID + "/" + cfg.Name
 	unsub := session.On(func(event copilot.SessionEvent) {
 		mu.Lock()
 		events = append(events, event)
@@ -151,7 +152,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				if event.Data.ToolName != nil {
 					toolName = *event.Data.ToolName
 				}
-				log.Printf("[DEBUG] ⚙ Tool start: %s", toolName)
+				log.Printf("[DEBUG] %s: ⚙ Tool start: %s", debugPrefix, toolName)
 			case copilot.SessionEventTypeToolExecutionComplete:
 				toolName := ""
 				if event.Data.ToolName != nil {
@@ -161,7 +162,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				if event.Data.Content != nil {
 					content = truncateStr(*event.Data.Content, 200)
 				}
-				log.Printf("[DEBUG] ✓ Tool done: %s → %s", toolName, content)
+				log.Printf("[DEBUG] %s: ✓ Tool done: %s → %s", debugPrefix, toolName, content)
 			case copilot.SessionEventTypeAssistantMessage:
 				content := ""
 				if event.Data.Content != nil {
@@ -170,9 +171,9 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				if content != "" {
 					// Detect file creation patterns
 					if summary := detectFileCreation(content); summary != "" {
-						log.Printf("[DEBUG] ← Assistant creating file: %s", summary)
+						log.Printf("[DEBUG] %s: ← Assistant creating file: %s", debugPrefix, summary)
 					} else {
-						log.Printf("[DEBUG] ← Assistant: %s", truncateStr(content, 200))
+						log.Printf("[DEBUG] %s: ← Assistant: %s", debugPrefix, truncateStr(content, 200))
 					}
 				}
 			case copilot.SessionEventTypeSessionError:
@@ -180,7 +181,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				if event.Data.Content != nil {
 					content = *event.Data.Content
 				}
-				log.Printf("[DEBUG] ✗ Session error: %s", content)
+				log.Printf("[DEBUG] %s: ✗ Session error: %s", debugPrefix, content)
 			default:
 				// Log all other events (session.start, session.idle, user.message, assistant.turn_end, etc.)
 				content := ""
@@ -188,9 +189,9 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 					content = truncateStr(*event.Data.Content, 100)
 				}
 				if content != "" {
-					log.Printf("[DEBUG]   Event %s: %s", event.Type, content)
+					log.Printf("[DEBUG] %s:   Event %s: %s", debugPrefix, event.Type, content)
 				} else {
-					log.Printf("[DEBUG]   Event %s", event.Type)
+					log.Printf("[DEBUG] %s:   Event %s", debugPrefix, event.Type)
 				}
 			}
 		}
@@ -199,7 +200,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 
 	// Send the prompt
 	if e.debug {
-		log.Printf("[DEBUG] → Sending prompt (%d chars)...", len(p.PromptText))
+		log.Printf("[DEBUG] %s: → Sending prompt (%d chars)...", debugPrefix, len(p.PromptText))
 	}
 	_, err = session.SendAndWait(ctx, copilot.MessageOptions{
 		Prompt: p.PromptText,
@@ -231,8 +232,8 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	hasError := hasSessionError(capturedEvents)
 
 	if e.debug {
-		log.Printf("[DEBUG] %s/%s: %d events, %d tool calls, %d files",
-			p.ID, cfg.Name, len(capturedEvents), len(toolCalls), len(generatedFiles))
+		log.Printf("[DEBUG] %s: %d events, %d tool calls, %d files",
+			debugPrefix, len(capturedEvents), len(toolCalls), len(generatedFiles))
 	}
 
 	return &EvalResult{
