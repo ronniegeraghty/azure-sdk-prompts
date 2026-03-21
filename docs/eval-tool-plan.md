@@ -859,7 +859,7 @@ All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
 
 ### Phase 5: Polish
 - [ ] `azsdk-prompt-eval report` command — re-render HTML/MD from existing report.json (no Copilot SDK, purely template-based)
-- [ ] Embedded CLI binary — use SDK bundler to embed Copilot CLI inside Go binary
+- [ ] Embedded CLI binary — use SDK bundler to embed Copilot CLI inside Go binary. Include `azsdk-prompt-eval auth login` and `auth status` commands that use the embedded CLI's OAuth device flow, so users never need to install the Copilot CLI separately. Single binary = full experience.
 - [ ] Progress bars and color output for terminal UX
 - [ ] Starter project support — `project_context: existing` + `starter_project:` in prompt frontmatter
 
