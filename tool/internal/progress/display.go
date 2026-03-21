@@ -11,39 +11,55 @@ import (
 
 // DisplayConfig configures the multi-line progress display.
 type DisplayConfig struct {
-	Total    int       // Total evaluations
-	Workers  int       // Parallel workers (= display slots)
-	Writer   io.Writer // Output writer (default: os.Stdout)
-	Disabled bool      // Force disabled (debug, dry-run, piped output)
+	Total     int       // Total evaluations
+	Workers   int       // Parallel workers (= display slots)
+	Writer    io.Writer // Output writer (default: os.Stdout)
+	Disabled  bool      // Force disabled (debug, dry-run, piped output)
+	ReportDir string    // Report directory path (shown in final output)
 }
 
 type slot struct {
 	evalID     string
 	promptID   string
 	configName string
-	icon       string
-	activity   string
+	phase      Phase  // Current phase (generating/verifying/reviewing)
+	icon       string // Activity icon within the phase
+	activity   string // Activity description within the phase
 	startTime  time.Time
 	active     bool // currently running
-	completed  bool // shows result until next eval claims slot
+}
+
+// completedEval stores the final result of a finished eval.
+type completedEval struct {
+	promptID    string
+	configName  string
+	passed      bool
+	errored     bool
+	fileCount   int
+	reviewScore int
+	message     string // failure/error message
+	duration    time.Duration
 }
 
 // Display renders multi-line per-eval progress with live status updates.
 // Each worker gets a dedicated line that updates in-place using ANSI escapes.
+// Completed evals are stored separately so all results persist in final output.
 type Display struct {
-	slots     []slot
-	total     int
-	completed int
-	passed    int
-	failed    int
-	errors    int
-	mu        sync.Mutex
-	w         io.Writer
-	rendered  bool
-	disabled  bool
-	evalSlots map[string]int // evalID → slot index
-	width     int
-	startTime time.Time
+	slots          []slot
+	completedEvals []completedEval // ALL finished evals (Issue 2 & 3)
+	total          int
+	completed      int
+	passed         int
+	failed         int
+	errors         int
+	mu             sync.Mutex
+	w              io.Writer
+	rendered       bool
+	disabled       bool
+	evalSlots      map[string]int // evalID → slot index
+	width          int
+	startTime      time.Time
+	reportDir      string
 }
 
 // NewDisplay creates a multi-line progress display.
@@ -67,6 +83,7 @@ func NewDisplay(cfg DisplayConfig) *Display {
 		evalSlots: make(map[string]int),
 		width:     TermWidth(),
 		startTime: time.Now(),
+		reportDir: cfg.ReportDir,
 	}
 
 	if !d.disabled {
@@ -76,6 +93,34 @@ func NewDisplay(cfg DisplayConfig) *Display {
 	}
 
 	return d
+}
+
+// phaseIcon returns the primary status icon for the current eval phase.
+func phaseIcon(p Phase) string {
+	switch p {
+	case PhaseGenerating:
+		return "🔄"
+	case PhaseVerifying:
+		return "🔍"
+	case PhaseReviewing:
+		return "📝"
+	default:
+		return "⏳"
+	}
+}
+
+// phaseLabel returns the short label for the current eval phase.
+func phaseLabel(p Phase) string {
+	switch p {
+	case PhaseGenerating:
+		return "Generating"
+	case PhaseVerifying:
+		return "Verifying"
+	case PhaseReviewing:
+		return "Reviewing"
+	default:
+		return "Starting"
+	}
 }
 
 // HandleEvent processes a progress event and redraws the display.
@@ -95,12 +140,24 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 				evalID:     evt.EvalID,
 				promptID:   evt.PromptID,
 				configName: evt.ConfigName,
+				phase:      PhaseGenerating,
 				icon:       "⏳",
 				activity:   "Waiting for session...",
 				startTime:  time.Now(),
 				active:     true,
 			}
 			d.evalSlots[evt.EvalID] = idx
+		}
+
+	case EventPhaseChange:
+		if idx, ok := d.evalSlots[evt.EvalID]; ok {
+			d.slots[idx].phase = evt.Phase
+			d.slots[idx].icon = phaseIcon(evt.Phase)
+			if evt.Message != "" {
+				d.slots[idx].activity = evt.Message
+			} else {
+				d.slots[idx].activity = phaseLabel(evt.Phase) + "..."
+			}
 		}
 
 	case EventSendingPrompt:
@@ -122,8 +179,9 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 		}
 
 	case EventToolComplete:
+		// Issue 1: Don't persist ✓ — revert to the current phase icon
 		if idx, ok := d.evalSlots[evt.EvalID]; ok {
-			d.slots[idx].icon = "✓"
+			d.slots[idx].icon = phaseIcon(d.slots[idx].phase)
 			d.slots[idx].activity = evt.Message
 		}
 
@@ -144,10 +202,15 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 		d.passed++
 		if idx, ok := d.evalSlots[evt.EvalID]; ok {
 			elapsed := time.Since(d.slots[idx].startTime)
-			d.slots[idx].icon = "✅"
-			d.slots[idx].activity = fmt.Sprintf("PASSED  %d files  %s", evt.FileCount, fmtDuration(elapsed))
-			d.slots[idx].active = false
-			d.slots[idx].completed = true
+			d.completedEvals = append(d.completedEvals, completedEval{
+				promptID:    d.slots[idx].promptID,
+				configName:  d.slots[idx].configName,
+				passed:      true,
+				fileCount:   evt.FileCount,
+				reviewScore: evt.ReviewScore,
+				duration:    elapsed,
+			})
+			d.slots[idx] = slot{} // release slot
 			delete(d.evalSlots, evt.EvalID)
 		}
 
@@ -156,10 +219,18 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 		d.failed++
 		if idx, ok := d.evalSlots[evt.EvalID]; ok {
 			elapsed := time.Since(d.slots[idx].startTime)
-			d.slots[idx].icon = "❌"
-			d.slots[idx].activity = fmt.Sprintf("FAILED  %s", fmtDuration(elapsed))
-			d.slots[idx].active = false
-			d.slots[idx].completed = true
+			msg := "verification failed"
+			if evt.Message != "" {
+				msg = evt.Message
+			}
+			d.completedEvals = append(d.completedEvals, completedEval{
+				promptID:   d.slots[idx].promptID,
+				configName: d.slots[idx].configName,
+				passed:     false,
+				message:    msg,
+				duration:   elapsed,
+			})
+			d.slots[idx] = slot{} // release slot
 			delete(d.evalSlots, evt.EvalID)
 		}
 
@@ -172,10 +243,14 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 			if evt.Message != "" {
 				msg = evt.Message
 			}
-			d.slots[idx].icon = "❌"
-			d.slots[idx].activity = fmt.Sprintf("%s  %s", msg, fmtDuration(elapsed))
-			d.slots[idx].active = false
-			d.slots[idx].completed = true
+			d.completedEvals = append(d.completedEvals, completedEval{
+				promptID:   d.slots[idx].promptID,
+				configName: d.slots[idx].configName,
+				errored:    true,
+				message:    msg,
+				duration:   elapsed,
+			})
+			d.slots[idx] = slot{} // release slot
 			delete(d.evalSlots, evt.EvalID)
 		}
 	}
@@ -183,8 +258,9 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 	d.redraw()
 }
 
-// Done finalizes the display with a summary line.
-func (d *Display) Done() {
+// Finish stops the ANSI refresh loop and prints all final results as static output.
+// This replaces Done() for the final display — all completed eval lines persist.
+func (d *Display) Finish() {
 	if d.disabled {
 		return
 	}
@@ -192,7 +268,7 @@ func (d *Display) Done() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// Clear the display region
+	// Clear the live display region
 	if d.rendered {
 		lines := len(d.slots) + 2
 		fmt.Fprintf(d.w, "\033[%dA", lines)
@@ -202,29 +278,56 @@ func (d *Display) Done() {
 		fmt.Fprintf(d.w, "\033[%dA", lines)
 	}
 
+	// Print all completed evals as static lines (no ANSI cursor movement)
+	for _, ce := range d.completedEvals {
+		name := d.formatName(ce.promptID, ce.configName)
+		if ce.errored {
+			fmt.Fprintf(d.w, "  %-40s ❌ %s  %s\n", name, ce.message, fmtDuration(ce.duration))
+		} else if !ce.passed {
+			fmt.Fprintf(d.w, "  %-40s ❌ FAILED  %s  %s\n", name, ce.message, fmtDuration(ce.duration))
+		} else {
+			score := ""
+			if ce.reviewScore > 0 {
+				score = fmt.Sprintf("  %d/10", ce.reviewScore)
+			}
+			fmt.Fprintf(d.w, "  %-40s ✅ PASSED  %d files%s  %s\n", name, ce.fileCount, score, fmtDuration(ce.duration))
+		}
+	}
+
+	// Summary line
 	elapsed := time.Since(d.startTime)
-	fmt.Fprintf(d.w, "\n%s━━━ Complete: %d/%d%s", ColorBold, d.completed, d.total, ColorReset)
-	fmt.Fprintf(d.w, "  %s%d passed%s", ColorGreen, d.passed, ColorReset)
+	fmt.Fprintf(d.w, "\n%sSummary: %d/%d passed%s", ColorBold, d.passed, d.total, ColorReset)
+	fmt.Fprintf(d.w, "  %s✅ %d%s", ColorGreen, d.passed, ColorReset)
 	if d.failed > 0 {
-		fmt.Fprintf(d.w, "  %s%d failed%s", ColorRed, d.failed, ColorReset)
+		fmt.Fprintf(d.w, "  %s❌ %d%s", ColorRed, d.failed, ColorReset)
 	}
 	if d.errors > 0 {
-		fmt.Fprintf(d.w, "  %s%d errors%s", ColorRed, d.errors, ColorReset)
+		fmt.Fprintf(d.w, "  %s❌ %d errors%s", ColorRed, d.errors, ColorReset)
 	}
-	fmt.Fprintf(d.w, "  %s\n", fmtDuration(elapsed))
+	fmt.Fprintf(d.w, "  Duration: %s\n", fmtDuration(elapsed))
+
+	if d.reportDir != "" {
+		fmt.Fprintf(d.w, "Reports: %s\n", d.reportDir)
+	}
+}
+
+// Done finalizes the display with a summary line (backward compat — prefer Finish).
+func (d *Display) Done() {
+	d.Finish()
+}
+
+// CompletedEvalCount returns the number of completed evals (for testing).
+func (d *Display) CompletedEvalCount() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return len(d.completedEvals)
 }
 
 // claimSlot finds a free slot for a new eval.
 func (d *Display) claimSlot() int {
-	// Prefer empty (never-used) slots
+	// Prefer empty (never-used or released) slots
 	for i, s := range d.slots {
-		if !s.active && !s.completed && s.evalID == "" {
-			return i
-		}
-	}
-	// Then completed slots (replace finished result)
-	for i, s := range d.slots {
-		if !s.active && s.completed {
+		if !s.active && s.evalID == "" {
 			return i
 		}
 	}
@@ -247,15 +350,14 @@ func (d *Display) redraw() {
 	for i := range d.slots {
 		s := &d.slots[i]
 		fmt.Fprintf(d.w, "\033[2K") // clear line
-		if s.active || s.completed {
+		if s.active {
 			name := d.formatName(s.promptID, s.configName)
+			pLabel := phaseLabel(s.phase)
+			pIcon := phaseIcon(s.phase)
 			activity := d.truncateActivity(s.activity)
-			if s.active {
-				elapsed := fmtDuration(time.Since(s.startTime))
-				fmt.Fprintf(d.w, "  %-40s %s %-*s %6s", name, s.icon, actW, activity, elapsed)
-			} else {
-				fmt.Fprintf(d.w, "  %-40s %s %s", name, s.icon, activity)
-			}
+			elapsed := fmtDuration(time.Since(s.startTime))
+			fmt.Fprintf(d.w, "  %-40s %s %-12s %s %-*s %6s",
+				name, pIcon, pLabel, s.icon, actW-16, activity, elapsed)
 		}
 		fmt.Fprint(d.w, "\n")
 	}

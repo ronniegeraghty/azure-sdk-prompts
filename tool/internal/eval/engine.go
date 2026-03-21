@@ -143,11 +143,14 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	start := time.Now()
 
+	runDir := filepath.Join(e.opts.OutputDir, runID)
+
 	// Progress display (disabled in debug mode or when stdout is not a terminal)
 	display := progress.NewDisplay(progress.DisplayConfig{
-		Total:    len(tasks),
-		Workers:  e.opts.Workers,
-		Disabled: e.opts.Debug,
+		Total:     len(tasks),
+		Workers:   e.opts.Workers,
+		Disabled:  e.opts.Debug,
+		ReportDir: runDir + "/",
 	})
 
 	// Wire progress reporting if evaluator supports it
@@ -176,23 +179,39 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				Message:    "Waiting for session...",
 			})
 
-			evalReport := e.runSingleEval(ctx, t, runID)
+			// Progress callback for phase transitions within runSingleEval
+			sendPhase := func(phase progress.Phase) {
+				display.HandleEvent(progress.ProgressEvent{
+					EvalID: taskName, Type: progress.EventPhaseChange, Phase: phase,
+				})
+			}
+
+			evalReport := e.runSingleEval(ctx, t, runID, sendPhase)
 
 			evtType := progress.EventPassed
 			msg := ""
+			reviewScore := 0
 			if evalReport.Error != "" {
 				evtType = progress.EventError
 				msg = "ERROR"
 			} else if !evalReport.Success {
 				evtType = progress.EventFailed
+				if evalReport.Verification != nil && !evalReport.Verification.Pass {
+					msg = "verification failed"
+				}
+			} else {
+				if evalReport.Review != nil {
+					reviewScore = evalReport.Review.OverallScore
+				}
 			}
 			display.HandleEvent(progress.ProgressEvent{
-				EvalID:     taskName,
-				PromptID:   t.Prompt.ID,
-				ConfigName: t.Config.Name,
-				Type:       evtType,
-				Message:    msg,
-				FileCount:  len(evalReport.GeneratedFiles),
+				EvalID:      taskName,
+				PromptID:    t.Prompt.ID,
+				ConfigName:  t.Config.Name,
+				Type:        evtType,
+				Message:     msg,
+				FileCount:   len(evalReport.GeneratedFiles),
+				ReviewScore: reviewScore,
 			})
 
 			mu.Lock()
@@ -233,7 +252,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	return summary, nil
 }
 
-func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string) *report.EvalReport {
+func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string, sendPhase func(progress.Phase)) *report.EvalReport {
 	evalCtx, cancel := context.WithTimeout(ctx, e.opts.Timeout)
 	defer cancel()
 
@@ -275,6 +294,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 	}
 
 	// Run evaluation
+	sendPhase(progress.PhaseGenerating)
 	result, err := e.evaluator.Evaluate(evalCtx, task.Prompt, &task.Config, ws.Dir)
 	if err != nil {
 		evalReport.Error = fmt.Sprintf("evaluation failed: %v", err)
@@ -307,6 +327,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 
 	// Copilot-based verification
 	if e.verifier != nil {
+		sendPhase(progress.PhaseVerifying)
 		if e.opts.Debug {
 			log.Printf("[DEBUG] %s: Starting verification session...", debugPrefix)
 		}
@@ -345,6 +366,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string)
 
 	// Code review (unless skipped)
 	if !e.opts.SkipReview && e.reviewer != nil {
+		sendPhase(progress.PhaseReviewing)
 		if e.opts.Debug {
 			log.Printf("[DEBUG] %s: Starting review session...", debugPrefix)
 		}
