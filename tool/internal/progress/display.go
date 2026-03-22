@@ -154,40 +154,35 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 
 	case EventSendingPrompt:
 		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].icon = "→"
-			d.lines[idx].activity = evt.Message
+			d.lines[idx].activity = "→ " + evt.Message
 		}
 
 	case EventReasoning:
 		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].icon = "💭"
-			d.lines[idx].activity = evt.Message
+			d.lines[idx].activity = "💭 " + evt.Message
 		}
 
 	case EventToolStart:
 		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].icon = "⚙"
-			d.lines[idx].activity = evt.Message
+			d.lines[idx].activity = "⚙ Used " + evt.Message
 		}
 
 	case EventToolComplete:
-		// Don't change icon — keep the current phase icon (⚙/🔄/🔍/📝).
-		// Just update activity text so it shows what completed.
-		// Changing to ✓ makes it look like the eval is done.
+		// Only update if the message has useful info beyond the tool name
 		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].activity = evt.Message
+			if evt.Message != "" {
+				d.lines[idx].activity = "⚙ " + evt.Message + " done"
+			}
 		}
 
 	case EventWritingFile:
 		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].icon = "📝"
-			d.lines[idx].activity = evt.Message
+			d.lines[idx].activity = "📝 " + evt.Message
 		}
 
 	case EventWaiting:
 		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].icon = "⏳"
-			d.lines[idx].activity = evt.Message
+			d.lines[idx].activity = "⏳ " + evt.Message
 		}
 
 	case EventPassed:
@@ -335,8 +330,8 @@ func (d *Display) redraw() {
 			pIcon := phaseIcon(l.phase)
 			activity := d.truncateActivity(l.activity)
 			elapsed := fmtDuration(time.Since(l.startTime))
-			fmt.Fprintf(d.w, "  %-40s %s %-12s %s %-*s %6s",
-				name, pIcon, pLabel, l.icon, actW-16, activity, elapsed)
+			fmt.Fprintf(d.w, "  %-40s %s %-12s %-*s %6s",
+				name, pIcon, pLabel, actW-12, activity, elapsed)
 		}
 		fmt.Fprint(d.w, "\n")
 	}

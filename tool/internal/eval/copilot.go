@@ -184,10 +184,18 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				if event.Data.ToolName != nil {
 					toolName = *event.Data.ToolName
 				}
+				result := ""
+				if event.Data.Result != nil && event.Data.Result.Content != nil {
+					result = truncateStr(*event.Data.Result.Content, 60)
+				}
+				msg := toolName
+				if result != "" {
+					msg = toolName + " → " + result
+				}
 				e.progressFn(progress.ProgressEvent{
 					EvalID: evalID, PromptID: p.ID, ConfigName: cfg.Name,
 					Type:    progress.EventToolComplete,
-					Message: toolName,
+					Message: msg,
 				})
 			case copilot.SessionEventTypeAssistantMessage:
 				content := ""
@@ -195,10 +203,11 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 					content = *event.Data.Content
 				}
 				if content != "" {
+					summary := truncateStr(content, 80)
 					e.progressFn(progress.ProgressEvent{
 						EvalID: evalID, PromptID: p.ID, ConfigName: cfg.Name,
 						Type:    progress.EventReasoning,
-						Message: "Reasoning...",
+						Message: summary,
 					})
 				}
 			}
