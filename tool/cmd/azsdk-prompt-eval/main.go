@@ -85,25 +85,26 @@ func resolveOutputFile(cmd *cobra.Command, candidates []string) string {
 }
 
 type runFlags struct {
-	prompts     string
-	service     string
-	language    string
-	plane       string
-	category    string
-	tags        string
-	promptID    string
-	configName  string
-	configFile  string
-	workers     int
-	timeout     int
-	model       string
-	output      string
-	skipTests   bool
-	skipReview  bool
-	verifyBuild bool
-	debug       bool
-	dryRun      bool
-	useStub     bool
+	prompts      string
+	service      string
+	language     string
+	plane        string
+	category     string
+	tags         string
+	promptID     string
+	configName   string
+	configFile   string
+	workers      int
+	timeout      int
+	model        string
+	output       string
+	progressMode string
+	skipTests    bool
+	skipReview   bool
+	verifyBuild  bool
+	debug        bool
+	dryRun       bool
+	useStub      bool
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -124,6 +125,7 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
 	cmd.Flags().BoolVar(&f.verifyBuild, "verify-build", false, "Also run build verification (in addition to Copilot verification)")
 	cmd.Flags().BoolVar(&f.debug, "debug", false, "Verbose output")
+	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, live, log, off")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
 	cmd.Flags().BoolVar(&f.useStub, "stub", false, "Use stub evaluator (no Copilot SDK)")
 }
@@ -265,14 +267,15 @@ func runCmd() *cobra.Command {
 
 			// Create and run engine
 			engine := eval.NewEngineWithReviewer(evaluator, verifier, reviewer, eval.EngineOptions{
-				Workers:     f.workers,
-				Timeout:     time.Duration(f.timeout) * time.Second,
-				OutputDir:   f.output,
-				SkipTests:   f.skipTests,
-				SkipReview:  f.skipReview,
-				VerifyBuild: f.verifyBuild,
-				Debug:       f.debug,
-				DryRun:      f.dryRun,
+				Workers:      f.workers,
+				Timeout:      time.Duration(f.timeout) * time.Second,
+				OutputDir:    f.output,
+				SkipTests:    f.skipTests,
+				SkipReview:   f.skipReview,
+				VerifyBuild:  f.verifyBuild,
+				Debug:        f.debug,
+				DryRun:       f.dryRun,
+				ProgressMode: f.progressMode,
 			})
 
 			summary, err := engine.Run(context.Background(), filtered, configs)

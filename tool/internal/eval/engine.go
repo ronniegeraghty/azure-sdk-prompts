@@ -53,14 +53,15 @@ func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *con
 
 // EngineOptions configures the evaluation engine.
 type EngineOptions struct {
-	Workers     int
-	Timeout     time.Duration
-	OutputDir   string
-	SkipTests   bool
-	SkipReview  bool
-	VerifyBuild bool
-	Debug       bool
-	DryRun      bool
+	Workers      int
+	Timeout      time.Duration
+	OutputDir    string
+	SkipTests    bool
+	SkipReview   bool
+	VerifyBuild  bool
+	Debug        bool
+	DryRun       bool
+	ProgressMode string // "auto", "live", "log", "off"
 }
 
 // Verifier evaluates generated code against prompt requirements.
@@ -151,6 +152,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		Workers:   e.opts.Workers,
 		Disabled:  e.opts.Debug,
 		ReportDir: runDir + "/",
+		Mode:      progress.ProgressMode(e.opts.ProgressMode),
 	})
 
 	// Wire progress reporting if evaluator supports it

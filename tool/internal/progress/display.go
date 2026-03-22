@@ -1,11 +1,22 @@
 package progress
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"sync"
 	"time"
+)
+
+// ProgressMode controls the rendering strategy.
+type ProgressMode string
+
+const (
+	ModeAuto ProgressMode = "auto" // ANSI if TTY, log otherwise
+	ModeLive ProgressMode = "live" // Force ANSI (cursor save/restore)
+	ModeLog  ProgressMode = "log"  // Append-only phase lines (no cursor movement)
+	ModeOff  ProgressMode = "off"  // No progress output
 )
 
 // DisplayConfig controls the progress display.
@@ -15,6 +26,7 @@ type DisplayConfig struct {
 	Writer    io.Writer
 	Disabled  bool
 	ReportDir string
+	Mode      ProgressMode // "" or "auto" uses auto-detection
 }
 
 type evalStatus int
@@ -43,10 +55,11 @@ type evalLine struct {
 // Display renders live progress for evaluation runs.
 //
 // In ANSI mode (real terminal), it prints a header, saves the cursor
-// position, and redraws the eval region on a 500ms timer using
-// save/restore cursor (\033[s / \033[u) + clear-to-end (\033[J).
-// This avoids cursor-up arithmetic that breaks when emoji or wide
-// characters cause line wrapping.
+// position with DECSC (\0337), and redraws the eval region on a 500ms
+// timer using DECRC (\0338) + clear-to-end (\033[J). All output for
+// a redraw is buffered and written as a single Write call to avoid
+// partial renders. DECSC/DECRC are more widely supported than the
+// SCO \033[s/\033[u sequences.
 //
 // In non-ANSI mode (piped output, test buffers), it prints result lines
 // inline as evals complete, then a summary on Finish.
@@ -76,6 +89,8 @@ type Display struct {
 
 // NewDisplay creates a progress display. When Writer is nil, it writes to
 // os.Stdout and enables ANSI rendering if stdout is a terminal.
+// Mode overrides auto-detection: "live" forces ANSI, "log" forces append-only,
+// "off" disables output entirely.
 func NewDisplay(cfg DisplayConfig) *Display {
 	w := cfg.Writer
 	if w == nil {
@@ -84,11 +99,24 @@ func NewDisplay(cfg DisplayConfig) *Display {
 
 	disabled := cfg.Disabled
 	ansi := false
-	if !disabled && cfg.Writer == nil {
-		if IsTerminal(os.Stdout) {
+
+	switch cfg.Mode {
+	case ModeOff:
+		disabled = true
+	case ModeLive:
+		if !disabled {
 			ansi = true
-		} else {
-			disabled = true
+		}
+	case ModeLog:
+		// Non-ANSI mode: append-only lines, no cursor movement
+		ansi = false
+	default: // ModeAuto or ""
+		if !disabled && cfg.Writer == nil {
+			if IsTerminal(os.Stdout) {
+				ansi = true
+			} else {
+				disabled = true
+			}
 		}
 	}
 
@@ -110,7 +138,7 @@ func NewDisplay(cfg DisplayConfig) *Display {
 
 	if d.ansi && cfg.Total > 0 {
 		fmt.Fprintf(d.w, "\nRunning %d evaluations (%d workers)\n", cfg.Total, cfg.Workers)
-		fmt.Fprint(d.w, "\033[s") // save cursor position
+		fmt.Fprint(d.w, "\0337") // DECSC: save cursor position
 		d.drawRegion()
 		d.stopCh = make(chan struct{})
 		d.ticker = time.NewTicker(500 * time.Millisecond)
@@ -124,67 +152,82 @@ func NewDisplay(cfg DisplayConfig) *Display {
 
 // --- ANSI fixed-region rendering (terminal only) ---
 
-func (d *Display) drawRegion() {
+// buildRegion renders the full eval region (all lines + summary) into a buffer.
+// Writing this buffer as a single io.Writer call avoids partial renders
+// where the terminal processes some lines before the rest arrive.
+func (d *Display) buildRegion() []byte {
+	var buf bytes.Buffer
 	for i := 0; i < d.total; i++ {
-		d.drawEvalLine(d.lines[i])
+		d.writeEvalLine(&buf, d.lines[i])
 	}
-	fmt.Fprintln(d.w)
-	d.drawSummaryLine()
+	buf.WriteByte('\n')
+	d.writeSummaryLine(&buf)
+	return buf.Bytes()
 }
 
+// drawRegion writes the eval region to the output writer atomically.
+func (d *Display) drawRegion() {
+	d.w.Write(d.buildRegion())
+}
+
+// redrawRegion restores cursor to the saved position, clears everything
+// below, and redraws the region — all as a single atomic write.
+// Uses DECRC (\0338) + ED (\033[J) which is more widely supported than
+// the SCO \033[u sequence.
 func (d *Display) redrawRegion() {
-	// Restore saved cursor position, then clear everything below it.
-	// This is more reliable than cursor-up because it doesn't depend
-	// on counting wrapped lines caused by emoji / wide characters.
-	fmt.Fprint(d.w, "\033[u\033[J")
-	d.drawRegion()
+	region := d.buildRegion()
+	// Prepend restore-cursor + clear-to-end-of-screen, write everything at once
+	var buf bytes.Buffer
+	buf.WriteString("\0338\033[J")
+	buf.Write(region)
+	d.w.Write(buf.Bytes())
 }
 
-func (d *Display) drawEvalLine(l *evalLine) {
+func (d *Display) writeEvalLine(buf *bytes.Buffer, l *evalLine) {
 	switch l.status {
 	case evalPending:
-		fmt.Fprintf(d.w, "  \033[2m⏳ (waiting)\033[0m\n")
+		fmt.Fprintf(buf, "  \033[2m⏳ (waiting)\033[0m\n")
 	case evalActive:
 		activity := l.activity
 		if activity == "" && l.phase != "" {
 			activity = string(l.phase)
 		}
 		if activity != "" {
-			fmt.Fprintf(d.w, "  🔄 %-40s  %s  %s\n", l.name, activity, fmtDuration(time.Since(l.startTime)))
+			fmt.Fprintf(buf, "  🔄 %-40s  %s  %s\n", l.name, activity, fmtDuration(time.Since(l.startTime)))
 		} else {
-			fmt.Fprintf(d.w, "  🔄 %-40s  %s\n", l.name, fmtDuration(time.Since(l.startTime)))
+			fmt.Fprintf(buf, "  🔄 %-40s  %s\n", l.name, fmtDuration(time.Since(l.startTime)))
 		}
 	case evalPassed:
 		score := ""
 		if l.reviewScore > 0 {
 			score = fmt.Sprintf("  %d/10", l.reviewScore)
 		}
-		fmt.Fprintf(d.w, "  ✅ %-40s %d files%s  %s\n", l.name, l.fileCount, score, fmtDuration(l.duration))
+		fmt.Fprintf(buf, "  ✅ %-40s %d files%s  %s\n", l.name, l.fileCount, score, fmtDuration(l.duration))
 	case evalFailed, evalError:
 		msg := l.message
 		if msg == "" {
 			msg = "failed"
 		}
-		fmt.Fprintf(d.w, "  ❌ %-40s %s  %s\n", l.name, msg, fmtDuration(l.duration))
+		fmt.Fprintf(buf, "  ❌ %-40s %s  %s\n", l.name, msg, fmtDuration(l.duration))
 	}
 }
 
-func (d *Display) drawSummaryLine() {
+func (d *Display) writeSummaryLine(buf *bytes.Buffer) {
 	if d.completed == d.total && d.total > 0 {
-		fmt.Fprintf(d.w, "  Summary: %d/%d passed", d.passed, d.total)
+		fmt.Fprintf(buf, "  Summary: %d/%d passed", d.passed, d.total)
 	} else {
-		fmt.Fprintf(d.w, "  %d/%d completed", d.completed, d.total)
+		fmt.Fprintf(buf, "  %d/%d completed", d.completed, d.total)
 	}
 	if d.passed > 0 {
-		fmt.Fprintf(d.w, "  ✅ %d", d.passed)
+		fmt.Fprintf(buf, "  ✅ %d", d.passed)
 	}
 	if d.failed > 0 {
-		fmt.Fprintf(d.w, "  ❌ %d", d.failed)
+		fmt.Fprintf(buf, "  ❌ %d", d.failed)
 	}
 	if d.errors > 0 {
-		fmt.Fprintf(d.w, "  ❌ %d errors", d.errors)
+		fmt.Fprintf(buf, "  ❌ %d errors", d.errors)
 	}
-	fmt.Fprintf(d.w, "  %s\n", fmtDuration(time.Since(d.startTime)))
+	fmt.Fprintf(buf, "  %s\n", fmtDuration(time.Since(d.startTime)))
 }
 
 func (d *Display) redrawLoop() {
@@ -238,6 +281,9 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 		l.status = evalActive
 		l.startTime = time.Now()
 		l.activity = evt.Message
+		if !d.ansi {
+			fmt.Fprintf(d.w, "  ▶ %-40s  starting...\n", l.name)
+		}
 
 	case EventSendingPrompt, EventReasoning, EventToolStart, EventToolComplete,
 		EventWritingFile, EventWaiting:
@@ -249,6 +295,9 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 		if idx, ok := d.lineIndex[evt.EvalID]; ok {
 			d.lines[idx].phase = evt.Phase
 			d.lines[idx].activity = string(evt.Phase)
+			if !d.ansi {
+				fmt.Fprintf(d.w, "  ▶ %-40s  %s...\n", d.lines[idx].name, evt.Phase)
+			}
 		}
 
 	case EventPassed:
@@ -321,9 +370,11 @@ func (d *Display) Finish() {
 		if d.total > 0 {
 			d.redrawRegion()
 		}
-		fmt.Fprintln(d.w)
+		// Print reports path below the region (no cursor restore — this is final)
 		if d.reportDir != "" {
-			fmt.Fprintf(d.w, "Reports: %s\n", d.reportDir)
+			fmt.Fprintf(d.w, "\nReports: %s\n", d.reportDir)
+		} else {
+			fmt.Fprintln(d.w)
 		}
 		d.mu.Unlock()
 		return
