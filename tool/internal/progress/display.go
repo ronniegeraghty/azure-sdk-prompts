@@ -34,6 +34,7 @@ disabled  bool
 startTime time.Time
 reportDir string
 active    map[string]*evalState
+stopHeart chan struct{}
 }
 
 func NewDisplay(cfg DisplayConfig) *Display {
@@ -122,8 +123,13 @@ func (d *Display) Finish() {
 if d.disabled {
 return
 }
+// Stop heartbeat
+if d.stopHeart != nil {
+close(d.stopHeart)
+}
 d.mu.Lock()
 defer d.mu.Unlock()
+fmt.Fprint(d.w, "\n\n")
 
 elapsed := time.Since(d.startTime)
 fmt.Fprintf(d.w, "\nSummary: %d/%d passed", d.passed, d.total)
