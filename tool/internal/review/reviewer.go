@@ -79,7 +79,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		go func() { session.Disconnect(); close(done) }()
 		select {
 		case <-done:
-		case <-time.After(5 * time.Second):
+		case <-time.After(15 * time.Second):
 		}
 	}()
 
