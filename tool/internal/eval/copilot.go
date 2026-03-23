@@ -393,9 +393,24 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		skillDirs = cfg.SkillDirectories
 	}
 
+	// System message ensures the agent creates actual code files in the workspace
+	// rather than responding with inline text or writing files to the wrong directory.
+	systemMsg := fmt.Sprintf(
+		"You are a code generation agent. Your working directory is: %s\n"+
+			"IMPORTANT: Always create actual code files using the create tool. "+
+			"All file paths MUST be under your working directory (%s). "+
+			"Use absolute paths starting with your working directory. "+
+			"Do NOT explain code in text — write complete, runnable code to files. "+
+			"Do NOT create files outside your working directory.",
+		workDir, workDir,
+	)
+
 	sc := &copilot.SessionConfig{
 		Model: cfg.Model,
-		// No system message — test the LLM's native ability with just the prompt.
+		SystemMessage: &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: systemMsg,
+		},
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 		SkillDirectories:    skillDirs,
