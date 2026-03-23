@@ -334,8 +334,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		evalReport.StarterFiles = result.StarterFiles
 	}
 
-	// Collect generated files — prefer evaluator's captured list (taken before
-	// SDK cleanup may remove files) over workspace listing which runs after cleanup.
+	// Collect generated files — workspace listing is the primary source since
+	// ForceStop preserves files on disk. Fallback to the evaluator's captured
+	// list only as a safety net (e.g., if the CLI wrote to a different path).
 	generatedFiles, _ := ws.ListFiles()
 	if len(generatedFiles) == 0 && result != nil && len(result.GeneratedFiles) > 0 {
 		generatedFiles = result.GeneratedFiles
