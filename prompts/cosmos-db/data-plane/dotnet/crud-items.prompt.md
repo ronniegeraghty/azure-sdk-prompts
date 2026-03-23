@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, query, and delete items in an Azure Cosmos DB
   container using the .NET SDK documentation?
 sdk_package: Microsoft.Azure.Cosmos
-doc_url: https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/quickstart-dotnet
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/microsoft.azure.cosmos-readme
 tags:
   - cosmos-db
   - nosql

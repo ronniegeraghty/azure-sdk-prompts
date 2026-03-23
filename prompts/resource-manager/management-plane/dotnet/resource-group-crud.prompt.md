@@ -9,7 +9,7 @@ description: >
   Can a developer create, list, update, and delete Azure Resource Groups
   using the .NET management SDK documentation?
 sdk_package: Azure.ResourceManager
-doc_url: https://learn.microsoft.com/en-us/dotnet/azure/sdk/resource-management
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/resourcemanager-readme
 tags:
   - resource-groups
   - management-plane

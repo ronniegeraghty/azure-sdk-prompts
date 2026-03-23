@@ -9,7 +9,7 @@ description: >
   Can a developer send and receive messages using Azure Service Bus
   queues and topics with the .NET SDK documentation?
 sdk_package: Azure.Messaging.ServiceBus
-doc_url: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-dotnet-get-started-with-queues
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/messaging.servicebus-readme
 tags:
   - service-bus
   - messaging

@@ -9,6 +9,7 @@ description: >
   Can a developer use the LRO polling pattern to create a Key Vault
   and wait for completion using the .NET management SDK?
 sdk_package: Azure.ResourceManager.KeyVault
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/resourcemanager.keyvault-readme
 tags:
   - polling
   - lro

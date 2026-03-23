@@ -9,6 +9,7 @@ description: >
   Can a developer perform batch blob operations including bulk delete
   and bulk set-tier using the .NET SDK?
 sdk_package: Azure.Storage.Blobs
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/storage.blobs-readme
 tags:
   - batch
   - bulk-operations

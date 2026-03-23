@@ -9,6 +9,7 @@ description: >
   Can a developer configure custom retry policies for Azure Blob Storage
   including exponential backoff and per-operation timeouts in .NET?
 sdk_package: Azure.Storage.Blobs
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/storage.blobs-readme
 tags:
   - retries
   - retry-policy

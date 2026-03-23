@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, update, and delete secrets in Azure Key Vault
   using the Java SDK based on the documentation alone?
 sdk_package: azure-security-keyvault-secrets
-doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-java
+doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/security-keyvault-secrets-readme
 tags:
   - secrets
   - crud

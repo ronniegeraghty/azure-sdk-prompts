@@ -9,7 +9,7 @@ description: >
   Can a developer send and receive messages using Azure Service Bus
   queues and topics with the JavaScript/TypeScript SDK documentation?
 sdk_package: "@azure/service-bus"
-doc_url: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-nodejs-how-to-use-queues
+doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/service-bus-readme
 tags:
   - service-bus
   - messaging

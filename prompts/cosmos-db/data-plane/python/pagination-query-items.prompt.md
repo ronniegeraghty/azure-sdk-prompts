@@ -9,6 +9,7 @@ description: >
   Can a developer paginate through large Cosmos DB query results
   using continuation tokens in Python?
 sdk_package: azure-cosmos
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/cosmos-readme
 tags:
   - pagination
   - query

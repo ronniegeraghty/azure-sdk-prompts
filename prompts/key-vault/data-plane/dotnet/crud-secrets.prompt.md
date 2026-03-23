@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, update, and delete secrets in Azure Key Vault
   using the .NET SDK based on the documentation alone?
 sdk_package: Azure.Security.KeyVault.Secrets
-doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-net
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/security.keyvault.secrets-readme
 tags:
   - secrets
   - crud

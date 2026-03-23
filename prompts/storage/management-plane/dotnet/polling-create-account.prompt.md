@@ -9,6 +9,7 @@ description: >
   Can a developer use the LRO polling pattern to create a Storage Account
   and wait for completion using the .NET management SDK?
 sdk_package: Azure.ResourceManager.Storage
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/resourcemanager.storage-readme
 tags:
   - polling
   - lro

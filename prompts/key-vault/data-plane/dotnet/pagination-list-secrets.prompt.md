@@ -9,6 +9,7 @@ description: >
   Can a developer paginate through a large list of Key Vault secrets
   using the .NET SDK documentation?
 sdk_package: Azure.Security.KeyVault.Secrets
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/security.keyvault.secrets-readme
 tags:
   - pagination
   - list-secrets

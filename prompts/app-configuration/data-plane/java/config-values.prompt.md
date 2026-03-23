@@ -9,7 +9,7 @@ description: >
   Can a developer read and write configuration values and feature flags
   in Azure App Configuration using the Java SDK documentation?
 sdk_package: azure-data-appconfiguration
-doc_url: https://learn.microsoft.com/en-us/azure/azure-app-configuration/quickstart-java-spring-app
+doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/data-appconfiguration-readme
 tags:
   - app-configuration
   - configuration

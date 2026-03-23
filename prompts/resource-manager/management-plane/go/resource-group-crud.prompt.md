@@ -9,7 +9,7 @@ description: >
   Can a developer create, list, update, and delete Azure Resource Groups
   using the Go management SDK documentation?
 sdk_package: github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources
-doc_url: https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-resource-management
+doc_url: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources
 tags:
   - resource-groups
   - management-plane

@@ -9,7 +9,7 @@ description: >
   Can a developer read and write configuration values and feature flags
   in Azure App Configuration using the Python SDK documentation?
 sdk_package: azure-appconfiguration
-doc_url: https://learn.microsoft.com/en-us/azure/azure-app-configuration/quickstart-python
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/appconfiguration-readme
 tags:
   - app-configuration
   - configuration

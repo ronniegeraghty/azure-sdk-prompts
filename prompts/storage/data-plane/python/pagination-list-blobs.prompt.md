@@ -9,7 +9,7 @@ description: >
   Can a developer correctly paginate through a large list of blobs in
   Azure Storage using the Python SDK based on docs alone?
 sdk_package: azure-storage-blob
-doc_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-list-python
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/storage-blob-readme
 tags:
   - blob
   - pagination

@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, update, and delete secrets in Azure Key Vault
   using the Python SDK based on the documentation alone?
 sdk_package: azure-keyvault-secrets
-doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-python
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/keyvault-secrets-readme
 tags:
   - secrets
   - crud

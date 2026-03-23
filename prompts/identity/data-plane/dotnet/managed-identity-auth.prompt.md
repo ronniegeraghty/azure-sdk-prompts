@@ -9,7 +9,7 @@ description: >
   Can a developer use Managed Identity to authenticate Azure SDK clients
   using the .NET SDK documentation?
 sdk_package: Azure.Identity
-doc_url: https://learn.microsoft.com/en-us/dotnet/azure/sdk/authentication/
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/identity-readme
 tags:
   - authentication
   - managed-identity

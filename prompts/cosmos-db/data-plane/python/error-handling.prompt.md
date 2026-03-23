@@ -9,6 +9,7 @@ description: >
   Can the docs help a developer handle Cosmos DB errors including
   throttling (429), conflicts (409), and not-found (404) in Python?
 sdk_package: azure-cosmos
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/cosmos-readme
 tags:
   - error-handling
   - exceptions

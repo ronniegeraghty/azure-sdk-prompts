@@ -9,7 +9,7 @@ description: >
   Can a developer upload, download, list, and delete blobs in Azure Blob Storage
   using the Java SDK documentation?
 sdk_package: azure-storage-blob
-doc_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-java-get-started
+doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/storage-blob-readme
 tags:
   - blob
   - crud

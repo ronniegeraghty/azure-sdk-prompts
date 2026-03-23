@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, query, and delete items in an Azure Cosmos DB
   container using the Python SDK documentation?
 sdk_package: azure-cosmos
-doc_url: https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/quickstart-python
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/cosmos-readme
 tags:
   - cosmos-db
   - nosql

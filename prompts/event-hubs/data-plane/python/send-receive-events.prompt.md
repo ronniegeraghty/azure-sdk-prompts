@@ -9,7 +9,7 @@ description: >
   Can a developer send and receive events using Azure Event Hubs
   with the Python SDK documentation?
 sdk_package: azure-eventhub
-doc_url: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-python-get-started-send
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/eventhub-readme
 tags:
   - event-hubs
   - streaming

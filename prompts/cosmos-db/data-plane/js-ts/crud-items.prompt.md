@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, query, and delete items in an Azure Cosmos DB
   container using the JavaScript/TypeScript SDK documentation?
 sdk_package: "@azure/cosmos"
-doc_url: https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/quickstart-nodejs
+doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/cosmos-readme
 tags:
   - cosmos-db
   - nosql

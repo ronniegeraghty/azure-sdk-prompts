@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, update, and delete secrets in Azure Key Vault
   using the Rust SDK based on the documentation alone?
 sdk_package: azure_security_keyvault_secrets
-doc_url: https://github.com/Azure/azure-sdk-for-rust
+doc_url: https://docs.rs/azure_security_keyvault_secrets/latest/azure_security_keyvault_secrets/
 tags:
   - secrets
   - crud

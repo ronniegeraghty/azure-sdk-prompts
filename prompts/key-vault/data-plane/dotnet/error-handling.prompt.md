@@ -9,6 +9,7 @@ description: >
   Can the docs help a developer handle Key Vault errors including
   access denied (403), secret not found (404), and throttling (429) in .NET?
 sdk_package: Azure.Security.KeyVault.Secrets
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/security.keyvault.secrets-readme
 tags:
   - error-handling
   - exceptions

@@ -9,6 +9,7 @@ description: >
   Can the docs help a developer handle Cosmos DB errors including
   throttling (429), conflicts (409), and not-found (404) in .NET?
 sdk_package: Microsoft.Azure.Cosmos
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/microsoft.azure.cosmos-readme
 tags:
   - error-handling
   - exceptions

@@ -9,6 +9,7 @@ description: >
   Can a developer paginate through large Cosmos DB query results
   using continuation tokens in .NET?
 sdk_package: Microsoft.Azure.Cosmos
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/microsoft.azure.cosmos-readme
 tags:
   - pagination
   - query

@@ -9,7 +9,7 @@ description: >
   Can a developer set up DefaultAzureCredential for Azure SDK clients
   using the Java SDK documentation?
 sdk_package: azure-identity
-doc_url: https://learn.microsoft.com/en-us/azure/developer/java/sdk/identity
+doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/identity-readme
 tags:
   - authentication
   - default-azure-credential

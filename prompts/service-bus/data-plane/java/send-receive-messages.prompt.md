@@ -9,7 +9,7 @@ description: >
   Can a developer send and receive messages using Azure Service Bus
   queues and topics with the Java SDK documentation?
 sdk_package: azure-messaging-servicebus
-doc_url: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-java-how-to-use-queues
+doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/messaging-servicebus-readme
 tags:
   - service-bus
   - messaging

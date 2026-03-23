@@ -9,7 +9,7 @@ description: >
   Can a developer send and receive events using Azure Event Hubs
   with the JavaScript/TypeScript SDK documentation?
 sdk_package: "@azure/event-hubs"
-doc_url: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-node-get-started-send
+doc_url: https://learn.microsoft.com/en-us/javascript/api/overview/azure/event-hubs-readme
 tags:
   - event-hubs
   - streaming

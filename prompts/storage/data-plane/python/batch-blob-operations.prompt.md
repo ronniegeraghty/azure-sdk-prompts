@@ -9,6 +9,7 @@ description: >
   Can a developer perform batch blob operations including bulk delete
   and bulk set-tier using the Python SDK?
 sdk_package: azure-storage-blob
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/storage-blob-readme
 tags:
   - batch
   - bulk-operations

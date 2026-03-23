@@ -9,7 +9,7 @@ description: >
   Can the docs help a developer authenticate to Azure Blob Storage
   using DefaultAzureCredential in .NET?
 sdk_package: Azure.Storage.Blobs
-doc_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-dotnet-get-started
+doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/storage.blobs-readme
 tags:
   - identity
   - default-azure-credential

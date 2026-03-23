@@ -9,7 +9,7 @@ description: >
   Can a developer upload, download, list, and delete blobs in Azure Blob Storage
   using the Go SDK documentation?
 sdk_package: azblob
-doc_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-go-get-started
+doc_url: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/storage/azblob
 tags:
   - blob
   - crud

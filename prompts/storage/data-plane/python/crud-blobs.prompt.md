@@ -9,7 +9,7 @@ description: >
   Can a developer upload, download, list, and delete blobs in Azure Blob Storage
   using the Python SDK documentation?
 sdk_package: azure-storage-blob
-doc_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-python-get-started
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/storage-blob-readme
 tags:
   - blob
   - crud

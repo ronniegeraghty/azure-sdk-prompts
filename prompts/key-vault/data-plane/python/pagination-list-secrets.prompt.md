@@ -9,6 +9,7 @@ description: >
   Can a developer paginate through a large list of Key Vault secrets
   using the Python SDK documentation?
 sdk_package: azure-keyvault-secrets
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/keyvault-secrets-readme
 tags:
   - pagination
   - list-secrets

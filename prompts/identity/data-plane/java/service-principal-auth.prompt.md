@@ -9,7 +9,7 @@ description: >
   Can a developer authenticate with a Service Principal (client secret)
   using the Java SDK documentation?
 sdk_package: azure-identity
-doc_url: https://learn.microsoft.com/en-us/azure/developer/java/sdk/identity
+doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/identity-readme
 tags:
   - authentication
   - service-principal

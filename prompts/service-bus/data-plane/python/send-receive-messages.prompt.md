@@ -9,7 +9,7 @@ description: >
   Can a developer send and receive messages using Azure Service Bus
   queues and topics with the Python SDK documentation?
 sdk_package: azure-servicebus
-doc_url: https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-python-how-to-use-queues
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/servicebus-readme
 tags:
   - service-bus
   - messaging

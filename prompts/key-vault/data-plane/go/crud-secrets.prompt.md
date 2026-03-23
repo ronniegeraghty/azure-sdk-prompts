@@ -9,7 +9,7 @@ description: >
   Can a developer create, read, update, and delete secrets in Azure Key Vault
   using the Go SDK based on the documentation alone?
 sdk_package: github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets
-doc_url: https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-go
+doc_url: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets
 tags:
   - secrets
   - crud

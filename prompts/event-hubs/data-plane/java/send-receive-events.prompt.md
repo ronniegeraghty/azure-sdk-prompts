@@ -9,7 +9,7 @@ description: >
   Can a developer send and receive events using Azure Event Hubs
   with the Java SDK documentation?
 sdk_package: azure-messaging-eventhubs
-doc_url: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-java-get-started-send
+doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/messaging-eventhubs-readme
 tags:
   - event-hubs
   - streaming

@@ -9,7 +9,7 @@ description: >
   Can a developer create, list, update, and delete Azure Resource Groups
   using the Python management SDK documentation?
 sdk_package: azure-mgmt-resource
-doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/resourcemanager-resources-readme
+doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/mgmt-resource-readme
 tags:
   - resource-groups
   - management-plane
