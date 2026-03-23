@@ -43,14 +43,15 @@ Error      string   `json:"error,omitempty"`
 
 // RunResult holds a single run's metrics for a specific prompt+config.
 type RunResult struct {
-RunID     string  `json:"run_id"`
-Timestamp string  `json:"timestamp"`
-Success   bool    `json:"success"`
-Duration  float64 `json:"duration_seconds"`
-FileCount int     `json:"file_count"`
-Score     int     `json:"score"`
-HasReview bool    `json:"has_review"`
-Error     string  `json:"error,omitempty"`
+RunID     string   `json:"run_id"`
+Timestamp string   `json:"timestamp"`
+Success   bool     `json:"success"`
+Duration  float64  `json:"duration_seconds"`
+FileCount int      `json:"file_count"`
+Score     int      `json:"score"`
+HasReview bool     `json:"has_review"`
+ToolCalls []string `json:"tool_calls,omitempty"`
+Error     string   `json:"error,omitempty"`
 }
 
 // PromptTrend holds time-series performance data for a single prompt.
@@ -142,6 +143,7 @@ Duration:  e.Duration,
 FileCount: e.FileCount,
 Score:     e.Score,
 HasReview: e.HasReview,
+ToolCalls: e.ToolCalls,
 Error:     e.Error,
 })
 }
