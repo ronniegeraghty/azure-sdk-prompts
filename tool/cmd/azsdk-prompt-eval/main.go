@@ -290,6 +290,11 @@ func runCmd() *cobra.Command {
 			// Resolve relative skill_directories in configs to absolute paths
 			resolveConfigSkillDirs(configs, f.prompts)
 
+			// Install declared skills and plugins (npx skills add)
+			if err := config.InstallSkillsAndPlugins(configs); err != nil {
+				return fmt.Errorf("installing skills/plugins: %w", err)
+			}
+
 			// Load and filter prompts
 			prompts, err := prompt.LoadPrompts(f.prompts)
 			if err != nil {
