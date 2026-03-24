@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -59,6 +60,14 @@ func WriteSummaryHTML(s *RunSummary, outputDir string) (string, error) {
 		return "", fmt.Errorf("creating summary HTML file: %w", err)
 	}
 	defer f.Close()
+
+	// Sort results by prompt ID so same-prompt entries (different configs) are adjacent
+	sort.Slice(s.Results, func(i, j int) bool {
+		if s.Results[i].PromptID != s.Results[j].PromptID {
+			return s.Results[i].PromptID < s.Results[j].PromptID
+		}
+		return s.Results[i].ConfigName < s.Results[j].ConfigName
+	})
 
 	matrix := buildMatrix(s)
 	stats := ComputeSummaryStats(s)
@@ -1057,5 +1066,14 @@ const summaryTemplate = `<!DOCTYPE html>
 {{end}}
 {{end}}
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+document.querySelectorAll('.analysis-content').forEach(el => {
+  if (typeof marked !== 'undefined') {
+    el.innerHTML = marked.parse(el.textContent);
+    el.style.whiteSpace = 'normal';
+  }
+});
+</script>
 </body>
 </html>`

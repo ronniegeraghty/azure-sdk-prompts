@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -272,6 +273,14 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 	}
 
 	summaryPath := filepath.Join(summaryDir, "summary.md")
+
+	// Sort results by prompt ID for consistent ordering
+	sort.Slice(s.Results, func(i, j int) bool {
+		if s.Results[i].PromptID != s.Results[j].PromptID {
+			return s.Results[i].PromptID < s.Results[j].PromptID
+		}
+		return s.Results[i].ConfigName < s.Results[j].ConfigName
+	})
 
 	matrix := buildMatrix(s)
 	stats := ComputeSummaryStats(s)

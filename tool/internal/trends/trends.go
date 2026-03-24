@@ -806,7 +806,17 @@ cfg, count, barColor, passRate, formatDuration(totalDur/float64(count)), avgScor
 b.WriteString("</tbody>\n</table>\n\n")
 }
 
-b.WriteString("</body>\n</html>")
+b.WriteString(`<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+document.querySelectorAll('.analysis-content').forEach(function(el) {
+  if (typeof marked !== 'undefined') {
+    el.innerHTML = marked.parse(el.textContent);
+    el.style.whiteSpace = 'normal';
+  }
+});
+</script>
+</body>
+</html>`)
 }
 
 func htmlEscape(s string) string {
