@@ -135,10 +135,16 @@ type EvalTask struct {
 
 // Run executes evaluations for the given prompts crossed with configs.
 func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []config.ToolConfig) (*report.RunSummary, error) {
-	// Build task list (cross product)
+	// Expand multi-model configs: a config with models: [A, B] becomes two configs
+	var expandedConfigs []config.ToolConfig
+	for _, c := range configs {
+		expandedConfigs = append(expandedConfigs, c.Expand()...)
+	}
+
+	// Build task list (cross product: prompts × expanded configs)
 	var tasks []EvalTask
 	for _, p := range prompts {
-		for _, c := range configs {
+		for _, c := range expandedConfigs {
 			tasks = append(tasks, EvalTask{Prompt: p, Config: c})
 		}
 	}
@@ -152,7 +158,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		RunID:        runID,
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
 		TotalPrompts: len(prompts),
-		TotalConfigs: len(configs),
+		TotalConfigs: len(expandedConfigs),
 		TotalEvals:   len(tasks),
 	}
 

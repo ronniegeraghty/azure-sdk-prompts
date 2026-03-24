@@ -1,9 +1,13 @@
+# Azure MCP: Azure MCP server attached — tests tool-augmented ability
 configs:
   - name: azure-mcp
     description: "Azure MCP server attached"
-    model: "claude-sonnet-4.5"
-    reviewer_models:
+    models:
+      - "claude-sonnet-4.5"
       - "claude-opus-4.6"
+      - "gpt-5.3-codex"
+    reviewer_models:
+      - "gemini-3-pro-preview"
       - "gpt-4.1"
     mcp_servers:
       azure:
@@ -11,4 +15,5 @@ configs:
         command: npx
         args: ["-y", "@azure/mcp@latest"]
         tools: ["*"]
-    # Omit available_tools/excluded_tools to get all default tools
+    reviewer_skill_directories:
+      - "./skills/reviewer"

@@ -17,10 +17,14 @@ Tools   []string `yaml:"tools" json:"tools"`
 }
 
 // ToolConfig represents a single evaluation configuration.
+// A config defines the tooling environment (MCP servers, skills) and can list
+// multiple generator models to test. The engine expands each model into a
+// separate eval run: prompts × configs × models.
 type ToolConfig struct {
 Name                       string                `yaml:"name" json:"name"`
 Description                string                `yaml:"description" json:"description"`
 Model                      string                `yaml:"model" json:"model"`
+Models                     []string              `yaml:"models" json:"models"`
 ReviewerModel              string                `yaml:"reviewer_model" json:"reviewer_model"`
 ReviewerModels             []string              `yaml:"reviewer_models" json:"reviewer_models"`
 MCPServers                 map[string]*MCPServer `yaml:"mcp_servers" json:"mcp_servers"`
@@ -32,7 +36,6 @@ ExcludedTools              []string              `yaml:"excluded_tools" json:"ex
 }
 
 // EffectiveReviewerModels returns the list of reviewer models to use.
-// Prefers reviewer_models (list) over reviewer_model (singular) for backward compat.
 func (tc *ToolConfig) EffectiveReviewerModels() []string {
 if len(tc.ReviewerModels) > 0 {
 return tc.ReviewerModels
@@ -41,6 +44,31 @@ if tc.ReviewerModel != "" {
 return []string{tc.ReviewerModel}
 }
 return nil
+}
+
+// Expand returns one ToolConfig per generator model. If models (plural) is set,
+// each model gets its own config with name "{config}-{model}". If only model
+// (singular) is set, returns the config as-is. This enables
+// prompts × configs × models evaluation matrix.
+func (tc *ToolConfig) Expand() []ToolConfig {
+models := tc.Models
+if len(models) == 0 {
+if tc.Model != "" {
+return []ToolConfig{*tc}
+}
+// No model at all — return as-is, engine will use default
+return []ToolConfig{*tc}
+}
+
+expanded := make([]ToolConfig, 0, len(models))
+for _, m := range models {
+c := *tc
+c.Model = m
+c.Models = nil // clear to avoid re-expansion
+c.Name = tc.Name + "/" + m
+expanded = append(expanded, c)
+}
+return expanded
 }
 
 // ConfigFile represents the top-level config file structure.
@@ -78,19 +106,25 @@ for i, c := range cf.Configs {
 if c.Name == "" {
 return fmt.Errorf("config at index %d has no name", i)
 }
-reviewerModels := c.EffectiveReviewerModels()
-for _, rm := range reviewerModels {
-if c.Model != "" && rm == c.Model {
-return fmt.Errorf("config %q: reviewer model %q must differ from generator model %q", c.Name, rm, c.Model)
-}
-}
 // Check for duplicate reviewer models
+reviewerModels := c.EffectiveReviewerModels()
 seen := make(map[string]bool, len(reviewerModels))
 for _, rm := range reviewerModels {
 if seen[rm] {
 return fmt.Errorf("config %q: duplicate reviewer model %q", c.Name, rm)
 }
 seen[rm] = true
+}
+// For each expanded config (per generator model), check that
+// ALL reviewer models differ from THAT generator model.
+// This allows reviewer model X even if X is one of the other generators,
+// as long as X isn't reviewing its own generation.
+for _, expanded := range c.Expand() {
+for _, rm := range reviewerModels {
+if expanded.Model != "" && rm == expanded.Model {
+return fmt.Errorf("config %q: reviewer model %q must differ from generator model %q", c.Name, rm, expanded.Model)
+}
+}
 }
 }
 return nil

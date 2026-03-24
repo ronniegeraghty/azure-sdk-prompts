@@ -262,11 +262,18 @@ func runCmd() *cobra.Command {
 				return err
 			}
 
-			// Override model if specified
+			// Override model if specified via CLI flag (overrides both model and models)
 			if f.model != "" {
 				for i := range configs {
 					configs[i].Model = f.model
+					configs[i].Models = nil // clear multi-model list
 				}
+			}
+
+			// Count expanded configs for display
+			expandedCount := 0
+			for _, c := range configs {
+				expandedCount += len(c.Expand())
 			}
 
 			// Resolve relative skill_directories in configs to absolute paths
@@ -286,8 +293,8 @@ func runCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Found %d prompt(s), %d config(s) → %d evaluation(s)\n",
-				len(filtered), len(configs), len(filtered)*len(configs))
+			fmt.Printf("Found %d prompt(s), %d config(s) × %d model(s) → %d evaluation(s)\n",
+				len(filtered), len(configs), expandedCount/max(len(configs), 1), len(filtered)*expandedCount)
 
 			// Select evaluator, verifier, and reviewer
 			var evaluator eval.CopilotEvaluator
