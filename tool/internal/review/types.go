@@ -24,6 +24,7 @@ type ReviewEvent struct {
 
 // ReviewResult holds the full output from an LLM-as-judge code review.
 type ReviewResult struct {
+	Model        string        `json:"model,omitempty"`
 	Scores       ReviewScores  `json:"scores"`
 	OverallScore int           `json:"overall_score"`
 	Summary      string        `json:"summary"`

@@ -4,21 +4,21 @@ configs:
   - name: baseline
     description: "No MCP servers, no skills — just base Copilot"
     model: "claude-sonnet-4.5"
-    reviewer_model: "gpt-4.1"
-    # Omit available_tools/excluded_tools to get all default tools
+    reviewer_models:
+      - "claude-opus-4.6"
+      - "gpt-4.1"
 
   - name: azure-mcp
     description: "Azure MCP server attached"
     model: "claude-sonnet-4.5"
-    reviewer_model: "gpt-4.1"
+    reviewer_models:
+      - "claude-opus-4.6"
+      - "gpt-4.1"
     mcp_servers:
       azure:
         type: local
         command: npx
         args: ["-y", "@azure/mcp@latest"]
         tools: ["*"]
-    # Skills loaded for reviewer/verifier sessions
     reviewer_skill_directories:
       - "./skills/reviewer"
-    # generator_skill_directories:
-    #   - "./skills/generator"

@@ -84,10 +84,11 @@ func (s *StubVerifier) Verify(_ context.Context, _ string, _ string, _ string) (
 
 // Engine orchestrates evaluation runs.
 type Engine struct {
-	evaluator CopilotEvaluator
-	reviewer  review.Reviewer
-	verifier  Verifier
-	opts      EngineOptions
+	evaluator      CopilotEvaluator
+	reviewer       review.Reviewer
+	panelReviewer  *review.PanelReviewer
+	verifier       Verifier
+	opts           EngineOptions
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
@@ -118,6 +119,12 @@ func NewEngineWithReviewer(evaluator CopilotEvaluator, verifier Verifier, review
 		verifier:  verifier,
 		opts:      opts,
 	}
+}
+
+// SetPanelReviewer configures a multi-model review panel.
+// When set, the engine uses the panel instead of the single reviewer.
+func (e *Engine) SetPanelReviewer(pr *review.PanelReviewer) {
+	e.panelReviewer = pr
 }
 
 // EvalTask represents a single prompt+config evaluation to run.
@@ -369,6 +376,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			debugPrefix, len(evalReport.ToolCalls), len(generatedFiles), time.Since(start).Truncate(time.Millisecond))
 	}
 
+	// Capture generation duration BEFORE review/verification so it only reflects
+	// the time the generator agent took, not the additional review time.
+	evalReport.Duration = time.Since(start).Seconds()
+
 	// Copilot-based verification (skip if eval hard-failed with no files)
 	if e.verifier != nil && len(generatedFiles) > 0 {
 		sendPhase(progress.PhaseVerifying)
@@ -416,29 +427,49 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	// Code review — always run if reviewer is available and files exist (Issue 4)
-	if !e.opts.SkipReview && e.reviewer != nil && len(generatedFiles) > 0 {
+	// Code review — use panel reviewer if available, otherwise single reviewer
+	if !e.opts.SkipReview && len(generatedFiles) > 0 {
 		sendPhase(progress.PhaseReviewing)
-		if e.opts.Debug {
-			log.Printf("[DEBUG] %s: Starting review session...", debugPrefix)
-		}
 		referenceDir := ""
 		if task.Prompt.ReferenceAnswer != "" {
 			referenceDir = task.Prompt.ReferenceAnswer
 		}
-		reviewResult, err := e.reviewer.Review(evalCtx, task.Prompt.PromptText, ws.Dir, referenceDir, task.Prompt.EvaluationCriteria)
-		if err != nil {
+
+		if e.panelReviewer != nil {
 			if e.opts.Debug {
-				log.Printf("[DEBUG] %s: ERROR: code review failed: %v", debugPrefix, err)
+				log.Printf("[DEBUG] %s: Starting review panel...", debugPrefix)
 			}
-		} else {
-			evalReport.Review = reviewResult
+			panel, consolidated, err := e.panelReviewer.ReviewPanel(evalCtx, task.Prompt.PromptText, ws.Dir, referenceDir, task.Prompt.EvaluationCriteria)
+			if err != nil {
+				if e.opts.Debug {
+					log.Printf("[DEBUG] %s: ERROR: review panel failed: %v", debugPrefix, err)
+				}
+			} else {
+				evalReport.ReviewPanel = panel
+				evalReport.Review = consolidated
+				if e.opts.Debug {
+					log.Printf("[DEBUG] %s: Review panel: %d reviewers, consensus score: %d/10",
+						debugPrefix, len(panel), consolidated.OverallScore)
+				}
+			}
+		} else if e.reviewer != nil {
 			if e.opts.Debug {
-				log.Printf("[DEBUG] %s: Review score: %d/10", debugPrefix, reviewResult.OverallScore)
+				log.Printf("[DEBUG] %s: Starting single review session...", debugPrefix)
+			}
+			reviewResult, err := e.reviewer.Review(evalCtx, task.Prompt.PromptText, ws.Dir, referenceDir, task.Prompt.EvaluationCriteria)
+			if err != nil {
+				if e.opts.Debug {
+					log.Printf("[DEBUG] %s: ERROR: code review failed: %v", debugPrefix, err)
+				}
+			} else {
+				evalReport.Review = reviewResult
+				if e.opts.Debug {
+					log.Printf("[DEBUG] %s: Review score: %d/10", debugPrefix, reviewResult.OverallScore)
+				}
 			}
 		}
 
-		// Capture reviewed (annotated) files — the review session may have added REVIEW: comments
+		// Capture reviewed (annotated) files
 		reviewedFiles, err := readReviewedFiles(ws.Dir)
 		if err == nil && len(reviewedFiles) > 0 {
 			evalReport.ReviewedFiles = reviewedFiles
@@ -456,8 +487,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				debugPrefix, evalReport.ToolUsage.Match, evalReport.ToolUsage.MatchedTools, evalReport.ToolUsage.MissingTools)
 		}
 	}
-
-	evalReport.Duration = time.Since(start).Seconds()
 
 	// Copy reviewed (annotated) files into report under reviewed-code/
 	if len(evalReport.ReviewedFiles) > 0 {

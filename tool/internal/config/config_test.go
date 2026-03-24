@@ -90,14 +90,15 @@ configs:
   - name: bad-config
     description: "Same model for generator and reviewer"
     model: "claude-sonnet-4.5"
-    reviewer_model: "claude-sonnet-4.5"
+    reviewer_models:
+      - "claude-sonnet-4.5"
 `)
 _, err := Parse(data)
 if err == nil {
-t.Fatal("expected error when model and reviewer_model are the same")
+t.Fatal("expected error when reviewer model matches generator model")
 }
-if !strings.Contains(err.Error(), "must be different") {
-t.Errorf("expected 'must be different' in error, got: %v", err)
+if !strings.Contains(err.Error(), "must differ") {
+t.Errorf("expected 'must differ' in error, got: %v", err)
 }
 }
 
@@ -107,14 +108,17 @@ configs:
   - name: good-config
     description: "Different models"
     model: "claude-sonnet-4.5"
-    reviewer_model: "gpt-4.1"
+    reviewer_models:
+      - "gpt-4.1"
+      - "gemini-3-pro-preview"
 `)
 cfg, err := Parse(data)
 if err != nil {
 t.Fatalf("unexpected error: %v", err)
 }
-if cfg.Configs[0].ReviewerModel != "gpt-4.1" {
-t.Errorf("expected reviewer_model 'gpt-4.1', got %q", cfg.Configs[0].ReviewerModel)
+models := cfg.Configs[0].EffectiveReviewerModels()
+if len(models) != 2 {
+t.Errorf("expected 2 reviewer models, got %d", len(models))
 }
 }
 
@@ -128,6 +132,40 @@ configs:
 _, err := Parse(data)
 if err != nil {
 t.Fatalf("unexpected error: %v", err)
+}
+}
+
+func TestValidateDuplicateReviewerModelsRejected(t *testing.T) {
+data := []byte(`
+configs:
+  - name: dupes
+    description: "Duplicate reviewer models"
+    model: "claude-sonnet-4.5"
+    reviewer_models:
+      - "gpt-4.1"
+      - "gpt-4.1"
+`)
+_, err := Parse(data)
+if err == nil {
+t.Fatal("expected error for duplicate reviewer models")
+}
+}
+
+func TestBackwardCompatSingularReviewerModel(t *testing.T) {
+data := []byte(`
+configs:
+  - name: compat
+    description: "Old-style singular reviewer_model"
+    model: "claude-sonnet-4.5"
+    reviewer_model: "gpt-4.1"
+`)
+cfg, err := Parse(data)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+models := cfg.Configs[0].EffectiveReviewerModels()
+if len(models) != 1 || models[0] != "gpt-4.1" {
+t.Errorf("expected [gpt-4.1] from backward compat, got %v", models)
 }
 }
 

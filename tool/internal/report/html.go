@@ -820,7 +820,50 @@ const reportTemplate = `<!DOCTYPE html>
 </div>
 {{end}}
 
-<!-- ━━ Generated Files (Issue 3: expandable contents) ━━ -->
+<!-- ━━ Review Panel (individual reviewer results) ━━ -->
+{{if .ReviewPanel}}
+<div class="section">
+  <div class="section-header"><span class="icon">👥</span><h2>Review Panel ({{len .ReviewPanel}} reviewers)</h2></div>
+  <div class="section-body">
+    <table class="detail-table">
+      <thead><tr><th>Reviewer</th><th>Score</th><th>Correctness</th><th>Completeness</th><th>Best Practices</th><th>Error Handling</th><th>Package Usage</th><th>Code Quality</th></tr></thead>
+      <tbody>
+        {{range .ReviewPanel}}
+        <tr>
+          <td><code>{{.Model}}</code></td>
+          <td><strong style="color:{{scoreColor .OverallScore}}">{{.OverallScore}}/10</strong></td>
+          <td>{{.Scores.Correctness}}</td>
+          <td>{{.Scores.Completeness}}</td>
+          <td>{{.Scores.BestPractices}}</td>
+          <td>{{.Scores.ErrorHandling}}</td>
+          <td>{{.Scores.PackageUsage}}</td>
+          <td>{{.Scores.CodeQuality}}</td>
+        </tr>
+        {{end}}
+        {{if .Review}}
+        <tr style="font-weight:700;border-top:2px solid var(--border)">
+          <td>🏆 Consensus</td>
+          <td><strong style="color:{{scoreColor .Review.OverallScore}}">{{.Review.OverallScore}}/10</strong></td>
+          <td>{{.Review.Scores.Correctness}}</td>
+          <td>{{.Review.Scores.Completeness}}</td>
+          <td>{{.Review.Scores.BestPractices}}</td>
+          <td>{{.Review.Scores.ErrorHandling}}</td>
+          <td>{{.Review.Scores.PackageUsage}}</td>
+          <td>{{.Review.Scores.CodeQuality}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{range .ReviewPanel}}
+    <details style="margin-top:0.75rem">
+      <summary><code>{{.Model}}</code> — {{.Summary}}</summary>
+      {{if .Issues}}<p><strong>Issues:</strong></p><ul>{{range .Issues}}<li>{{.}}</li>{{end}}</ul>{{end}}
+      {{if .Strengths}}<p><strong>Strengths:</strong></p><ul>{{range .Strengths}}<li>{{.}}</li>{{end}}</ul>{{end}}
+    </details>
+    {{end}}
+  </div>
+</div>
+{{end}}
 {{if .GeneratedFiles}}
 <div class="section">
   <div class="section-header"><span class="icon">📁</span><h2>Generated Files ({{.FileCount}})</h2></div>

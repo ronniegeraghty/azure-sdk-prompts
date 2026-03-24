@@ -22,12 +22,25 @@ Name                       string                `yaml:"name" json:"name"`
 Description                string                `yaml:"description" json:"description"`
 Model                      string                `yaml:"model" json:"model"`
 ReviewerModel              string                `yaml:"reviewer_model" json:"reviewer_model"`
+ReviewerModels             []string              `yaml:"reviewer_models" json:"reviewer_models"`
 MCPServers                 map[string]*MCPServer `yaml:"mcp_servers" json:"mcp_servers"`
 SkillDirectories           []string              `yaml:"skill_directories" json:"skill_directories"`
 GeneratorSkillDirectories  []string              `yaml:"generator_skill_directories" json:"generator_skill_directories"`
 ReviewerSkillDirectories   []string              `yaml:"reviewer_skill_directories" json:"reviewer_skill_directories"`
 AvailableTools             []string              `yaml:"available_tools" json:"available_tools"`
 ExcludedTools              []string              `yaml:"excluded_tools" json:"excluded_tools"`
+}
+
+// EffectiveReviewerModels returns the list of reviewer models to use.
+// Prefers reviewer_models (list) over reviewer_model (singular) for backward compat.
+func (tc *ToolConfig) EffectiveReviewerModels() []string {
+if len(tc.ReviewerModels) > 0 {
+return tc.ReviewerModels
+}
+if tc.ReviewerModel != "" {
+return []string{tc.ReviewerModel}
+}
+return nil
 }
 
 // ConfigFile represents the top-level config file structure.
@@ -65,8 +78,19 @@ for i, c := range cf.Configs {
 if c.Name == "" {
 return fmt.Errorf("config at index %d has no name", i)
 }
-if c.Model != "" && c.ReviewerModel != "" && c.Model == c.ReviewerModel {
-return fmt.Errorf("config %q: model and reviewer_model must be different (both set to %q). The reviewer should use a different model than the generator to provide an independent evaluation", c.Name, c.Model)
+reviewerModels := c.EffectiveReviewerModels()
+for _, rm := range reviewerModels {
+if c.Model != "" && rm == c.Model {
+return fmt.Errorf("config %q: reviewer model %q must differ from generator model %q", c.Name, rm, c.Model)
+}
+}
+// Check for duplicate reviewer models
+seen := make(map[string]bool, len(reviewerModels))
+for _, rm := range reviewerModels {
+if seen[rm] {
+return fmt.Errorf("config %q: duplicate reviewer model %q", c.Name, rm)
+}
+seen[rm] = true
 }
 }
 return nil

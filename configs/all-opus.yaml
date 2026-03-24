@@ -4,12 +4,16 @@ configs:
   - name: baseline-opus
     description: "No MCP servers, no skills — Claude Opus 4.6"
     model: "claude-opus-4.6"
-    reviewer_model: "gpt-4.1"
+    reviewer_models:
+      - "claude-sonnet-4.5"
+      - "gpt-4.1"
 
   - name: azure-mcp-opus
     description: "Azure MCP server attached — Claude Opus 4.6"
     model: "claude-opus-4.6"
-    reviewer_model: "gpt-4.1"
+    reviewer_models:
+      - "claude-sonnet-4.5"
+      - "gpt-4.1"
     mcp_servers:
       azure:
         type: local

@@ -293,6 +293,7 @@ func runCmd() *cobra.Command {
 			var evaluator eval.CopilotEvaluator
 			var reviewer review.Reviewer
 			var verifier eval.Verifier
+			var panelReviewer *review.PanelReviewer
 
 			if f.useStub {
 				fmt.Println("Using stub evaluator (--stub flag)")
@@ -331,25 +332,39 @@ func runCmd() *cobra.Command {
 					}
 					verifier = copilotVerifier
 
-					// Create a real CopilotReviewer backed by its own Copilot client
-					reviewClient := copilot.NewClient(clientOpts)
-					if err := reviewClient.Start(context.Background()); err != nil {
-						fmt.Printf("⚠️  Could not start reviewer client: %v, reviews will be skipped\n", err)
-					} else {
-						// Use reviewer_model from first config that specifies one, else fall back to CLI --model
-						reviewerModel := f.model
-						for _, c := range configs {
-							if c.ReviewerModel != "" {
-								reviewerModel = c.ReviewerModel
-								break
-							}
+					// Create reviewer(s) — use panel if reviewer_models list configured
+					var reviewerModels []string
+					for _, c := range configs {
+						if models := c.EffectiveReviewerModels(); len(models) > 0 {
+							reviewerModels = models
+							break
 						}
-						copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModel)
+					}
+
+					if len(reviewerModels) > 1 {
+						// Multi-model panel
+						panelReviewer = review.NewPanelReviewer(clientOpts, reviewerModels, f.debug)
 						if len(reviewerSkillsDirs) > 0 {
-							copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+							panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
 						}
-						reviewer = copilotReviewer
-						defer reviewClient.Stop()
+						fmt.Printf("Using review panel: %v\n", reviewerModels)
+					} else {
+						// Single reviewer (backward compat)
+						reviewClient := copilot.NewClient(clientOpts)
+						if err := reviewClient.Start(context.Background()); err != nil {
+							fmt.Printf("⚠️  Could not start reviewer client: %v, reviews will be skipped\n", err)
+						} else {
+							reviewerModel := f.model
+							if len(reviewerModels) == 1 {
+								reviewerModel = reviewerModels[0]
+							}
+							copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModel)
+							if len(reviewerSkillsDirs) > 0 {
+								copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+							}
+							reviewer = copilotReviewer
+							defer reviewClient.Stop()
+						}
 					}
 
 					// Override generator config's skill directories with generator-specific ones
@@ -373,6 +388,9 @@ func runCmd() *cobra.Command {
 				DryRun:       f.dryRun,
 				ProgressMode: f.progressMode,
 			})
+			if panelReviewer != nil && !f.skipReview {
+				engine.SetPanelReviewer(panelReviewer)
+			}
 
 			summary, err := engine.Run(context.Background(), filtered, configs)
 			if err != nil {

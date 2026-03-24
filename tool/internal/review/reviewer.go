@@ -183,3 +183,278 @@ func parseReviewResponse(text string) (*ReviewResult, error) {
 	}
 	return &result, nil
 }
+
+// PanelReviewer runs multiple reviewers in parallel and consolidates results.
+type PanelReviewer struct {
+	clientOpts       *copilot.ClientOptions
+	models           []string // first model is the consolidator
+	skillDirectories []string
+	debug            bool
+}
+
+// NewPanelReviewer creates a panel reviewer that runs multiple models concurrently.
+// The first model in the list is used as the consolidator.
+func NewPanelReviewer(clientOpts *copilot.ClientOptions, models []string, debug bool) *PanelReviewer {
+	return &PanelReviewer{
+		clientOpts: clientOpts,
+		models:     models,
+		debug:      debug,
+	}
+}
+
+// SetSkillDirectories configures skill directories for all review sessions.
+func (p *PanelReviewer) SetSkillDirectories(dirs []string) {
+	p.skillDirectories = dirs
+}
+
+// ReviewPanel runs all reviewer models in parallel and returns individual results
+// plus a consolidated result. The consolidated result is produced by the first model
+// in the list, which receives all other reviewers' outputs.
+func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (panel []ReviewResult, consolidated *ReviewResult, err error) {
+	if len(p.models) == 0 {
+		return nil, nil, fmt.Errorf("no reviewer models configured")
+	}
+
+	generatedFiles, err := utils.ReadDirFiles(workDir)
+	if err != nil || len(generatedFiles) == 0 {
+		return nil, nil, fmt.Errorf("no generated files to review in %s", workDir)
+	}
+
+	var referenceFiles map[string]string
+	if referenceDir != "" {
+		referenceFiles, _ = utils.ReadDirFiles(referenceDir)
+	}
+
+	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria)
+
+	// Run all reviewers in parallel
+	type reviewOutput struct {
+		index  int
+		model  string
+		result *ReviewResult
+		err    error
+	}
+
+	results := make(chan reviewOutput, len(p.models))
+	var wg sync.WaitGroup
+
+	for i, model := range p.models {
+		wg.Add(1)
+		go func(idx int, m string) {
+			defer wg.Done()
+			result, reviewErr := p.runSingleReview(ctx, m, reviewPrompt, workDir)
+			if result != nil {
+				result.Model = m
+			}
+			results <- reviewOutput{index: idx, model: m, result: result, err: reviewErr}
+		}(i, model)
+	}
+
+	// Close channel when all goroutines complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results in order
+	ordered := make([]*ReviewResult, len(p.models))
+	for out := range results {
+		if out.err != nil && p.debug {
+			fmt.Printf("[DEBUG] reviewer %s failed: %v\n", out.model, out.err)
+		}
+		ordered[out.index] = out.result
+	}
+
+	// Build panel (non-nil results only)
+	for _, r := range ordered {
+		if r != nil {
+			panel = append(panel, *r)
+		}
+	}
+
+	if len(panel) == 0 {
+		return nil, nil, fmt.Errorf("all reviewers failed")
+	}
+
+	// If only one reviewer succeeded, use it as consolidated
+	if len(panel) == 1 {
+		c := panel[0]
+		return panel, &c, nil
+	}
+
+	// Consolidate: use the first model to synthesize all reviews
+	consolidated, err = p.consolidate(ctx, originalPrompt, generatedFiles, panel)
+	if err != nil {
+		// Fallback: use median scores from panel
+		consolidated = medianReview(panel)
+	}
+	consolidated.Model = "consensus"
+
+	return panel, consolidated, nil
+}
+
+// Review implements the Reviewer interface using the panel (for backward compat).
+func (p *PanelReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error) {
+	_, consolidated, err := p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, evaluationCriteria)
+	return consolidated, err
+}
+
+// runSingleReview creates a Copilot client, runs a review session, and returns the result.
+func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, reviewPrompt string, workDir string) (*ReviewResult, error) {
+	opts := *p.clientOpts
+	client := copilot.NewClient(&opts)
+
+	if err := client.Start(ctx); err != nil {
+		return nil, fmt.Errorf("starting reviewer client for %s: %w", model, err)
+	}
+	defer func() {
+		done := make(chan struct{})
+		go func() { client.Stop(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+		}
+	}()
+
+	session, err := client.CreateSession(ctx, &copilot.SessionConfig{
+		Model: model,
+		SystemMessage: &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: "You are a code review judge evaluating another AI agent's work. Score the generated code using the rubric and any prompt-specific evaluation criteria provided. Respond with ONLY valid JSON. No markdown, no explanation.",
+		},
+		WorkingDirectory:    workDir,
+		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		SkillDirectories:    p.skillDirectories,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating review session for %s: %w", model, err)
+	}
+
+	var assistantContent strings.Builder
+	var mu sync.Mutex
+	unsub := session.On(func(event copilot.SessionEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+		if event.Type == copilot.SessionEventTypeAssistantMessage && event.Data.Content != nil {
+			assistantContent.WriteString(*event.Data.Content)
+		}
+	})
+	defer unsub()
+
+	_, err = session.SendAndWait(ctx, copilot.MessageOptions{
+		Prompt: reviewPrompt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("review session send for %s: %w", model, err)
+	}
+
+	mu.Lock()
+	responseText := assistantContent.String()
+	mu.Unlock()
+
+	return parseReviewResponse(responseText)
+}
+
+// consolidate uses the first model to synthesize all individual reviews into a consensus.
+func (p *PanelReviewer) consolidate(ctx context.Context, originalPrompt string, generatedFiles map[string]string, panel []ReviewResult) (*ReviewResult, error) {
+	var b strings.Builder
+	b.WriteString("You are a senior review consolidator. Multiple independent reviewers have scored the same generated code.\n")
+	b.WriteString("Synthesize their feedback into a single consensus review.\n\n")
+
+	b.WriteString("## Original Prompt\n\n")
+	b.WriteString(originalPrompt)
+	b.WriteString("\n\n")
+
+	b.WriteString("## Individual Reviews\n\n")
+	for i, r := range panel {
+		reviewJSON, _ := json.MarshalIndent(r, "", "  ")
+		fmt.Fprintf(&b, "### Reviewer %d (%s)\n```json\n%s\n```\n\n", i+1, r.Model, string(reviewJSON))
+	}
+
+	b.WriteString("## Instructions\n\n")
+	b.WriteString("Produce a consensus review. Use the median of individual scores for each dimension. ")
+	b.WriteString("Combine the best issues and strengths from all reviewers. ")
+	b.WriteString("Write a summary that captures the consensus view.\n\n")
+	b.WriteString("Respond with ONLY a JSON object in the same format as the individual reviews.\n")
+
+	consolidatorModel := p.models[0]
+	result, err := p.runSingleReview(ctx, consolidatorModel, b.String(), "")
+	if err != nil {
+		return nil, fmt.Errorf("consolidation failed: %w", err)
+	}
+	return result, nil
+}
+
+// medianReview computes median scores across a panel as a fallback.
+func medianReview(panel []ReviewResult) *ReviewResult {
+	if len(panel) == 0 {
+		return &ReviewResult{Summary: "No reviews to consolidate"}
+	}
+
+	median := func(extract func(ReviewScores) int) int {
+		vals := make([]int, 0, len(panel))
+		for _, r := range panel {
+			vals = append(vals, extract(r.Scores))
+		}
+		// Simple sort for small N
+		for i := range vals {
+			for j := i + 1; j < len(vals); j++ {
+				if vals[j] < vals[i] {
+					vals[i], vals[j] = vals[j], vals[i]
+				}
+			}
+		}
+		return vals[len(vals)/2]
+	}
+
+	scores := ReviewScores{
+		Correctness:   median(func(s ReviewScores) int { return s.Correctness }),
+		Completeness:  median(func(s ReviewScores) int { return s.Completeness }),
+		BestPractices: median(func(s ReviewScores) int { return s.BestPractices }),
+		ErrorHandling: median(func(s ReviewScores) int { return s.ErrorHandling }),
+		PackageUsage:  median(func(s ReviewScores) int { return s.PackageUsage }),
+		CodeQuality:   median(func(s ReviewScores) int { return s.CodeQuality }),
+	}
+
+	// Median overall
+	overalls := make([]int, 0, len(panel))
+	for _, r := range panel {
+		overalls = append(overalls, r.OverallScore)
+	}
+	for i := range overalls {
+		for j := i + 1; j < len(overalls); j++ {
+			if overalls[j] < overalls[i] {
+				overalls[i], overalls[j] = overalls[j], overalls[i]
+			}
+		}
+	}
+
+	// Merge issues and strengths
+	issueSet := make(map[string]bool)
+	var issues []string
+	strengthSet := make(map[string]bool)
+	var strengths []string
+	for _, r := range panel {
+		for _, iss := range r.Issues {
+			if !issueSet[iss] {
+				issueSet[iss] = true
+				issues = append(issues, iss)
+			}
+		}
+		for _, s := range r.Strengths {
+			if !strengthSet[s] {
+				strengthSet[s] = true
+				strengths = append(strengths, s)
+			}
+		}
+	}
+
+	return &ReviewResult{
+		Model:        "consensus (median)",
+		Scores:       scores,
+		OverallScore: overalls[len(overalls)/2],
+		Summary:      fmt.Sprintf("Median consensus from %d reviewers", len(panel)),
+		Issues:       issues,
+		Strengths:    strengths,
+	}
+}

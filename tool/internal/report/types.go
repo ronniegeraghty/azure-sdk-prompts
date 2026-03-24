@@ -57,7 +57,8 @@ type EvalReport struct {
 	ReviewedFiles  []ReviewedFile       `json:"reviewed_files,omitempty"`
 	Build          *build.BuildResult   `json:"build,omitempty"`
 	Verification   *VerifyResult        `json:"verification,omitempty"`
-	Review         *review.ReviewResult `json:"review,omitempty"`
+	Review         *review.ReviewResult   `json:"review,omitempty"`
+	ReviewPanel    []review.ReviewResult  `json:"review_panel,omitempty"`
 	ToolUsage      *ToolUsageResult     `json:"tool_usage,omitempty"`
 	SessionEvents  []SessionEventRecord `json:"session_events,omitempty"`
 	EventCount     int                  `json:"event_count"`
