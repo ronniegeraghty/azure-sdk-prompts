@@ -319,11 +319,17 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		log.Printf("[DEBUG] %s: Workspace: %s", debugPrefix, ws.Dir)
 	}
 
-	// Snapshot home directory before eval so we can recover misplaced files after
+	// Snapshot home directory and CWD before eval so we can recover misplaced files after
 	homeDir, _ := os.UserHomeDir()
 	var preEvalHomeFiles map[string]bool
 	if homeDir != "" {
 		preEvalHomeFiles = snapshotDir(homeDir)
+	}
+	// Also snapshot CWD — agents may write files relative to the process working directory
+	cwdDir, _ := os.Getwd()
+	var preEvalCwdFiles map[string]bool
+	if cwdDir != "" && cwdDir != homeDir && cwdDir != ws.Dir {
+		preEvalCwdFiles = snapshotDir(cwdDir)
 	}
 
 	// Run evaluation
@@ -363,8 +369,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// The Copilot CLI sometimes creates files in ~ when the agent omits the path parameter.
 	if homeDir != "" && preEvalHomeFiles != nil {
 		recovered := recoverMisplacedFiles(homeDir, preEvalHomeFiles, ws.Dir, debugPrefix, e.opts.Debug)
-		if recovered > 0 && e.opts.Debug {
-			log.Printf("[DEBUG] %s: Recovered %d misplaced files from %s to workspace", debugPrefix, recovered, homeDir)
+		if recovered > 0 {
+			log.Printf("%s: Recovered %d misplaced files from home dir to workspace", debugPrefix, recovered)
+		}
+	}
+	// Also recover from CWD
+	if cwdDir != "" && preEvalCwdFiles != nil {
+		recovered := recoverMisplacedFiles(cwdDir, preEvalCwdFiles, ws.Dir, debugPrefix, e.opts.Debug)
+		if recovered > 0 {
+			log.Printf("%s: Recovered %d misplaced files from CWD to workspace", debugPrefix, recovered)
 		}
 	}
 
@@ -373,6 +386,29 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		generatedFiles = result.GeneratedFiles
 	}
 	evalReport.GeneratedFiles = generatedFiles
+
+	// Diagnostic: if 0 files generated, check if agent attempted file creation
+	if len(generatedFiles) == 0 && !evalFailed {
+		fileToolAttempts := 0
+		for _, ev := range evalReport.SessionEvents {
+			if ev.Type == "tool.execution_start" && isFileWriteTool(ev.ToolName) {
+				fileToolAttempts++
+			}
+		}
+		if fileToolAttempts > 0 {
+			log.Printf("WARNING %s: 0 files generated despite %d file-write tool attempts — files may have been written to wrong location", debugPrefix, fileToolAttempts)
+			if evalReport.Error == "" {
+				evalReport.Error = fmt.Sprintf("0 files generated despite %d file-write tool attempts", fileToolAttempts)
+				evalReport.Success = false
+			}
+		} else {
+			log.Printf("WARNING %s: 0 files generated — agent did not use any file-write tools", debugPrefix)
+			if evalReport.Error == "" {
+				evalReport.Error = "0 files generated — agent did not create any files"
+				evalReport.Success = false
+			}
+		}
+	}
 
 	if e.opts.Debug {
 		log.Printf("[DEBUG] %s: Session complete: %d tool calls, %d files generated, %s",
