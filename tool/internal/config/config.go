@@ -4,6 +4,7 @@ package config
 import (
 "fmt"
 "os"
+"path/filepath"
 
 "gopkg.in/yaml.v3"
 )
@@ -83,6 +84,32 @@ if err != nil {
 return nil, fmt.Errorf("reading config file: %w", err)
 }
 return Parse(data)
+}
+
+// LoadDir reads all .yaml files in a directory and merges their configs.
+// This allows splitting configs across multiple files (e.g., baseline.yaml, azure-mcp.yaml).
+func LoadDir(dir string) (*ConfigFile, error) {
+entries, err := os.ReadDir(dir)
+if err != nil {
+return nil, fmt.Errorf("reading config directory %s: %w", dir, err)
+}
+
+merged := &ConfigFile{}
+for _, e := range entries {
+if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
+continue
+}
+cf, err := Load(filepath.Join(dir, e.Name()))
+if err != nil {
+return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
+}
+merged.Configs = append(merged.Configs, cf.Configs...)
+}
+
+if len(merged.Configs) == 0 {
+return nil, fmt.Errorf("no configs found in %s", dir)
+}
+return merged, nil
 }
 
 // Parse parses configuration from YAML bytes.

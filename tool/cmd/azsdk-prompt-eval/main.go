@@ -76,8 +76,13 @@ func resolvePromptsDir(cmd *cobra.Command) string {
 
 func resolveConfigFile(cmd *cobra.Command) string {
 	return resolvePathFlag(cmd, "config-file", []string{
-		"./configs/all.yaml", "../configs/all.yaml",
-		"./configs.yaml", "../configs.yaml",
+		"./configs", "../configs",
+	})
+}
+
+func resolveConfigDir(cmd *cobra.Command) string {
+	return resolvePathFlag(cmd, "config-dir", []string{
+		"./configs", "../configs",
 	})
 }
 
@@ -99,6 +104,7 @@ type runFlags struct {
 	promptID     string
 	configName   string
 	configFile   string
+	configDir    string
 	workers      int
 	timeout      int
 	model        string
@@ -122,7 +128,8 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.tags, "tags", "", "Filter by tags (comma-separated)")
 	cmd.Flags().StringVar(&f.promptID, "prompt-id", "", "Run a single prompt by ID")
 	cmd.Flags().StringVar(&f.configName, "config", "", "Config name(s) from config file (comma-separated)")
-	cmd.Flags().StringVar(&f.configFile, "config-file", "./configs/all.yaml", "Path to configuration YAML")
+	cmd.Flags().StringVar(&f.configFile, "config-file", "", "Path to a specific configuration YAML file (default: load all from configs/)")
+	cmd.Flags().StringVar(&f.configDir, "config-dir", "./configs", "Directory containing configuration YAML files")
 	cmd.Flags().IntVar(&f.workers, "workers", 4, "Parallel evaluation workers")
 	cmd.Flags().IntVar(&f.timeout, "timeout", 600, "Per-prompt timeout in seconds")
 	cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
@@ -240,13 +247,24 @@ func runCmd() *cobra.Command {
 		Long:  "Run evaluations with optional filters against the prompt library.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f.prompts = resolvePromptsDir(cmd)
-			f.configFile = resolveConfigFile(cmd)
 			f.output = resolveOutputDir(cmd)
 
-			// Load config
-			cfgFile, err := config.Load(f.configFile)
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
+			// Load config(s)
+			var cfgFile *config.ConfigFile
+			if cmd.Flags().Changed("config-file") {
+				f.configFile = resolveConfigFile(cmd)
+				var err error
+				cfgFile, err = config.Load(f.configFile)
+				if err != nil {
+					return fmt.Errorf("loading config: %w", err)
+				}
+			} else {
+				configDir := resolveConfigDir(cmd)
+				var err error
+				cfgFile, err = config.LoadDir(configDir)
+				if err != nil {
+					return fmt.Errorf("loading configs from %s: %w", configDir, err)
+				}
 			}
 
 			// Get selected configs
@@ -516,16 +534,27 @@ func listCmd() *cobra.Command {
 
 func configsCmd() *cobra.Command {
 	var configFile string
+	var configDir string
 
 	cmd := &cobra.Command{
 		Use:   "configs",
 		Short: "List available configurations",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configFile = resolveConfigFile(cmd)
-
-			cfgFile, err := config.Load(configFile)
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
+			var cfgFile *config.ConfigFile
+			if cmd.Flags().Changed("config-file") {
+				configFile = resolveConfigFile(cmd)
+				var err error
+				cfgFile, err = config.Load(configFile)
+				if err != nil {
+					return fmt.Errorf("loading config: %w", err)
+				}
+			} else {
+				configDir = resolveConfigDir(cmd)
+				var err error
+				cfgFile, err = config.LoadDir(configDir)
+				if err != nil {
+					return fmt.Errorf("loading configs from %s: %w", configDir, err)
+				}
 			}
 
 			fmt.Printf("Available configurations (%d):\n\n", len(cfgFile.Configs))
@@ -544,7 +573,8 @@ func configsCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&configFile, "config-file", "./configs/all.yaml", "Path to configuration YAML")
+	cmd.Flags().StringVar(&configFile, "config-file", "", "Path to a specific configuration YAML file")
+	cmd.Flags().StringVar(&configDir, "config-dir", "./configs", "Directory containing configuration YAML files")
 	return cmd
 }
 
