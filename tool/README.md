@@ -266,6 +266,7 @@ Configurations live in the `configs/` directory at the repo root. Each file defi
 |------|----------------|-------------|
 | `configs/baseline-sonnet.yaml` | Claude Sonnet 4.5 | No MCP — raw Copilot |
 | `configs/baseline-opus.yaml` | Claude Opus 4.6 | No MCP — raw Copilot |
+| `configs/baseline-opus-skills.yaml` | Claude Opus 4.6 | No MCP — raw Copilot + generator skills |
 | `configs/baseline-codex.yaml` | GPT Codex | No MCP — raw Copilot |
 | `configs/azure-mcp-sonnet.yaml` | Claude Sonnet 4.5 | Azure MCP server attached |
 | `configs/azure-mcp-opus.yaml` | Claude Opus 4.6 | Azure MCP server attached |
@@ -299,9 +300,37 @@ configs:
 | `model` | string | `SessionConfig.Model` | Generator AI model |
 | `reviewer_models` | list | — | Review panel models (first is consolidator) |
 | `mcp_servers` | map | `SessionConfig.MCPServers` | MCP server definitions |
-| `skill_directories` | list | `SessionConfig.SkillDirectories` | Paths to skill directories |
+| `generator_skill_directories` | list | `SessionConfig.SkillDirectories` | Skill directories for the generator agent (takes priority over `skill_directories`) |
+| `reviewer_skill_directories` | list | `SessionConfig.SkillDirectories` | Skill directories for the review panel agents |
+| `skill_directories` | list | `SessionConfig.SkillDirectories` | Shared fallback skill directories (used when role-specific fields are not set) |
 | `available_tools` | list | `SessionConfig.AvailableTools` | Allowed tool names |
 | `excluded_tools` | list | `SessionConfig.ExcludedTools` | Blocked tool names |
+
+#### Skill Directory Resolution
+
+The tool resolves skill directories per role:
+
+- **Generator:** Uses `generator_skill_directories` if set, otherwise falls back to `skill_directories`
+- **Reviewers:** Uses `reviewer_skill_directories` if set, otherwise falls back to `skill_directories`
+
+This allows configs to load different skills for generation vs. review. For example, the generator might get SDK-specific coding skills while reviewers get build-verification and version-checking skills.
+
+**Example — separate skills per role:**
+
+```yaml
+configs:
+  - name: full-skills/claude-opus-4.6
+    description: "Generator and reviewer skills"
+    model: "claude-opus-4.6"
+    reviewer_models:
+      - "claude-opus-4.6"
+      - "gemini-3-pro-preview"
+      - "gpt-4.1"
+    generator_skill_directories:
+      - "./skills/generator"
+    reviewer_skill_directories:
+      - "./skills/reviewer"
+```
 
 ## Smart Path Detection
 

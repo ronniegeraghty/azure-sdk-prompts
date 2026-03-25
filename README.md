@@ -155,6 +155,51 @@ configs:
 
 Then run with: `azsdk-prompt-eval run --config-file configs/my-custom-config.yaml`
 
+#### Adding Skills to Configs
+
+Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. Skills are local directories containing a `SKILL.md` file and optional `references/` folder.
+
+The repo organizes skills by role:
+
+```
+skills/
+├── generator/                 # Skills for the code generation agent
+│   └── keyvault-secrets-java/ # Example: Java Key Vault Secrets skill
+│       ├── SKILL.md
+│       └── references/
+└── reviewer/                  # Skills for the review panel agents
+    ├── code-review-comments/
+    ├── reviewer-build/
+    └── sdk-version-check/
+```
+
+Use these config fields to load skills:
+
+| Field | Applies to | Description |
+|-------|-----------|-------------|
+| `generator_skill_directories` | Generator only | Paths to skill directories for the code generation agent |
+| `reviewer_skill_directories` | Reviewers only | Paths to skill directories for the review panel |
+| `skill_directories` | Both (fallback) | Shared fallback — used by the generator if `generator_skill_directories` is not set |
+
+**Priority:** `generator_skill_directories` takes priority over `skill_directories` for the generator session. If `generator_skill_directories` is set, `skill_directories` is ignored for generation (but still applies to reviewers if `reviewer_skill_directories` is not set).
+
+**Example — config with generator skills:**
+
+```yaml
+configs:
+  - name: baseline-skills/claude-opus-4.6
+    description: "Baseline + Skills — Claude Opus 4.6 with generator skills"
+    model: "claude-opus-4.6"
+    reviewer_models:
+      - "claude-opus-4.6"
+      - "gemini-3-pro-preview"
+      - "gpt-4.1"
+    generator_skill_directories:
+      - "./skills/generator"
+```
+
+See `configs/baseline-opus-skills.yaml` for a working example.
+
 ## Adding a New Prompt
 
 Add a `.prompt.md` file to `prompts/` and run the tool — it discovers prompts automatically.
@@ -183,6 +228,7 @@ azure-sdk-prompts/
 ├── configs/                           # Evaluation configs (one generator per file)
 │   ├── baseline-sonnet.yaml           # Baseline + Claude Sonnet 4.5
 │   ├── baseline-opus.yaml             # Baseline + Claude Opus 4.6
+│   ├── baseline-opus-skills.yaml      # Baseline + Claude Opus 4.6 + generator skills
 │   ├── baseline-codex.yaml            # Baseline + GPT Codex
 │   ├── azure-mcp-sonnet.yaml          # Azure MCP + Claude Sonnet 4.5
 │   ├── azure-mcp-opus.yaml            # Azure MCP + Claude Opus 4.6
@@ -200,6 +246,9 @@ azure-sdk-prompts/
 │       └── ...
 ├── skills/                            # Copilot skills for eval sessions
 │   ├── generator/                     # Skills loaded only for the generator agent
+│   │   └── keyvault-secrets-java/     # Java Key Vault Secrets SDK skill
+│   │       ├── SKILL.md
+│   │       └── references/
 │   └── reviewer/                      # Skills loaded only for the review agent
 │       ├── code-review-comments/
 │       ├── reviewer-build/

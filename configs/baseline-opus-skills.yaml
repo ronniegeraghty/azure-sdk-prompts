@@ -1,0 +1,14 @@
+# Baseline with Claude Opus 4.6 + generator skills — no MCP servers
+# Demonstrates loading skills for the generator agent session.
+# Skills give the generator domain-specific knowledge (e.g., SDK patterns,
+# API usage examples) that improve code generation quality.
+configs:
+  - name: baseline-skills/claude-opus-4.6
+    description: "Baseline + Skills — Claude Opus 4.6 with generator skills"
+    model: "claude-opus-4.6"
+    reviewer_models:
+      - "claude-opus-4.6"
+      - "gemini-3-pro-preview"
+      - "gpt-4.1"
+    generator_skill_directories:
+      - "./skills/generator"
