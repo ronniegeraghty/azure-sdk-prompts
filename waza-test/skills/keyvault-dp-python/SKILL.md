@@ -1,6 +1,5 @@
 ---
 name: keyvault-dp-python
-type: utility
 description: |
   USE FOR: Azure Key Vault secrets operations in Python (CRUD, pagination, error handling).
   DO NOT USE FOR: Key Vault keys/certificates, non-Python languages, control plane operations.

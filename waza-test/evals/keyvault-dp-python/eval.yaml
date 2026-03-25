@@ -18,6 +18,23 @@ description: |
 skill: keyvault-dp-python
 version: "1.0"
 
+# Metrics define how we measure overall skill quality
+metrics:
+  - name: task_completion
+    weight: 0.4
+    threshold: 0.8
+    description: Did the skill generate correct Key Vault Python code?
+
+  - name: trigger_accuracy
+    weight: 0.3
+    threshold: 0.9
+    description: Does the skill trigger on appropriate Key Vault prompts?
+
+  - name: behavior_quality
+    weight: 0.3
+    threshold: 0.7
+    description: Is the generated code well-structured with proper error handling?
+
 config:
   trials_per_task: 1
   timeout_seconds: 300
@@ -32,7 +49,6 @@ graders:
   - type: text
     name: python_syntax_check
     config:
-      # Basic sanity: output should contain Python code indicators
       contains:
         - "import"
       not_contains:
