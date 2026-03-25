@@ -47,34 +47,40 @@ Three Azure Key Vault Data Plane Python prompts from `prompts/key-vault/data-pla
 ## Running
 
 ```bash
-# Dry run with mock executor (no API calls):
-# Edit eval.yaml: change executor to "mock"
-waza run waza-test/eval.yaml -v
+cd waza-test/
 
-# Real run (requires GITHUB_TOKEN):
-waza run waza-test/eval.yaml --model claude-sonnet-4.5 -v -o results.json
+# Auto-discover and run all skill evals:
+waza run
+
+# Or explicitly discover:
+waza run --discover
+
+# Run a specific skill:
+waza run keyvault-dp-python
 
 # Multi-model comparison:
-waza run waza-test/eval.yaml \
-  --model claude-sonnet-4.5 \
-  --model claude-opus-4.6 \
-  --model gpt-4.1 \
-  -o results.json
+waza run --model claude-sonnet-4.5 --model claude-opus-4.6 --model gpt-4.1 -o results.json
 
 # With result caching:
-waza run waza-test/eval.yaml --cache -v
+waza run --cache -v
 ```
 
 ## Directory Structure
 
 ```
 waza-test/
-├── eval.yaml                          # Eval spec (global graders + config)
-├── tasks/
-│   ├── crud-secrets.yaml              # CRUD operations task
-│   ├── error-handling.yaml            # Error handling task
-│   └── pagination-list-secrets.yaml   # Pagination task
-└── README.md                          # This file
+├── .waza.yaml                                  # Waza project config (created by waza init)
+├── .gitignore                                  # Waza-specific ignores
+├── skills/
+│   └── keyvault-dp-python/
+│       ├── SKILL.md                            # Skill definition
+│       ├── eval.yaml                           # Eval spec (global graders + config)
+│       └── tasks/
+│           ├── crud-secrets.yaml               # CRUD operations task
+│           ├── error-handling.yaml              # Error handling task
+│           └── pagination-list-secrets.yaml     # Pagination task
+├── .github/workflows/eval.yml                  # CI pipeline
+└── README.md                                   # This file
 ```
 
 ## Key Findings

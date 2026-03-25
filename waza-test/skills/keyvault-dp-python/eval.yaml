@@ -15,13 +15,13 @@ description: |
 
   Ported from azure-sdk-prompts hyoka eval configs as a Waza POC.
 
+skill: keyvault-dp-python
 version: "1.0"
 
 config:
   trials_per_task: 1
   timeout_seconds: 300
   parallel: false
-  # Use copilot-sdk for real evaluation; mock for dry runs
   executor: copilot-sdk
   model: claude-sonnet-4.5
 
