@@ -1,0 +1,89 @@
+# Task: Error Handling — Azure Key Vault Secrets (Python)
+# Source: prompts/key-vault/data-plane/python/error-handling.prompt.md
+# Hyoka ID: key-vault-dp-python-error-handling
+id: key-vault-dp-python-error-handling
+name: Error Handling - Azure Key Vault Python
+description: |
+  Can a developer handle Key Vault errors including access denied (403),
+  secret not found (404), and throttling (429) in Python?
+
+tags:
+  - key-vault
+  - data-plane
+  - python
+  - error-handling
+  - intermediate
+
+inputs:
+  prompt: |
+    How do I properly handle errors when working with Azure Key Vault secrets in Python?
+    I need to handle access denied (403) when my app's identity doesn't have the right
+    RBAC role, secret not found (404), and throttling (429) when rate limits are hit.
+    Show me try/except patterns with the azure-keyvault-secrets SDK including
+    how to inspect the status_code and error message on HttpResponseError.
+    Also explain what happens when I try to get a soft-deleted secret.
+
+# Task-level graders — per-prompt evaluation criteria
+graders:
+  # Text graders for key exception types and patterns
+  - type: text
+    name: error_exception_types
+    config:
+      contains:
+        - "HttpResponseError"
+        - "ResourceNotFoundError"
+      contains_cs:
+        - "status_code"
+
+  - type: text
+    name: error_status_codes
+    config:
+      contains:
+        - "403"
+        - "404"
+        - "429"
+
+  # LLM grader for nuanced criteria evaluation
+  - type: prompt
+    name: error_handling_criteria_judge
+    config:
+      model: claude-sonnet-4.5
+      prompt: |
+        You are evaluating Azure Key Vault Python SDK error handling code.
+        Check each criterion independently. For each, call set_waza_grade_pass or
+        set_waza_grade_fail with the criterion name as description.
+
+        ## Prompt-Specific Criteria
+
+        1. **Exception types** — Code uses HttpResponseError and
+           ResourceNotFoundError from the Azure SDK.
+           (description: "exception_types")
+
+        2. **Status code inspection** — Code shows how to extract status_code,
+           error.code, and message from HttpResponseError.
+           (description: "status_code_inspection")
+
+        3. **403 handling** — Code handles access denied (403) with guidance on
+           diagnosing RBAC vs access policy issues.
+           (description: "403_access_denied")
+
+        4. **404 handling** — Code handles secret not found (404), distinguishing
+           between never-existed and deleted-but-not-purged scenarios.
+           (description: "404_not_found")
+
+        5. **429 throttling** — Code addresses Key Vault rate limits and
+           retry-after behavior.
+           (description: "429_throttling")
+
+        6. **Retry configuration** — Code shows SecretClient retry configuration
+           via kwargs or retry policy.
+           (description: "retry_configuration")
+
+        7. **Soft-delete awareness** — Code explains or handles
+           begin_recover_deleted_secret for soft-deleted secrets.
+           (description: "soft_delete_recovery")
+
+        8. **Proper imports** — Code imports from azure.core.exceptions.
+           (description: "azure_core_imports")
+
+        Make exactly 8 tool calls (one per criterion).

@@ -1,0 +1,89 @@
+# Waza POC: KeyVault Data Plane Python Eval Suite
+# Replicates hyoka's evaluation model using Waza's eval framework
+#
+# Mapping from hyoka:
+#   - General criteria (rubric.md)    → spec-level `prompt` grader
+#   - Per-prompt criteria             → task-level `prompt` graders
+#   - Multi-model review panel        → NOT REPLICATED (Waza limitation)
+#   - Config variants (baseline/MCP)  → separate eval.yaml files or --baseline flag
+#
+name: keyvault-dp-python-eval
+description: |
+  Azure Key Vault Data Plane Python SDK evaluation suite.
+  Tests code generation quality for Key Vault secrets operations
+  across CRUD, error handling, and pagination scenarios.
+
+  Ported from azure-sdk-prompts hyoka eval configs as a Waza POC.
+
+version: "1.0"
+
+config:
+  trials_per_task: 1
+  timeout_seconds: 300
+  parallel: false
+  # Use copilot-sdk for real evaluation; mock for dry runs
+  executor: copilot-sdk
+  model: claude-sonnet-4.5
+
+# Global graders — applied to ALL tasks
+# These replicate hyoka's rubric.md general criteria
+graders:
+  # General criterion 1: Code Builds
+  - type: text
+    name: python_syntax_check
+    config:
+      # Basic sanity: output should contain Python code indicators
+      contains:
+        - "import"
+      not_contains:
+        - "SyntaxError"
+        - "IndentationError"
+
+  # General criterion 2: Latest Package Versions
+  - type: text
+    name: uses_azure_sdk_packages
+    config:
+      contains:
+        - "azure-keyvault-secrets"
+        - "azure-identity"
+
+  # General criterion 3-5: Best Practices, Error Handling, Code Quality
+  # These require LLM judgment — use the prompt grader
+  - type: prompt
+    name: general_quality_rubric
+    config:
+      model: claude-sonnet-4.5
+      prompt: |
+        You are a senior Azure SDK code reviewer. Evaluate the generated code
+        against these general quality criteria. For EACH criterion, make one
+        tool call — set_waza_grade_pass if met, set_waza_grade_fail if not.
+
+        ## Criteria (evaluate each independently)
+
+        1. **Code Builds** — Does the generated Python code look syntactically
+           correct? Would it run without import errors or obvious bugs?
+           (description: "code_builds")
+
+        2. **Latest Package Versions** — Does the code use azure-keyvault-secrets
+           and azure-identity (the current packages, not deprecated ones like
+           azure-keyvault)? Are there any references to deprecated APIs?
+           (description: "latest_packages")
+
+        3. **Best Practices** — Does it use DefaultAzureCredential for auth?
+           Does it follow Azure SDK best practices (proper client initialization,
+           resource cleanup)?
+           (description: "best_practices")
+
+        4. **Error Handling** — Are errors handled? Try/except blocks? Proper
+           exception types from azure.core.exceptions?
+           (description: "error_handling")
+
+        5. **Code Quality** — Is the code clean, readable, well-structured?
+           Good variable names? Appropriate comments?
+           (description: "code_quality")
+
+        Make exactly 5 tool calls (one per criterion).
+
+# Task files — one per hyoka prompt
+tasks:
+  - "tasks/*.yaml"
