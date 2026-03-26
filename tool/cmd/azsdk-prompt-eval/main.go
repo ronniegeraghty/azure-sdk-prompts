@@ -191,6 +191,7 @@ func resolveSkillsDirs(promptsDir string) (generatorDirs, reviewerDirs []string)
 
 // resolveConfigSkillDirs resolves relative skill_directories in loaded configs
 // to absolute paths so they work regardless of which directory the tool is invoked from.
+// Handles both legacy top-level fields and new Generator/Reviewer sub-struct skills.
 func resolveConfigSkillDirs(configs []config.ToolConfig, promptsDir string) {
 	resolve := func(dirs []string) []string {
 		resolved := make([]string, 0, len(dirs))
@@ -220,10 +221,37 @@ func resolveConfigSkillDirs(configs []config.ToolConfig, promptsDir string) {
 		return resolved
 	}
 
+	resolveSkills := func(skills []config.Skill) {
+		for j := range skills {
+			if skills[j].Type == "local" && skills[j].Path != "" && !filepath.IsAbs(skills[j].Path) {
+				candidates := []string{
+					skills[j].Path,
+					filepath.Join(filepath.Dir(promptsDir), skills[j].Path),
+				}
+				for _, c := range candidates {
+					if info, err := os.Stat(c); err == nil && info.IsDir() {
+						abs, _ := filepath.Abs(c)
+						skills[j].Path = abs
+						break
+					}
+				}
+			}
+		}
+	}
+
 	for i := range configs {
+		// Resolve legacy top-level fields
 		configs[i].SkillDirectories = resolve(configs[i].SkillDirectories)
 		configs[i].GeneratorSkillDirectories = resolve(configs[i].GeneratorSkillDirectories)
 		configs[i].ReviewerSkillDirectories = resolve(configs[i].ReviewerSkillDirectories)
+
+		// Resolve new sub-struct skill paths
+		if configs[i].Generator != nil {
+			resolveSkills(configs[i].Generator.Skills)
+		}
+		if configs[i].Reviewer != nil {
+			resolveSkills(configs[i].Reviewer.Skills)
+		}
 	}
 }
 
@@ -290,6 +318,9 @@ func runCmd() *cobra.Command {
 			if f.model != "" {
 				for i := range configs {
 					configs[i].Model = f.model
+					if configs[i].Generator != nil {
+						configs[i].Generator.Model = f.model
+					}
 				}
 			}
 
@@ -566,11 +597,12 @@ func configsCmd() *cobra.Command {
 
 			fmt.Printf("Available configurations (%d):\n\n", len(cfgFile.Configs))
 			for _, c := range cfgFile.Configs {
-				fmt.Printf("  %-20s %s (model: %s)\n", c.Name, c.Description, c.Model)
-				if len(c.MCPServers) > 0 {
+				fmt.Printf("  %-20s %s (model: %s)\n", c.Name, c.Description, c.EffectiveModel())
+				mcpServers := c.EffectiveMCPServers()
+				if len(mcpServers) > 0 {
 					fmt.Printf("  %-20s MCP servers: ", "")
 					var names []string
-					for name := range c.MCPServers {
+					for name := range mcpServers {
 						names = append(names, name)
 					}
 					fmt.Println(strings.Join(names, ", "))
