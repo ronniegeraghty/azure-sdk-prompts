@@ -1,0 +1,56 @@
+# Example: full config showing all available options in the new schema.
+#
+# The config is split into two clear sections:
+#   generator: — everything about the code generation agent
+#   reviewer:  — everything about the review/grading plane
+#
+# Skills use a unified list with type: remote or type: local.
+# Old-style top-level fields (model, reviewer_models, skill_directories, etc.)
+# still work for backward compatibility.
+configs:
+  - name: example-full/claude-sonnet-4.5
+    description: "Full example — all config options demonstrated"
+
+    # Generator section — controls the Copilot code generation session
+    generator:
+      model: "claude-sonnet-4.5"
+
+      # Unified skills list replaces skill_directories + generator_skill_directories
+      skills:
+        # Remote skill — fetched from a GitHub repository
+        - type: remote
+          name: azure-keyvault-py
+          repo: microsoft/skills
+
+        # Local skill — directory path (supports glob patterns)
+        - type: local
+          path: "./skills/generator"
+
+      # MCP servers attached to the generator session
+      mcp_servers:
+        azure:
+          type: local
+          command: npx
+          args: ["-y", "@azure/mcp@latest"]
+          tools: ["*"]
+
+      # Tool restrictions (optional — omit for all defaults)
+      # available_tools: ["create", "edit", "bash", "view", "glob", "grep"]
+      # excluded_tools: ["web_fetch"]
+
+    # Reviewer section — controls the multi-model review panel
+    reviewer:
+      models:
+        - "claude-opus-4.6"        # first model acts as consolidator
+        - "gemini-3-pro-preview"
+        - "gpt-4.1"
+
+      # Reviewer-specific skills (e.g., rubric knowledge, build verification)
+      skills:
+        - type: local
+          path: "./skills/reviewer"
+
+  # Minimal config — only required fields (backward-compatible format still works)
+  - name: example-minimal/gpt-4
+    description: "Minimal config — legacy format"
+    model: "gpt-4"

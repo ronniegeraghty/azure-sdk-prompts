@@ -115,7 +115,7 @@ azsdk-prompt-eval validate
 
 ### Tool Configurations
 
-Each config file defines **one generator model** and a **multi-model review panel**. The `configs/` directory contains 6 configs (3 baseline + 3 azure-mcp), auto-discovered via `LoadDir()`:
+Each config file defines **one generator model** and a **multi-model review panel**. The `configs/` directory contains configs auto-discovered via `LoadDir()`:
 
 ```bash
 # List configs
@@ -136,79 +136,79 @@ azsdk-prompt-eval run --config baseline/claude-sonnet-4.5,azure-mcp/claude-sonne
 
 #### Custom Configs
 
-Create your own config YAML in the `configs/` directory. Each file defines one generator model and its review panel:
+Create your own config YAML in the `configs/` directory. The config has two clear sections — `generator` for the code generation agent and `reviewer` for the review/grading plane:
 
 ```yaml
 configs:
   - name: my-custom-config
     description: "My custom evaluation config"
-    model: "claude-sonnet-4.5"
-    reviewer_models:
-      - "claude-opus-4.6"        # first model acts as consolidator
-      - "gemini-3-pro-preview"
-      - "gpt-4.1"
-    mcp_servers: {}
-    skill_directories: []
-    available_tools: []
-    excluded_tools: []
+    generator:
+      model: "claude-sonnet-4.5"
+      skills:
+        - type: remote
+          name: azure-keyvault-py
+          repo: microsoft/skills
+        - type: local
+          path: "./skills/generator"
+      mcp_servers:
+        azure:
+          type: local
+          command: npx
+          args: ["-y", "@azure/mcp@latest"]
+          tools: ["*"]
+    reviewer:
+      models:
+        - "claude-opus-4.6"
+        - "gemini-3-pro-preview"
+        - "gpt-4.1"
+      skills:
+        - type: local
+          path: "./skills/reviewer"
 ```
 
 Then run with: `azsdk-prompt-eval run --config-file configs/my-custom-config.yaml`
 
-#### Adding Skills to Configs
+> **Backward compatibility:** Legacy top-level fields (`model`, `reviewer_models`, `skill_directories`, `generator_skill_directories`, etc.) still work. They are automatically migrated to the `generator`/`reviewer` sub-structs at parse time.
 
-Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. Skills are local directories containing a `SKILL.md` file and optional `references/` folder.
+#### Unified Skills
 
-**Install skills with `npx skills add`** instead of manually vendoring files. This pulls the latest version from a skills repository and lets you select which skills to install:
+Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. The unified `skills:` list replaces the old `skill_directories`, `generator_skill_directories`, and `reviewer_skill_directories` fields.
 
-```bash
-# Install a generator skill into skills/generator/
-npx skills add microsoft/skills --directory skills/generator
+Each skill has a `type`:
 
-# Example: install the Java Key Vault Secrets skill
-# Run the command, then select "keyvault-secrets-java" from the wizard
-npx skills add microsoft/skills --directory skills/generator
+| Type | Fields | Description |
+|------|--------|-------------|
+| `local` | `path` | Local directory containing a `SKILL.md` file. Supports glob patterns (e.g., `"./skills/generator/*"`) |
+| `remote` | `name`, `repo` | Skill fetched from a GitHub repository via `npx skills add` |
+
+**Example — generator with local + remote skills:**
+
+```yaml
+generator:
+  model: "claude-sonnet-4.5"
+  skills:
+    - type: remote
+      name: azure-keyvault-py
+      repo: microsoft/skills
+    - type: local
+      path: "./skills/generator"
+```
+
+**Example — reviewer with local skills:**
+
+```yaml
+reviewer:
+  models:
+    - "claude-opus-4.6"
+    - "gpt-4.1"
+  skills:
+    - type: local
+      path: "./skills/reviewer"
 ```
 
 > **Tip:** The [microsoft/skills](https://github.com/microsoft/skills) repo contains 132+ skills across Azure SDK scenarios. Browse the repo or run `npx skills add microsoft/skills` to see what's available.
 
-The repo organizes skills by role:
-
-```
-skills/
-├── generator/                 # Skills for the code generation agent (install via npx skills add)
-└── reviewer/                  # Skills for the review panel agents
-    ├── code-review-comments/
-    ├── reviewer-build/
-    └── sdk-version-check/
-```
-
-Use these config fields to load skills:
-
-| Field | Applies to | Description |
-|-------|-----------|-------------|
-| `generator_skill_directories` | Generator only | Paths to skill directories for the code generation agent |
-| `reviewer_skill_directories` | Reviewers only | Paths to skill directories for the review panel |
-| `skill_directories` | Both (fallback) | Shared fallback — used by the generator if `generator_skill_directories` is not set |
-
-**Priority:** `generator_skill_directories` takes priority over `skill_directories` for the generator session. If `generator_skill_directories` is set, `skill_directories` is ignored for generation (but still applies to reviewers if `reviewer_skill_directories` is not set).
-
-**Example — config with generator skills:**
-
-```yaml
-configs:
-  - name: baseline-skills/claude-opus-4.6
-    description: "Baseline + Skills — Claude Opus 4.6 with generator skills"
-    model: "claude-opus-4.6"
-    reviewer_models:
-      - "claude-opus-4.6"
-      - "gemini-3-pro-preview"
-      - "gpt-4.1"
-    generator_skill_directories:
-      - "./skills/generator"
-```
-
-See `configs/baseline-opus-skills.yaml` for a working example.
+See `configs/example-full.yaml` for a complete example with all options.
 
 ## Adding a New Prompt
 
@@ -255,8 +255,8 @@ azure-sdk-prompts/
 │   └── key-vault/
 │       └── ...
 ├── skills/                            # Copilot skills for eval sessions
-│   ├── generator/                     # Skills loaded only for the generator agent (install via npx skills add)
-│   └── reviewer/                      # Skills loaded only for the review agent
+│   ├── generator/                     # Skills for the generator agent (install via npx skills add or type: remote)
+│   └── reviewer/                      # Skills for the review panel agents
 │       ├── code-review-comments/
 │       ├── reviewer-build/
 │       └── sdk-version-check/

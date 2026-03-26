@@ -425,7 +425,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	)
 
 	sc := &copilot.SessionConfig{
-		Model: cfg.Model,
+		Model: cfg.EffectiveModel(),
 		SystemMessage: &copilot.SystemMessageConfig{
 			Mode:    "append",
 			Content: systemMsg,
@@ -438,17 +438,20 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// Only set AvailableTools/ExcludedTools when non-empty.
 	// An empty slice serializes as JSON [] which tells the CLI "zero tools" —
 	// nil serializes as null which means "all default tools available."
-	if len(cfg.AvailableTools) > 0 {
-		sc.AvailableTools = cfg.AvailableTools
+	availableTools := cfg.EffectiveAvailableTools()
+	excludedTools := cfg.EffectiveExcludedTools()
+	if len(availableTools) > 0 {
+		sc.AvailableTools = availableTools
 	}
-	if len(cfg.ExcludedTools) > 0 {
-		sc.ExcludedTools = cfg.ExcludedTools
+	if len(excludedTools) > 0 {
+		sc.ExcludedTools = excludedTools
 	}
 
 	// Map MCP servers
-	if len(cfg.MCPServers) > 0 {
-		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(cfg.MCPServers))
-		for name, srv := range cfg.MCPServers {
+	mcpServers := cfg.EffectiveMCPServers()
+	if len(mcpServers) > 0 {
+		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpServers))
+		for name, srv := range mcpServers {
 			sc.MCPServers[name] = copilot.MCPServerConfig{
 				"type":    srv.Type,
 				"command": srv.Command,
