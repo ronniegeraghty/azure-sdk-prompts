@@ -1,6 +1,6 @@
 # azure-sdk-prompts
 
-A curated library of prompts for evaluating how well AI agents generate Azure SDK code, paired with a Go evaluation tool (`azsdk-prompt-eval`) that runs prompts through the Copilot SDK, reviews code via a multi-model panel, and produces criteria-based pass/fail reports.
+A curated library of prompts for evaluating how well AI agents generate Azure SDK code, paired with a Go evaluation tool (`hyoka`) that runs prompts through the Copilot SDK, reviews code via a multi-model panel, and produces criteria-based pass/fail reports.
 
 ## Quick Start
 
@@ -23,43 +23,43 @@ git clone https://github.com/ronniegeraghty/azure-sdk-prompts.git
 cd azure-sdk-prompts
 
 # List prompts
-go run ./tool/cmd/azsdk-prompt-eval list
+go run ./tool/cmd/hyoka list
 
 # Run all evaluations (auto-generates trend analysis after)
-go run ./tool/cmd/azsdk-prompt-eval run
+go run ./tool/cmd/hyoka run
 
 # Filter by service and language
-go run ./tool/cmd/azsdk-prompt-eval run --service storage --language dotnet
+go run ./tool/cmd/hyoka run --service storage --language dotnet
 ```
 
 ### Install as a CLI
 
 ```bash
-go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/azsdk-prompt-eval@latest
+go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/hyoka@latest
 
 # When run from the repo root, prompts are auto-detected
 cd azure-sdk-prompts
-azsdk-prompt-eval run --service storage
+hyoka run --service storage
 
 # Or specify the prompts path explicitly
-azsdk-prompt-eval run --prompts ~/projects/azure-sdk-prompts/prompts
+hyoka run --prompts ~/projects/azure-sdk-prompts/prompts
 ```
 
-> **Smart path detection:** `azsdk-prompt-eval` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `tool/` directory both work without extra flags.
+> **Smart path detection:** `hyoka` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `tool/` directory both work without extra flags.
 
 ## Commands
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `azsdk-prompt-eval run` | | Run evaluations against prompts |
-| `azsdk-prompt-eval list` | `ls` | List prompts matching filters |
-| `azsdk-prompt-eval configs` | | Show available tool configurations |
-| `azsdk-prompt-eval validate` | | Validate prompt frontmatter against schema |
-| `azsdk-prompt-eval check-env` | `env` | Check for required language toolchains and tools |
-| `azsdk-prompt-eval trends` | | Generate historical trend reports with AI analysis |
-| `azsdk-prompt-eval report` | | Re-render HTML/MD reports from existing JSON data |
-| `azsdk-prompt-eval new-prompt` | | Scaffold a new prompt file interactively |
-| `azsdk-prompt-eval version` | | Print version |
+| `hyoka run` | | Run evaluations against prompts |
+| `hyoka list` | `ls` | List prompts matching filters |
+| `hyoka configs` | | Show available tool configurations |
+| `hyoka validate` | | Validate prompt frontmatter against schema |
+| `hyoka check-env` | `env` | Check for required language toolchains and tools |
+| `hyoka trends` | | Generate historical trend reports with AI analysis |
+| `hyoka report` | | Re-render HTML/MD reports from existing JSON data |
+| `hyoka new-prompt` | | Scaffold a new prompt file interactively |
+| `hyoka version` | | Print version |
 
 ### Filtering
 
@@ -67,28 +67,28 @@ All filter flags work with `run`, `list`, and other prompt-aware commands:
 
 ```bash
 # By service
-azsdk-prompt-eval run --service storage
+hyoka run --service storage
 
 # By language
-azsdk-prompt-eval run --language dotnet
+hyoka run --language dotnet
 
 # Combine filters (AND logic)
-azsdk-prompt-eval run --service storage --language dotnet --plane data-plane
+hyoka run --service storage --language dotnet --plane data-plane
 
 # By category
-azsdk-prompt-eval run --category authentication
+hyoka run --category authentication
 
 # By tags
-azsdk-prompt-eval run --tags identity
+hyoka run --tags identity
 
 # Single prompt by ID
-azsdk-prompt-eval run --prompt-id storage-dp-dotnet-auth
+hyoka run --prompt-id storage-dp-dotnet-auth
 
 # Dry run — list matches without executing
-azsdk-prompt-eval run --service storage --dry-run
+hyoka run --service storage --dry-run
 
 # JSON output for scripting
-azsdk-prompt-eval list --json
+hyoka list --json
 ```
 
 ### Run Command Flags
@@ -110,7 +110,7 @@ azsdk-prompt-eval list --json
 
 ```bash
 # Validate all prompts
-azsdk-prompt-eval validate
+hyoka validate
 ```
 
 ### Tool Configurations
@@ -119,19 +119,19 @@ Each config file defines **one generator model** and a **multi-model review pane
 
 ```bash
 # List configs
-azsdk-prompt-eval configs
+hyoka configs
 
 # Run with a specific config file
-azsdk-prompt-eval run --config-file configs/baseline-sonnet.yaml --prompt-id storage-dp-dotnet-auth
+hyoka run --config-file configs/baseline-sonnet.yaml --prompt-id storage-dp-dotnet-auth
 
 # Run all configs (default — auto-discovers configs/ directory)
-azsdk-prompt-eval run --prompt-id storage-dp-dotnet-auth
+hyoka run --prompt-id storage-dp-dotnet-auth
 
 # Run with a specific config name
-azsdk-prompt-eval run --config baseline/claude-sonnet-4.5
+hyoka run --config baseline/claude-sonnet-4.5
 
 # Run multiple configs (produces comparison data)
-azsdk-prompt-eval run --config baseline/claude-sonnet-4.5,azure-mcp/claude-sonnet-4.5
+hyoka run --config baseline/claude-sonnet-4.5,azure-mcp/claude-sonnet-4.5
 ```
 
 #### Custom Configs
@@ -166,7 +166,7 @@ configs:
           path: "./skills/reviewer"
 ```
 
-Then run with: `azsdk-prompt-eval run --config-file configs/my-custom-config.yaml`
+Then run with: `hyoka run --config-file configs/my-custom-config.yaml`
 
 > **Backward compatibility:** Legacy top-level fields (`model`, `reviewer_models`, `skill_directories`, `generator_skill_directories`, etc.) still work. They are automatically migrated to the `generator`/`reviewer` sub-structs at parse time.
 
@@ -222,7 +222,7 @@ cp templates/prompt-template.prompt.md \
 # 2. Edit the file — fill in frontmatter and write your prompt
 
 # 3. Validate
-go run ./tool/cmd/azsdk-prompt-eval validate
+go run ./tool/cmd/hyoka validate
 
 # 4. Commit
 git add prompts/
@@ -260,8 +260,8 @@ azure-sdk-prompts/
 │       ├── code-review-comments/
 │       ├── reviewer-build/
 │       └── sdk-version-check/
-├── tool/                              # Go eval tool (azsdk-prompt-eval)
-│   ├── cmd/azsdk-prompt-eval/main.go
+├── tool/                              # Go eval tool (hyoka)
+│   ├── cmd/hyoka/main.go
 │   ├── go.mod / go.sum
 │   └── internal/                      # config, prompt, eval, build, report,
 │       │                              #   validate, trends, verify, review

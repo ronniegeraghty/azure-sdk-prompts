@@ -35,7 +35,7 @@ func main() {
 
 func rootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "azsdk-prompt-eval",
+		Use:   "hyoka",
 		Short: "Azure SDK Prompt Evaluation Tool — test AI agent code generation quality",
 		Long:  "A tool for evaluating AI agent code generation quality by running prompts through the Copilot SDK, verifying builds, and generating reports.",
 	}
@@ -681,7 +681,7 @@ func versionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("azsdk-prompt-eval version %s\n", version)
+			fmt.Printf("hyoka version %s\n", version)
 		},
 	}
 }
@@ -931,7 +931,7 @@ TODO: Why this prompt matters.
 			fmt.Printf("   Prompt ID: %s\n", id)
 			fmt.Println("\nNext steps:")
 			fmt.Println("  1. Edit the file to add your prompt text")
-			fmt.Println("  2. Run: go run ./tool/cmd/azsdk-prompt-eval validate")
+			fmt.Println("  2. Run: go run ./tool/cmd/hyoka validate")
 			return nil
 		},
 	}

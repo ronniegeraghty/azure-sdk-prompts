@@ -1,6 +1,6 @@
-# azsdk-prompt-eval — CLI Reference
+# hyoka — CLI Reference
 
-The `azsdk-prompt-eval` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying code with Copilot-based verification, reviewing code via a multi-model review panel with criteria-based pass/fail scoring, and generating JSON, HTML, and Markdown reports.
+The `hyoka` tool evaluates AI agent code generation quality by running prompts from the `azure-sdk-prompts` library through configurable Copilot sessions, verifying code with Copilot-based verification, reviewing code via a multi-model review panel with criteria-based pass/fail scoring, and generating JSON, HTML, and Markdown reports.
 
 ## Prerequisites
 
@@ -18,17 +18,17 @@ The `azsdk-prompt-eval` tool evaluates AI agent code generation quality by runni
 
 ```bash
 cd azure-sdk-prompts
-go run ./tool/cmd/azsdk-prompt-eval <command> [flags]
+go run ./tool/cmd/hyoka <command> [flags]
 ```
 
 ### Install globally
 
 ```bash
-go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/azsdk-prompt-eval@latest
-azsdk-prompt-eval <command> [flags]
+go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/hyoka@latest
+hyoka <command> [flags]
 ```
 
-> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/azsdk-prompt-eval@tool/v0.3.0`
+> **Pinned version:** `go install github.com/ronniegeraghty/azure-sdk-prompts/tool/cmd/hyoka@tool/v0.3.0`
 
 ## Features
 
@@ -68,12 +68,12 @@ Use `--stub` to explicitly skip SDK initialization and use the stub evaluator.
 
 ## Commands
 
-### `azsdk-prompt-eval run`
+### `hyoka run`
 
 Run evaluations against the prompt library.
 
 ```bash
-azsdk-prompt-eval run [flags]
+hyoka run [flags]
 ```
 
 | Flag | Default | Description |
@@ -102,37 +102,37 @@ azsdk-prompt-eval run [flags]
 
 ```bash
 # Run all prompts with all configs (real Copilot SDK)
-azsdk-prompt-eval run
+hyoka run
 
 # Run with stub evaluator (no SDK needed)
-azsdk-prompt-eval run --stub
+hyoka run --stub
 
 # Run storage prompts with the baseline config, skip review
-azsdk-prompt-eval run --service storage --config baseline --skip-review
+hyoka run --service storage --config baseline --skip-review
 
 # Run a single prompt
-azsdk-prompt-eval run --prompt-id storage-dp-dotnet-auth
+hyoka run --prompt-id storage-dp-dotnet-auth
 
 # Compare configs
-azsdk-prompt-eval run --service storage --config baseline,azure-mcp
+hyoka run --service storage --config baseline,azure-mcp
 ```
 
-### `azsdk-prompt-eval list`
+### `hyoka list`
 
 List prompts matching the given filters (no evaluation).
 
 ```bash
-azsdk-prompt-eval list [flags]
+hyoka list [flags]
 ```
 
 Takes the same filter flags as `run`. Output shows prompt ID, service/plane/language, category, and description.
 
-### `azsdk-prompt-eval manifest`
+### `hyoka manifest`
 
 (Optional) Generate a `manifest.yaml` snapshot from prompt files. The tool discovers prompts directly from the `prompts/` directory at runtime — this command is only needed to produce a static index for external tooling or documentation.
 
 ```bash
-azsdk-prompt-eval manifest [flags]
+hyoka manifest [flags]
 ```
 
 | Flag | Default | Description |
@@ -140,41 +140,41 @@ azsdk-prompt-eval manifest [flags]
 | `--prompts` | `./prompts` (auto-detected) | Path to prompt library directory |
 | `--output` | `./manifest.yaml` (auto-detected) | Output path for manifest |
 
-### `azsdk-prompt-eval validate`
+### `hyoka validate`
 
 Validate prompt frontmatter against the schema.
 
 ```bash
-azsdk-prompt-eval validate [flags]
+hyoka validate [flags]
 ```
 
 Checks required fields, enum values, ID naming conventions, and `## Prompt` section presence. Exits with code 1 on validation failure.
 
-### `azsdk-prompt-eval configs`
+### `hyoka configs`
 
 List available tool configurations.
 
 ```bash
-azsdk-prompt-eval configs [--config-file PATH]
+hyoka configs [--config-file PATH]
 ```
 
-### `azsdk-prompt-eval version`
+### `hyoka version`
 
 Print the tool version.
 
-### `azsdk-prompt-eval check-env`
+### `hyoka check-env`
 
 Check for required language toolchains and tools.
 
 ```bash
-azsdk-prompt-eval check-env
+hyoka check-env
 ```
 
 Reports availability of Python, .NET, Go, Node.js, Java, Rust, C/C++, Copilot CLI, gh authentication, and npx (for Azure MCP server). Uses ✅/❌ indicators with version strings.
 
 ## Code Review (Multi-Model Panel)
 
-After code generation, `azsdk-prompt-eval` runs a **multi-model review panel** — multiple reviewer models evaluate the generated code in parallel, then the first model consolidates results using majority-vote consensus. This avoids self-bias since the reviewers didn't generate the code.
+After code generation, `hyoka` runs a **multi-model review panel** — multiple reviewer models evaluate the generated code in parallel, then the first model consolidates results using majority-vote consensus. This avoids self-bias since the reviewers didn't generate the code.
 
 ### Evaluation Criteria
 
@@ -336,7 +336,7 @@ configs:
 
 ## Smart Path Detection
 
-`azsdk-prompt-eval` automatically resolves paths when flags aren't explicitly set:
+`hyoka` automatically resolves paths when flags aren't explicitly set:
 
 | Flag | Candidates checked |
 |------|--------------------|
@@ -348,7 +348,7 @@ configs:
 
 ```
 tool/
-├── cmd/azsdk-prompt-eval/main.go        # CLI entry point (cobra)
+├── cmd/hyoka/main.go        # CLI entry point (cobra)
 ├── go.mod / go.sum
 ├── internal/
 │   ├── checkenv/                # Environment check (check-env command)

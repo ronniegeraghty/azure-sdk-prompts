@@ -5,16 +5,16 @@
 **Requested by:** Ronnie Geraghty
 
 > **⚠️ UPDATE 2026-07-28:** Implementation complete. Python scripts removed. The Go
-> `azsdk-prompt-eval` tool is the sole evaluation approach. Tool lives in `tool/` subdirectory
+> `hyoka` tool is the sole evaluation approach. Tool lives in `tool/` subdirectory
 > with configs at `configs/` (repo root) and reports at `reports/` (repo root). The
-> standalone `azsdk-prompt-eval-tool` repo has been deleted. Sections referencing Python scripts,
+> standalone `hyoka-tool` repo has been deleted. Sections referencing Python scripts,
 > `doc-agent evaluate`, `scripts/`, or the separate repo are historical context only.
 
 ---
 
 ## Executive Summary
 
-This plan describes the Go-based evaluation tool for testing how well AI agents write and update Azure SDK code. The tool lives in the `ronniegeraghty/azure-sdk-prompts` monorepo alongside the prompt library. Python scripts and the `doc-agent evaluate` workflow have been removed — `azsdk-prompt-eval` is the sole evaluation approach.
+This plan describes the Go-based evaluation tool for testing how well AI agents write and update Azure SDK code. The tool lives in the `ronniegeraghty/azure-sdk-prompts` monorepo alongside the prompt library. Python scripts and the `doc-agent evaluate` workflow have been removed — `hyoka` is the sole evaluation approach.
 
 The new tool uses the **GitHub Copilot SDK for Go** (`github.com/github/copilot-sdk/go`) to programmatically create Copilot sessions, send prompts, capture generated code, verify builds, optionally generate and run tests, and score results via LLM-as-judge review. A key differentiator is the **tool configuration matrix**: each prompt can be tested against multiple configurations (different MCP servers, skills, tool sets) to measure how tooling affects code quality.
 
@@ -550,18 +550,18 @@ Future enhancement: A `trends.html` page showing score trends over time per prom
 ### 8.1 Command Structure
 
 ```bash
-# Binary name: azsdk-prompt-eval
-azsdk-prompt-eval run [flags]          # Run evaluations
-azsdk-prompt-eval list [flags]         # List matching prompts (dry run)
-azsdk-prompt-eval report [run-id]      # Open/regenerate report for a past run
-azsdk-prompt-eval configs              # List available configurations
-azsdk-prompt-eval version              # Print version
+# Binary name: hyoka
+hyoka run [flags]          # Run evaluations
+hyoka list [flags]         # List matching prompts (dry run)
+hyoka report [run-id]      # Open/regenerate report for a past run
+hyoka configs              # List available configurations
+hyoka version              # Print version
 ```
 
 ### 8.2 Filter Flags
 
 ```bash
-azsdk-prompt-eval run \
+hyoka run \
   --prompts ./prompts \
   --service storage \
   --language dotnet \
@@ -604,7 +604,7 @@ azsdk-prompt-eval run \
 ### 8.3 Progress Output
 
 ```
-azsdk-prompt-eval run --service storage --config baseline,azure-mcp --config-file ./configs/default.yaml
+hyoka run --service storage --config baseline,azure-mcp --config-file ./configs/default.yaml
 
 Running 8 prompts × 2 configs = 16 evaluations (4 workers)
 
@@ -672,7 +672,7 @@ The doc-review-agent uses `gh auth login` credentials (via the `GH_TOKEN` env va
 
 ### 10.1 Monorepo Layout
 
-The Go eval tool lives in `ronniegeraghty/azure-sdk-prompts` alongside the prompt library and reports. Everything ships from one repo. Python scripts have been removed — `azsdk-prompt-eval` is the sole evaluation tool.
+The Go eval tool lives in `ronniegeraghty/azure-sdk-prompts` alongside the prompt library and reports. Everything ships from one repo. Python scripts have been removed — `hyoka` is the sole evaluation tool.
 
 ```
 azure-sdk-prompts/                     # ronniegeraghty/azure-sdk-prompts
@@ -688,9 +688,9 @@ azure-sdk-prompts/                     # ronniegeraghty/azure-sdk-prompts
 │       └── data-plane/
 │           └── dotnet/
 │               └── authentication.prompt.md
-├── tool/                              # Go eval tool (azsdk-prompt-eval)
+├── tool/                              # Go eval tool (hyoka)
 │   ├── README.md                      # CLI reference
-│   ├── cmd/azsdk-prompt-eval/main.go           # CLI entry point (cobra)
+│   ├── cmd/hyoka/main.go           # CLI entry point (cobra)
 │   ├── go.mod / go.sum
 │   ├── internal/                      # Go packages
 │   │   ├── config/                    # Config file parsing
@@ -725,13 +725,13 @@ tool/go.mod:
 
 ### 10.3 Tool as Sole Evaluation Approach
 
-Python scripts (`run-evals.py`, `generate-manifest.py`, `validate-prompts.py`) have been removed. The Go `azsdk-prompt-eval` tool replaces all their functionality:
+Python scripts (`run-evals.py`, `generate-manifest.py`, `validate-prompts.py`) have been removed. The Go `hyoka` tool replaces all their functionality:
 
 | Removed Python Script | Go Replacement |
 |---|---|
-| `scripts/run-evals.py` | `azsdk-prompt-eval run` |
-| `scripts/generate-manifest.py` | `azsdk-prompt-eval manifest` |
-| `scripts/validate-prompts.py` | `azsdk-prompt-eval validate` |
+| `scripts/run-evals.py` | `hyoka run` |
+| `scripts/generate-manifest.py` | `hyoka manifest` |
+| `scripts/validate-prompts.py` | `hyoka validate` |
 
 The tool uses smart path detection — running from the repo root or the `tool/` directory both work without extra flags.
 
@@ -826,7 +826,7 @@ func (p *WorkerPool) RunEval(ctx context.Context, task EvalTask) EvalResult {
 All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
 
 ### Phase 1: Foundation (MVP) ✅
-- [x] Project scaffolding (`go.mod`, `cmd/azsdk-prompt-eval/`, `internal/` packages, CLI framework)
+- [x] Project scaffolding (`go.mod`, `cmd/hyoka/`, `internal/` packages, CLI framework)
 - [x] Prompt loader (read and filter prompts from `./prompts`)
 - [x] Basic evaluation engine (create session, send prompt, capture events)
 - [x] Build verification (all languages)
@@ -847,19 +847,19 @@ All work happens in the `ronniegeraghty/azure-sdk-prompts` repo.
 - [x] Matrix execution (prompt × config cross-product)
 
 ### Phase 4: Evaluation Quality ✅
-- [x] Rename CLI to `azsdk-prompt-eval`
+- [x] Rename CLI to `hyoka`
 - [x] `check-env` command — tests if language toolchains are installed (dotnet, python, go, node, java, rust, cargo, cmake, etc.) and reports availability
 - [x] `expected_tools` field in prompt frontmatter — reviewer checks if generation session used those tools
 - [x] Reviewer build skill — a skill the reviewing Copilot session loads that knows how to set up build environments and attempt builds without modifying generated code
 - [x] SDK version checking skill — skill for reviewer that checks if generated code uses latest Azure SDK package versions
 - [x] Tool usage evaluation criteria — reviewer checks generation session tool calls against `expected_tools`
-- [x] Historical trend command — `azsdk-prompt-eval trends --prompt-id X` uses Copilot SDK to analyze past runs and generate trend reports
+- [x] Historical trend command — `hyoka trends --prompt-id X` uses Copilot SDK to analyze past runs and generate trend reports
 
 > **Status:** Complete (v0.5.0).
 
 ### Phase 5: Polish ✅
 - [x] Review comments on generated code — new `code-review-comments` skill instructs reviewer to add inline `REVIEW:` comments. Annotated files saved to `reviewed-code/` alongside `generated-code/`. HTML report highlights review comments in amber; Markdown report shows annotated code in fenced blocks.
-- [x] `azsdk-prompt-eval report` command — re-render HTML/MD from existing report.json (no Copilot SDK, purely template-based). Supports `report <run-id>` and `report --all`.
+- [x] `hyoka report` command — re-render HTML/MD from existing report.json (no Copilot SDK, purely template-based). Supports `report <run-id>` and `report --all`.
 - [x] Progress bars and color output for terminal UX — ANSI progress bar with pass/fail icons, duration, worker count. Auto-disabled in `--debug` mode to avoid conflict with verbose output.
 - [x] Starter project support — `project_context: existing` + `starter_project:` in prompt frontmatter. Already implemented in evaluator; documented in prompt template.
 - [ ] Embedded CLI binary with `auth login`/`auth status` commands — deferred. Use SDK bundler to embed Copilot CLI inside Go binary so users never need to install the Copilot CLI separately.

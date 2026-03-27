@@ -9,11 +9,11 @@
 
 ## Item 1: Make Tool Callable from Repo Root
 
-**Current state:** The tool already has smart path resolution (`main.go:52-81`) that tries `./prompts` → `../prompts`, `./configs/all.yaml` → `../configs/all.yaml`, etc. Running `go run ./tool/cmd/azsdk-prompt-eval` from repo root works today. A pre-built binary exists at `tool/azsdk-prompt-eval`.
+**Current state:** The tool already has smart path resolution (`main.go:52-81`) that tries `./prompts` → `../prompts`, `./configs/all.yaml` → `../configs/all.yaml`, etc. Running `go run ./tool/cmd/hyoka` from repo root works today. A pre-built binary exists at `tool/hyoka`.
 
 **What needs to change:**
 - Add a `Makefile` at repo root with targets: `build`, `install`, `test`, `lint`, `run`
-- Add a `go.work` file at repo root so `go run ./tool/cmd/azsdk-prompt-eval` works without `cd tool/`
+- Add a `go.work` file at repo root so `go run ./tool/cmd/hyoka` works without `cd tool/`
 - Optionally add a thin wrapper script (`./eval` or `./run-eval.sh`) for quick invocation
 - Update README to recommend repo-root invocation as the primary method
 
@@ -186,7 +186,7 @@
 | **Hybrid** (summaries centralized + symlinks or index to per-prompt results) | Best of both worlds conceptually | Complex implementation; fragile symlinks; confusing |
 
 **Recommendation:** Keep centralized results but add a **per-prompt history view**:
-- Add a `history` command: `azsdk-prompt-eval history --prompt-id <id>` that scans all runs for a given prompt and shows its pass/fail timeline
+- Add a `history` command: `hyoka history --prompt-id <id>` that scans all runs for a given prompt and shows its pass/fail timeline
 - This gives the "see a prompt's history" benefit without moving files
 - The `trends` command already partially does this — enhance it for single-prompt deep-dive
 

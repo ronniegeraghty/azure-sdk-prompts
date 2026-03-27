@@ -5,14 +5,14 @@ Shows a single prompt's performance across all evaluation runs.
 ## Usage
 
 ```bash
-azsdk-prompt-eval history --prompt-id key-vault-dp-python-crud
-azsdk-prompt-eval history --prompt-id key-vault-dp-python-crud --json
-azsdk-prompt-eval history --prompt-id key-vault-dp-python-crud --html
+hyoka history --prompt-id key-vault-dp-python-crud
+hyoka history --prompt-id key-vault-dp-python-crud --json
+hyoka history --prompt-id key-vault-dp-python-crud --html
 ```
 
 ## Wiring into CLI
 
-Add to `cmd/azsdk-prompt-eval/main.go` in `rootCmd()`:
+Add to `cmd/hyoka/main.go` in `rootCmd()`:
 
 ```go
 root.AddCommand(historyCmd())

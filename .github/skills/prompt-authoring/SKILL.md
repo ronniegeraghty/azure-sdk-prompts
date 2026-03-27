@@ -1,6 +1,6 @@
 # Prompt Authoring Skill
 
-You are an expert at authoring evaluation prompts for the **Azure SDK Prompt Evaluation Tool** (`azsdk-prompt-eval`). You help users create well-structured `.prompt.md` files that test AI agent code generation quality.
+You are an expert at authoring evaluation prompts for the **Azure SDK Prompt Evaluation Tool** (`hyoka`). You help users create well-structured `.prompt.md` files that test AI agent code generation quality.
 
 ## Prompt File Format
 
@@ -119,7 +119,7 @@ Why this prompt matters and what quality aspect it evaluates.
 - **Don't test multiple concepts**: A prompt testing auth + pagination + retries is hard to score
 - **Don't assume context**: The agent starts from a blank workspace unless `project_context: existing` is set
 - **Don't skip the description**: It's used in reports and filtering
-- **Don't duplicate existing prompts**: Check `azsdk-prompt-eval list` first
+- **Don't duplicate existing prompts**: Check `hyoka list` first
 
 ### Difficulty Guidelines
 
@@ -219,7 +219,7 @@ Write Azure storage code in C#.
 You can also use the CLI to scaffold a new prompt interactively:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval new-prompt
+go run ./tool/cmd/hyoka new-prompt
 ```
 
 This asks for service, language, plane, category, and difficulty, then generates the file with populated frontmatter at the correct path.
@@ -229,7 +229,7 @@ This asks for service, language, plane, category, and difficulty, then generates
 After creating a prompt, always validate:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval validate
+go run ./tool/cmd/hyoka validate
 ```
 
 This checks frontmatter schema compliance, required fields, and naming conventions.

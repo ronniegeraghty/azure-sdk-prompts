@@ -37,18 +37,18 @@ The repo uses a `go.work` file, so all commands run from the repo root — no ne
 Verify the setup:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval version
+go run ./tool/cmd/hyoka version
 ```
 
 Expected output:
 ```
-azsdk-prompt-eval version 0.6.0
+hyoka version 0.6.0
 ```
 
 Check your environment:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval check-env
+go run ./tool/cmd/hyoka check-env
 ```
 
 This reports which language toolchains and tools are available.
@@ -57,13 +57,13 @@ This reports which language toolchains and tools are available.
 
 ```bash
 # List all prompts
-go run ./tool/cmd/azsdk-prompt-eval list
+go run ./tool/cmd/hyoka list
 
 # Filter by service
-go run ./tool/cmd/azsdk-prompt-eval list --service storage
+go run ./tool/cmd/hyoka list --service storage
 
 # JSON output (for scripting)
-go run ./tool/cmd/azsdk-prompt-eval list --json
+go run ./tool/cmd/hyoka list --json
 ```
 
 Expected output:
@@ -80,7 +80,7 @@ Found 79 prompt(s):
 Start with a single prompt to keep it quick:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval run \
+go run ./tool/cmd/hyoka run \
   --prompt-id storage-dp-dotnet-auth \
   --config baseline
 ```
@@ -88,7 +88,7 @@ go run ./tool/cmd/azsdk-prompt-eval run \
 Or use **stub mode** to test the pipeline without Copilot:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval run \
+go run ./tool/cmd/hyoka run \
   --prompt-id storage-dp-dotnet-auth \
   --stub
 ```
@@ -135,7 +135,7 @@ Individual reports at `reports/<run-id>/results/.../report.html` show the full a
 After multiple runs, generate trend reports:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval trends
+go run ./tool/cmd/hyoka trends
 ```
 
 This scans all past runs and produces:
@@ -147,7 +147,7 @@ This scans all past runs and produces:
 Open the trend report:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval trends --open
+go run ./tool/cmd/hyoka trends --open
 ```
 
 ## 6. Create a New Prompt
@@ -155,7 +155,7 @@ go run ./tool/cmd/azsdk-prompt-eval trends --open
 Use the interactive scaffolder:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval new-prompt
+go run ./tool/cmd/hyoka new-prompt
 ```
 
 Or copy the template manually:
@@ -168,7 +168,7 @@ cp templates/prompt-template.prompt.md \
 Validate after editing:
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval validate
+go run ./tool/cmd/hyoka validate
 ```
 
 ## Common Workflows
@@ -177,30 +177,30 @@ go run ./tool/cmd/azsdk-prompt-eval validate
 
 ```bash
 # All prompts × all configs (baseline + azure-mcp)
-go run ./tool/cmd/azsdk-prompt-eval run
+go run ./tool/cmd/hyoka run
 ```
 
 ### Run with specific configs
 
 ```bash
 # Just baseline
-go run ./tool/cmd/azsdk-prompt-eval run --config baseline
+go run ./tool/cmd/hyoka run --config baseline
 
 # Both configs for one service
-go run ./tool/cmd/azsdk-prompt-eval run --service storage
+go run ./tool/cmd/hyoka run --service storage
 ```
 
 ### Re-render reports after template changes
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval report --all
+go run ./tool/cmd/hyoka report --all
 ```
 
 ### Skip AI analysis for faster iteration
 
 ```bash
-go run ./tool/cmd/azsdk-prompt-eval run --skip-trends
-go run ./tool/cmd/azsdk-prompt-eval trends --no-analyze
+go run ./tool/cmd/hyoka run --skip-trends
+go run ./tool/cmd/hyoka trends --no-analyze
 ```
 
 ## Next Steps
