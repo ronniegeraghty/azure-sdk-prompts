@@ -2,8 +2,8 @@
 package report
 
 import (
-	"github.com/ronniegeraghty/azure-sdk-prompts/hyoka/internal/build"
-	"github.com/ronniegeraghty/azure-sdk-prompts/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/internal/build"
+	"github.com/ronniegeraghty/hyoka/internal/review"
 )
 
 // SessionEventRecord is a serializable representation of a Copilot session event.
@@ -66,8 +66,15 @@ type EvalReport struct {
 	Success        bool                 `json:"success"`
 	Error          string               `json:"error,omitempty"`
 	ErrorDetails   string               `json:"error_details,omitempty"`
+	ErrorCategory  string               `json:"error_category,omitempty"`  // timeout, sdk_error, generation_failure, review_failure, no_files
+	FailureReason  string               `json:"failure_reason,omitempty"` // human-readable explanation of failure
 	IsStub         bool                 `json:"is_stub,omitempty"`
 	RerunCommand   string               `json:"rerunCommand,omitempty"`
+	// Generator guardrails (#35)
+	GuardrailMaxTurns      int    `json:"guardrail_max_turns,omitempty"`
+	GuardrailMaxFiles      int    `json:"guardrail_max_files,omitempty"`
+	GuardrailMaxOutputSize int64  `json:"guardrail_max_output_size,omitempty"`
+	GuardrailAbortReason   string `json:"guardrail_abort_reason,omitempty"`
 }
 
 // RunSummary contains aggregate statistics for an evaluation run.

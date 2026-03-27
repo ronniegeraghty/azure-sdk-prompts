@@ -1,4 +1,4 @@
-# Getting Started with azure-sdk-prompts
+# Getting Started with hyoka
 
 This guide walks you through cloning the repo, running your first evaluation, and viewing results.
 
@@ -28,8 +28,8 @@ Without Copilot auth, the tool falls back to **stub mode** (no real agent evalua
 ## 1. Clone and Verify
 
 ```bash
-git clone https://github.com/ronniegeraghty/azure-sdk-prompts.git
-cd azure-sdk-prompts
+git clone https://github.com/ronniegeraghty/hyoka.git
+cd hyoka
 ```
 
 The repo uses a `go.work` file, so all commands run from the repo root — no need to `cd hyoka/`.
@@ -92,6 +92,8 @@ go run ./hyoka run \
   --prompt-id storage-dp-dotnet-auth \
   --stub
 ```
+
+> **Confirmation prompt:** If a run would execute more than 10 evaluations, hyoka asks for confirmation before proceeding. Use `-y` to skip in CI or scripted runs. If you run without a `--config` filter and multiple configs exist, add `--all-configs` to confirm you intend to run all of them.
 
 Expected output:
 ```
@@ -176,8 +178,11 @@ go run ./hyoka validate
 ### Run a full evaluation matrix
 
 ```bash
-# All prompts × all configs (baseline + azure-mcp)
-go run ./hyoka run
+# All prompts × all configs (requires --all-configs since multiple configs exist)
+go run ./hyoka run --all-configs
+
+# Skip confirmation prompt for CI
+go run ./hyoka run --all-configs -y
 ```
 
 ### Run with specific configs
@@ -188,6 +193,19 @@ go run ./hyoka run --config baseline
 
 # Both configs for one service
 go run ./hyoka run --service storage
+```
+
+### Adjust guardrails
+
+```bash
+# Tighter limits for faster iteration
+go run ./hyoka run --max-turns 10 --max-files 20 --max-output-size 512KB
+
+# Allow real Azure resource provisioning
+go run ./hyoka run --allow-cloud
+
+# Limit concurrent sessions on a shared machine
+go run ./hyoka run --max-sessions 4 --workers 2
 ```
 
 ### Re-render reports after template changes
@@ -202,6 +220,41 @@ go run ./hyoka report --all
 go run ./hyoka run --skip-trends
 go run ./hyoka trends --no-analyze
 ```
+
+## Guardrails & Safety
+
+hyoka applies sensible defaults to keep evaluation runs safe and bounded. All limits are configurable via CLI flags.
+
+### Generator Limits
+
+Every code-generation session is automatically aborted if it exceeds:
+
+| Limit | Default | Flag |
+|-------|---------|------|
+| Conversation turns | 25 | `--max-turns` |
+| Generated files | 50 | `--max-files` |
+| Total output size | 1 MB | `--max-output-size` |
+
+When a limit is hit, the evaluation stops and the report shows the specific guardrail that triggered (e.g., `guardrail: file count 51 exceeded limit of 50`).
+
+### Safety Boundaries
+
+By default, generators are instructed **not to provision real Azure resources**. They'll use:
+- Local emulators (Azurite, CosmosDB emulator)
+- Environment variable placeholders (`os.Getenv("AZURE_STORAGE_CONNECTION_STRING")`)
+- Bicep/ARM/Terraform templates instead of live `az` CLI commands
+
+To opt out: `--allow-cloud`.
+
+### Process Cleanup
+
+All spawned Copilot processes are tracked and terminated on run completion or Ctrl+C. The cleanup sends SIGTERM, waits up to 5 seconds, then escalates to SIGKILL.
+
+### Prompt Discovery
+
+If `validate` or `run` finds zero prompts, it scans for near-miss filenames and suggests fixes:
+- `auth-prompt.md` → `auth.prompt.md` (hyphen instead of dot)
+- `crud.prompt.txt` → `crud.prompt.md` (wrong extension)
 
 ## Next Steps
 
