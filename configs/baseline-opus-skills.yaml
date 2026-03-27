@@ -15,3 +15,5 @@ configs:
       - "gpt-4.1"
     generator_skill_directories:
       - "./skills/generator"
+    reviewer_skill_directories:
+      - "./skills/reviewer"
