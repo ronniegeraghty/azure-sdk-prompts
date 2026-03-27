@@ -68,6 +68,11 @@ type EvalReport struct {
 	ErrorDetails   string               `json:"error_details,omitempty"`
 	IsStub         bool                 `json:"is_stub,omitempty"`
 	RerunCommand   string               `json:"rerunCommand,omitempty"`
+	// Generator guardrails (#35)
+	GuardrailMaxTurns      int    `json:"guardrail_max_turns,omitempty"`
+	GuardrailMaxFiles      int    `json:"guardrail_max_files,omitempty"`
+	GuardrailMaxOutputSize int64  `json:"guardrail_max_output_size,omitempty"`
+	GuardrailAbortReason   string `json:"guardrail_abort_reason,omitempty"`
 }
 
 // RunSummary contains aggregate statistics for an evaluation run.

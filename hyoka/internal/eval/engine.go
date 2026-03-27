@@ -185,6 +185,25 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		}
 	}
 
+	// Pre-run summary (#34: fan-out visibility)
+	evalCount := len(tasks)
+	estimatedSessions := evalCount * 3 // generate + verify + review per eval
+	maxSessions := e.opts.Workers * 3
+	fmt.Printf("\n📊 Evaluation plan: %d evaluations (%d prompts × %d configs)\n", evalCount, len(prompts), len(configs))
+	fmt.Printf("   Estimated Copilot sessions: %d (%d × 3 for generate/verify/review)\n", estimatedSessions, evalCount)
+	fmt.Printf("   Workers: %d | Max sessions: %d\n\n", e.opts.Workers, maxSessions)
+
+	// Confirmation prompt for large runs (#34)
+	if evalCount > 10 && e.opts.ConfirmLargeRuns && !e.opts.AutoConfirm {
+		fmt.Printf("⚠️  Large run detected (%d evaluations). Continue? [y/N] ", evalCount)
+		var answer string
+		fmt.Scanln(&answer)
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer != "y" && answer != "yes" {
+			return nil, fmt.Errorf("run aborted by user (use -y to skip confirmation)")
+		}
+	}
+
 	if e.opts.DryRun {
 		return e.dryRun(tasks)
 	}
@@ -372,6 +391,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			"name":  task.Config.Name,
 			"model": task.Config.Model,
 		},
+		// Guardrail limits recorded for report transparency (#35)
+		GuardrailMaxTurns:      e.opts.MaxTurns,
+		GuardrailMaxFiles:      e.opts.MaxFiles,
+		GuardrailMaxOutputSize: e.opts.MaxOutputSize,
 	}
 	if len(task.Prompt.Tags) > 0 {
 		evalReport.PromptMeta["tags"] = strings.Join(task.Prompt.Tags, ", ")
@@ -497,6 +520,52 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Capture generation duration BEFORE review/verification so it only reflects
 	// the time the generator agent took, not the additional review time.
 	evalReport.Duration = time.Since(start).Seconds()
+
+	// Generator guardrail checks (#35)
+	if !evalFailed {
+		// Check turn count (count assistant turn-end events as turns)
+		turnCount := 0
+		for _, ev := range evalReport.SessionEvents {
+			if ev.Type == "assistant.turn_end" || ev.Type == "assistant.message" {
+				turnCount++
+			}
+		}
+		if turnCount > e.opts.MaxTurns {
+			reason := fmt.Sprintf("guardrail: turn count %d exceeded limit of %d", turnCount, e.opts.MaxTurns)
+			evalReport.GuardrailAbortReason = reason
+			evalReport.Error = reason
+			evalReport.Success = false
+			log.Printf("WARNING %s: %s", debugPrefix, reason)
+		}
+
+		// Check file count
+		if len(generatedFiles) > e.opts.MaxFiles {
+			reason := fmt.Sprintf("guardrail: file count %d exceeded limit of %d", len(generatedFiles), e.opts.MaxFiles)
+			evalReport.GuardrailAbortReason = reason
+			evalReport.Error = reason
+			evalReport.Success = false
+			log.Printf("WARNING %s: %s", debugPrefix, reason)
+		}
+
+		// Check total output size
+		var totalSize int64
+		for _, f := range generatedFiles {
+			absPath := f
+			if !filepath.IsAbs(f) {
+				absPath = filepath.Join(ws.Dir, f)
+			}
+			if info, err := os.Stat(absPath); err == nil {
+				totalSize += info.Size()
+			}
+		}
+		if totalSize > e.opts.MaxOutputSize {
+			reason := fmt.Sprintf("guardrail: total output size %d bytes exceeded limit of %d bytes", totalSize, e.opts.MaxOutputSize)
+			evalReport.GuardrailAbortReason = reason
+			evalReport.Error = reason
+			evalReport.Success = false
+			log.Printf("WARNING %s: %s", debugPrefix, reason)
+		}
+	}
 
 	// Copilot-based verification (skip if eval hard-failed with no files)
 	// Uses its own independent timeout context (fixes issue #3).

@@ -21,6 +21,7 @@ import (
 type CopilotSDKEvaluator struct {
 	clientOpts *copilot.ClientOptions
 	debug      bool
+	allowCloud bool
 	progressFn progress.ProgressFunc
 }
 
@@ -56,6 +57,7 @@ func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
 	return &CopilotSDKEvaluator{
 		clientOpts: clientOpts,
 		debug:      opts.Debug,
+		allowCloud: opts.AllowCloud,
 	}
 }
 
@@ -425,6 +427,16 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 			"10. Use python3 (not python) for all Python scripts and commands.",
 		workDir, workDir, workDir, workDir,
 	)
+
+	// Safety boundaries (#36): prevent real Azure resource provisioning unless --allow-cloud is set.
+	if !e.allowCloud {
+		systemMsg += "\n\nSAFETY BOUNDARIES:\n" +
+			"11. Do NOT provision real Azure resources. Do NOT run `az` CLI commands that create, update, or delete resources.\n" +
+			"12. Do NOT use `az group create`, `az storage account create`, `az webapp create`, or any destructive Azure CLI commands.\n" +
+			"13. Use mock data, environment variables, or local emulators (e.g., Azurite for Storage, CosmosDB emulator) for connection strings.\n" +
+			"14. Generate code that can run locally without cloud dependencies. Use placeholder values like `os.Getenv(\"AZURE_STORAGE_CONNECTION_STRING\")` for configuration.\n" +
+			"15. If the prompt asks for infrastructure provisioning, generate Bicep/ARM templates or Terraform files instead of running live commands."
+	}
 
 	sc := &copilot.SessionConfig{
 		Model: cfg.EffectiveModel(),
