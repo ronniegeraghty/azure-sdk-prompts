@@ -209,20 +209,25 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	// Set up signal handler so SIGINT/SIGTERM terminates spawned processes.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	defer close(sigCh)
 	go func() {
-		sig, ok := <-sigCh
-		if !ok {
-			return
-		}
-		slog.Warn("Received signal — terminating tracked Copilot processes", "signal", sig.String())
-		if errs := DefaultTracker.TerminateAll(5 * time.Second); len(errs) > 0 {
-			for _, err := range errs {
-				slog.Warn("Process cleanup error", "error", err)
+		first := true
+		for sig := range sigCh {
+			if first {
+				slog.Warn("Received signal — terminating tracked Copilot processes", "signal", sig.String())
+				if errs := DefaultTracker.TerminateAll(5 * time.Second); len(errs) > 0 {
+					for _, err := range errs {
+						slog.Warn("Process cleanup error", "error", err)
+					}
+				}
+				first = false
+			} else {
+				slog.Warn("Received second signal — forcing exit", "signal", sig.String())
+				os.Exit(1)
 			}
 		}
 	}()
-	defer signal.Stop(sigCh)
-	defer close(sigCh)
 
 	runID := time.Now().Format("20060102-150405")
 	summary := &report.RunSummary{
@@ -421,9 +426,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	defer os.RemoveAll(genDir)
 
-	if e.opts.Debug {
-		lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir)
-	}
+	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir)
 
 	// Snapshot home directory and CWD before eval so we can recover misplaced files after
 	homeDir, _ := os.UserHomeDir()
@@ -537,12 +540,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	if e.opts.Debug {
-		lg.Debug("Session complete",
-			"tool_calls", len(evalReport.ToolCalls),
-			"files_generated", len(generatedFiles),
-			"elapsed", time.Since(start).Truncate(time.Millisecond).String())
-	}
+	lg.Debug("Session complete",
+		"tool_calls", len(evalReport.ToolCalls),
+		"files_generated", len(generatedFiles),
+		"elapsed", time.Since(start).Truncate(time.Millisecond).String())
 
 	// Capture generation duration BEFORE review/verification so it only reflects
 	// the time the generator agent took, not the additional review time.

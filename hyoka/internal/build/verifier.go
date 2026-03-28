@@ -37,30 +37,28 @@ Success:  false,
 }, nil
 }
 
-cmdStr, args := buildCommand(lc, workDir)
-slog.Info("Starting build verification", "language", lc.Name, "command", fmt.Sprintf("%s %s", cmdStr, strings.Join(args, " ")))
+commands := buildCommands(lc, workDir)
+slog.Info("Starting build verification", "language", lc.Name, "steps", len(commands))
 
 start := time.Now()
 
-cmd := exec.CommandContext(ctx, cmdStr, args...)
-cmd.Dir = workDir
-
 var stdout, stderr strings.Builder
+for _, step := range commands {
+cmd := exec.CommandContext(ctx, step.Cmd, step.Args...)
+cmd.Dir = workDir
 cmd.Stdout = &stdout
 cmd.Stderr = &stderr
 
 err := cmd.Run()
+if err != nil {
 duration := time.Since(start)
-
 result := &BuildResult{
 Language: lc.Name,
-Command:  fmt.Sprintf("%s %s", cmdStr, strings.Join(args, " ")),
+Command:  step.String(),
 Stdout:   stdout.String(),
 Stderr:   stderr.String(),
 Duration: duration,
 }
-
-if err != nil {
 if exitErr, ok := err.(*exec.ExitError); ok {
 result.ExitCode = exitErr.ExitCode()
 } else {
@@ -68,55 +66,85 @@ result.ExitCode = -1
 result.Stderr = err.Error()
 }
 result.Success = false
-slog.Info("Build verification failed", "language", lc.Name, "exit_code", result.ExitCode, "duration", duration)
-} else {
-result.ExitCode = 0
-result.Success = true
-slog.Info("Build verification passed", "language", lc.Name, "duration", duration)
+slog.Info("Build verification failed", "language", lc.Name, "step", step.String(), "exit_code", result.ExitCode, "duration", duration)
+return result, nil
+}
 }
 
+duration := time.Since(start)
+last := commands[len(commands)-1]
+result := &BuildResult{
+Language: lc.Name,
+Command:  last.String(),
+ExitCode: 0,
+Stdout:   stdout.String(),
+Stderr:   stderr.String(),
+Duration: duration,
+Success:  true,
+}
+slog.Info("Build verification passed", "language", lc.Name, "duration", duration)
 return result, nil
 }
 
-// buildCommand returns the command and args for the given language config.
-func buildCommand(lc *LanguageConfig, workDir string) (string, []string) {
+// buildStep describes a single command to execute during build verification.
+type buildStep struct {
+Cmd  string
+Args []string
+}
+
+func (s buildStep) String() string {
+return s.Cmd + " " + strings.Join(s.Args, " ")
+}
+
+// buildCommands returns the ordered list of commands to execute for the given language.
+func buildCommands(lc *LanguageConfig, workDir string) []buildStep {
 switch lc.Name {
 case "dotnet":
-return "sh", []string{"-c", "dotnet restore && dotnet build"}
+return []buildStep{
+{Cmd: "dotnet", Args: []string{"restore"}},
+{Cmd: "dotnet", Args: []string{"build"}},
+}
 case "python":
-// Find all .py files
 var pyFiles []string
-if err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
-if err == nil && !info.IsDir() && strings.HasSuffix(path, ".py") {
+_ = filepath.WalkDir(workDir, func(path string, d os.DirEntry, err error) error {
+if err != nil {
+return nil
+}
+if d.Type()&os.ModeSymlink != 0 {
+return nil
+}
+if !d.IsDir() && strings.HasSuffix(path, ".py") {
 pyFiles = append(pyFiles, path)
 }
 return nil
-}); err != nil {
-return "python3", []string{"-m", "py_compile", "/dev/null"}
-}
+})
 if len(pyFiles) == 0 {
-return "python3", []string{"-m", "py_compile", "/dev/null"}
+return []buildStep{{Cmd: "python3", Args: []string{"-m", "py_compile", "/dev/null"}}}
 }
 args := []string{"-m", "py_compile"}
 args = append(args, pyFiles...)
-return "python3", args
+return []buildStep{{Cmd: "python3", Args: args}}
 case "javascript":
 var jsFiles []string
-if err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
-if err == nil && !info.IsDir() && (strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".mjs")) {
+_ = filepath.WalkDir(workDir, func(path string, d os.DirEntry, err error) error {
+if err != nil {
+return nil
+}
+if d.Type()&os.ModeSymlink != 0 {
+return nil
+}
+if !d.IsDir() && (strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".mjs")) {
 jsFiles = append(jsFiles, path)
 }
 return nil
-}); err != nil {
-return "node", []string{"--check", "/dev/null"}
-}
+})
 if len(jsFiles) == 0 {
-return "node", []string{"--check", "/dev/null"}
+return []buildStep{{Cmd: "node", Args: []string{"--check", "/dev/null"}}}
 }
 args := []string{"--check"}
 args = append(args, jsFiles...)
-return "node", args
+return []buildStep{{Cmd: "node", Args: args}}
 default:
-return lc.BuildCmd, lc.BuildArgs
+return []buildStep{{Cmd: lc.BuildCmd, Args: lc.BuildArgs}}
 }
 }

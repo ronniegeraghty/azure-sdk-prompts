@@ -337,6 +337,15 @@ func runCmd() *cobra.Command {
 				}
 			}
 
+			// Forward compat: --log-level debug also sets the Debug flag so that
+			// downstream components (SDK log level, progress suppression) behave
+			// identically regardless of which flag the user passed.
+			if !f.debug {
+				if ll, _ := cmd.Root().PersistentFlags().GetString("log-level"); ll == "debug" {
+					f.debug = true
+				}
+			}
+
 			// When log-level is debug or info and progress mode is auto,
 			// disable live progress so slog output is visible on stderr.
 			if f.progressMode == "auto" {

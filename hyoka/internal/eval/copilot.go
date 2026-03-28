@@ -89,6 +89,11 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 			ErrorDetails: err.Error(),
 		}, fmt.Errorf("starting copilot client: %w", err)
 	}
+	// NOTE: ProcessTracker.Register/Deregister cannot be wired here because the
+	// Copilot SDK's Client struct does not expose the underlying process PID (the
+	// osProcess field is unexported). The SDK manages its own process lifecycle
+	// via client.Stop()/ForceStop(). DefaultTracker.TerminateAll is still called
+	// from the signal handler in engine.go for any future tracked processes.
 	// Defer client cleanup. We use client.Stop() which sends session.destroy
 	// for a graceful shutdown. The generated files are in the report tree
 	// (not a temp dir), so session.destroy won't delete them.
