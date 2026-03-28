@@ -38,3 +38,4 @@ skills-lock.json
 
 # Built binary
 /hyoka/azsdk-prompt-eval
+coverage.txt
