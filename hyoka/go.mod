@@ -3,12 +3,12 @@ module github.com/ronniegeraghty/hyoka
 go 1.26.1
 
 require (
+	github.com/github/copilot-sdk/go v0.2.0
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/github/copilot-sdk/go v0.2.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect

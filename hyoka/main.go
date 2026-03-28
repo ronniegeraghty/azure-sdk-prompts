@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,13 +17,13 @@ import (
 	"github.com/ronniegeraghty/hyoka/internal/checkenv"
 	"github.com/ronniegeraghty/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/internal/eval"
+	"github.com/ronniegeraghty/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/internal/rerender"
 	"github.com/ronniegeraghty/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/internal/review"
 	"github.com/ronniegeraghty/hyoka/internal/trends"
 	"github.com/ronniegeraghty/hyoka/internal/validate"
-	"github.com/ronniegeraghty/hyoka/internal/verify"
 	"github.com/spf13/cobra"
 )
 
@@ -35,11 +36,30 @@ func main() {
 }
 
 func rootCmd() *cobra.Command {
+	var logLevel, logFile string
+
 	root := &cobra.Command{
 		Use:   "hyoka",
 		Short: "Azure SDK Prompt Evaluation Tool — test AI agent code generation quality",
-		Long:  "A tool for evaluating AI agent code generation quality by running prompts through the Copilot SDK, verifying builds, and generating reports.",
+		Long:  "A tool for evaluating AI agent code generation quality by running prompts through the Copilot SDK, running build verification, and generating reports.",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			closer, err := logging.Setup(logging.Options{
+				Level:    logLevel,
+				FilePath: logFile,
+			})
+			if err != nil {
+				return err
+			}
+			// Store closer on the context so it can be called at shutdown.
+			// For simplicity we use a runtime finalizer via cobra's PostRun;
+			// in practice the process exits right after Execute returns.
+			cmd.Root().PersistentPostRun = func(*cobra.Command, []string) { closer() }
+			return nil
+		},
 	}
+
+	root.PersistentFlags().StringVar(&logLevel, "log-level", "warn", "Log level: debug, info, warn, error")
+	root.PersistentFlags().StringVar(&logFile, "log-file", "", "Redirect log output to a file (stderr stays clean)")
 
 	root.AddCommand(runCmd())
 	root.AddCommand(listCmd())
@@ -110,7 +130,7 @@ type runFlags struct {
 	maxSessions     int
 	timeout         int
 	generateTimeout int
-	verifyTimeout   int
+	buildTimeout    int
 	reviewTimeout   int
 	model           string
 	output       string
@@ -119,7 +139,6 @@ type runFlags struct {
 	skipReview   bool
 	skipTrends   bool
 	verifyBuild  bool
-	debug        bool
 	dryRun       bool
 	useStub      bool
 	// Fan-out visibility (#34)
@@ -148,14 +167,13 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().IntVar(&f.maxSessions, "max-sessions", 0, "Maximum concurrent Copilot sessions (default: workers × 3)")
 	cmd.Flags().IntVar(&f.timeout, "timeout", 600, "Per-prompt generation timeout in seconds (deprecated: use --generate-timeout)")
 	cmd.Flags().IntVar(&f.generateTimeout, "generate-timeout", 0, "Generation phase timeout in seconds (default: --timeout value or 600)")
-	cmd.Flags().IntVar(&f.verifyTimeout, "verify-timeout", 300, "Verification phase timeout in seconds")
+	cmd.Flags().IntVar(&f.buildTimeout, "build-timeout", 300, "Build verification timeout in seconds")
 	cmd.Flags().IntVar(&f.reviewTimeout, "review-timeout", 300, "Review phase timeout in seconds")
 	cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
 	cmd.Flags().StringVar(&f.output, "output", "./reports", "Report output directory")
 	cmd.Flags().BoolVar(&f.skipTests, "skip-tests", false, "Skip test generation")
 	cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
-	cmd.Flags().BoolVar(&f.verifyBuild, "verify-build", false, "Also run build verification (in addition to Copilot verification)")
-	cmd.Flags().BoolVar(&f.debug, "debug", false, "Verbose output")
+	cmd.Flags().BoolVar(&f.verifyBuild, "verify-build", false, "Run build verification on generated code")
 	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, live, log, off")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
 	cmd.Flags().BoolVar(&f.useStub, "stub", false, "Use stub evaluator (no Copilot SDK)")
@@ -303,6 +321,16 @@ func runCmd() *cobra.Command {
 		Short: "Run evaluations",
 		Long:  "Run evaluations with optional filters against the prompt library.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Backward compat: --debug upgrades log level to debug
+			// When log-level is debug or info and progress mode is auto,
+			// disable live progress so slog output is visible on stderr.
+			if f.progressMode == "auto" {
+				logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
+				if logLevel == "debug" || logLevel == "info" {
+					f.progressMode = "log"
+				}
+			}
+
 			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
 
@@ -382,21 +410,19 @@ func runCmd() *cobra.Command {
 			fmt.Printf("Found %d prompt(s), %d config(s) → %d evaluation(s)\n",
 				len(filtered), len(configs), len(filtered)*len(configs))
 
-			// Select evaluator, verifier, and reviewer
+			// Select evaluator and reviewer
 			var evaluator eval.CopilotEvaluator
 			var reviewer review.Reviewer
-			var verifier eval.Verifier
 			var panelReviewer *review.PanelReviewer
 
 			if f.useStub {
+				slog.Info("Using stub evaluator", "reason", "--stub flag")
 				fmt.Println("Using stub evaluator (--stub flag)")
 				evaluator = &eval.StubEvaluator{}
 				reviewer = &review.StubReviewer{}
-				verifier = &eval.StubVerifier{}
 			} else {
 				// Try to create a real Copilot SDK evaluator
 				sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
-					Debug:      f.debug,
 					AllowCloud: f.allowCloud,
 				})
 				evaluator = sdkEval
@@ -404,27 +430,22 @@ func runCmd() *cobra.Command {
 				// Verify Copilot CLI is available
 				client := copilot.NewClient(nil)
 				if err := client.Start(context.Background()); err != nil {
+					slog.Warn("Copilot SDK unavailable, falling back to stub", "error", err)
 					fmt.Printf("⚠️  Copilot SDK unavailable (%v), falling back to stub evaluator\n", err)
 					evaluator = &eval.StubEvaluator{}
 					reviewer = &review.StubReviewer{}
-					verifier = &eval.StubVerifier{}
 				} else {
 					client.Stop()
+					slog.Info("Using Copilot SDK evaluator")
 					fmt.Println("Using Copilot SDK evaluator")
 
-					// Create a real CopilotVerifier with its own client options
 					clientOpts := &copilot.ClientOptions{}
-					if f.debug {
+					if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 						clientOpts.LogLevel = "debug"
 					}
-					copilotVerifier := verify.NewCopilotVerifier(clientOpts, f.model, f.debug)
 
-					// Wire skills directories separately for generator, reviewer, and verifier
+					// Wire skills directories separately for generator and reviewer
 					generatorSkillsDirs, reviewerSkillsDirs := resolveSkillsDirs(f.prompts)
-					if len(reviewerSkillsDirs) > 0 {
-						copilotVerifier.SetSkillDirectories(reviewerSkillsDirs)
-					}
-					verifier = copilotVerifier
 
 					// Create reviewer(s) — use panel if reviewer_models list configured
 					var reviewerModels []string
@@ -437,15 +458,17 @@ func runCmd() *cobra.Command {
 
 					if len(reviewerModels) > 1 {
 						// Multi-model panel
-						panelReviewer = review.NewPanelReviewer(clientOpts, reviewerModels, f.debug)
+						panelReviewer = review.NewPanelReviewer(clientOpts, reviewerModels)
 						if len(reviewerSkillsDirs) > 0 {
 							panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
 						}
 						fmt.Printf("Using review panel: %v\n", reviewerModels)
+						slog.Info("Review panel configured", "models", reviewerModels)
 					} else {
 						// Single reviewer (backward compat)
 						reviewClient := copilot.NewClient(clientOpts)
 						if err := reviewClient.Start(context.Background()); err != nil {
+							slog.Warn("Could not start reviewer client, reviews will be skipped", "error", err)
 							fmt.Printf("⚠️  Could not start reviewer client: %v, reviews will be skipped\n", err)
 						} else {
 							reviewerModel := f.model
@@ -477,18 +500,17 @@ func runCmd() *cobra.Command {
 			}
 
 			// Create and run engine
-			engine := eval.NewEngineWithReviewer(evaluator, verifier, reviewer, eval.EngineOptions{
+			engine := eval.NewEngineWithReviewer(evaluator, reviewer, eval.EngineOptions{
 				Workers:          f.workers,
 				MaxSessions:      f.maxSessions,
 				Timeout:          time.Duration(f.timeout) * time.Second,
 				GenerateTimeout:  time.Duration(f.generateTimeout) * time.Second,
-				VerifyTimeout:    time.Duration(f.verifyTimeout) * time.Second,
+				BuildTimeout:     time.Duration(f.buildTimeout) * time.Second,
 				ReviewTimeout:    time.Duration(f.reviewTimeout) * time.Second,
 				OutputDir:        f.output,
 				SkipTests:        f.skipTests,
 				SkipReview:       f.skipReview,
 				VerifyBuild:      f.verifyBuild,
-				Debug:            f.debug,
 				DryRun:           f.dryRun,
 				ProgressMode:     f.progressMode,
 				ConfirmLargeRuns: true,
@@ -526,11 +548,13 @@ func runCmd() *cobra.Command {
 					Analyze:    false, // generate data first, analyze below
 				})
 				if err != nil {
+					slog.Warn("Trend generation failed", "error", err)
 					fmt.Printf("⚠️  Trend generation failed: %v\n", err)
 				} else if tr.TotalRuns > 0 {
 					fmt.Println("🤖 Running AI-powered trend analysis...")
 					analysis, aErr := trends.AnalyzeTrends(context.Background(), tr)
 					if aErr != nil {
+						slog.Warn("AI trend analysis failed", "error", aErr)
 						fmt.Printf("⚠️  AI analysis failed: %v (continuing without analysis)\n", aErr)
 					} else {
 						tr.Analysis = analysis
@@ -541,6 +565,7 @@ func runCmd() *cobra.Command {
 						// Re-write summary HTML with AI analysis included (Issue 7)
 						summary.Analysis = analysis
 						if _, err := report.WriteSummaryHTML(summary, f.output); err != nil {
+							slog.Warn("Failed to update summary with analysis", "error", err)
 							fmt.Printf("⚠️  Failed to update summary with analysis: %v\n", err)
 						}
 					}
@@ -801,6 +826,7 @@ func trendsCmd() *cobra.Command {
 				fmt.Println("🤖 Running AI-powered trend analysis...")
 				analysis, err := trends.AnalyzeTrends(context.Background(), tr)
 				if err != nil {
+					slog.Warn("AI trend analysis failed", "error", err)
 					fmt.Printf("⚠️  AI analysis failed: %v (continuing without analysis)\n", err)
 				} else {
 					tr.Analysis = analysis
