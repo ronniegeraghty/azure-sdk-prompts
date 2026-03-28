@@ -30,3 +30,11 @@ reports/
 
 # Logs
 logs/
+
+# Agent workspace
+.agents/
+.claude/
+skills-lock.json
+
+# Built binary
+/hyoka/azsdk-prompt-eval
