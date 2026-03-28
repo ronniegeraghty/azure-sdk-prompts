@@ -338,6 +338,15 @@ func runCmd() *cobra.Command {
 				}
 			}
 
+			// When log-level is debug or info and progress mode is auto,
+			// disable live progress so slog output is visible on stderr.
+			if f.progressMode == "auto" {
+				logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
+				if logLevel == "debug" || logLevel == "info" || f.debug {
+					f.progressMode = "log"
+				}
+			}
+
 			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
 
