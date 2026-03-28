@@ -27,3 +27,6 @@ reports/runs/_tmp_eval/
 # Evaluation reports
 reports/
 *.test
+
+# Logs
+logs/
