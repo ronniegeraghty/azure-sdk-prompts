@@ -258,6 +258,12 @@ If `validate` or `run` finds zero prompts, it scans for near-miss filenames and 
 
 ## Next Steps
 
-- Read the [root README](../README.md) for full command reference
-- Check out `skills/prompt-authoring/SKILL.md` for prompt writing best practices
-- See `docs/cleanup-plan.md` for the project roadmap
+- **[CLI Reference](cli-reference.md)** — Full command and flag reference
+- **[Configuration Guide](configuration.md)** — Config YAML schema, skills, MCP servers
+- **[Prompt Authoring Guide](prompt-authoring.md)** — Writing prompts, frontmatter, evaluation criteria
+- **[Architecture Overview](architecture.md)** — How hyoka works end-to-end
+- **[Evaluation Criteria](evaluation-criteria.md)** — Scoring methodology and review panel
+- **[Reports & Trends](reports-and-trends.md)** — Understanding evaluation output
+- **[Guardrails & Safety](guardrails-and-safety.md)** — Safety boundaries and resource limits
+- **[Troubleshooting](troubleshooting.md)** — Diagnostics and common issues
+- **[Contributing](contributing.md)** — Build, test, and extend hyoka

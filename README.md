@@ -396,3 +396,18 @@ See [`hyoka/README.md`](hyoka/README.md) for full CLI reference and configuratio
 ## License
 
 [MIT](LICENSE)
+
+## Documentation
+
+For detailed documentation beyond this README, see the [`docs/`](docs/README.md) directory:
+
+- **[Getting Started](docs/getting-started.md)** — Prerequisites, installation, first run
+- **[CLI Reference](docs/cli-reference.md)** — Complete command and flag reference
+- **[Configuration Guide](docs/configuration.md)** — Config YAML schema, skills, MCP servers
+- **[Prompt Authoring](docs/prompt-authoring.md)** — Frontmatter schema, evaluation criteria
+- **[Architecture Overview](docs/architecture-overview.md)** — End-to-end pipeline
+- **[Evaluation Criteria](docs/evaluation-criteria.md)** — Scoring methodology
+- **[Reports & Trends](docs/reports-and-trends.md)** — Report format, trend analysis
+- **[Guardrails & Safety](docs/guardrails-and-safety.md)** — Limits, safety boundaries
+- **[Troubleshooting](docs/troubleshooting.md)** — Common issues, diagnostics
+- **[Contributing](docs/contributing.md)** — Build, test, extend hyoka
