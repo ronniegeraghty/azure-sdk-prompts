@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -101,7 +102,16 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	}()
 
 	// Build session config from tool config
-	sessionCfg := e.buildSessionConfig(cfg, workDir)
+	// Create isolated config directory to prevent user-level skills from
+	// leaking into the eval session (#21). Only skills explicitly listed
+	// in the eval config's SkillDirectories are loaded.
+	configDir, err := NewIsolatedConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("creating isolated config dir: %w", err)
+	}
+	defer os.RemoveAll(configDir)
+
+	sessionCfg := e.buildSessionConfig(cfg, workDir, configDir)
 
 	session, err := client.CreateSession(ctx, sessionCfg)
 	if err != nil {
@@ -398,7 +408,7 @@ func (e *CopilotSDKEvaluator) Client(ctx context.Context, workDir string) (*copi
 	return client, nil
 }
 
-func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string) *copilot.SessionConfig {
+func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string) *copilot.SessionConfig {
 	// Use generator-specific skills if configured, otherwise fall back to shared
 	skillDirs := cfg.GeneratorSkillDirectories
 	if len(skillDirs) == 0 {
@@ -444,6 +454,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 			Mode:    "append",
 			Content: systemMsg,
 		},
+		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 		SkillDirectories:    skillDirs,

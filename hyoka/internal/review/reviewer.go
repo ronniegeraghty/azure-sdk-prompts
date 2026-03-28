@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -59,12 +60,21 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 
 	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria)
 
+	// Create isolated config directory to prevent user-level skills from
+	// leaking into the review session (#21).
+	configDir, err := os.MkdirTemp("", "hyoka-config-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating isolated config dir: %w", err)
+	}
+	defer os.RemoveAll(configDir)
+
 	session, err := r.client.CreateSession(ctx, &copilot.SessionConfig{
 		Model: r.model,
 		SystemMessage: &copilot.SystemMessageConfig{
 			Mode:    "append",
 			Content: "You are a code review judge evaluating another AI agent's work. Actively verify the code: attempt to build it, check if SDK packages are the latest versions, and test any claims. Score each criterion as pass/fail per the rubric. Respond with ONLY valid JSON. No markdown, no explanation.",
 		},
+		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 		SkillDirectories:    r.skillDirectories,
@@ -321,12 +331,21 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		}
 	}()
 
+	// Create isolated config directory to prevent user-level skills from
+	// leaking into the review session (#21).
+	configDir, err := os.MkdirTemp("", "hyoka-config-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating isolated config dir for %s: %w", model, err)
+	}
+	defer os.RemoveAll(configDir)
+
 	session, err := client.CreateSession(ctx, &copilot.SessionConfig{
 		Model: model,
 		SystemMessage: &copilot.SystemMessageConfig{
 			Mode:    "append",
 			Content: "You are a code review judge evaluating another AI agent's work. Actively verify the code: attempt to build it, check if SDK packages are the latest versions, and test any claims. Score each criterion as pass/fail per the rubric. Respond with ONLY valid JSON. No markdown, no explanation.",
 		},
+		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 		SkillDirectories:    p.skillDirectories,
