@@ -65,6 +65,7 @@ type EngineOptions struct {
 	BuildTimeout    time.Duration // Timeout for build verification phase (--verify-build).
 	ReviewTimeout   time.Duration // Independent timeout for review phase.
 	OutputDir       string
+	CriteriaDir     string // Directory containing criteria YAML files (portable mode).
 	SkipTests       bool
 	SkipReview      bool
 	VerifyBuild     bool

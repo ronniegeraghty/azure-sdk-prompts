@@ -18,6 +18,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/internal/eval"
 	"github.com/ronniegeraghty/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/internal/project"
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/internal/rerender"
 	"github.com/ronniegeraghty/hyoka/internal/report"
@@ -29,6 +30,10 @@ import (
 
 var version = "0.2.0"
 
+// projectCfg holds the project-level config discovered from hyoka.yaml / .hyoka.yaml.
+// It is nil when no project config file is found (e.g., when running inside the hyoka repo).
+var projectCfg *project.Config
+
 func main() {
 	if err := rootCmd().Execute(); err != nil {
 		os.Exit(1)
@@ -36,12 +41,12 @@ func main() {
 }
 
 func rootCmd() *cobra.Command {
-	var logLevel, logFile string
+	var logLevel, logFile, projectConfigPath string
 
 	root := &cobra.Command{
 		Use:   "hyoka",
 		Short: "Azure SDK Prompt Evaluation Tool — test AI agent code generation quality",
-		Long:  "A tool for evaluating AI agent code generation quality by running prompts through the Copilot SDK, running build verification, and generating reports.",
+		Long:  "A tool for evaluating AI agent code generation quality by running prompts through the Copilot SDK, running build verification, and generating reports.\n\nPortable mode: Place a hyoka.yaml or .hyoka.yaml in your repo root to configure directory paths (prompts_dir, configs_dir, skills_dir, criteria_dir, reports_dir).",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			closer, err := logging.Setup(logging.Options{
 				Level:    logLevel,
@@ -50,16 +55,33 @@ func rootCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// Store closer on the context so it can be called at shutdown.
-			// For simplicity we use a runtime finalizer via cobra's PostRun;
-			// in practice the process exits right after Execute returns.
 			cmd.Root().PersistentPostRun = func(*cobra.Command, []string) { closer() }
+
+			// Load project config — explicit path or auto-discover
+			if projectConfigPath != "" {
+				cfg, err := project.Load(projectConfigPath)
+				if err != nil {
+					return fmt.Errorf("loading project config: %w", err)
+				}
+				projectCfg = cfg
+			} else {
+				cwd, _ := os.Getwd()
+				cfg, err := project.Discover(cwd)
+				if err != nil {
+					slog.Warn("Error discovering project config", "error", err)
+				}
+				projectCfg = cfg // may be nil — that's fine
+			}
+			if projectCfg != nil {
+				slog.Info("Using project config", "path", projectCfg.ConfigPath)
+			}
 			return nil
 		},
 	}
 
 	root.PersistentFlags().StringVar(&logLevel, "log-level", "warn", "Log level: debug, info, warn, error")
 	root.PersistentFlags().StringVar(&logFile, "log-file", "", "Redirect log output to a file (stderr stays clean)")
+	root.PersistentFlags().StringVar(&projectConfigPath, "project-config", "", "Path to hyoka.yaml project config file (auto-discovered if not specified)")
 
 	root.AddCommand(runCmd())
 	root.AddCommand(listCmd())
@@ -76,7 +98,8 @@ func rootCmd() *cobra.Command {
 }
 
 // resolvePathFlag returns the flag value if explicitly set by the user,
-// otherwise tries the candidate paths in order, falling back to the default.
+// otherwise tries the project config value, then candidate paths in order,
+// falling back to the default.
 func resolvePathFlag(cmd *cobra.Command, flagName string, candidates []string) string {
 	if cmd.Flags().Changed(flagName) {
 		val, _ := cmd.Flags().GetString(flagName)
@@ -91,8 +114,32 @@ func resolvePathFlag(cmd *cobra.Command, flagName string, candidates []string) s
 	return val
 }
 
+// resolveWithProjectConfig resolves a path using project config first, then
+// candidates, then the flag default. The projectDir is the value from the
+// project config (may be empty if not set or no project config).
+func resolveWithProjectConfig(cmd *cobra.Command, flagName, projectDir string, candidates []string) string {
+	if cmd.Flags().Changed(flagName) {
+		val, _ := cmd.Flags().GetString(flagName)
+		return val
+	}
+	if projectDir != "" {
+		return projectDir
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	val, _ := cmd.Flags().GetString(flagName)
+	return val
+}
+
 func resolvePromptsDir(cmd *cobra.Command) string {
-	return resolvePathFlag(cmd, "prompts", []string{"./prompts", "../prompts"})
+	var projDir string
+	if projectCfg != nil {
+		projDir = projectCfg.EffectivePromptsDir()
+	}
+	return resolveWithProjectConfig(cmd, "prompts", projDir, []string{"./prompts", "../prompts"})
 }
 
 func resolveConfigFile(cmd *cobra.Command) string {
@@ -102,13 +149,27 @@ func resolveConfigFile(cmd *cobra.Command) string {
 }
 
 func resolveConfigDir(cmd *cobra.Command) string {
-	return resolvePathFlag(cmd, "config-dir", []string{
-		"./configs", "../configs",
-	})
+	var projDir string
+	if projectCfg != nil {
+		projDir = projectCfg.EffectiveConfigsDir()
+	}
+	return resolveWithProjectConfig(cmd, "config-dir", projDir, []string{"./configs", "../configs"})
 }
 
 func resolveOutputDir(cmd *cobra.Command) string {
-	return resolvePathFlag(cmd, "output", []string{"./reports", "../reports"})
+	var projDir string
+	if projectCfg != nil {
+		projDir = projectCfg.EffectiveReportsDir()
+	}
+	return resolveWithProjectConfig(cmd, "output", projDir, []string{"./reports", "../reports"})
+}
+
+func resolveCriteriaDir(cmd *cobra.Command) string {
+	var projDir string
+	if projectCfg != nil {
+		projDir = projectCfg.EffectiveCriteriaDir()
+	}
+	return resolveWithProjectConfig(cmd, "criteria-dir", projDir, []string{"./criteria", "../criteria"})
 }
 
 func resolveOutputFile(cmd *cobra.Command, candidates []string) string {
@@ -126,6 +187,7 @@ type runFlags struct {
 	configName   string
 	configFile   string
 	configDir    string
+	criteriaDir  string
 	workers         int
 	maxSessions     int
 	timeout         int
@@ -163,6 +225,7 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.configName, "config", "", "Config name(s) from config file (comma-separated)")
 	cmd.Flags().StringVar(&f.configFile, "config-file", "", "Path to a specific configuration YAML file (default: load all from configs/)")
 	cmd.Flags().StringVar(&f.configDir, "config-dir", "./configs", "Directory containing configuration YAML files")
+	cmd.Flags().StringVar(&f.criteriaDir, "criteria-dir", "./criteria", "Directory containing criteria YAML files for attribute-matched evaluation")
 	cmd.Flags().IntVar(&f.workers, "workers", 0, "Parallel evaluation workers (default: number of CPUs, max 8)")
 	cmd.Flags().IntVar(&f.maxSessions, "max-sessions", 0, "Maximum concurrent Copilot sessions (default: workers × 3)")
 	cmd.Flags().IntVar(&f.timeout, "timeout", 600, "Per-prompt generation timeout in seconds (deprecated: use --generate-timeout)")
@@ -191,22 +254,34 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().MarkHidden("sandbox") // sandbox is the default; --allow-cloud is the opt-out
 }
 
-// resolveSkillsDirs finds the skills directory relative to the prompts directory.
-// It checks multiple candidate paths to work from both repo root and tool/ directory.
 // resolveSkillsDirs resolves skill directories for generator and reviewer sessions.
+// It consults the project config first, then checks standard candidate paths.
 // It looks for skills/generator/ and skills/reviewer/ subdirectories.
 // Falls back to the parent skills/ directory for both if subdirs don't exist.
 func resolveSkillsDirs(promptsDir string) (generatorDirs, reviewerDirs []string) {
 	var baseDir string
-	for _, candidate := range []string{
-		filepath.Join(filepath.Dir(promptsDir), "skills"),
-		"./skills",
-		"../skills",
-	} {
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			abs, _ := filepath.Abs(candidate)
-			baseDir = abs
-			break
+
+	// Check project config first
+	if projectCfg != nil {
+		if d := projectCfg.EffectiveSkillsDir(); d != "" {
+			if info, err := os.Stat(d); err == nil && info.IsDir() {
+				abs, _ := filepath.Abs(d)
+				baseDir = abs
+			}
+		}
+	}
+
+	if baseDir == "" {
+		for _, candidate := range []string{
+			filepath.Join(filepath.Dir(promptsDir), "skills"),
+			"./skills",
+			"../skills",
+		} {
+			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+				abs, _ := filepath.Abs(candidate)
+				baseDir = abs
+				break
+			}
 		}
 	}
 	if baseDir == "" {
@@ -333,6 +408,17 @@ func runCmd() *cobra.Command {
 
 			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
+			f.criteriaDir = resolveCriteriaDir(cmd)
+
+			// Log resolved paths for portable mode debugging
+			if projectCfg != nil {
+				slog.Info("Portable mode: paths resolved",
+					"prompts", f.prompts,
+					"output", f.output,
+					"criteria", f.criteriaDir,
+					"project_config", projectCfg.ConfigPath,
+				)
+			}
 
 			// Load config(s)
 			var cfgFile *config.ConfigFile
@@ -508,6 +594,7 @@ func runCmd() *cobra.Command {
 				BuildTimeout:     time.Duration(f.buildTimeout) * time.Second,
 				ReviewTimeout:    time.Duration(f.reviewTimeout) * time.Second,
 				OutputDir:        f.output,
+				CriteriaDir:     f.criteriaDir,
 				SkipTests:        f.skipTests,
 				SkipReview:       f.skipReview,
 				VerifyBuild:      f.verifyBuild,
@@ -690,6 +777,7 @@ func configsCmd() *cobra.Command {
 
 func validateCmd() *cobra.Command {
 	var promptsDir string
+	var configDir string
 
 	cmd := &cobra.Command{
 		Use:   "validate",
@@ -729,8 +817,12 @@ func validateCmd() *cobra.Command {
 				allOK = false
 			}
 
-			// Validate config files
-			configDir := filepath.Join(filepath.Dir(promptsDir), "configs")
+			// Validate config files — use project config if available, else infer from prompts dir
+			configDir := resolveConfigDir(cmd)
+			if _, statErr := os.Stat(configDir); statErr != nil {
+				// Fall back to legacy behavior: sibling to prompts dir
+				configDir = filepath.Join(filepath.Dir(promptsDir), "configs")
+			}
 			if entries, err := os.ReadDir(configDir); err == nil {
 				configCount := 0
 				configErrors := 0
@@ -764,6 +856,7 @@ func validateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&promptsDir, "prompts", "./prompts", "Path to prompt library directory")
+	cmd.Flags().StringVar(&configDir, "config-dir", "./configs", "Directory containing configuration YAML files")
 	return cmd
 }
 
