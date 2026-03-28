@@ -244,17 +244,17 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	runDir := filepath.Join(e.opts.OutputDir, runID)
 
-	// Progress display (disabled in debug mode or when stdout is not a terminal)
+	// Progress display — mode is controlled by --progress flag.
+	// When --log-level debug/info, main.go sets ProgressMode to "log" automatically.
 	display := progress.NewDisplay(progress.DisplayConfig{
 		Total:     len(tasks),
 		Workers:   e.opts.Workers,
-		Disabled:  e.opts.Debug,
 		ReportDir: runDir + "/",
 		Mode:      progress.ProgressMode(e.opts.ProgressMode),
 	})
 
 	// Wire progress reporting if evaluator supports it
-	if pr, ok := e.evaluator.(progress.Reporter); ok && !e.opts.Debug {
+	if pr, ok := e.evaluator.(progress.Reporter); ok {
 		pr.SetProgressFunc(display.HandleEvent)
 	}
 
