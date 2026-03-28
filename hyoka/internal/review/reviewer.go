@@ -68,36 +68,12 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 	}
 	defer os.RemoveAll(configDir)
 
-	session, err := r.client.CreateSession(ctx, &copilot.SessionConfig{
-		Model: r.model,
-		SystemMessage: &copilot.SystemMessageConfig{
-			Mode:    "append",
-			Content: "You are a code review judge evaluating another AI agent's work. Actively verify the code: attempt to build it, check if SDK packages are the latest versions, and test any claims. Score each criterion as pass/fail per the rubric. Respond with ONLY valid JSON. No markdown, no explanation.",
-		},
-		ConfigDir:           configDir,
-		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
-		SkillDirectories:    r.skillDirectories,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating review session: %w", err)
-	}
-	// SDK's Disconnect() can block if the CLI subprocess is stuck.
-	// Timeout and let the owning client's Stop handle final cleanup.
-	defer func() {
-		done := make(chan struct{})
-		go func() { session.Disconnect(); close(done) }()
-		select {
-		case <-done:
-		case <-time.After(15 * time.Second):
-		}
-	}()
-
 	// Capture the assistant's response and all session events
 	var assistantContent strings.Builder
 	var reviewEvents []ReviewEvent
 	var mu sync.Mutex
-	unsub := session.On(func(event copilot.SessionEvent) {
+
+	eventHandler := func(event copilot.SessionEvent) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -134,8 +110,33 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 			evt.Duration = *event.Data.Duration
 		}
 		reviewEvents = append(reviewEvents, evt)
+	}
+
+	session, err := r.client.CreateSession(ctx, &copilot.SessionConfig{
+		Model: r.model,
+		SystemMessage: &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: "You are a code review judge evaluating another AI agent's work. Actively verify the code: attempt to build it, check if SDK packages are the latest versions, and test any claims. Score each criterion as pass/fail per the rubric. Respond with ONLY valid JSON. No markdown, no explanation.",
+		},
+		ConfigDir:           configDir,
+		WorkingDirectory:    workDir,
+		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		SkillDirectories:    r.skillDirectories,
+		OnEvent:             eventHandler,
 	})
-	defer unsub()
+	if err != nil {
+		return nil, fmt.Errorf("creating review session: %w", err)
+	}
+	// SDK's Disconnect() can block if the CLI subprocess is stuck.
+	// Timeout and let the owning client's Stop handle final cleanup.
+	defer func() {
+		done := make(chan struct{})
+		go func() { session.Disconnect(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(15 * time.Second):
+		}
+	}()
 
 	_, err = session.SendAndWait(ctx, copilot.MessageOptions{
 		Prompt: reviewPrompt,
@@ -339,25 +340,11 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 	}
 	defer os.RemoveAll(configDir)
 
-	session, err := client.CreateSession(ctx, &copilot.SessionConfig{
-		Model: model,
-		SystemMessage: &copilot.SystemMessageConfig{
-			Mode:    "append",
-			Content: "You are a code review judge evaluating another AI agent's work. Actively verify the code: attempt to build it, check if SDK packages are the latest versions, and test any claims. Score each criterion as pass/fail per the rubric. Respond with ONLY valid JSON. No markdown, no explanation.",
-		},
-		ConfigDir:           configDir,
-		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
-		SkillDirectories:    p.skillDirectories,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating review session for %s: %w", model, err)
-	}
-
 	var assistantContent strings.Builder
 	var reviewEvents []ReviewEvent
 	var mu sync.Mutex
-	unsub := session.On(func(event copilot.SessionEvent) {
+
+	eventHandler := func(event copilot.SessionEvent) {
 		mu.Lock()
 		defer mu.Unlock()
 		if event.Type == copilot.SessionEventTypeAssistantMessage && event.Data.Content != nil {
@@ -392,8 +379,23 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 			evt.Duration = *event.Data.Duration
 		}
 		reviewEvents = append(reviewEvents, evt)
+	}
+
+	session, err := client.CreateSession(ctx, &copilot.SessionConfig{
+		Model: model,
+		SystemMessage: &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: "You are a code review judge evaluating another AI agent's work. Actively verify the code: attempt to build it, check if SDK packages are the latest versions, and test any claims. Score each criterion as pass/fail per the rubric. Respond with ONLY valid JSON. No markdown, no explanation.",
+		},
+		ConfigDir:           configDir,
+		WorkingDirectory:    workDir,
+		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		SkillDirectories:    p.skillDirectories,
+		OnEvent:             eventHandler,
 	})
-	defer unsub()
+	if err != nil {
+		return nil, fmt.Errorf("creating review session for %s: %w", model, err)
+	}
 
 	_, err = session.SendAndWait(ctx, copilot.MessageOptions{
 		Prompt: reviewPrompt,

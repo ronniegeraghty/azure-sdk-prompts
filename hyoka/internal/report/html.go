@@ -706,6 +706,27 @@ const reportTemplate = `<!DOCTYPE html>
 </div>
 {{end}}
 
+{{if .Environment}}
+<div class="section">
+  <div class="section-header"><span class="icon">🔧</span><h2>Environment & Configuration</h2></div>
+  <div class="section-body">
+  <table class="meta-table">
+    <tr><td>Model</td><td>{{.Environment.Model}}</td></tr>
+    {{if .Environment.SkillsLoaded}}<tr><td>Skills Loaded</td><td>{{join .Environment.SkillsLoaded ", "}}</td></tr>{{end}}
+    {{if .Environment.SkillsInvoked}}<tr><td>Skills Invoked</td><td>{{join .Environment.SkillsInvoked ", "}}</td></tr>{{end}}
+    {{if .Environment.AvailableTools}}<tr><td>Available Tools</td><td>{{join .Environment.AvailableTools ", "}}</td></tr>{{end}}
+    {{if .Environment.ExcludedTools}}<tr><td>Excluded Tools</td><td>{{join .Environment.ExcludedTools ", "}}</td></tr>{{end}}
+    {{if .Environment.MCPServers}}<tr><td>MCP Servers</td><td>{{join .Environment.MCPServers ", "}}</td></tr>{{end}}
+    <tr><td>Safety Boundaries</td><td>{{if .Environment.SafetyBoundaries}}✅ Active{{else}}❌ Off{{end}}</td></tr>
+    <tr><td>Cloud Access</td><td>{{if .Environment.AllowCloud}}✅ Allowed{{else}}❌ Denied{{end}}</td></tr>
+    {{if or .Environment.TotalInputTokens .Environment.TotalOutputTokens}}<tr><td>Token Usage</td><td>in={{.Environment.TotalInputTokens}} out={{.Environment.TotalOutputTokens}}</td></tr>{{end}}
+    {{if .Environment.TurnCount}}<tr><td>Turn Count</td><td>{{.Environment.TurnCount}}</td></tr>{{end}}
+    {{if .Environment.ContextTruncated}}<tr><td>Context Truncated</td><td>⚠️ Yes</td></tr>{{end}}
+  </table>
+  </div>
+</div>
+{{end}}
+
 <!-- ━━ Generation Timeline ━━ -->
 {{if .TimelineSteps}}
 <div class="phase phase-gen">

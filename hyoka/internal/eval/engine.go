@@ -557,6 +557,42 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// the time the generator agent took, not the additional review time.
 	evalReport.Duration = time.Since(start).Seconds()
 
+	// Populate environment info from config and captured events
+	env := &report.EnvironmentInfo{
+		Model:            task.Config.EffectiveModel(),
+		SkillDirectories: task.Config.SkillDirectories,
+		AvailableTools:   task.Config.EffectiveAvailableTools(),
+		ExcludedTools:    task.Config.EffectiveExcludedTools(),
+		SafetyBoundaries: true,
+		AllowCloud:       false,
+		WorkingDirectory: ws.Dir,
+	}
+	// Extract MCP server names
+	for name := range task.Config.EffectiveMCPServers() {
+		env.MCPServers = append(env.MCPServers, name)
+	}
+	// Derive token usage, turn count, truncation, skills from events
+	for _, ev := range evalReport.SessionEvents {
+		switch ev.Type {
+		case "assistant.usage":
+			env.TotalInputTokens += ev.InputTokens
+			env.TotalOutputTokens += ev.OutputTokens
+		case "assistant.turn_start":
+			env.TurnCount++
+		case "session.truncation":
+			env.ContextTruncated = true
+		case "skill.invoked":
+			if ev.SkillName != "" {
+				env.SkillsInvoked = append(env.SkillsInvoked, ev.SkillName)
+			}
+		case "session.skills_loaded":
+			if ev.Content != "" {
+				env.SkillsLoaded = strings.Split(ev.Content, ", ")
+			}
+		}
+	}
+	evalReport.Environment = env
+
 	// Generator guardrail checks (#35)
 	if !evalFailed {
 		// Check turn count (count assistant turn-end events as turns)

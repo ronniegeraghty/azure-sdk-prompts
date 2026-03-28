@@ -60,6 +60,53 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		b.WriteString("\n")
 	}
 
+	// Environment & Configuration
+	if r.Environment != nil {
+		env := r.Environment
+		b.WriteString("## Environment & Configuration\n\n")
+		b.WriteString("| Setting | Value |\n")
+		b.WriteString("|---------|-------|\n")
+		fmt.Fprintf(&b, "| Model | %s |\n", env.Model)
+		if len(env.SkillDirectories) > 0 {
+			fmt.Fprintf(&b, "| Skill Directories | %s |\n", strings.Join(env.SkillDirectories, ", "))
+		}
+		if len(env.SkillsLoaded) > 0 {
+			fmt.Fprintf(&b, "| Skills Loaded | %s |\n", strings.Join(env.SkillsLoaded, ", "))
+		}
+		if len(env.SkillsInvoked) > 0 {
+			fmt.Fprintf(&b, "| Skills Invoked | %s |\n", strings.Join(env.SkillsInvoked, ", "))
+		}
+		if len(env.AvailableTools) > 0 {
+			fmt.Fprintf(&b, "| Available Tools | %s |\n", strings.Join(env.AvailableTools, ", "))
+		}
+		if len(env.ExcludedTools) > 0 {
+			fmt.Fprintf(&b, "| Excluded Tools | %s |\n", strings.Join(env.ExcludedTools, ", "))
+		}
+		if len(env.MCPServers) > 0 {
+			fmt.Fprintf(&b, "| MCP Servers | %s |\n", strings.Join(env.MCPServers, ", "))
+		}
+		safetyStr := "❌ Off"
+		if env.SafetyBoundaries {
+			safetyStr = "✅ Active"
+		}
+		fmt.Fprintf(&b, "| Safety Boundaries | %s |\n", safetyStr)
+		cloudStr := "❌ Denied"
+		if env.AllowCloud {
+			cloudStr = "✅ Allowed"
+		}
+		fmt.Fprintf(&b, "| Cloud Access | %s |\n", cloudStr)
+		if env.TotalInputTokens > 0 || env.TotalOutputTokens > 0 {
+			fmt.Fprintf(&b, "| Token Usage | in=%d out=%d |\n", env.TotalInputTokens, env.TotalOutputTokens)
+		}
+		if env.TurnCount > 0 {
+			fmt.Fprintf(&b, "| Turn Count | %d |\n", env.TurnCount)
+		}
+		if env.ContextTruncated {
+			b.WriteString("| Context Truncated | ⚠️ Yes |\n")
+		}
+		b.WriteString("\n")
+	}
+
 	// Error (if failed)
 	if r.Error != "" {
 		b.WriteString("## Error\n\n")
