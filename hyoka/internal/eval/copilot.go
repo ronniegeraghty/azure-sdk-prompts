@@ -677,6 +677,30 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		systemMsg = cfg.Generator.SystemPrompt
 	}
 
+	// Append workspace and file creation rules.
+	systemMsg += fmt.Sprintf(
+		"\n\nYou are a code generation agent. Your working directory is: %s\n"+
+			"FILE CREATION RULES:\n"+
+			"1. Always write code to files using the create or edit tools — never just explain code in text.\n"+
+			"2. Every file path MUST be a FULL ABSOLUTE PATH starting with: %s/\n"+
+			"3. NEVER omit the path parameter. NEVER use relative paths.\n"+
+			"4. NEVER create files outside your working directory.\n"+
+			"BASH RULES:\n"+
+			"5. When using bash, always cd to %s first.\n"+
+			"PYTHON RULES:\n"+
+			"6. Use python3 (not python) for all Python scripts and commands.",
+		workDir, workDir, workDir,
+	)
+
+	// Safety boundaries (#36): prevent real Azure resource provisioning unless --allow-cloud is set.
+	if !e.allowCloud {
+		systemMsg += "\n\nSAFETY BOUNDARIES:\n" +
+			"7. Do NOT provision real Azure resources. Do NOT run `az` CLI commands that create, update, or delete resources.\n" +
+			"8. Use mock data, environment variables, or local emulators for connection strings.\n" +
+			"9. Generate code that can run locally without cloud dependencies.\n" +
+			"10. If the prompt asks for infrastructure provisioning, generate infra-as-code files instead of running live commands."
+	}
+
 	// Instruct the agent to use available skills before generating code.
 	// Without this hint, models tend to go straight to code generation
 	// and never invoke the skill tool, even when skills are loaded.
@@ -773,6 +797,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	}
 	if len(mcpEntries) > 0 {
 		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpEntries))
+		var mcpNames []string
 		for _, entry := range mcpEntries {
 			mcpCfg := copilot.MCPServerConfig{
 				"type":    "local",
@@ -783,6 +808,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 				mcpCfg["tools"] = entry.MCPTools
 			}
 			sc.MCPServers[entry.Name] = mcpCfg
+			mcpNames = append(mcpNames, entry.Name)
 			slog.Info("MCP server configured",
 				"name", entry.Name,
 				"type", "local",
@@ -791,6 +817,11 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 				"tools", entry.MCPTools,
 			)
 		}
+		// MCP servers are available — the agent will discover them via tool
+		// descriptions. No explicit hint is added to avoid biasing the eval;
+		// we want to measure whether MCP tool descriptions alone are sufficient
+		// to trigger tool usage.
+		slog.Info("MCP servers configured", "servers", mcpNames)
 	} else {
 		slog.Debug("No MCP servers configured")
 	}
