@@ -661,7 +661,7 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 }
 
 func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
-	// Build skill directories from generator tool entries.
+	// Collect skill directories from Generator.Tools (includes resolved plugins)
 	var skillDirs []string
 	if cfg.Generator != nil {
 		for _, entry := range cfg.Generator.Tools {
@@ -670,9 +670,23 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 			}
 		}
 	}
-
 	// Use the config-driven system prompt (#115, #116). The default is zero
 	// system prompt — all behavioral instructions belong in the config YAML.
+	systemMsg := ""
+	if cfg.Generator != nil && cfg.Generator.SystemPrompt != "" {
+		systemMsg = cfg.Generator.SystemPrompt
+	}
+
+	// Instruct the agent to use available skills before generating code.
+	// Without this hint, models tend to go straight to code generation
+	// and never invoke the skill tool, even when skills are loaded.
+	if len(skillDirs) > 0 {
+		systemMsg += "\n\nSKILLS:\n" +
+			"You have Azure SDK skills available. BEFORE writing any code, invoke the relevant skill " +
+			"using the skill tool to get SDK-specific patterns, API examples, and acceptance criteria. " +
+			"Also read the skill's reference files (acceptance-criteria.md, examples.md) for detailed guidance. " +
+			"Then use that information to generate correct, modern Azure SDK code."
+	}
 
 	sc := &copilot.SessionConfig{
 		Model:               cfg.Generator.Model,
@@ -781,13 +795,14 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		slog.Debug("No MCP servers configured")
 	}
 
-	// Wire generator system prompt to Copilot SDK session.
-	if cfg.Generator.SystemPrompt != "" {
+	// Set the system message: start with config-driven system prompt,
+	// then append any accumulated hints (skills, MCP, etc.)
+	if systemMsg != "" {
 		sc.SystemMessage = &copilot.SystemMessageConfig{
 			Mode:    "append",
-			Content: cfg.Generator.SystemPrompt,
+			Content: systemMsg,
 		}
-		slog.Info("Generator system prompt configured", "length", len(cfg.Generator.SystemPrompt))
+		slog.Info("Generator system prompt configured", "length", len(systemMsg))
 	}
 
 	return sc
