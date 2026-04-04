@@ -50,7 +50,29 @@ session, err := client.CreateSession(ctx, &copilot.SessionConfig{
 Model: "gpt-4.1",
 SystemMessage: &copilot.SystemMessageConfig{
 Mode:    "append",
-Content: "You are an expert at analyzing AI agent tool usage and its impact on code generation quality. Focus on how tool availability affects output. Be concise and actionable.",
+Content: `You are an Azure SDK code evaluation analyst. You analyze results from automated code generation evaluations where different AI agent configurations (baseline, with-skills, with-MCP-tools) are compared.
+
+Your output must be structured markdown with these exact sections:
+
+## Key Findings
+A 3-5 bullet summary of the most important takeaways.
+
+## Config Comparison
+For each prompt evaluated, a table comparing configs:
+| Criteria | Config A | Config B | Config C | Notes |
+Use ✅/❌ for pass/fail. Add a Notes column explaining differences.
+
+## What Tools/Skills Helped
+- Which specific tools or skills were invoked and what impact they had
+- What the agent got RIGHT because of tools/skills that baseline got wrong
+- What the agent got WRONG despite having tools/skills
+
+## What Needs Investigation
+- Criteria that failed across ALL configs (systemic gaps)
+- Unexpected regressions (config with more tools scored lower)
+- Non-deterministic behavior (same config, different results)
+
+Be specific — reference exact criteria names, tool names, and scores. Do NOT reference historical runs or prompts not in the current data.`,
 },
 ConfigDir:           configDir,
 OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
@@ -98,17 +120,12 @@ return result, nil
 func formatTrendPrompt(tr *TrendReport) string {
 var b strings.Builder
 
-b.WriteString("Analyze the following evaluation data with a focus on TOOL USAGE and RESOURCE IMPACT.\n\n")
-b.WriteString("This tool measures how adding different tools/resources to an AI agent helps it produce better code. ")
-b.WriteString("Each prompt tests an Azure SDK scenario. Configs represent different tool setups — ")
-b.WriteString("'baseline' has NO tools (agent relies on its own knowledge), while 'azure-mcp' gives the agent access to MCP tools.\n\n")
-b.WriteString("Provide:\n")
-b.WriteString("1. **TOOL USAGE COMPARISON** — For each config, what tools did the AI agent use? Compare tool call counts and types between baseline and azure-mcp.\n")
-b.WriteString("2. **RESOURCE IMPACT** — Which prompts showed the biggest improvement when tools were available? Which performed similarly with or without tools?\n")
-b.WriteString("3. **KNOWLEDGE vs TOOLS** — For baseline (no tools), what did the agent rely on? For tool-enhanced runs, which tools were most impactful?\n")
-b.WriteString("4. **RECOMMENDATIONS** — Based on the data, which prompts would benefit most from additional tools/resources? Are there tools that should be added?\n")
-b.WriteString("5. **QUALITY DELTA** — Compare pass rates, file counts, scores, and durations between configs to quantify tool impact.\n\n")
-b.WriteString("Be concise and specific. Reference prompt IDs, config names, and tool names. Use bullet points.\n\n")
+b.WriteString("Analyze the following evaluation results from a SINGLE RUN comparing different AI agent configurations.\n\n")
+b.WriteString("Each config represents a different tool setup for the same AI model:\n")
+b.WriteString("- 'baseline' = no tools, no skills (agent relies on built-in knowledge)\n")
+b.WriteString("- 'baseline-skills' = SDK-specific skills loaded (patterns, examples, acceptance criteria)\n")
+b.WriteString("- 'azure-mcp' = Azure MCP server tools (get_best_practices, documentation lookup)\n\n")
+b.WriteString("Analyze ONLY the data below. Do NOT reference prompts or runs not listed here.\n\n")
 b.WriteString("---\n\n")
 
 // Overall stats
@@ -174,6 +191,14 @@ avgDur = totalDur / float64(len(runs))
 trend := pt.Trend[cfg]
 fmt.Fprintf(&b, "- **%s**: %d/%d passed (%.0f%%), avg duration: %s, trend: %s\n",
 cfg, p, p+f, pct(p, p+f), formatDuration(avgDur), trend)
+
+// Include score details from most recent run
+if len(runs) > 0 {
+latest := runs[len(runs)-1]
+if latest.HasReview && latest.MaxScore > 0 {
+fmt.Fprintf(&b, "  Score: %d/%d (%.0f%%)\n", latest.Score, latest.MaxScore, pct(latest.Score, latest.MaxScore))
+}
+}
 
 if len(toolSet) > 0 {
 b.WriteString("  Tools used: ")

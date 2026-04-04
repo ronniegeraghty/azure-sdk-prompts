@@ -578,6 +578,46 @@ func htmlFuncMap() template.FuncMap {
 		},
 		"hasPrefix": strings.HasPrefix,
 		"contains":  strings.Contains,
+		"mdToHTML": func(md string) template.HTML {
+			var b strings.Builder
+			inList := false
+			for _, line := range strings.Split(md, "\n") {
+				trimmed := strings.TrimSpace(line)
+				if trimmed == "" {
+					if inList {
+						b.WriteString("</ul>")
+						inList = false
+					}
+					continue
+				}
+				// Headers
+				if strings.HasPrefix(trimmed, "## ") {
+					if inList { b.WriteString("</ul>"); inList = false }
+					b.WriteString("<h3>" + template.HTMLEscapeString(strings.TrimPrefix(trimmed, "## ")) + "</h3>")
+					continue
+				}
+				// Bullets
+				if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
+					if !inList { b.WriteString("<ul>"); inList = true }
+					content := trimmed[2:]
+					// Bold
+					for strings.Contains(content, "**") {
+						i := strings.Index(content, "**")
+						j := strings.Index(content[i+2:], "**")
+						if j < 0 { break }
+						content = content[:i] + "<strong>" + content[i+2:i+2+j] + "</strong>" + content[i+2+j+2:]
+					}
+					b.WriteString("<li>" + content + "</li>")
+					continue
+				}
+				// Regular paragraph with bold
+				if inList { b.WriteString("</ul>"); inList = false }
+				content := template.HTMLEscapeString(trimmed)
+				b.WriteString("<p>" + content + "</p>")
+			}
+			if inList { b.WriteString("</ul>") }
+			return template.HTML(b.String())
+		},
 		"fileTypeSummary": func(files []string) string {
 			counts := make(map[string]int)
 			for _, f := range files {
@@ -1247,7 +1287,7 @@ const summaryTemplate = `<!DOCTYPE html>
 {{if .Summary.Analysis}}
 <div class="analysis">
   <h2>🤖 AI Analysis</h2>
-  <div class="analysis-content">{{.Summary.Analysis}}</div>
+  <div class="analysis-content">{{mdToHTML .Summary.Analysis}}</div>
 </div>
 {{end}}
 
