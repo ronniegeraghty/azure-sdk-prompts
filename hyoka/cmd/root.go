@@ -52,6 +52,7 @@ root.AddCommand(newPromptCmd())
 root.AddCommand(serveCmd())
 root.AddCommand(pluginsCmd())
 root.AddCommand(cleanCmd())
+	root.AddCommand(compareCmd())
 
 return root
 }
