@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -751,6 +752,57 @@ func TestCriteriaDirEmpty(t *testing.T) {
 	// Should fall back to prompt-only criteria
 	if !strings.Contains(reviewer.capturedCriteria, "Prompt specific criterion") {
 		t.Errorf("expected prompt criteria as fallback, got: %s", reviewer.capturedCriteria)
+	}
+}
+
+// TestCancelledContextNoGoroutineLeak verifies that goroutines spawned by
+// Engine.Run terminate promptly when the parent context is already cancelled.
+// This catches semaphore-acquisition leaks (#129).
+func TestCancelledContextNoGoroutineLeak(t *testing.T) {
+	outputDir := t.TempDir()
+	// Use 1 worker but many tasks — excess goroutines would block on
+	// semaphore acquisition if context cancellation is not respected.
+	engine := NewEngine(&slowEvaluator{}, quietOpts(EngineOptions{
+		Workers:    1,
+		OutputDir:  outputDir,
+		SkipReview: true,
+	}))
+
+	prompts := []*prompt.Prompt{
+		{ID: "leak-1", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+		{ID: "leak-2", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+		{ID: "leak-3", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+		{ID: "leak-4", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+	}
+	configs := []config.ToolConfig{
+		{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	}
+
+	before := runtime.NumGoroutine()
+
+	// Context is already cancelled — all goroutines should bail immediately.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := engine.Run(ctx, prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Allow goroutines a brief window to wind down.
+	deadline := time.After(2 * time.Second)
+	for {
+		after := runtime.NumGoroutine()
+		// Tolerate a small delta for unrelated runtime goroutines.
+		if after <= before+2 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("goroutine leak: before=%d, after=%d (delta %d)", before, after, after-before)
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
 	}
 }
 

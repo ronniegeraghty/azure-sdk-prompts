@@ -360,10 +360,20 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			defer wg.Done()
 
 			// Acquire session semaphore first to limit total Copilot sessions.
-			sessionSem <- struct{}{}
+			// Use select so context cancellation unblocks waiting goroutines
+			// instead of leaking them (#129).
+			select {
+			case sessionSem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-sessionSem }()
 
-			sem <- struct{}{}
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-sem }()
 
 			taskName := t.Prompt.ID + "/" + t.Config.Name
@@ -567,19 +577,21 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		return evalReport
 	}
 
-	// Create an isolated temporary workspace for the generator (#26).
+	// Create an isolated temporary workspace for the generator (#26, #126).
 	// The agent writes files here — not directly to the report tree.
 	// After generation, files are copied to the persistent report directory.
-	genDir, err := os.MkdirTemp("", "hyoka-gen-*")
+	// The workspace is empty to prevent leakage from the user's dev environment.
+	evalWs, err := NewEvalWorkspace()
 	if err != nil {
 		evalReport.Error = fmt.Sprintf("generator workspace setup failed: %v", err)
 		evalReport.ErrorDetails = err.Error()
 		evalReport.ErrorCategory = "generation_failure"
-		evalReport.FailureReason = fmt.Sprintf("Could not create isolated generator workspace: %v", err)
+		evalReport.FailureReason = fmt.Sprintf("Could not create isolated eval workspace: %v", err)
 		evalReport.Duration = time.Since(start).Seconds()
 		return evalReport
 	}
-	defer os.RemoveAll(genDir)
+	defer evalWs.Cleanup()
+	genDir := evalWs.Dir
 
 	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir)
 
