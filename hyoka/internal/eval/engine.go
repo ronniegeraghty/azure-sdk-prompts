@@ -872,6 +872,46 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.Environment = env
 
+	// Build SessionSetup from config and starter files (#219).
+	setup := &report.SessionSetupEvent{
+		Tools:        reportAvailableTools,
+		StarterFiles: evalReport.StarterFiles,
+	}
+	// Record configured MCP servers with details.
+	for name, srv := range task.Config.Generator.MCPServers {
+		details := srv.Command
+		if len(srv.Args) > 0 {
+			details += " " + strings.Join(srv.Args, " ")
+		}
+		setup.MCPServers = append(setup.MCPServers, report.ToolLoadResult{
+			Name:    name,
+			Status:  "configured",
+			Details: details,
+		})
+	}
+	// Record configured skills with details.
+	for _, s := range task.Config.Generator.Skills {
+		name := s.Name
+		if name == "" {
+			name = s.Path
+		}
+		if name == "" {
+			name = s.Repo
+		}
+		setup.Skills = append(setup.Skills, report.ToolLoadResult{
+			Name:    name,
+			Status:  "configured",
+			Details: s.Type,
+		})
+	}
+	// Determine system prompt status.
+	if task.Config.Generator.SystemPrompt != "" {
+		setup.SystemPrompt = fmt.Sprintf("custom (%d chars)", len(task.Config.Generator.SystemPrompt))
+	} else {
+		setup.SystemPrompt = "none (default)"
+	}
+	evalReport.SessionSetup = setup
+
 	// Generator guardrail checks (#35, #125)
 	if !evalFailed {
 		// Check turn count (assistant.message events = conversation turns)
@@ -1019,6 +1059,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 						reportResults[i] = rr
 					}
 					evalReport.GraderResults = reportResults
+					evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
 
 					if !agg.Pass && !evalFailed {
 						evalReport.Success = false

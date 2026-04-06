@@ -534,6 +534,9 @@ func TestTemplateFS(t *testing.T) {
 	for _, want := range []string{"report.gohtml", "summary.gohtml"} {
 		if !names[want] {
 			t.Errorf("embedded templates missing %q", want)
+		}
+	}
+}
 
 func TestWriteHTMLReportGraderDetails(t *testing.T) {
 	dir := t.TempDir()

@@ -2,6 +2,9 @@
 package report
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/ronniegeraghty/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/internal/review"
 )
@@ -84,6 +87,35 @@ type BehaviorGraderDetail struct {
 	MatchedActions   int            `json:"matched_actions,omitempty"`
 	ConstraintsMet   bool           `json:"constraints_met,omitempty"`
 	ToolCounts       map[string]int `json:"tool_counts,omitempty"`
+	// Weighted aggregation fields (#143)
+	Score  float64 `json:"score,omitempty"`  // 0.0–1.0 normalized score
+	Weight float64 `json:"weight,omitempty"` // Weight for aggregation (default 1.0)
+	Gate   bool    `json:"gate,omitempty"`   // If true, failure overrides weighted scoring
+	Pass   bool    `json:"pass,omitempty"`   // Binary pass/fail
+}
+
+// ScoreContribution describes a single grader's contribution to the final score.
+type ScoreContribution struct {
+	Name            string  `json:"name"`
+	Kind            string  `json:"kind"`
+	Score           float64 `json:"score"`
+	Weight          float64 `json:"weight"`
+	WeightedScore   float64 `json:"weighted_score"` // score × weight
+	Gate            bool    `json:"gate,omitempty"`
+	Pass            bool    `json:"pass"`
+	ContributionPct float64 `json:"contribution_pct"` // (weighted_score / totalWeightedSum) × 100
+}
+
+// ScoreBreakdown shows how the final aggregated score is computed (#143).
+type ScoreBreakdown struct {
+	Formula         string              `json:"formula"`
+	Contributions   []ScoreContribution `json:"contributions"`
+	TotalWeight     float64             `json:"total_weight"`
+	WeightedSum     float64             `json:"weighted_sum"`
+	FinalScore      float64             `json:"final_score"`
+	FinalScorePct   float64             `json:"final_score_pct"` // FinalScore × 100
+	GateFailed      bool                `json:"gate_failed,omitempty"`
+	GateFailedNames []string            `json:"gate_failed_names,omitempty"`
 }
 
 // SessionEventRecord is a serializable representation of a Copilot session event.
@@ -157,6 +189,7 @@ type ResourceStats struct {
 // ActionTimelineReport is the serializable form of an action timeline for JSON reports (#139).
 type ActionTimelineReport struct {
 	Events  []ActionEventReport `json:"events"`
+	Entries []ActionTimelineEntry `json:"entries,omitempty"`
 	Summary ActionSummaryReport `json:"summary"`
 }
 
@@ -219,6 +252,8 @@ type EvalReport struct {
 	ToolCalls      []string              `json:"tool_calls"`
 	Environment    *EnvironmentInfo      `json:"environment,omitempty"`
 	ResourceUsage  *ResourceStats        `json:"resource_usage,omitempty"` // Per-eval resource stats (#45)
+	ScoreBreakdown *ScoreBreakdown       `json:"score_breakdown,omitempty"` // Weighted aggregation breakdown (#143)
+	SessionSetup   *SessionSetupEvent   `json:"session_setup,omitempty"`   // Tool/skill/MCP loading status (#219)
 	Success        bool                  `json:"success"`
 	Error          string                `json:"error,omitempty"`
 	ErrorDetails   string                `json:"error_details,omitempty"`
@@ -234,18 +269,113 @@ type EvalReport struct {
 	GuardrailAbortReason       string `json:"guardrail_abort_reason,omitempty"`
 }
 
+// ToolLoadResult records the outcome of loading a single tool, skill, or MCP server.
+type ToolLoadResult struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"`            // "loaded", "failed", "configured"
+	Error   string `json:"error,omitempty"`
+	Details string `json:"details,omitempty"` // e.g., command string for MCP servers
+}
+
+// SessionSetupEvent captures the tool/skill/MCP loading results at session start.
+type SessionSetupEvent struct {
+	MCPServers   []ToolLoadResult `json:"mcp_servers,omitempty"`
+	Skills       []ToolLoadResult `json:"skills,omitempty"`
+	Tools        []string         `json:"tools_available,omitempty"`
+	SystemPrompt string           `json:"system_prompt_status"` // "custom (N chars)" or "none (default)"
+	StarterFiles []string         `json:"starter_files,omitempty"`
+}
+
+// ActionTimelineEntry represents a single action in the session timeline.
+type ActionTimelineEntry struct {
+	Index        int                `json:"index"`
+	TurnNumber   int                `json:"turn_number,omitempty"`
+	Type         string             `json:"type"`
+	ToolName     string             `json:"tool_name,omitempty"`
+	Duration     float64            `json:"duration_ms,omitempty"`
+	Success      *bool              `json:"success,omitempty"`
+	Error        string             `json:"error,omitempty"`
+	MCPServer    string             `json:"mcp_server,omitempty"`
+	FilePath     string             `json:"file_path,omitempty"`
+	Intent       string             `json:"intent,omitempty"`
+	SessionSetup *SessionSetupEvent `json:"session_setup,omitempty"`
+}
+
+// ActionTimelineSummary holds aggregate statistics for the action timeline.
+type ActionTimelineSummary struct {
+	TotalActions     int     `json:"total_actions"`
+	TotalToolCalls   int     `json:"total_tool_calls"`
+	TotalTurns       int     `json:"total_turns"`
+	ToolCallDuration float64 `json:"tool_call_duration_ms"`
+	ToolSuccesses    int     `json:"tool_successes"`
+	ToolFailures     int     `json:"tool_failures"`
+}
 
 // BuildActionTimeline derives a structured action timeline from SessionEvents.
 // This is a fallback for reports that don't have a pre-built timeline from the
 // eval engine (e.g., when re-rendering from JSON).
 func BuildActionTimeline(events []SessionEventRecord) *ActionTimelineReport {
-	if len(events) == 0 {
+	return BuildActionTimelineWithSetup(events, nil)
+}
+
+// BuildActionTimelineWithSetup derives a structured action timeline from
+// SessionEvents and prepends a session_setup entry when setup data is available.
+func BuildActionTimelineWithSetup(events []SessionEventRecord, setup *SessionSetupEvent) *ActionTimelineReport {
+	if len(events) == 0 && setup == nil {
 		return nil
 	}
 	var reportEvents []ActionEventReport
+	var entries []ActionTimelineEntry
 	var summary ActionSummaryReport
 	seq := 0
+	index := 0
 	turnNumber := 0
+
+	// Synthesize session_setup entry from config + SDK events.
+	synthesized := setup
+	if synthesized == nil {
+		synthesized = &SessionSetupEvent{}
+	}
+	// Enrich from SDK events (skills_loaded, mcp_servers_loaded).
+	for _, ev := range events {
+		switch ev.Type {
+		case "session.skills_loaded":
+			if ev.Content != "" {
+				for _, name := range splitCSV(ev.Content) {
+					if !hasToolLoadResult(synthesized.Skills, name) {
+						synthesized.Skills = append(synthesized.Skills, ToolLoadResult{
+							Name:   name,
+							Status: "loaded",
+						})
+					}
+				}
+			}
+		case "session.mcp_servers_loaded":
+			if ev.Content != "" {
+				for _, name := range splitCSV(ev.Content) {
+					if !hasToolLoadResult(synthesized.MCPServers, name) {
+						synthesized.MCPServers = append(synthesized.MCPServers, ToolLoadResult{
+							Name:   name,
+							Status: "loaded",
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// Only emit the entry when there is meaningful data.
+	if len(synthesized.MCPServers) > 0 || len(synthesized.Skills) > 0 ||
+		len(synthesized.Tools) > 0 || synthesized.SystemPrompt != "" ||
+		len(synthesized.StarterFiles) > 0 {
+		index++
+		entries = append(entries, ActionTimelineEntry{
+			Index:        index,
+			Type:         "session_setup",
+			SessionSetup: synthesized,
+		})
+		summary.TotalActions++
+	}
 
 	for _, ev := range events {
 		seq++
@@ -284,8 +414,32 @@ func BuildActionTimeline(events []SessionEventRecord) *ActionTimelineReport {
 	summary.TotalEvents = len(events)
 	return &ActionTimelineReport{
 		Events:  reportEvents,
+		Entries: entries,
 		Summary: summary,
 	}
+}
+
+// splitCSV splits a comma-separated string and trims whitespace from each element.
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// hasToolLoadResult checks whether a name already exists in a slice of ToolLoadResult.
+func hasToolLoadResult(results []ToolLoadResult, name string) bool {
+	for _, r := range results {
+		if r.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // RunResourceStats holds aggregate resource utilization across all evals (#45).
@@ -313,6 +467,81 @@ type RunSummary struct {
 	Analysis     string        `json:"analysis,omitempty"`
 	ResourceUsage  *RunResourceStats `json:"resource_usage,omitempty"` // Aggregate resource stats (#45)
 	PairwiseResults []*pairwise.PairwiseReport `json:"pairwise_results,omitempty"` // Per-prompt pairwise impact (#123)
+}
+
+// BuildScoreBreakdown computes a ScoreBreakdown from the grader results on a report.
+// It mirrors the AggregateResults logic from the graders package to show users
+// exactly how the final score was derived.
+func BuildScoreBreakdown(results []GraderResult) *ScoreBreakdown {
+	if len(results) == 0 {
+		return nil
+	}
+
+	// Skip breakdown for legacy review-only results that lack Score/Weight data.
+	hasWeightedData := false
+	for _, r := range results {
+		if r.Score > 0 || r.Weight > 0 || r.Gate {
+			hasWeightedData = true
+			break
+		}
+	}
+	if !hasWeightedData {
+		return nil
+	}
+
+	sb := &ScoreBreakdown{
+		Formula: "Final Score = Σ(grader_score × weight) / Σ(weights)",
+	}
+
+	// Check gate failures first.
+	for _, r := range results {
+		if r.Gate && (r.Pass == nil || !*r.Pass) {
+			sb.GateFailed = true
+			sb.GateFailedNames = append(sb.GateFailedNames, r.GraderName)
+		}
+	}
+
+	var totalWeight float64
+	var weightedSum float64
+	for _, r := range results {
+		w := r.Weight
+		if w == 0 {
+			w = 1.0
+		}
+		ws := r.Score * w
+		totalWeight += w
+		weightedSum += ws
+
+		sb.Contributions = append(sb.Contributions, ScoreContribution{
+			Name:          r.GraderName,
+			Kind:          r.GraderType,
+			Score:         r.Score,
+			Weight:        w,
+			WeightedScore: ws,
+			Gate:          r.Gate,
+			Pass:          r.Pass != nil && *r.Pass,
+		})
+	}
+
+	sb.TotalWeight = totalWeight
+	sb.WeightedSum = weightedSum
+	if totalWeight > 0 {
+		sb.FinalScore = weightedSum / totalWeight
+	}
+	if sb.GateFailed {
+		sb.FinalScore = 0
+		sb.Formula = fmt.Sprintf("Final Score = 0 (gate grader failed: %s)", strings.Join(sb.GateFailedNames, ", "))
+	}
+	sb.FinalScorePct = sb.FinalScore * 100
+
+	// Compute contribution percentages.
+	for i := range sb.Contributions {
+		if weightedSum > 0 && !sb.GateFailed {
+			sb.Contributions[i].ContributionPct = (sb.Contributions[i].WeightedScore / weightedSum) * 100
+		}
+	}
+
+	return sb
 }
 
 // GraderResultsFromReview converts legacy ReviewResult data into []GraderResult.
