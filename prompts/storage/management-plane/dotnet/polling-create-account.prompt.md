@@ -23,14 +23,12 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# program that creates
-an Azure Storage Account using the management plane SDK and properly handles the
-long-running operation (LRO):
+I'm creating a storage account with CreateOrUpdateAsync and it returns
+an ArmOperation. How do I properly wait for it to finish? I need to:
 1. Start the create operation using CreateOrUpdateAsync
-2. Poll for completion using WaitForCompletionAsync
-3. Show how to check the operation status while it's in progress
-4. Handle timeout scenarios where the operation takes too long
-5. Demonstrate the difference between WaitForCompletion and manual polling
+2. Wait for completion using WaitForCompletionAsync
+3. Handle timeout scenarios where the operation takes too long
+4. Understand the difference between WaitUntil.Completed and WaitUntil.Started
 
 Use Azure.ResourceManager.Storage with DefaultAzureCredential. Show required
 NuGet packages and explain the ArmOperation<T> pattern.

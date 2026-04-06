@@ -23,15 +23,14 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# program that manages
-configuration settings in Azure App Configuration:
+How do I read and write configuration values in Azure App Configuration
+using the .NET SDK? I need to:
 1. Create a ConfigurationClient using a connection string
 2. Set a configuration setting with key "app:Settings:FontSize" and value "24"
 3. Set a configuration setting with a label "Production"
 4. Get the setting by key and print its value
-5. List all settings with the prefix "app:Settings:" using GetConfigurationSettings
-6. Create a feature flag setting for "BetaFeature" that is enabled
-7. Delete the setting
+5. List all settings with the prefix "app:Settings:"
+6. Delete a setting
 
 Show required NuGet packages and proper error handling with RequestFailedException.
 
@@ -43,7 +42,6 @@ The generated code should include:
 - `SetConfigurationSetting()` with key, value, and optional label
 - `GetConfigurationSetting()` by key and label
 - `GetConfigurationSettings()` with `SettingSelector` for filtering
-- Feature flag configuration settings with `FeatureFlagConfigurationSetting`
 - `DeleteConfigurationSetting()` and `RequestFailedException` handling
 
 ## Context

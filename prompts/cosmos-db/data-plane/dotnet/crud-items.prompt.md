@@ -23,15 +23,12 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# program that performs
-CRUD operations on items in an Azure Cosmos DB NoSQL container:
-1. Create a CosmosClient using a connection string
-2. Create a database named "TestDB" and a container named "Items" with partition key "/category"
-3. Insert a JSON item with properties: id, category, name, and quantity
-4. Read the item back by id and partition key
-5. Query items where category equals "electronics" using SQL-like syntax
-6. Replace the item with updated quantity
-7. Delete the item
+How do I do basic CRUD operations against a Cosmos DB NoSQL container in C#?
+I have an existing database and container and need to:
+1. Create a CosmosClient and get a reference to my container
+2. Insert a JSON item with properties: id, category, name, and quantity
+3. Read the item back by id and partition key
+4. Query items where category equals "electronics" using SQL-like syntax
 
 Show required NuGet packages and proper error handling with CosmosException.
 
@@ -40,9 +37,7 @@ Show required NuGet packages and proper error handling with CosmosException.
 The generated code should include:
 - `Microsoft.Azure.Cosmos` NuGet package
 - `CosmosClient` creation and configuration
-- `Database.CreateDatabaseIfNotExistsAsync()`
-- `Container.CreateContainerIfNotExistsAsync()` with partition key
-- `Container.CreateItemAsync<T>()`, `ReadItemAsync<T>()`, `ReplaceItemAsync<T>()`, `DeleteItemAsync<T>()`
+- `Container.CreateItemAsync<T>()`, `ReadItemAsync<T>()`
 - `Container.GetItemQueryIterator<T>()` with `QueryDefinition`
 - `CosmosException` handling with status codes
 

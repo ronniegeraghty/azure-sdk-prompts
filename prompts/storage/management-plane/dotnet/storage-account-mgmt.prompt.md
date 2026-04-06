@@ -22,17 +22,12 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# program that manages
-Azure Storage Accounts using the management plane SDK:
-1. Authenticate using DefaultAzureCredential
-2. Create a new Storage Account with Standard_LRS SKU in "eastus"
-3. List all Storage Accounts in a resource group
-4. Get the properties of the created Storage Account
-5. Update the account to enable blob versioning
-6. Delete the Storage Account
+I need to create a Standard_LRS storage account in eastus using the
+Azure.ResourceManager.Storage SDK, then enable blob versioning on it
+afterward. How do I do this with the new Track 2 management SDK?
 
-Show required NuGet packages and proper error handling.
-Use the Azure.ResourceManager.Storage SDK.
+Show me authentication with DefaultAzureCredential, the create call,
+and how to update properties. Include required NuGet packages.
 
 ## Evaluation Criteria
 

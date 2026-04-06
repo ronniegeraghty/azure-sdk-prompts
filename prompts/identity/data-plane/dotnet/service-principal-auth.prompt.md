@@ -22,15 +22,15 @@ author: ronniegeraghty
 
 ## Prompt
 
-Show me how to authenticate
-to Azure using a Service Principal with client secret in C#. I need:
+My CI pipeline needs to authenticate to Azure using a service principal.
+How do I use ClientSecretCredential in C#? I need:
 1. Required NuGet packages
 2. How to create a ClientSecretCredential with tenant ID, client ID, and client secret
-3. How to use it with an Azure SDK client (e.g., BlobServiceClient)
+3. How to use it with a BlobServiceClient
 4. Best practices for storing the secret (environment variables vs configuration)
 5. Error handling when credentials are invalid
 
-Provide a complete example with proper error handling.
+Show a complete example with proper error handling.
 
 ## Evaluation Criteria
 

@@ -22,12 +22,13 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# console application that performs
-all four CRUD operations on Azure Key Vault secrets:
-1. Create a new secret called "my-secret" with value "my-secret-value"
-2. Read the secret back and print its value
-3. Update the secret to a new value "updated-value"
-4. Delete the secret and purge it (soft-delete enabled vault)
+I need to rotate a secret in Azure Key Vault — set a new value for an
+existing secret and then purge the old deleted version. How do I do the full
+lifecycle with SecretClient?
+1. Create a secret called "my-secret" with an initial value
+2. Read it back and print its value
+3. Update it to a new value
+4. Delete the old secret and purge it (soft-delete enabled vault)
 
 Use DefaultAzureCredential for authentication. Include proper error handling
 and show required NuGet packages.

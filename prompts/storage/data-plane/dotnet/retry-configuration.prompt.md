@@ -23,16 +23,14 @@ author: ronniegeraghty
 
 ## Prompt
 
-How do I configure custom retry policies for Azure Blob Storage operations in .NET?
-My application needs to:
+My blob uploads sometimes fail with 503 Service Unavailable under load.
+How do I configure retry policies with exponential backoff for
+Azure Blob Storage in .NET? I need to:
 1. Set a custom retry policy with 5 max retries and exponential backoff
 2. Configure per-operation timeouts so a single upload doesn't hang forever
-3. Handle network errors (transient) differently from auth errors (non-transient)
-4. Use a custom retry policy for specific high-value operations
-5. Implement circuit-breaker patterns for sustained failures
+3. Understand which HTTP errors the SDK retries automatically vs. ones I need to handle myself
 
-Show me how to configure BlobClientOptions with custom RetryOptions,
-and explain which HTTP status codes the SDK considers retryable by default.
+Show me how to configure BlobClientOptions with custom RetryOptions.
 Use the Azure.Storage.Blobs SDK.
 
 ## Evaluation Criteria
@@ -43,8 +41,6 @@ Use the Azure.Storage.Blobs SDK.
 - Default retryable status codes (408, 429, 500, 502, 503, 504)
 - Non-retryable errors (400, 401, 403, 404, 409)
 - Per-operation `CancellationToken` for timeout control
-- Geo-redundant retry with `GeoRedundantSecondaryUri`
-- Interaction with Polly or other resilience libraries
 
 ## Context
 

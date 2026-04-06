@@ -23,17 +23,15 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# program that demonstrates
-messaging with Azure Service Bus:
+How do I send and receive messages from an Azure Service Bus queue in C#?
+I need to:
 1. Create a ServiceBusClient using a connection string
-2. Create a ServiceBusSender for a queue and send a single message
-3. Send a batch of 5 messages using ServiceBusMessageBatch
-4. Create a ServiceBusReceiver and receive messages using ReceiveMessagesAsync
-5. Complete a message after processing with CompleteMessageAsync
-6. Create a ServiceBusProcessor for continuous processing with handlers
-7. Demonstrate sending to a topic and receiving from a subscription
+2. Send a single message and a batch of messages to a queue
+3. Receive and complete messages using ServiceBusReceiver
+4. Set up a ServiceBusProcessor for continuous processing with handlers
+5. Handle proper disposal with await using
 
-Show required NuGet packages and proper disposal with await using.
+Show required NuGet packages.
 
 ## Evaluation Criteria
 
@@ -43,9 +41,8 @@ The generated code should include:
 - `ServiceBusSender` and `ServiceBusMessage` for sending
 - `ServiceBusMessageBatch` and `TryAddMessage()`
 - `ServiceBusReceiver` and `ReceiveMessagesAsync()`
-- `CompleteMessageAsync()`, `AbandonMessageAsync()`, `DeadLetterMessageAsync()`
+- `CompleteMessageAsync()`, `AbandonMessageAsync()`
 - `ServiceBusProcessor` with `ProcessMessageAsync` and `ProcessErrorAsync`
-- Topic/subscription with `CreateSender(topicName)` and `CreateReceiver(topicName, subscriptionName)`
 
 ## Context
 

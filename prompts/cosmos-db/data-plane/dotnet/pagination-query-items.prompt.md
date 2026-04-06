@@ -23,13 +23,12 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# program that queries
-items in a Cosmos DB container with proper pagination:
-1. Execute a SQL query "SELECT * FROM c WHERE c.category = 'electronics'" against a container
-2. Process results page-by-page using FeedIterator, limiting each page to 50 items
-3. Print the continuation token after each page
-4. Implement a "resume from token" pattern where the query can restart from a saved token
-5. Track total RU consumption across all pages
+I'm querying a Cosmos DB container with thousands of items and my query
+returns too much data at once. How do I paginate results using FeedIterator?
+1. Execute a SQL query against a container with MaxItemCount set to 50
+2. Process results page-by-page using FeedIterator
+3. Save the continuation token so I can resume the query later
+4. Track total RU consumption across all pages
 
 Use the Microsoft.Azure.Cosmos SDK v3. Show how to configure MaxItemCount
 and explain the difference between FeedIterator and LINQ-based queries.

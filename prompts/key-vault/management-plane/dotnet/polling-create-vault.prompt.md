@@ -23,17 +23,15 @@ author: ronniegeraghty
 
 ## Prompt
 
-Write a C# program that creates
-an Azure Key Vault using the management plane SDK and handles the long-running
-operation:
+I need to create a Key Vault with RBAC authorization and purge protection
+using the management SDK, and wait for the LRO to complete. How do I do
+this with Azure.ResourceManager.KeyVault?
 1. Authenticate using DefaultAzureCredential
 2. Create a Key Vault with RBAC authorization enabled in "eastus"
 3. Configure soft-delete and purge protection
 4. Wait for the vault creation to complete using the ArmOperation pattern
-5. Verify the vault is accessible by creating a SecretClient pointing to it
 
-Use Azure.ResourceManager.KeyVault. Show required NuGet packages and how
-to set access policies or RBAC roles during creation.
+Show required NuGet packages and how to set RBAC roles during creation.
 
 ## Evaluation Criteria
 

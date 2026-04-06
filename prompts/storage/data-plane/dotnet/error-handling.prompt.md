@@ -33,7 +33,6 @@ including how to extract the error code and HTTP status from RequestFailedExcept
 - `RequestFailedException` as the primary exception type
 - Extracting `Status` and `ErrorCode` from the exception
 - Handling specific HTTP status codes (404, 403, 409, 429)
-- Retry policy configuration via `BlobClientOptions`
 - Conditional request failures (ETags, leases)
 - Logging and diagnostics for troubleshooting
 

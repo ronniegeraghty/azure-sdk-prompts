@@ -22,16 +22,15 @@ author: ronniegeraghty
 
 ## Prompt
 
-Show me how to authenticate
-an Azure SDK client using DefaultAzureCredential in C#. Explain:
-1. What NuGet packages are needed
-2. How to create and use a DefaultAzureCredential instance
-3. The credential chain order (which credentials are tried and in what sequence)
-4. How it behaves differently in local development vs deployed Azure environments
-5. How to troubleshoot when authentication fails
+I keep getting AuthenticationFailedException when using DefaultAzureCredential
+and I don't understand where it's looking for credentials. Explain:
+1. What NuGet packages are needed for Azure.Identity
+2. The credential chain order (which credentials are tried and in what sequence)
+3. How it behaves differently in local development vs deployed Azure environments
+4. How to troubleshoot when authentication fails — what logs or options help?
 
-Provide a complete, runnable example that creates a BlobServiceClient using
-DefaultAzureCredential.
+Show a working example that creates a BlobServiceClient with DefaultAzureCredential,
+and explain what to check when it doesn't work.
 
 ## Evaluation Criteria
 
