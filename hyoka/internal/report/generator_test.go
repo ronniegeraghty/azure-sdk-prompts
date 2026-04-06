@@ -10,6 +10,8 @@ import (
 	"github.com/ronniegeraghty/hyoka/internal/review"
 )
 
+func boolPtr(b bool) *bool { return &b }
+
 func TestWriteReport(t *testing.T) {
 	dir := t.TempDir()
 
@@ -633,6 +635,88 @@ func TestSessionSetupOmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestBuildScoreBreakdownWeightedAverage(t *testing.T) {
+	results := []GraderResult{
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: boolPtr(true)},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: boolPtr(true)},
+		{GraderName: "build", GraderType: "program", Score: 0.6, Weight: 1.0, Pass: boolPtr(true)},
+	}
+
+	sb := BuildScoreBreakdown(results)
+	if sb == nil {
+		t.Fatal("expected non-nil ScoreBreakdown")
+	}
+
+	if sb.GateFailed {
+		t.Error("expected gate_failed to be false")
+	}
+	if sb.Formula != "Final Score = Σ(grader_score × weight) / Σ(weights)" {
+		t.Errorf("unexpected formula: %s", sb.Formula)
+	}
+	if len(sb.Contributions) != 3 {
+		t.Fatalf("expected 3 contributions, got %d", len(sb.Contributions))
+	}
+
+	// Expected: (1.0*1 + 0.8*2 + 0.6*1) / (1+2+1) = 3.2/4 = 0.8
+	const epsilon = 0.001
+	if diff := sb.FinalScore - 0.8; diff > epsilon || diff < -epsilon {
+		t.Errorf("expected final score ~0.8, got %.4f", sb.FinalScore)
+	}
+	if diff := sb.FinalScorePct - 80.0; diff > epsilon || diff < -epsilon {
+		t.Errorf("expected final score pct ~80.0, got %.1f", sb.FinalScorePct)
+	}
+	if diff := sb.TotalWeight - 4.0; diff > epsilon || diff < -epsilon {
+		t.Errorf("expected total weight 4.0, got %.2f", sb.TotalWeight)
+	}
+	if diff := sb.WeightedSum - 3.2; diff > epsilon || diff < -epsilon {
+		t.Errorf("expected weighted sum 3.2, got %.4f", sb.WeightedSum)
+	}
+
+	// Verify contribution percentages sum to 100%
+	var totalPct float64
+	for _, c := range sb.Contributions {
+		totalPct += c.ContributionPct
+	}
+	if diff := totalPct - 100.0; diff > epsilon || diff < -epsilon {
+		t.Errorf("contribution percentages should sum to 100, got %.1f", totalPct)
+	}
+}
+
+func TestBuildScoreBreakdownGateFailure(t *testing.T) {
+	results := []GraderResult{
+		{GraderName: "file_exists", GraderType: "file", Score: 0.0, Weight: 1.0, Gate: true, Pass: boolPtr(false)},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.9, Weight: 2.0, Pass: boolPtr(true)},
+	}
+
+	sb := BuildScoreBreakdown(results)
+	if sb == nil {
+		t.Fatal("expected non-nil ScoreBreakdown")
+	}
+
+	if !sb.GateFailed {
+		t.Error("expected gate_failed to be true")
+	}
+	if sb.FinalScore != 0 {
+		t.Errorf("expected final score 0 when gate fails, got %.4f", sb.FinalScore)
+	}
+	if sb.FinalScorePct != 0 {
+		t.Errorf("expected final score pct 0, got %.1f", sb.FinalScorePct)
+	}
+	if len(sb.GateFailedNames) != 1 || sb.GateFailedNames[0] != "file_exists" {
+		t.Errorf("expected gate failed name 'file_exists', got %v", sb.GateFailedNames)
+	}
+	if sb.Formula == "Final Score = Σ(grader_score × weight) / Σ(weights)" {
+		t.Error("formula should reflect gate failure override")
+	}
+
+	// All contribution percentages should be 0 when gate fails
+	for _, c := range sb.Contributions {
+		if c.ContributionPct != 0 {
+			t.Errorf("expected 0 contribution pct on gate failure, got %.1f for %s", c.ContributionPct, c.Name)
+		}
+	}
+}
+
 func TestSessionSetupNilEventsWithSetup(t *testing.T) {
 	setup := &SessionSetupEvent{
 		SystemPrompt: "custom (100 chars)",
@@ -695,4 +779,215 @@ func TestSessionSetupJSONRoundTrip(t *testing.T) {
 	if len(ss.MCPServers) != 1 || ss.MCPServers[0].Name != "azure-mcp" { t.Errorf("MCP servers mismatch: %+v", ss.MCPServers) }
 	if len(ss.StarterFiles) != 2 { t.Errorf("expected 2 starter files, got %d", len(ss.StarterFiles)) }
 	if parsed.SessionSetup == nil { t.Error("expected session_setup at top level of report") }
+}
+
+func TestBuildScoreBreakdownDefaultWeight(t *testing.T) {
+	results := []GraderResult{
+		{GraderName: "grader_a", GraderType: "file", Score: 1.0, Weight: 0, Pass: boolPtr(true)},
+		{GraderName: "grader_b", GraderType: "file", Score: 0.5, Weight: 0, Pass: boolPtr(true)},
+	}
+
+	sb := BuildScoreBreakdown(results)
+	if sb == nil {
+		t.Fatal("expected non-nil ScoreBreakdown")
+	}
+
+	// Weight 0 defaults to 1.0, so: (1.0*1 + 0.5*1) / (1+1) = 0.75
+	const epsilon = 0.001
+	if diff := sb.FinalScore - 0.75; diff > epsilon || diff < -epsilon {
+		t.Errorf("expected final score ~0.75 (default weights), got %.4f", sb.FinalScore)
+	}
+	for _, c := range sb.Contributions {
+		if c.Weight != 1.0 {
+			t.Errorf("expected effective weight 1.0, got %.2f for %s", c.Weight, c.Name)
+		}
+	}
+}
+
+func TestBuildScoreBreakdownNilForEmpty(t *testing.T) {
+	sb := BuildScoreBreakdown(nil)
+	if sb != nil {
+		t.Error("expected nil for empty results")
+	}
+	sb = BuildScoreBreakdown([]GraderResult{})
+	if sb != nil {
+		t.Error("expected nil for zero-length results")
+	}
+}
+
+func TestBuildScoreBreakdownNilForLegacyReview(t *testing.T) {
+	// Legacy review-only results have no Score/Weight/Gate data
+	results := []GraderResult{
+		{GraderName: "reviewer", GraderType: "review", OverallScore: 4, MaxScore: 5},
+	}
+	sb := BuildScoreBreakdown(results)
+	if sb != nil {
+		t.Error("expected nil for legacy review-only results (no weighted data)")
+	}
+}
+
+func TestScoreBreakdownJSONRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+
+	graderResults := []GraderResult{
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: boolPtr(true), Gate: true},
+		{GraderName: "review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: boolPtr(true)},
+	}
+
+	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
+		PromptID:       "breakdown-test",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-15T10:00:00Z",
+		Duration:       10.0,
+		PromptMeta:     map[string]any{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.go"},
+		GraderResults:  graderResults,
+		ScoreBreakdown: BuildScoreBreakdown(graderResults),
+		Success:        true,
+	}
+
+	p := &prompt.Prompt{
+		ID:         "breakdown-test",
+		Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"},
+	}
+
+	reportPath, err := WriteReport(r, dir, "run-bd", p)
+	if err != nil {
+		t.Fatalf("WriteReport failed: %v", err)
+	}
+
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("failed to read report: %v", err)
+	}
+
+	var parsed EvalReport
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if parsed.ScoreBreakdown == nil {
+		t.Fatal("expected score_breakdown in JSON output")
+	}
+	if len(parsed.ScoreBreakdown.Contributions) != 2 {
+		t.Errorf("expected 2 contributions, got %d", len(parsed.ScoreBreakdown.Contributions))
+	}
+
+	const epsilon = 0.001
+	// Expected: (1.0*1 + 0.8*2) / (1+2) = 2.6/3 ≈ 0.8667
+	if diff := parsed.ScoreBreakdown.FinalScore - 0.8667; diff > epsilon || diff < -epsilon {
+		t.Errorf("expected final score ~0.8667, got %.4f", parsed.ScoreBreakdown.FinalScore)
+	}
+	if parsed.ScoreBreakdown.GateFailed {
+		t.Error("gate should not be failed")
+	}
+}
+
+func TestScoreBreakdownInHTMLReport(t *testing.T) {
+	dir := t.TempDir()
+
+	graderResults := []GraderResult{
+		{GraderName: "build_check", GraderType: "program", Score: 1.0, Weight: 1.0, Pass: boolPtr(true), Gate: true},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.7, Weight: 2.0, Pass: boolPtr(true)},
+	}
+
+	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
+		PromptID:       "html-breakdown",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-15T10:00:00Z",
+		Duration:       10.0,
+		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.py"},
+		GraderResults:  graderResults,
+		ScoreBreakdown: BuildScoreBreakdown(graderResults),
+		Success:        true,
+	}
+
+	htmlPath, err := WriteHTMLReport(r, dir, "run-html-bd", "identity", "data-plane", "python", "auth")
+	if err != nil {
+		t.Fatalf("WriteHTMLReport failed: %v", err)
+	}
+
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("failed to read HTML: %v", err)
+	}
+
+	html := string(data)
+	if !containsStr(html, "Score Breakdown") {
+		t.Error("HTML report should contain 'Score Breakdown' section")
+	}
+	if !containsStr(html, "build_check") {
+		t.Error("HTML report should contain grader name 'build_check'")
+	}
+	if !containsStr(html, "code_review") {
+		t.Error("HTML report should contain grader name 'code_review'")
+	}
+	if !containsStr(html, "Σ(grader_score") {
+		t.Error("HTML report should contain the formula")
+	}
+}
+
+func TestScoreBreakdownInMarkdownReport(t *testing.T) {
+	dir := t.TempDir()
+
+	graderResults := []GraderResult{
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 0.5, Pass: boolPtr(true)},
+		{GraderName: "review", GraderType: "prompt", Score: 0.6, Weight: 1.0, Pass: boolPtr(true)},
+	}
+
+	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
+		PromptID:       "md-breakdown",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-15T10:00:00Z",
+		Duration:       10.0,
+		PromptMeta:     map[string]any{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.go"},
+		GraderResults:  graderResults,
+		ScoreBreakdown: BuildScoreBreakdown(graderResults),
+		Success:        true,
+	}
+
+	mdPath, err := WriteMarkdownReport(r, dir, "run-md-bd", "storage", "data-plane", "go", "crud")
+	if err != nil {
+		t.Fatalf("WriteMarkdownReport failed: %v", err)
+	}
+
+	data, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatalf("failed to read markdown: %v", err)
+	}
+
+	md := string(data)
+	if !containsStr(md, "## Score Breakdown") {
+		t.Error("Markdown report should contain '## Score Breakdown' heading")
+	}
+	if !containsStr(md, "file_check") {
+		t.Error("Markdown report should list grader 'file_check'")
+	}
+	if !containsStr(md, "review") {
+		t.Error("Markdown report should list grader 'review'")
+	}
+	if !containsStr(md, "**Final**") {
+		t.Error("Markdown report should contain final score row")
+	}
+}
+
+func containsStr(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && (len(s) >= len(substr)) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
+}
+
+func findSubstring(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
 }
