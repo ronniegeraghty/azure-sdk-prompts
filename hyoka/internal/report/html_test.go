@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -455,6 +456,84 @@ func TestWriteSummaryHTMLAvgPhaseTimings(t *testing.T) {
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("Summary HTML missing avg phase timing %q", want)
+		}
+	}
+}
+
+func TestEmbeddedTemplatesProduceValidHTML(t *testing.T) {
+	// Verify the embedded report template executes and produces valid HTML structure.
+	boolTrue := true
+	data := buildReportData(&EvalReport{
+		PromptID:       "embed-test",
+		ConfigName:     "test-config",
+		Timestamp:      "2024-06-01T12:00:00Z",
+		Duration:       10.0,
+		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "test-config"},
+		GeneratedFiles: []string{"main.py"},
+		Success:        true,
+		Review:         &review.ReviewResult{OverallScore: 3, MaxScore: 5, Scores: review.ReviewScores{Criteria: []review.CriterionResult{{Name: "Builds", Passed: true, Reason: "ok"}}}},
+		SessionEvents: []SessionEventRecord{
+			{Type: "user.message", Content: "test prompt"},
+			{Type: "tool.execution_start", ToolName: "create", ToolArgs: `{"path":"main.py"}`},
+			{Type: "tool.execution_complete", ToolName: "create", ToolResult: "ok", ToolSuccess: &boolTrue, Duration: 50},
+		},
+	})
+	data.BackPath = "../summary.html"
+
+	var buf bytes.Buffer
+	if err := parsedReportTemplate.Execute(&buf, data); err != nil {
+		t.Fatalf("report template execution failed: %v", err)
+	}
+	html := buf.String()
+	if !strings.HasPrefix(html, "<!DOCTYPE html>") {
+		t.Error("report template missing DOCTYPE")
+	}
+	if !strings.Contains(html, "</html>") {
+		t.Error("report template missing closing </html>")
+	}
+
+	// Verify the embedded summary template executes and produces valid HTML structure.
+	summary := &RunSummary{
+		RunID:      "embed-test-run",
+		Timestamp:  "2024-06-01T12:00:00Z",
+		TotalEvals: 1, Passed: 1, Duration: 10.0,
+		Results: []*EvalReport{{PromptID: "p1", ConfigName: "c1", Success: true, Duration: 5.0}},
+	}
+	matrix := buildMatrix(summary)
+	stats := ComputeSummaryStats(summary)
+	summaryData := struct {
+		Summary *RunSummary
+		Matrix  *MatrixData
+		Stats   *SummaryStats
+	}{Summary: summary, Matrix: matrix, Stats: stats}
+
+	buf.Reset()
+	if err := parsedSummaryTemplate.Execute(&buf, summaryData); err != nil {
+		t.Fatalf("summary template execution failed: %v", err)
+	}
+	html = buf.String()
+	if !strings.HasPrefix(html, "<!DOCTYPE html>") {
+		t.Error("summary template missing DOCTYPE")
+	}
+	if !strings.Contains(html, "</html>") {
+		t.Error("summary template missing closing </html>")
+	}
+}
+
+func TestTemplateFS(t *testing.T) {
+	// Verify the embedded filesystem contains the expected template files.
+	entries, err := templateFS.ReadDir("templates")
+	if err != nil {
+		t.Fatalf("failed to read embedded templates dir: %v", err)
+	}
+	names := make(map[string]bool)
+	for _, e := range entries {
+		names[e.Name()] = true
+	}
+	for _, want := range []string{"report.gohtml", "summary.gohtml"} {
+		if !names[want] {
+			t.Errorf("embedded templates missing %q", want)
 		}
 	}
 }
