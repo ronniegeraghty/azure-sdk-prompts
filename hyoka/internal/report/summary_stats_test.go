@@ -144,7 +144,7 @@ func TestComputeSummaryStatsTimeline(t *testing.T) {
 				Duration:   10.0,
 				Success:    true,
 				ActionTimeline: &ActionTimelineReport{
-					Summary: ActionTimelineSummary{
+					Summary: ActionSummaryReport{
 						TotalActions:     12,
 						TotalToolCalls:   4,
 						TotalTurns:       2,
@@ -160,7 +160,7 @@ func TestComputeSummaryStatsTimeline(t *testing.T) {
 				Duration:   8.0,
 				Success:    true,
 				ActionTimeline: &ActionTimelineReport{
-					Summary: ActionTimelineSummary{
+					Summary: ActionSummaryReport{
 						TotalActions:     8,
 						TotalToolCalls:   2,
 						TotalTurns:       1,

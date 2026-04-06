@@ -418,7 +418,7 @@ func TestActionTimelinePresetNotOverwritten(t *testing.T) {
 	// Pre-set a timeline — WriteReport should not overwrite it.
 	preset := &ActionTimelineReport{
 		Entries: []ActionTimelineEntry{{Index: 1, Type: "custom"}},
-		Summary: ActionTimelineSummary{TotalActions: 99},
+		Summary: ActionSummaryReport{TotalActions: 99},
 	}
 
 	r := &EvalReport{
@@ -490,4 +490,209 @@ func TestMigrateToV2(t *testing.T) {
 	if r.GraderResults[0].GraderName != "modified" {
 		t.Error("MigrateToV2 should be idempotent")
 	}
+}
+
+// --- Session Setup in Action Timeline tests (#219) ---
+
+func TestSessionSetupIsFirstEntry(t *testing.T) {
+	events := []SessionEventRecord{
+		{Type: "session.skills_loaded", Content: "azure-sdk-helper"},
+		{Type: "session.mcp_servers_loaded", Content: "azure-mcp"},
+		{Type: "assistant.turn_start"},
+		{Type: "assistant.message"},
+		{Type: "assistant.turn_end"},
+	}
+	setup := &SessionSetupEvent{
+		Tools:        []string{"create_file", "edit_file"},
+		SystemPrompt: "custom (500 chars)",
+	}
+
+	tl := BuildActionTimelineWithSetup(events, setup)
+	if tl == nil {
+		t.Fatal("expected non-nil timeline")
+	}
+	if len(tl.Entries) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	if tl.Entries[0].Type != "session_setup" {
+		t.Errorf("first entry should be session_setup, got %q", tl.Entries[0].Type)
+	}
+	if tl.Entries[0].Index != 1 {
+		t.Errorf("first entry index should be 1, got %d", tl.Entries[0].Index)
+	}
+	ss := tl.Entries[0].SessionSetup
+	if ss == nil {
+		t.Fatal("session_setup entry should have SessionSetup data")
+	}
+	if ss.SystemPrompt != "custom (500 chars)" {
+		t.Errorf("expected system prompt status 'custom (500 chars)', got %q", ss.SystemPrompt)
+	}
+	if len(ss.Tools) != 2 {
+		t.Errorf("expected 2 tools, got %d", len(ss.Tools))
+	}
+}
+
+func TestSessionSetupMCPLoadedFromEvents(t *testing.T) {
+	events := []SessionEventRecord{
+		{Type: "session.mcp_servers_loaded", Content: "azure-mcp, github-mcp"},
+		{Type: "assistant.turn_start"},
+		{Type: "assistant.turn_end"},
+	}
+	setup := &SessionSetupEvent{
+		MCPServers: []ToolLoadResult{
+			{Name: "azure-mcp", Status: "configured", Details: "npx @azure/mcp@latest"},
+		},
+		SystemPrompt: "none (default)",
+	}
+
+	tl := BuildActionTimelineWithSetup(events, setup)
+	if tl == nil {
+		t.Fatal("expected non-nil timeline")
+	}
+	ss := tl.Entries[0].SessionSetup
+	if ss == nil {
+		t.Fatal("expected session_setup data")
+	}
+	if len(ss.MCPServers) != 2 {
+		t.Fatalf("expected 2 MCP servers, got %d", len(ss.MCPServers))
+	}
+	var azureFound, githubFound bool
+	for _, s := range ss.MCPServers {
+		switch s.Name {
+		case "azure-mcp":
+			azureFound = true
+			if s.Status != "configured" {
+				t.Errorf("azure-mcp should retain 'configured' status, got %q", s.Status)
+			}
+		case "github-mcp":
+			githubFound = true
+			if s.Status != "loaded" {
+				t.Errorf("github-mcp should have 'loaded' status, got %q", s.Status)
+			}
+		}
+	}
+	if !azureFound { t.Error("expected azure-mcp in MCP servers") }
+	if !githubFound { t.Error("expected github-mcp in MCP servers") }
+}
+
+func TestSessionSetupSkillsLoadedFromEvents(t *testing.T) {
+	events := []SessionEventRecord{
+		{Type: "session.skills_loaded", Content: "azure-sdk-helper, code-review"},
+	}
+	setup := &SessionSetupEvent{
+		Skills: []ToolLoadResult{
+			{Name: "azure-sdk-helper", Status: "configured", Details: "local"},
+		},
+		SystemPrompt: "none (default)",
+	}
+
+	tl := BuildActionTimelineWithSetup(events, setup)
+	if tl == nil { t.Fatal("expected non-nil timeline") }
+	ss := tl.Entries[0].SessionSetup
+	if len(ss.Skills) != 2 { t.Fatalf("expected 2 skills, got %d", len(ss.Skills)) }
+	if ss.Skills[0].Name != "azure-sdk-helper" || ss.Skills[0].Status != "configured" {
+		t.Errorf("first skill should be azure-sdk-helper/configured, got %s/%s", ss.Skills[0].Name, ss.Skills[0].Status)
+	}
+	if ss.Skills[1].Name != "code-review" || ss.Skills[1].Status != "loaded" {
+		t.Errorf("second skill should be code-review/loaded, got %s/%s", ss.Skills[1].Name, ss.Skills[1].Status)
+	}
+}
+
+func TestSessionSetupFailedLoadsIncludeErrors(t *testing.T) {
+	setup := &SessionSetupEvent{
+		MCPServers: []ToolLoadResult{
+			{Name: "broken-server", Status: "failed", Error: "connection refused"},
+		},
+		Skills: []ToolLoadResult{
+			{Name: "missing-skill", Status: "failed", Error: "skill not found"},
+		},
+		SystemPrompt: "none (default)",
+	}
+	tl := BuildActionTimelineWithSetup(nil, setup)
+	if tl == nil { t.Fatal("expected non-nil timeline") }
+	ss := tl.Entries[0].SessionSetup
+	if ss.MCPServers[0].Error != "connection refused" {
+		t.Errorf("expected error 'connection refused', got %q", ss.MCPServers[0].Error)
+	}
+	if ss.Skills[0].Error != "skill not found" {
+		t.Errorf("expected error 'skill not found', got %q", ss.Skills[0].Error)
+	}
+}
+
+func TestSessionSetupOmittedWhenEmpty(t *testing.T) {
+	events := []SessionEventRecord{
+		{Type: "assistant.turn_start"},
+		{Type: "assistant.turn_end"},
+	}
+	tl := BuildActionTimelineWithSetup(events, nil)
+	if tl == nil { t.Fatal("expected non-nil timeline") }
+	for _, e := range tl.Entries {
+		if e.Type == "session_setup" {
+			t.Error("should not have session_setup entry when there is no setup data")
+		}
+	}
+}
+
+func TestSessionSetupNilEventsWithSetup(t *testing.T) {
+	setup := &SessionSetupEvent{
+		SystemPrompt: "custom (100 chars)",
+		Tools:        []string{"bash"},
+	}
+	tl := BuildActionTimelineWithSetup(nil, setup)
+	if tl == nil { t.Fatal("expected non-nil timeline for setup-only data") }
+	if len(tl.Entries) != 1 { t.Fatalf("expected 1 entry, got %d", len(tl.Entries)) }
+	if tl.Entries[0].Type != "session_setup" {
+		t.Errorf("expected session_setup, got %q", tl.Entries[0].Type)
+	}
+}
+
+func TestSessionSetupJSONRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	setup := &SessionSetupEvent{
+		MCPServers:   []ToolLoadResult{{Name: "azure-mcp", Status: "loaded"}},
+		Skills:       []ToolLoadResult{{Name: "helper", Status: "loaded"}},
+		Tools:        []string{"create_file", "bash"},
+		SystemPrompt: "custom (200 chars)",
+		StarterFiles: []string{"main.py", "requirements.txt"},
+	}
+	events := []SessionEventRecord{
+		{Type: "assistant.turn_start"},
+		{Type: "assistant.message"},
+		{Type: "assistant.turn_end"},
+	}
+	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
+		PromptID:       "setup-roundtrip",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-15T10:00:00Z",
+		Duration:       5.0,
+		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.py"},
+		SessionEvents:  events,
+		SessionSetup:   setup,
+		EventCount:     3,
+		Success:        true,
+	}
+	p := &prompt.Prompt{
+		ID:         "setup-roundtrip",
+		Properties: map[string]string{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+	}
+	reportPath, err := WriteReport(r, dir, "run-setup", p)
+	if err != nil { t.Fatalf("WriteReport failed: %v", err) }
+	data, err := os.ReadFile(reportPath)
+	if err != nil { t.Fatalf("failed to read: %v", err) }
+	var parsed EvalReport
+	if err := json.Unmarshal(data, &parsed); err != nil { t.Fatalf("invalid JSON: %v", err) }
+	if parsed.ActionTimeline == nil { t.Fatal("expected action_timeline in JSON") }
+	if len(parsed.ActionTimeline.Entries) == 0 { t.Fatal("expected at least one timeline entry") }
+	if parsed.ActionTimeline.Entries[0].Type != "session_setup" {
+		t.Errorf("first entry should be session_setup, got %q", parsed.ActionTimeline.Entries[0].Type)
+	}
+	ss := parsed.ActionTimeline.Entries[0].SessionSetup
+	if ss == nil { t.Fatal("session_setup data missing after round-trip") }
+	if ss.SystemPrompt != "custom (200 chars)" { t.Errorf("system_prompt_status mismatch: %q", ss.SystemPrompt) }
+	if len(ss.MCPServers) != 1 || ss.MCPServers[0].Name != "azure-mcp" { t.Errorf("MCP servers mismatch: %+v", ss.MCPServers) }
+	if len(ss.StarterFiles) != 2 { t.Errorf("expected 2 starter files, got %d", len(ss.StarterFiles)) }
+	if parsed.SessionSetup == nil { t.Error("expected session_setup at top level of report") }
 }
