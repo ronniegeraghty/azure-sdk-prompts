@@ -4,8 +4,6 @@ package tools
 
 import (
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -88,24 +86,11 @@ func LoadRegistry(path string) (*ToolRegistry, error) {
 }
 
 // LoadRemoteRegistry fetches a YAML registry from a URL and returns a
-// validated ToolRegistry.
+// validated ToolRegistry. It normalizes GitHub blob URLs to raw content
+// URLs, caches results locally with a TTL, and falls back to stale
+// cache on network failure. See RemoteFetcher for fine-grained control.
 func LoadRemoteRegistry(url string) (*ToolRegistry, error) {
-	resp, err := http.Get(url) //nolint:gosec // URL is caller-provided
-	if err != nil {
-		return nil, fmt.Errorf("fetching remote registry %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("remote registry %s returned status %d", url, resp.StatusCode)
-	}
-
-	const maxSize = 2 * 1024 * 1024 // 2 MB
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxSize))
-	if err != nil {
-		return nil, fmt.Errorf("reading remote registry body: %w", err)
-	}
-	return ParseRegistry(data)
+	return FetchRemoteRegistry(url)
 }
 
 // validateRegistry checks structural invariants on a parsed registry.
