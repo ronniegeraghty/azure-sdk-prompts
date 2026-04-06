@@ -682,3 +682,99 @@ func TestWriteHTMLReportGraderDetails(t *testing.T) {
 		}
 	}
 }
+
+func TestActionTimelineHTMLRendering(t *testing.T) {
+	boolTrue := true
+	boolFalse := false
+
+	r := &EvalReport{
+		PromptID:       "timeline-test",
+		ConfigName:     "test-config",
+		Timestamp:      "2024-06-01T12:00:00Z",
+		Duration:       30.0,
+		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "test-config"},
+		GeneratedFiles: []string{"main.py"},
+		Success:        true,
+		SessionEvents: []SessionEventRecord{
+			{Type: "user.message", Content: "test prompt"},
+			{Type: "assistant.reasoning", Content: "thinking"},
+			{Type: "tool.execution_start", ToolName: "create", ToolArgs: `{"path":"main.py"}`},
+			{Type: "tool.execution_complete", ToolName: "create", ToolResult: "ok", ToolSuccess: &boolTrue, Duration: 150},
+			{Type: "assistant.message", Content: "Done"},
+		},
+		ActionTimeline: BuildActionTimeline([]SessionEventRecord{
+			{Type: "assistant.turn_start"},
+			{Type: "assistant.reasoning"},
+			{Type: "tool.execution_start", ToolName: "create", MCPServerName: "fs-server", FilePath: "main.py"},
+			{Type: "tool.execution_complete", ToolName: "create", ToolSuccess: &boolTrue, Duration: 150},
+			{Type: "tool.execution_start", ToolName: "bash", FilePath: "/workspace/build.sh"},
+			{Type: "tool.execution_complete", ToolName: "bash", ToolSuccess: &boolFalse, Duration: 2500, Error: "build failed"},
+			{Type: "assistant.intent", Intent: "fixing imports"},
+			{Type: "assistant.message"},
+			{Type: "assistant.turn_end"},
+		}),
+	}
+
+	data := buildReportData(r)
+	data.BackPath = "../summary.html"
+
+	var buf bytes.Buffer
+	if err := parsedReportTemplate.Execute(&buf, data); err != nil {
+		t.Fatalf("template execution failed: %v", err)
+	}
+	html := buf.String()
+
+	checks := []string{
+		"Action Timeline",
+		"atl-summary-bar",
+		"atl-search",
+		"atl-list",
+		"atl-row",
+		"tool calls",
+		"turns",
+		"tool duration",
+		"succeeded",
+		"create",
+		"bash",
+		"fs-server",
+		"150ms",
+		"2.5s",
+		"atl-success",
+		"atl-failure",
+		"fixing imports",
+		"build failed",
+		"Filter timeline",
+	}
+	for _, check := range checks {
+		if !strings.Contains(html, check) {
+			t.Errorf("action timeline HTML missing %q", check)
+		}
+	}
+}
+
+func TestActionTimelineHTMLOmittedWhenNil(t *testing.T) {
+	r := &EvalReport{
+		PromptID:       "no-timeline",
+		ConfigName:     "test-config",
+		Timestamp:      "2024-06-01T12:00:00Z",
+		Duration:       5.0,
+		PromptMeta:     map[string]any{},
+		ConfigUsed:     map[string]any{},
+		GeneratedFiles: []string{},
+		Success:        true,
+	}
+
+	data := buildReportData(r)
+	data.BackPath = "../summary.html"
+
+	var buf bytes.Buffer
+	if err := parsedReportTemplate.Execute(&buf, data); err != nil {
+		t.Fatalf("template execution failed: %v", err)
+	}
+	html := buf.String()
+
+	if strings.Contains(html, "atl-summary-bar") {
+		t.Error("action timeline section should not render when ActionTimeline is nil")
+	}
+}
