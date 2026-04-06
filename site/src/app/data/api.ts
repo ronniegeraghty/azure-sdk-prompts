@@ -1,4 +1,5 @@
 import type { RunSummary, EvalReport, DocEntry, DocDetail } from "./types";
+import type { ConfigComparison } from "./types";
 
 const API_BASE = "";
 
@@ -56,4 +57,10 @@ export async function fetchPrompts(): Promise<PromptInfo[]> {
 
 export async function fetchPrompt(promptId: string): Promise<PromptInfo> {
   return fetchJSON<PromptInfo>(`/api/prompts/${encodeURIComponent(promptId)}`);
+}
+
+export async function fetchCompareConfigs(configA: string, configB: string): Promise<ConfigComparison> {
+  return fetchJSON<ConfigComparison>(
+    `/api/compare/configs?a=${encodeURIComponent(configA)}&b=${encodeURIComponent(configB)}`
+  );
 }

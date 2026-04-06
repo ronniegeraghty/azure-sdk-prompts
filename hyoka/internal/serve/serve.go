@@ -119,10 +119,14 @@ func buildMux(opts Options) *http.ServeMux {
 		mux.HandleFunc("/api/prompts", func(w http.ResponseWriter, r *http.Request) {
 			handleAPIPrompts(w, r, opts.PromptsDir)
 		})
-		mux.HandleFunc("/api/prompts/", func(w http.ResponseWriter, r *http.Request) {
-			handleAPIPromptDetail(w, r, opts.PromptsDir)
-		})
 	}
+	// Always register /api/prompts/ — history works without PromptsDir.
+	mux.HandleFunc("/api/prompts/", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIPromptDetail(w, r, opts.PromptsDir, opts.ReportsDir)
+	})
+
+	// --- Dashboard routes (comparison, trends, drill-down) ---
+	registerDashboardRoutes(mux, opts)
 
 	// --- Static file serving for raw report files ---
 	reportFS := http.FileServer(http.Dir(opts.ReportsDir))
@@ -176,9 +180,38 @@ func handleAPIRunDetail(w http.ResponseWriter, r *http.Request, reportsDir strin
 		return
 	}
 
-	// /api/runs/{runId}/eval?path=...
-	if len(parts) == 2 && parts[1] == "eval" {
-		handleAPIEval(w, r, reportsDir, runID)
+	// Sub-resource dispatch for /api/runs/{runId}/{sub}
+	if len(parts) == 2 {
+		switch parts[1] {
+		case "eval":
+			handleAPIEval(w, r, reportsDir, runID)
+		case "graders":
+			handleAPIGraders(w, r, reportsDir, runID)
+		case "timeline":
+			handleAPITimeline(w, r, reportsDir, runID)
+		case "score-breakdown":
+			handleAPIScoreBreakdown(w, r, reportsDir, runID)
+		default:
+			http.NotFound(w, r)
+		}
+		return
+	}
+
+	// /api/runs/{runId}/graders
+	if len(parts) == 2 && parts[1] == "graders" {
+		handleAPIGraders(w, r, reportsDir, runID)
+		return
+	}
+
+	// /api/runs/{runId}/timeline
+	if len(parts) == 2 && parts[1] == "timeline" {
+		handleAPITimeline(w, r, reportsDir, runID)
+		return
+	}
+
+	// /api/runs/{runId}/score-breakdown
+	if len(parts) == 2 && parts[1] == "score-breakdown" {
+		handleAPIScoreBreakdown(w, r, reportsDir, runID)
 		return
 	}
 
@@ -262,9 +295,20 @@ func handleAPIPrompts(w http.ResponseWriter, _ *http.Request, promptsDir string)
 	writeJSON(w, prompts)
 }
 
-func handleAPIPromptDetail(w http.ResponseWriter, r *http.Request, promptsDir string) {
+func handleAPIPromptDetail(w http.ResponseWriter, r *http.Request, promptsDir, reportsDir string) {
 	slug := strings.TrimPrefix(r.URL.Path, "/api/prompts/")
 	if slug == "" || strings.Contains(slug, "..") {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Handle /api/prompts/{promptId}/history
+	if strings.HasSuffix(slug, "/history") {
+		handleAPIPromptHistory(w, r, reportsDir)
+		return
+	}
+
+	if promptsDir == "" {
 		http.NotFound(w, r)
 		return
 	}
