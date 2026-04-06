@@ -178,16 +178,21 @@ type ActionEventReport struct {
 
 // ActionSummaryReport holds aggregate statistics for the timeline.
 type ActionSummaryReport struct {
-	TotalEvents     int            `json:"total_events"`
-	TotalTurns      int            `json:"total_turns"`
-	ToolCalls       int            `json:"tool_calls"`
-	FileReads       int            `json:"file_reads"`
-	FileWrites      int            `json:"file_writes"`
-	BashCommands    int            `json:"bash_commands"`
-	MCPCalls        int            `json:"mcp_calls"`
-	Errors          int            `json:"errors"`
-	ToolBreakdown   map[string]int `json:"tool_breakdown"`
-	TotalDurationMs float64        `json:"total_duration_ms,omitempty"`
+	TotalEvents      int            `json:"total_events"`
+	TotalTurns       int            `json:"total_turns"`
+	TotalActions     int            `json:"total_actions"`
+	TotalToolCalls   int            `json:"total_tool_calls"`
+	ToolCalls        int            `json:"tool_calls"`
+	FileReads        int            `json:"file_reads"`
+	FileWrites       int            `json:"file_writes"`
+	BashCommands     int            `json:"bash_commands"`
+	MCPCalls         int            `json:"mcp_calls"`
+	Errors           int            `json:"errors"`
+	ToolBreakdown    map[string]int `json:"tool_breakdown"`
+	TotalDurationMs  float64        `json:"total_duration_ms,omitempty"`
+	ToolCallDuration float64        `json:"tool_call_duration_ms,omitempty"`
+	ToolSuccesses    int            `json:"tool_successes"`
+	ToolFailures     int            `json:"tool_failures"`
 }
 
 // EvalReport contains the results of a single prompt evaluation.
@@ -229,6 +234,59 @@ type EvalReport struct {
 	GuardrailAbortReason       string `json:"guardrail_abort_reason,omitempty"`
 }
 
+
+// BuildActionTimeline derives a structured action timeline from SessionEvents.
+// This is a fallback for reports that don't have a pre-built timeline from the
+// eval engine (e.g., when re-rendering from JSON).
+func BuildActionTimeline(events []SessionEventRecord) *ActionTimelineReport {
+	if len(events) == 0 {
+		return nil
+	}
+	var reportEvents []ActionEventReport
+	var summary ActionSummaryReport
+	seq := 0
+	turnNumber := 0
+
+	for _, ev := range events {
+		seq++
+		switch ev.Type {
+		case "assistant.turn_start":
+			turnNumber++
+			summary.TotalTurns++
+			summary.TotalActions++
+		case "assistant.turn_end":
+			summary.TotalActions++
+		case "tool.execution_start":
+			summary.TotalToolCalls++
+			summary.TotalActions++
+			summary.ToolCalls++
+			reportEvents = append(reportEvents, ActionEventReport{
+				Sequence:   seq,
+				Type:       "tool_call",
+				Tool:       ev.ToolName,
+				Path:       ev.FilePath,
+				TurnNumber: turnNumber,
+				MCPServer:  ev.MCPServerName,
+			})
+		case "tool.execution_complete":
+			summary.TotalActions++
+			summary.ToolCallDuration += ev.Duration
+			summary.TotalDurationMs += ev.Duration
+			if ev.ToolSuccess != nil {
+				if *ev.ToolSuccess {
+					summary.ToolSuccesses++
+				} else {
+					summary.ToolFailures++
+				}
+			}
+		}
+	}
+	summary.TotalEvents = len(events)
+	return &ActionTimelineReport{
+		Events:  reportEvents,
+		Summary: summary,
+	}
+}
 
 // RunResourceStats holds aggregate resource utilization across all evals (#45).
 type RunResourceStats struct {

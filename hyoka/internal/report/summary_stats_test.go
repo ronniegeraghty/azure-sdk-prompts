@@ -134,3 +134,98 @@ func TestCalcDurationStats(t *testing.T) {
 		t.Error("expected zero stats for nil slice")
 	}
 }
+
+func TestComputeSummaryStatsTimeline(t *testing.T) {
+	s := &RunSummary{
+		Results: []*EvalReport{
+			{
+				PromptID:   "p1",
+				ConfigName: "baseline",
+				Duration:   10.0,
+				Success:    true,
+				ActionTimeline: &ActionTimelineReport{
+					Summary: ActionTimelineSummary{
+						TotalActions:     12,
+						TotalToolCalls:   4,
+						TotalTurns:       2,
+						ToolCallDuration: 400.0,
+						ToolSuccesses:    3,
+						ToolFailures:     1,
+					},
+				},
+			},
+			{
+				PromptID:   "p2",
+				ConfigName: "baseline",
+				Duration:   8.0,
+				Success:    true,
+				ActionTimeline: &ActionTimelineReport{
+					Summary: ActionTimelineSummary{
+						TotalActions:     8,
+						TotalToolCalls:   2,
+						TotalTurns:       1,
+						ToolCallDuration: 200.0,
+						ToolSuccesses:    2,
+						ToolFailures:     0,
+					},
+				},
+			},
+			{
+				// Eval without timeline (e.g. failed early)
+				PromptID:   "p3",
+				ConfigName: "baseline",
+				Duration:   1.0,
+				Success:    false,
+			},
+		},
+	}
+
+	stats := ComputeSummaryStats(s)
+
+	if stats.Timeline == nil {
+		t.Fatal("expected timeline summary")
+	}
+
+	tl := stats.Timeline
+	if tl.TotalActions != 20 {
+		t.Errorf("expected total_actions=20, got %d", tl.TotalActions)
+	}
+	if tl.TotalToolCalls != 6 {
+		t.Errorf("expected total_tool_calls=6, got %d", tl.TotalToolCalls)
+	}
+	if tl.TotalTurns != 3 {
+		t.Errorf("expected total_turns=3, got %d", tl.TotalTurns)
+	}
+	// avg actions per eval: 20/2 = 10.0
+	if tl.AvgActionsPerEval != 10.0 {
+		t.Errorf("expected avg_actions_per_eval=10.0, got %.1f", tl.AvgActionsPerEval)
+	}
+	// avg tool calls per eval: 6/2 = 3.0
+	if tl.AvgToolCallsPerEval != 3.0 {
+		t.Errorf("expected avg_tool_calls_per_eval=3.0, got %.1f", tl.AvgToolCallsPerEval)
+	}
+	// avg turns per eval: 3/2 = 1.5
+	if tl.AvgTurnsPerEval != 1.5 {
+		t.Errorf("expected avg_turns_per_eval=1.5, got %.1f", tl.AvgTurnsPerEval)
+	}
+	// avg tool duration: 600/6 = 100.0
+	if tl.AvgToolCallDuration != 100.0 {
+		t.Errorf("expected avg_tool_call_duration=100.0, got %.1f", tl.AvgToolCallDuration)
+	}
+	// tool success rate: 5/(5+1) * 100 = 83.3
+	if tl.ToolSuccessRate != 83.3 {
+		t.Errorf("expected tool_success_rate=83.3, got %.1f", tl.ToolSuccessRate)
+	}
+}
+
+func TestComputeSummaryStatsNoTimeline(t *testing.T) {
+	s := &RunSummary{
+		Results: []*EvalReport{
+			{PromptID: "p1", ConfigName: "c1", Duration: 5.0, Success: true},
+		},
+	}
+	stats := ComputeSummaryStats(s)
+	if stats.Timeline != nil {
+		t.Error("expected nil timeline when no evals have timelines")
+	}
+}
