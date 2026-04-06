@@ -22,7 +22,7 @@
 
 After every substantial work session:
 
-1. **Log the session** to `.squad/log/{timestamp}-{topic}.md`:
+1. **Log the session** to `.squad/log/{timestamp}-{topic}.md` (use hyphens instead of colons in timestamps for Windows compatibility, e.g., `2026-04-04T03-55-26Z`):
    - Who worked
    - What was done
    - Decisions made
