@@ -8,6 +8,7 @@ const navLinks = [
   { to: "/runs", label: "Runs" },
   { to: "/prompts", label: "Prompts" },
   { to: "/pairwise", label: "Pairwise" },
+  { to: "/compare", label: "Compare" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/docs", label: "Docs" },
 ];

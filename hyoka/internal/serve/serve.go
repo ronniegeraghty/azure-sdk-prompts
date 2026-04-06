@@ -128,6 +128,11 @@ func buildMux(opts Options) *http.ServeMux {
 	// --- Dashboard routes (comparison, trends, drill-down) ---
 	registerDashboardRoutes(mux, opts)
 
+	// --- API: comparison ---
+	mux.HandleFunc("/api/compare/configs", func(w http.ResponseWriter, r *http.Request) {
+		handleAPICompareConfigs(w, r, opts.ReportsDir)
+	})
+
 	// --- Static file serving for raw report files ---
 	reportFS := http.FileServer(http.Dir(opts.ReportsDir))
 	mux.Handle("/reports/", http.StripPrefix("/reports/", reportFS))
