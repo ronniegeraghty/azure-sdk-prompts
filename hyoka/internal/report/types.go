@@ -229,6 +229,7 @@ type EvalReport struct {
 	GuardrailAbortReason       string `json:"guardrail_abort_reason,omitempty"`
 }
 
+
 // RunResourceStats holds aggregate resource utilization across all evals (#45).
 type RunResourceStats struct {
 	PeakCPUPercent float64 `json:"peak_cpu_percent"`

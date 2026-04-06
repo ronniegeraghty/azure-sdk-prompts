@@ -534,6 +534,148 @@ func TestTemplateFS(t *testing.T) {
 	for _, want := range []string{"report.gohtml", "summary.gohtml"} {
 		if !names[want] {
 			t.Errorf("embedded templates missing %q", want)
+
+func TestWriteHTMLReportGraderDetails(t *testing.T) {
+	dir := t.TempDir()
+	boolTrue := true
+	boolFalse := false
+	patternTrue := true
+
+	r := &EvalReport{
+		PromptID:       "grader-detail-test",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-20T10:00:00Z",
+		Duration:       30.0,
+		PromptMeta:     map[string]any{"service": "storage", "language": "python"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.py"},
+		Success:        true,
+		GraderResults: []GraderResult{
+			{
+				GraderName: "main-exists",
+				GraderType: "file",
+				Summary:    "Checking required files",
+				Score:      1.0,
+				Weight:     0.5,
+				Pass:       &boolTrue,
+				Gate:       true,
+				FileDetails: &FileGraderDetail{
+					CheckedFiles: []FileCheckDetail{
+						{Path: "main.py", Exists: true, PatternMatched: &patternTrue, Pattern: "import azure"},
+						{Path: "tests.py", Exists: false},
+					},
+				},
+			},
+			{
+				GraderName: "build-check",
+				GraderType: "program",
+				Summary:    "Build verification",
+				Score:      0.0,
+				Weight:     1.0,
+				Pass:       &boolFalse,
+				Gate:       true,
+				ProgramDetails: &ProgramGraderDetail{
+					Command:  "python -m py_compile main.py",
+					ExitCode: 1,
+					Stdout:   "Compiling...",
+					Stderr:   "SyntaxError: unexpected EOF",
+				},
+			},
+			{
+				GraderName: "quality-review",
+				GraderType: "prompt",
+				Summary:    "LLM quality assessment",
+				Score:      0.75,
+				Weight:     1.0,
+				Pass:       &boolTrue,
+				PromptDetails: &PromptGraderDetail{
+					Model:     "claude-opus-4.6",
+					Rubric:    "Evaluate code quality on a 1-5 scale",
+					Reasoning: "The code demonstrates good structure but lacks error handling",
+					RawScore:  4,
+					MaxScore:  5,
+				},
+			},
+			{
+				GraderName: "tool-usage",
+				GraderType: "behavior",
+				Summary:    "Agent behavior analysis",
+				Score:      0.5,
+				Weight:     0.5,
+				Pass:       &boolFalse,
+				BehaviorDetails: &BehaviorGraderDetail{
+					ToolsUsed:     []string{"create", "edit"},
+					MissingTools:  []string{"azure-mcp"},
+					ForbiddenUsed: []string{"rm"},
+					TotalActions:  15,
+					MaxTurns:      25,
+					ActualTurns:   12,
+					Violations:    []string{"Used forbidden tool: rm"},
+					ToolCounts:    map[string]int{"create": 3, "edit": 5, "rm": 1},
+				},
+			},
+		},
+	}
+
+	reportPath, err := WriteHTMLReport(r, dir, "20240120-100000", "storage", "data-plane", "python", "crud")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("failed to read report: %v", err)
+	}
+
+	content := string(data)
+	checks := []string{
+		// Section header
+		"Grader Results",
+		"4 graders",
+
+		// File grader
+		"main-exists",
+		"file",
+		"main.py",
+		"exists",
+		"tests.py",
+		"missing",
+		"import azure",
+		"GATE PASSED",
+
+		// Program grader
+		"build-check",
+		"program",
+		"python -m py_compile main.py",
+		"Exit code",
+		"Show stdout",
+		"Compiling...",
+		"Show stderr",
+		"SyntaxError: unexpected EOF",
+		"GATE FAILED",
+
+		// Prompt grader
+		"quality-review",
+		"claude-opus-4.6",
+		"Show rubric",
+		"Show LLM reasoning",
+		"good structure but lacks error handling",
+		"4/5",
+
+		// Behavior grader
+		"tool-usage",
+		"behavior",
+		"azure-mcp",
+		"Used forbidden tool: rm",
+		"Tool call counts",
+
+		// Score bar
+		"score-bar",
+		"score-bar-fill",
+	}
+	for _, check := range checks {
+		if !strings.Contains(content, check) {
+			t.Errorf("HTML report missing %q", check)
 		}
 	}
 }
