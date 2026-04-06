@@ -22,53 +22,70 @@ func ReportDir(outputDir string, runID string, p *prompt.Prompt) string {
 }
 
 // WriteReport writes an EvalReport as JSON to the appropriate directory.
+// Large reports are truncated before writing (see TruncateReport) and
+// streamed directly to disk via json.NewEncoder to avoid holding the full
+// serialized form in memory.
 func WriteReport(r *EvalReport, outputDir string, runID string, p *prompt.Prompt) (string, error) {
-// Ensure schema version is current
-if r.SchemaVersion == 0 {
-	r.SchemaVersion = CurrentSchemaVersion
+	reportDir := filepath.Join(
+		ReportDir(outputDir, runID, p), r.ConfigName,
+	)
+
+	if err := os.MkdirAll(reportDir, 0755); err != nil {
+		return "", fmt.Errorf("creating report directory: %w", err)
+	}
+
+	// Truncate verbose fields when the report is excessively large.
+	TruncateReport(r)
+
+	reportPath := filepath.Join(reportDir, "report.json")
+
+	f, err := os.Create(reportPath)
+	if err != nil {
+		return "", fmt.Errorf("creating report file: %w", err)
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(r); err != nil {
+		return "", fmt.Errorf("encoding report: %w", err)
+	}
+
+	info, _ := f.Stat()
+	var size int64
+	if info != nil {
+		size = info.Size()
+	}
+	slog.Debug("Report written", "path", reportPath, "size", size)
+	return reportPath, nil
 }
 
-reportDir := filepath.Join(
-ReportDir(outputDir, runID, p), r.ConfigName,
-)
-
-if err := os.MkdirAll(reportDir, 0755); err != nil {
-return "", fmt.Errorf("creating report directory: %w", err)
-}
-
-reportPath := filepath.Join(reportDir, "report.json")
-
-data, err := json.MarshalIndent(r, "", "  ")
-if err != nil {
-return "", fmt.Errorf("marshaling report: %w", err)
-}
-
-if err := os.WriteFile(reportPath, data, 0644); err != nil {
-return "", fmt.Errorf("writing report: %w", err)
-}
-
-slog.Debug("Report written", "path", reportPath, "size", len(data))
-return reportPath, nil
-}
-
-// WriteSummary writes a RunSummary as JSON.
+// WriteSummary writes a RunSummary as JSON, streaming directly to disk.
 func WriteSummary(s *RunSummary, outputDir string) (string, error) {
-summaryDir := filepath.Join(outputDir, s.RunID)
-if err := os.MkdirAll(summaryDir, 0755); err != nil {
-return "", fmt.Errorf("creating summary directory: %w", err)
-}
+	summaryDir := filepath.Join(outputDir, s.RunID)
+	if err := os.MkdirAll(summaryDir, 0755); err != nil {
+		return "", fmt.Errorf("creating summary directory: %w", err)
+	}
 
-summaryPath := filepath.Join(summaryDir, "summary.json")
+	summaryPath := filepath.Join(summaryDir, "summary.json")
 
-data, err := json.MarshalIndent(s, "", "  ")
-if err != nil {
-return "", fmt.Errorf("marshaling summary: %w", err)
-}
+	f, err := os.Create(summaryPath)
+	if err != nil {
+		return "", fmt.Errorf("creating summary file: %w", err)
+	}
+	defer f.Close()
 
-if err := os.WriteFile(summaryPath, data, 0644); err != nil {
-return "", fmt.Errorf("writing summary: %w", err)
-}
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(s); err != nil {
+		return "", fmt.Errorf("encoding summary: %w", err)
+	}
 
-slog.Debug("Summary written", "path", summaryPath, "size", len(data))
-return summaryPath, nil
+	info, _ := f.Stat()
+	var size int64
+	if info != nil {
+		size = info.Size()
+	}
+	slog.Debug("Summary written", "path", summaryPath, "size", size)
+	return summaryPath, nil
 }
