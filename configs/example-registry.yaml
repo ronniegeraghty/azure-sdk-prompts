@@ -1,0 +1,66 @@
+# Example tool registry — curated catalog of MCP servers and skills.
+# Evaluation configs reference tools by name instead of inlining full details.
+
+version: "1"
+tools:
+  # --- MCP Servers ---
+
+  - name: azure-mcp
+    type: mcp
+    description: "Azure MCP server for cloud resource management"
+    version: "0.1.0"
+    mcp:
+      command: npx
+      args: ["-y", "@azure/mcp@latest", "server", "start"]
+      tools: ["*"]
+
+  - name: azure-mcp-pinned
+    type: mcp
+    description: "Azure MCP server pinned to a specific version"
+    version: "0.1.0"
+    mcp:
+      command: npx
+      args: ["-y", "@azure/mcp@0.1.0", "server", "start"]
+      env:
+        AZURE_SUBSCRIPTION_ID: "${AZURE_SUBSCRIPTION_ID}"
+      tools:
+        - list_resources
+        - get_resource
+
+  # --- Remote Skills ---
+
+  - name: azure-keyvault-py
+    type: skill
+    description: "Azure Key Vault Python skill (data-plane)"
+    version: "1.0.0"
+    skill:
+      source: remote
+      repo: microsoft/skills
+      name: azure-keyvault-py
+
+  - name: azure-identity-py
+    type: skill
+    description: "Azure Identity Python skill"
+    version: "1.0.0"
+    skill:
+      source: remote
+      repo: microsoft/skills
+      name: azure-identity-py
+
+  # --- Local Skills ---
+
+  - name: generator-skills
+    type: skill
+    description: "All local generator skills"
+    version: "0.0.1"
+    skill:
+      source: local
+      path: "./skills/generator/*"
+
+  - name: reviewer-skills
+    type: skill
+    description: "All local reviewer skills"
+    version: "0.0.1"
+    skill:
+      source: local
+      path: "./skills/reviewer/*"
