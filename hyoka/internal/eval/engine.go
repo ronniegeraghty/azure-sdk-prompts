@@ -48,8 +48,12 @@ type ReviewerFactory func(cfg *config.ToolConfig) (review.Reviewer, *review.Pane
 // StubEvaluator returns placeholder results for testing.
 type StubEvaluator struct{}
 
-// Evaluate returns a stub result.
+// Evaluate returns a stub result and creates a stub output file in the workspace.
 func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+	// Write a stub file so file graders can find it on disk.
+	if workDir != "" {
+		_ = os.WriteFile(filepath.Join(workDir, "stub_output.txt"), []byte("stub"), 0644)
+	}
 	return &EvalResult{
 		GeneratedFiles: []string{"stub_output.txt"},
 		EventCount:     0,
