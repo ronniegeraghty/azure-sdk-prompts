@@ -1,160 +1,154 @@
 package graders
 
 import (
-	"context"
-	"fmt"
-	"time"
+"context"
+"fmt"
 )
 
-// Grader evaluates generated code and produces a structured result.
-// Each implementation handles a single concern (file check, build, LLM review, etc.).
+// Grader is the core evaluation abstraction. Each grader is a single-concern
+// evaluator (file check, build verification, LLM review, etc.) that scores
+// one aspect of agent-generated code.
 type Grader interface {
-	// Kind returns the grader kind (e.g., "file", "program", "prompt").
-	Kind() string
-
-	// Name returns the unique name of this grader instance.
-	Name() string
-
-	// Grade evaluates the generated code and returns a result.
-	Grade(ctx context.Context, input *GraderInput) (*GraderResult, error)
+// Kind returns the grader type identifier (e.g., "file", "program", "prompt").
+Kind() string
+// Name returns the human-readable name of this grader instance.
+Name() string
+// Grade evaluates the agent output and returns a scored result.
+Grade(ctx context.Context, input GraderInput) (GraderResult, error)
 }
 
-// ActionEvent represents a single action taken by the agent during code generation.
-type ActionEvent struct {
-	Tool      string `json:"tool"`
-	Arguments string `json:"arguments,omitempty"`
-	Result    string `json:"result,omitempty"`
-	Timestamp int64  `json:"timestamp,omitempty"`
-}
-
-// FileInfo describes a file produced by the agent.
-type FileInfo struct {
-	Path    string `json:"path"`
-	Size    int64  `json:"size"`
-	IsDir   bool   `json:"is_dir,omitempty"`
-	ModTime int64  `json:"mod_time,omitempty"`
-}
-
-// SessionSummary holds metadata about the generation session.
-type SessionSummary struct {
-	SessionID    string        `json:"session_id"`
-	Model        string        `json:"model"`
-	TotalActions int           `json:"total_actions"`
-	Duration     time.Duration `json:"duration"`
-}
-
-// GraderInput contains everything a grader needs to evaluate generated code.
-// DM5: concrete struct rather than interface to keep grader signatures simple.
+// GraderInput is a concrete struct containing everything a grader might need
+// (DM5). Graders use what they need and ignore the rest.
 type GraderInput struct {
-	WorkspacePath  string            // Path to session workspace with generated files
-	ActionLog      []ActionEvent     // Agent action history
-	PromptMeta     map[string]string // Prompt frontmatter properties (language, service, etc.)
-	Config         map[string]any    // Grader-specific config values from YAML
-	Files          []FileInfo        // Generated files listing
-	SessionSummary *SessionSummary   // Optional session metadata
+WorkspacePath string         // Absolute path to the agent's output workspace
+ActionLog     []ActionEvent  // Ordered list of agent actions
+PromptMeta    PromptMetadata // Metadata from the prompt frontmatter
+Config        GraderConfig   // The grader's own config entry
+Files         []FileEntry    // Listing of files in the workspace
 }
 
-// GraderResult holds the outcome of a single grader execution.
-// DM4: typed optional detail fields instead of interface{} for type safety.
+// ActionEvent represents a single agent action from the session log.
+type ActionEvent struct {
+Tool   string `json:"tool"`
+Action string `json:"action"`
+Path   string `json:"path,omitempty"`
+}
+
+// PromptMetadata holds prompt frontmatter fields relevant to grading.
+type PromptMetadata struct {
+ID       string `json:"id"`
+Service  string `json:"service"`
+Language string `json:"language"`
+Plane    string `json:"plane"`
+Category string `json:"category"`
+}
+
+// FileEntry describes a file in the agent workspace.
+type FileEntry struct {
+Path string `json:"path"` // Relative to workspace root
+Size int64  `json:"size"`
+}
+
+// GraderResult uses typed optional fields instead of interface{} (DM4).
+// Templates check `if .FileDetails` directly — no type assertions needed.
 type GraderResult struct {
-	Kind    string  `json:"kind"`
-	Name    string  `json:"name"`
-	Score   float64 `json:"score"`   // 0.0–1.0 normalized
-	Weight  float64 `json:"weight"`  // effective weight used in aggregation
-	Pass    bool    `json:"pass"`    // whether the grader considers this passing
-	Gate    bool    `json:"gate"`    // DM3: hard pass/fail overrides weighted scoring
-	Message string  `json:"message"` // human-readable summary
+Kind    string  `json:"kind"`
+Name    string  `json:"name"`
+Score   float64 `json:"score"`   // 0.0–1.0 normalized
+Weight  float64 `json:"weight"`  // Weight for aggregation
+Pass    bool    `json:"pass"`    // Binary pass/fail
+Gate    bool    `json:"gate"`    // If true, failure overrides weighted scoring (DM3)
+Message string  `json:"message"` // Human-readable summary
 
-	// Typed optional details per grader kind (DM4).
-	FileDetails     *FileGraderDetails     `json:"file_details,omitempty"`
-	ProgramDetails  *ProgramGraderDetails  `json:"program_details,omitempty"`
-	PromptDetails   *PromptGraderDetails   `json:"prompt_details,omitempty"`
-	BehaviorDetails *BehaviorGraderDetails `json:"behavior_details,omitempty"`
+// Typed details — only one populated per result (DM4).
+FileDetails     *FileGraderDetails     `json:"file_details,omitempty"`
+ProgramDetails  *ProgramGraderDetails  `json:"program_details,omitempty"`
+PromptDetails   *PromptGraderDetails   `json:"prompt_details,omitempty"`
+BehaviorDetails *BehaviorGraderDetails `json:"behavior_details,omitempty"`
 }
 
-// FileGraderDetails contains results from file existence/content checks.
+// FileGraderDetails holds file-check specifics.
 type FileGraderDetails struct {
-	Path       string `json:"path"`
-	Exists     bool   `json:"exists"`
-	MatchFound bool   `json:"match_found,omitempty"` // true if pattern matched
-	Pattern    string `json:"pattern,omitempty"`      // regex/glob that was tested
+CheckedFiles []FileCheckResult `json:"checked_files"`
 }
 
-// ProgramGraderDetails contains results from running an external command.
+// FileCheckResult records the outcome of a single file check.
+type FileCheckResult struct {
+Path           string `json:"path"`
+Exists         bool   `json:"exists"`
+PatternMatched *bool  `json:"pattern_matched,omitempty"` // nil if no pattern configured
+Pattern        string `json:"pattern,omitempty"`
+}
+
+// ProgramGraderDetails holds program execution specifics.
 type ProgramGraderDetails struct {
-	Command  string        `json:"command"`
-	ExitCode int           `json:"exit_code"`
-	Stdout   string        `json:"stdout"`
-	Stderr   string        `json:"stderr"`
-	Duration time.Duration `json:"duration"`
+Command  string `json:"command"`
+ExitCode int    `json:"exit_code"`
+Stdout   string `json:"stdout"`
+Stderr   string `json:"stderr"`
 }
 
-// PromptGraderDetails contains results from an LLM-as-judge evaluation.
+// PromptGraderDetails holds LLM-as-judge specifics.
 type PromptGraderDetails struct {
-	Model     string `json:"model"`
-	Rubric    string `json:"rubric"`
-	Reasoning string `json:"reasoning"`
-	RawScore  int    `json:"raw_score"`
-	MaxScore  int    `json:"max_score"`
+Model     string `json:"model"`
+Rubric    string `json:"rubric"`
+Reasoning string `json:"reasoning"`
 }
 
-// BehaviorGraderDetails contains results from agent action log analysis.
+// BehaviorGraderDetails holds agent behavior analysis specifics.
 type BehaviorGraderDetails struct {
-	ToolsUsed      []string `json:"tools_used"`
-	MissingTools   []string `json:"missing_tools,omitempty"`
-	ForbiddenUsed  []string `json:"forbidden_used,omitempty"`
-	TotalActions   int      `json:"total_actions"`
-	TurnLimitHit   bool     `json:"turn_limit_hit,omitempty"`
-	SequenceMatch  bool     `json:"sequence_match,omitempty"`   // for action_sequence
-	ConstraintsMet bool     `json:"constraints_met,omitempty"`  // for tool_constraint
+ToolsUsed     []string `json:"tools_used,omitempty"`
+ForbiddenUsed []string `json:"forbidden_used,omitempty"`
+TurnCount     int      `json:"turn_count"`
+Violations    []string `json:"violations,omitempty"`
 }
 
 // AggregateResult holds the final aggregated score from all graders.
 type AggregateResult struct {
-	Score      float64        `json:"score"`       // 0.0–1.0 weighted average
-	Pass       bool           `json:"pass"`        // true if score > 0 and no gate failures
-	GateFailed bool           `json:"gate_failed"` // true if any gate grader failed
-	Results    []GraderResult `json:"results"`
+Score      float64        `json:"score"`       // 0.0–1.0 weighted average
+Pass       bool           `json:"pass"`        // true if score > 0 and no gate failures
+GateFailed bool           `json:"gate_failed"` // true if any gate grader failed
+Results    []GraderResult `json:"results"`
 }
 
 // AggregateResults computes a weighted score from a set of grader results.
 // Gate semantics (DM3): if any gate grader fails, the overall result fails
 // with a score of 0 regardless of other scores.
 func AggregateResults(results []GraderResult) (*AggregateResult, error) {
-	if len(results) == 0 {
-		return nil, fmt.Errorf("no grader results to aggregate")
-	}
+if len(results) == 0 {
+return nil, fmt.Errorf("no grader results to aggregate")
+}
 
-	agg := &AggregateResult{
-		Results: results,
-		Pass:    true,
-	}
+agg := &AggregateResult{
+Results: results,
+Pass:    true,
+}
 
-	// Check gate failures first.
-	for _, r := range results {
-		if r.Gate && !r.Pass {
-			agg.GateFailed = true
-			agg.Pass = false
-			agg.Score = 0
-			return agg, nil
-		}
-	}
+// Check gate failures first.
+for _, r := range results {
+if r.Gate && !r.Pass {
+agg.GateFailed = true
+agg.Pass = false
+agg.Score = 0
+return agg, nil
+}
+}
 
-	// Compute weighted average.
-	var totalWeight float64
-	var weightedSum float64
-	for _, r := range results {
-		w := r.Weight
-		if w == 0 {
-			w = 1.0
-		}
-		totalWeight += w
-		weightedSum += r.Score * w
-	}
+// Compute weighted average.
+var totalWeight float64
+var weightedSum float64
+for _, r := range results {
+w := r.Weight
+if w == 0 {
+w = 1.0
+}
+totalWeight += w
+weightedSum += r.Score * w
+}
 
-	if totalWeight > 0 {
-		agg.Score = weightedSum / totalWeight
-	}
+if totalWeight > 0 {
+agg.Score = weightedSum / totalWeight
+}
 
-	return agg, nil
+return agg, nil
 }
