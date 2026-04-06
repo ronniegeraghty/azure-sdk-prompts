@@ -9,6 +9,7 @@ import { RunDetailPage } from "./components/run-detail-page";
 import { PromptsPage } from "./components/prompts-page";
 import { PromptDetailPage } from "./components/prompt-detail-page";
 import { EvalDetailPage } from "./components/eval-detail-page";
+import { PairwisePage } from "./components/pairwise-page";
 
 export const router = createBrowserRouter([
   {
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
       { index: true, Component: HomePage },
       { path: "how-it-works", Component: HowItWorksPage },
       { path: "dashboard", Component: DashboardPage },
+      { path: "pairwise", Component: PairwisePage },
       { path: "docs", Component: DocsPage },
       { path: "runs", Component: RunsPage },
       { path: "runs/:runId", Component: RunDetailPage },

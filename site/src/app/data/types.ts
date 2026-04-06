@@ -84,6 +84,32 @@ export interface EvalResult {
   prompt_metadata: PromptMetadata;
 }
 
+// ── Pairwise impact types (matching Go pairwise package) ──────────────
+
+export interface VariantResult {
+  config_name: string;
+  removed_tool?: string;
+  score: number;
+  max_score: number;
+  success: boolean;
+}
+
+export interface ToolImpact {
+  tool_name: string;
+  impact: number;
+  baseline_score: number;
+  without_score: number;
+  baseline_pass: boolean;
+  without_pass: boolean;
+}
+
+export interface PairwiseReport {
+  prompt_id: string;
+  baseline: VariantResult;
+  variants: VariantResult[];
+  impacts: ToolImpact[];
+}
+
 export interface RunSummary {
   run_id: string;
   timestamp: string;
@@ -99,6 +125,7 @@ export interface RunSummary {
   avg_build_duration_seconds?: number;
   analysis?: string;
   results: EvalResult[];
+  pairwise_results?: PairwiseReport[];
 }
 
 export interface EvalReport {
@@ -132,4 +159,41 @@ export interface DocDetail {
   slug: string;
   title: string;
   content: string;
+}
+
+// ── Comparison types ─────────────────────────────────────────────────
+
+export interface GraderDiff {
+  name: string;
+  score_a: number;
+  score_b: number;
+  delta: number;
+  pass_a: boolean;
+  pass_b: boolean;
+}
+
+export interface PromptDiff {
+  prompt_id: string;
+  score_a: number;
+  score_b: number;
+  delta: number;
+  grader_diffs?: GraderDiff[];
+  only_in_a?: boolean;
+  only_in_b?: boolean;
+}
+
+export interface ComparisonSummary {
+  avg_delta: number;
+  improved: number;
+  regressed: number;
+  unchanged: number;
+  top_improved?: PromptDiff[];
+  top_regressed?: PromptDiff[];
+}
+
+export interface ConfigComparison {
+  config_a: string;
+  config_b: string;
+  per_prompt: PromptDiff[];
+  summary: ComparisonSummary;
 }
