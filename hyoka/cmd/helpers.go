@@ -14,6 +14,19 @@ import (
 "github.com/spf13/cobra"
 )
 
+// cachedProjectDir holds the lazily discovered .hyoka project directory.
+var cachedProjectDir *config.ProjectDir
+
+func discoverProject() *config.ProjectDir {
+if cachedProjectDir == nil {
+cachedProjectDir = config.DiscoverFromCWD()
+if cachedProjectDir.Found() {
+slog.Info("Using .hyoka project directory", "path", cachedProjectDir.Root)
+}
+}
+return cachedProjectDir
+}
+
 // resolvePathFlag returns the flag value if explicitly set by the user,
 // otherwise tries the candidate paths in order, falling back to the default.
 func resolvePathFlag(cmd *cobra.Command, flagName string, candidates []string) string {
@@ -31,27 +44,37 @@ return val
 }
 
 func resolvePromptsDir(cmd *cobra.Command) string {
-return resolvePathFlag(cmd, "prompts", []string{"./prompts", "../prompts"})
+proj := discoverProject()
+candidates := config.ResolveCandidates(proj, "prompts", "./prompts", "../prompts")
+return resolvePathFlag(cmd, "prompts", candidates)
 }
 
 func resolveConfigFile(cmd *cobra.Command) string {
-return resolvePathFlag(cmd, "config-file", []string{
-"./configs", "../configs",
-})
+proj := discoverProject()
+candidates := config.ResolveCandidates(proj, "configs", "./configs", "../configs")
+return resolvePathFlag(cmd, "config-file", candidates)
 }
 
 func resolveConfigDir(cmd *cobra.Command) string {
-return resolvePathFlag(cmd, "config-dir", []string{
-"./configs", "../configs",
-})
+proj := discoverProject()
+candidates := config.ResolveCandidates(proj, "configs", "./configs", "../configs")
+return resolvePathFlag(cmd, "config-dir", candidates)
 }
 
 func resolveOutputDir(cmd *cobra.Command) string {
-return resolvePathFlag(cmd, "output", []string{"./reports", "../reports"})
+proj := discoverProject()
+candidates := config.ResolveCandidates(proj, "reports", "./reports", "../reports")
+return resolvePathFlag(cmd, "output", candidates)
 }
 
 func resolveOutputFile(cmd *cobra.Command, candidates []string) string {
 return resolvePathFlag(cmd, "output", candidates)
+}
+
+func resolveCriteriaDir(cmd *cobra.Command) string {
+proj := discoverProject()
+candidates := config.ResolveCandidates(proj, "criteria", "./criteria", "../criteria")
+return resolvePathFlag(cmd, "criteria-dir", candidates)
 }
 
 // resolveConfigSkillDirs resolves relative skill_directories in loaded configs
