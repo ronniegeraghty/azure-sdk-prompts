@@ -10,26 +10,6 @@ import (
 // v1 = legacy monolithic ReviewResult; v2 = grader-based.
 const CurrentSchemaVersion = 2
 
-// GraderResultEntry is a serializable representation of a single grader result.
-type GraderResultEntry struct {
-	Name    string  `json:"name"`
-	Kind    string  `json:"kind"`
-	Passed  bool    `json:"passed"`
-	Score   float64 `json:"score"`
-	Message string  `json:"message"`
-	Weight  float64 `json:"weight"`
-	Gate    bool    `json:"gate,omitempty"`
-	Error   string  `json:"error,omitempty"`
-}
-
-// GraderAggregateEntry is a serializable representation of aggregated grader results.
-type GraderAggregateEntry struct {
-	Results     []GraderResultEntry `json:"results"`
-	Score       float64             `json:"score"`
-	Passed      bool                `json:"passed"`
-	GatesFailed []string            `json:"gates_failed,omitempty"`
-}
-
 // GraderResult holds the output from a single grader (LLM reviewer, build check, etc.).
 type GraderResult struct {
 	GraderName   string              `json:"grader_name"`
@@ -129,8 +109,7 @@ type EvalReport struct {
 	ReviewedFiles  []ReviewedFile        `json:"reviewed_files,omitempty"`
 	Review         *review.ReviewResult  `json:"review,omitempty"`
 	ReviewPanel    []review.ReviewResult `json:"review_panel,omitempty"`
-	GraderResults  []GraderResult        `json:"grader_results_legacy,omitempty"`
-	GraderAgg      *GraderAggregateEntry `json:"grader_results,omitempty"` // Pluggable grader results (#136)
+	GraderResults  []GraderResult        `json:"grader_results,omitempty"`
 	ToolUsage      *ToolUsageResult      `json:"tool_usage,omitempty"`
 	SessionEvents  []SessionEventRecord  `json:"session_events,omitempty"`
 	EventCount     int                   `json:"event_count"`
