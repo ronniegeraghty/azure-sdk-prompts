@@ -306,6 +306,38 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		b.WriteString("\n")
 	}
 
+	// Score Breakdown (#143)
+	if r.ScoreBreakdown != nil {
+		b.WriteString("## Score Breakdown\n\n")
+		if r.ScoreBreakdown.GateFailed {
+			b.WriteString("> ⛔ **Gate Override:** Gate grader(s) ")
+			for i, n := range r.ScoreBreakdown.GateFailedNames {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				fmt.Fprintf(&b, "`%s`", n)
+			}
+			b.WriteString(" failed — final score forced to 0%.\n\n")
+		}
+		fmt.Fprintf(&b, "**Formula:** `%s`\n\n", r.ScoreBreakdown.Formula)
+		b.WriteString("| Grader | Type | Score | Weight | Weighted | Contribution | Status |\n")
+		b.WriteString("|--------|------|-------|--------|----------|--------------|--------|\n")
+		for _, c := range r.ScoreBreakdown.Contributions {
+			gate := ""
+			if c.Gate {
+				gate = " 🚪 GATE"
+			}
+			status := "✅"
+			if !c.Pass {
+				status = "❌"
+			}
+			fmt.Fprintf(&b, "| `%s` | %s | %.0f%% | %.2f | %.4f | %.1f%% | %s%s |\n",
+				c.Name, c.Kind, c.Score*100, c.Weight, c.WeightedScore, c.ContributionPct, status, gate)
+		}
+		fmt.Fprintf(&b, "| **Final** | | | **Σ %.2f** | **Σ %.4f** | **%.1f%%** | |\n\n",
+			r.ScoreBreakdown.TotalWeight, r.ScoreBreakdown.WeightedSum, r.ScoreBreakdown.FinalScorePct)
+	}
+
 	// Re-run command
 	if r.RerunCommand != "" {
 		b.WriteString("## Re-run Command\n\n")
