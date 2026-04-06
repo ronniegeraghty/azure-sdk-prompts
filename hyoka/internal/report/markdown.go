@@ -410,7 +410,7 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 		category, _ := r.PromptMeta["category"].(string)
 		promptCell := r.PromptID
 		if service != "" && plane != "" && language != "" && category != "" {
-			link := filepath.Join("results", service, plane, language, category, r.ConfigName, "report.md")
+			link := strings.Join([]string{"results", service, plane, language, category, r.ConfigName, "report.md"}, "/")
 			promptCell = fmt.Sprintf("[%s](%s)", r.PromptID, link)
 		}
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %.1fs | %d |\n",

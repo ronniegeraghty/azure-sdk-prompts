@@ -157,7 +157,7 @@ func buildMatrix(s *RunSummary) *MatrixData {
 		language, _ := r.PromptMeta["language"].(string)
 		category, _ := r.PromptMeta["category"].(string)
 		if service != "" && plane != "" && language != "" && category != "" {
-			cell.ReportLink = filepath.Join("results", service, plane, language, category, r.PromptID, r.ConfigName, "report.html")
+			cell.ReportLink = strings.Join([]string{"results", service, plane, language, category, r.PromptID, r.ConfigName, "report.html"}, "/")
 		}
 		m.Cells[r.PromptID][r.ConfigName] = cell
 	}
@@ -631,7 +631,8 @@ func htmlFuncMap() template.FuncMap {
 			if service == "" || plane == "" || language == "" || category == "" {
 				return ""
 			}
-			return filepath.Join("results", service, plane, language, category, r.PromptID, r.ConfigName, "report.html")
+			// Use forward slashes for HTML links (filepath.Join uses OS-native backslashes on Windows)
+			return strings.Join([]string{"results", service, plane, language, category, r.PromptID, r.ConfigName, "report.html"}, "/")
 		},
 	}
 }
