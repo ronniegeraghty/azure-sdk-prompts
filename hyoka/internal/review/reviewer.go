@@ -364,6 +364,10 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 
 	// Run reviewers sequentially — one Copilot session at a time
 	for i, model := range p.models {
+		// Bail early if the parent context was cancelled (#129).
+		if ctx.Err() != nil {
+			break
+		}
 		slog.Debug("Panel reviewer starting", "model", model, "index", i)
 		modelWorkDir, copyErr := copyDirToTemp(workDir, fmt.Sprintf("hyoka-review-%s-*", model))
 		if copyErr != nil {
@@ -439,6 +443,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		select {
 		case <-done:
 		case <-time.After(10 * time.Second):
+			client.ForceStop()
 		}
 	}()
 
