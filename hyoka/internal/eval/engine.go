@@ -962,7 +962,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 							Gate:    r.Gate,
 						}
 					}
-					evalReport.GraderResults = &report.GraderAggregateEntry{
+					evalReport.GraderAgg = &report.GraderAggregateEntry{
 						Results: reportResults,
 						Score:   agg.Score,
 						Passed:  agg.Pass,

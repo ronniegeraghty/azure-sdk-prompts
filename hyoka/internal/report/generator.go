@@ -23,6 +23,11 @@ func ReportDir(outputDir string, runID string, p *prompt.Prompt) string {
 
 // WriteReport writes an EvalReport as JSON to the appropriate directory.
 func WriteReport(r *EvalReport, outputDir string, runID string, p *prompt.Prompt) (string, error) {
+// Ensure schema version is current
+if r.SchemaVersion == 0 {
+	r.SchemaVersion = CurrentSchemaVersion
+}
+
 reportDir := filepath.Join(
 ReportDir(outputDir, runID, p), r.ConfigName,
 )

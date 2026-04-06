@@ -2,8 +2,13 @@
 package report
 
 import (
+	"github.com/ronniegeraghty/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/internal/review"
 )
+
+// CurrentSchemaVersion is the latest report schema version.
+// v1 = legacy monolithic ReviewResult; v2 = grader-based.
+const CurrentSchemaVersion = 2
 
 // GraderResultEntry is a serializable representation of a single grader result.
 type GraderResultEntry struct {
@@ -23,6 +28,21 @@ type GraderAggregateEntry struct {
 	Score       float64             `json:"score"`
 	Passed      bool                `json:"passed"`
 	GatesFailed []string            `json:"gates_failed,omitempty"`
+}
+
+// GraderResult holds the output from a single grader (LLM reviewer, build check, etc.).
+type GraderResult struct {
+	GraderName   string              `json:"grader_name"`
+	GraderType   string              `json:"grader_type"` // "review", "build", "lint", "test"
+	Model        string              `json:"model,omitempty"`
+	Scores       review.ReviewScores `json:"scores"`
+	OverallScore int                 `json:"overall_score"`
+	MaxScore     int                 `json:"max_score"`
+	Summary      string              `json:"summary"`
+	Issues       []string            `json:"issues,omitempty"`
+	Strengths    []string            `json:"strengths,omitempty"`
+	Duration     float64             `json:"duration_seconds,omitempty"`
+	IsConsensus  bool                `json:"is_consensus,omitempty"`
 }
 
 // SessionEventRecord is a serializable representation of a Copilot session event.
@@ -95,34 +115,36 @@ type ResourceStats struct {
 
 // EvalReport contains the results of a single prompt evaluation.
 type EvalReport struct {
-	PromptID           string                `json:"prompt_id"`
-	ConfigName         string                `json:"config_name"`
-	Timestamp          string                `json:"timestamp"`
-	Duration           float64               `json:"duration_seconds"`
-	GenerationDuration float64               `json:"generation_duration_seconds,omitempty"`
-	ReviewDuration     float64               `json:"review_duration_seconds,omitempty"`
-	PromptMeta         map[string]any        `json:"prompt_metadata"`
-	ConfigUsed         map[string]any        `json:"config_used"`
-	GeneratedFiles     []string              `json:"generated_files"`
-	StarterFiles       []string              `json:"starter_files,omitempty"`
-	ReviewedFiles      []ReviewedFile        `json:"reviewed_files,omitempty"`
-	Review             *review.ReviewResult  `json:"review,omitempty"`
-	ReviewPanel        []review.ReviewResult `json:"review_panel,omitempty"`
-	ToolUsage          *ToolUsageResult      `json:"tool_usage,omitempty"`
-	SessionEvents      []SessionEventRecord  `json:"session_events,omitempty"`
-	EventCount         int                   `json:"event_count"`
-	ToolCalls          []string              `json:"tool_calls"`
-	Environment        *EnvironmentInfo      `json:"environment,omitempty"`
-	ResourceUsage      *ResourceStats        `json:"resource_usage,omitempty"` // Per-eval resource stats (#45)
-	GraderResults      *GraderAggregateEntry `json:"grader_results,omitempty"` // Pluggable grader results (#136)
-	Success            bool                  `json:"success"`
-	Error              string                `json:"error,omitempty"`
-	ErrorDetails       string                `json:"error_details,omitempty"`
-	ErrorCategory      string                `json:"error_category,omitempty"` // timeout, sdk_error, generation_failure, review_failure, no_files
-	FailureReason      string                `json:"failure_reason,omitempty"` // human-readable explanation of failure
-	IsStub             bool                  `json:"is_stub,omitempty"`
-	RerunCommand       string                `json:"rerunCommand,omitempty"`
-	// Generator guardrails (#35, #125)
+	SchemaVersion  int                   `json:"schema_version"`
+	PromptID       string                `json:"prompt_id"`
+	ConfigName     string                `json:"config_name"`
+	Timestamp      string                `json:"timestamp"`
+	Duration               float64               `json:"duration_seconds"`
+	GenerationDuration     float64               `json:"generation_duration_seconds,omitempty"`
+	ReviewDuration         float64               `json:"review_duration_seconds,omitempty"`
+	PromptMeta     map[string]any        `json:"prompt_metadata"`
+	ConfigUsed     map[string]any        `json:"config_used"`
+	GeneratedFiles []string              `json:"generated_files"`
+	StarterFiles   []string              `json:"starter_files,omitempty"`
+	ReviewedFiles  []ReviewedFile        `json:"reviewed_files,omitempty"`
+	Review         *review.ReviewResult  `json:"review,omitempty"`
+	ReviewPanel    []review.ReviewResult `json:"review_panel,omitempty"`
+	GraderResults  []GraderResult        `json:"grader_results_legacy,omitempty"`
+	GraderAgg      *GraderAggregateEntry `json:"grader_results,omitempty"` // Pluggable grader results (#136)
+	ToolUsage      *ToolUsageResult      `json:"tool_usage,omitempty"`
+	SessionEvents  []SessionEventRecord  `json:"session_events,omitempty"`
+	EventCount     int                   `json:"event_count"`
+	ToolCalls      []string              `json:"tool_calls"`
+	Environment    *EnvironmentInfo      `json:"environment,omitempty"`
+	ResourceUsage  *ResourceStats        `json:"resource_usage,omitempty"` // Per-eval resource stats (#45)
+	Success        bool                  `json:"success"`
+	Error          string                `json:"error,omitempty"`
+	ErrorDetails   string                `json:"error_details,omitempty"`
+	ErrorCategory  string                `json:"error_category,omitempty"` // timeout, sdk_error, generation_failure, review_failure, no_files
+	FailureReason  string                `json:"failure_reason,omitempty"` // human-readable explanation of failure
+	IsStub         bool                  `json:"is_stub,omitempty"`
+	RerunCommand   string                `json:"rerunCommand,omitempty"`
+	// Generator guardrails (#35)
 	GuardrailMaxTurns          int    `json:"guardrail_max_turns,omitempty"`
 	GuardrailMaxFiles          int    `json:"guardrail_max_files,omitempty"`
 	GuardrailMaxOutputSize     int64  `json:"guardrail_max_output_size,omitempty"`
@@ -139,19 +161,78 @@ type RunResourceStats struct {
 
 // RunSummary contains aggregate statistics for an evaluation run.
 type RunSummary struct {
-	RunID                 string            `json:"run_id"`
-	Timestamp             string            `json:"timestamp"`
-	TotalPrompts          int               `json:"total_prompts"`
-	TotalConfigs          int               `json:"total_configs"`
-	TotalEvals            int               `json:"total_evaluations"`
-	Passed                int               `json:"passed"`
-	Failed                int               `json:"failed"`
-	Errors                int               `json:"errors"`
-	Duration              float64           `json:"duration_seconds"`
-	AvgGenerationDuration float64           `json:"avg_generation_duration_seconds,omitempty"`
-	AvgReviewDuration     float64           `json:"avg_review_duration_seconds,omitempty"`
-	Reports               []string          `json:"report_paths"`
-	Results               []*EvalReport     `json:"results,omitempty"`
-	Analysis              string            `json:"analysis,omitempty"`
-	ResourceUsage         *RunResourceStats `json:"resource_usage,omitempty"` // Aggregate resource stats (#45)
+	RunID        string        `json:"run_id"`
+	Timestamp    string        `json:"timestamp"`
+	TotalPrompts int           `json:"total_prompts"`
+	TotalConfigs int           `json:"total_configs"`
+	TotalEvals   int           `json:"total_evaluations"`
+	Passed       int           `json:"passed"`
+	Failed       int           `json:"failed"`
+	Errors       int           `json:"errors"`
+	Duration              float64       `json:"duration_seconds"`
+	AvgGenerationDuration float64       `json:"avg_generation_duration_seconds,omitempty"`
+	AvgReviewDuration     float64       `json:"avg_review_duration_seconds,omitempty"`
+	Reports      []string      `json:"report_paths"`
+	Results      []*EvalReport `json:"results,omitempty"`
+	Analysis     string        `json:"analysis,omitempty"`
+	ResourceUsage  *RunResourceStats `json:"resource_usage,omitempty"` // Aggregate resource stats (#45)
+	PairwiseResults []*pairwise.PairwiseReport `json:"pairwise_results,omitempty"` // Per-prompt pairwise impact (#123)
+}
+
+// GraderResultsFromReview converts legacy ReviewResult data into []GraderResult.
+// If panel is non-empty, each panel member becomes a grader entry and the
+// consolidated review becomes the consensus entry.
+func GraderResultsFromReview(consolidated *review.ReviewResult, panel []review.ReviewResult) []GraderResult {
+	if consolidated == nil {
+		return nil
+	}
+	var results []GraderResult
+	for i := range panel {
+		r := &panel[i]
+		name := r.Model
+		if name == "" {
+			name = "reviewer"
+		}
+		results = append(results, GraderResult{
+			GraderName:   name,
+			GraderType:   "review",
+			Model:        r.Model,
+			Scores:       r.Scores,
+			OverallScore: r.OverallScore,
+			MaxScore:     r.MaxScore,
+			Summary:      r.Summary,
+			Issues:       r.Issues,
+			Strengths:    r.Strengths,
+		})
+	}
+	consensusName := consolidated.Model
+	if consensusName == "" {
+		consensusName = "consensus"
+	}
+	results = append(results, GraderResult{
+		GraderName:   consensusName,
+		GraderType:   "review",
+		Model:        consolidated.Model,
+		Scores:       consolidated.Scores,
+		OverallScore: consolidated.OverallScore,
+		MaxScore:     consolidated.MaxScore,
+		Summary:      consolidated.Summary,
+		Issues:       consolidated.Issues,
+		Strengths:    consolidated.Strengths,
+		IsConsensus:  len(panel) > 0,
+	})
+	return results
+}
+
+// MigrateToV2 upgrades a v1 (or v0) EvalReport to the current v2 schema.
+// It populates GraderResults from the existing Review/ReviewPanel fields
+// and sets SchemaVersion. The function is idempotent.
+func MigrateToV2(r *EvalReport) {
+	if r.SchemaVersion >= CurrentSchemaVersion {
+		return
+	}
+	if len(r.GraderResults) == 0 && r.Review != nil {
+		r.GraderResults = GraderResultsFromReview(r.Review, r.ReviewPanel)
+	}
+	r.SchemaVersion = CurrentSchemaVersion
 }
