@@ -180,9 +180,20 @@ func handleAPIRunDetail(w http.ResponseWriter, r *http.Request, reportsDir strin
 		return
 	}
 
-	// /api/runs/{runId}/eval?path=...
-	if len(parts) == 2 && parts[1] == "eval" {
-		handleAPIEval(w, r, reportsDir, runID)
+	// Sub-resource dispatch for /api/runs/{runId}/{sub}
+	if len(parts) == 2 {
+		switch parts[1] {
+		case "eval":
+			handleAPIEval(w, r, reportsDir, runID)
+		case "graders":
+			handleAPIGraders(w, r, reportsDir, runID)
+		case "timeline":
+			handleAPITimeline(w, r, reportsDir, runID)
+		case "score-breakdown":
+			handleAPIScoreBreakdown(w, r, reportsDir, runID)
+		default:
+			http.NotFound(w, r)
+		}
 		return
 	}
 
