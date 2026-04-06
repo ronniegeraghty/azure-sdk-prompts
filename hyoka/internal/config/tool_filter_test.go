@@ -211,3 +211,51 @@ t.Errorf("result[%d] = %q, want %q", i, result[i], name)
 }
 }
 }
+
+func TestParseConfigWithAlwaysOn(t *testing.T) {
+data := []byte(`
+configs:
+  - name: always-on-test
+    description: "Config with always_on tools"
+    generator:
+      model: "claude-opus-4.6"
+      tools:
+        - name: "bash"
+          always_on: true
+        - name: "azure-mcp"
+          when:
+            language: python
+        - name: "edit"
+`)
+cfg, err := Parse(data)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+tools := cfg.Configs[0].Generator.Tools
+if len(tools) != 3 {
+t.Fatalf("expected 3 tools, got %d", len(tools))
+}
+if !tools[0].AlwaysOn {
+t.Error("expected bash to have always_on=true")
+}
+if tools[1].AlwaysOn {
+t.Error("expected azure-mcp to have always_on=false (default)")
+}
+if tools[2].AlwaysOn {
+t.Error("expected edit to have always_on=false (default)")
+}
+}
+
+func TestToolEntryAlwaysOnDefault(t *testing.T) {
+entry := ToolEntry{Name: "bash"}
+if entry.AlwaysOn {
+t.Error("expected AlwaysOn to default to false")
+}
+}
+
+func TestValidateToolEntry_WithAlwaysOn(t *testing.T) {
+entry := ToolEntry{Name: "bash", AlwaysOn: true}
+if err := validateToolEntry(entry, "test", 0); err != nil {
+t.Errorf("unexpected error for always_on tool: %v", err)
+}
+}
