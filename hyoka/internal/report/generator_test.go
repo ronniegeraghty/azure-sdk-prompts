@@ -245,6 +245,221 @@ func TestGraderResultsFromSingleReview(t *testing.T) {
 	}
 }
 
+func TestBuildActionTimeline(t *testing.T) {
+	boolTrue := true
+	boolFalse := false
+	events := []SessionEventRecord{
+		{Type: "assistant.turn_start"},
+		{Type: "assistant.reasoning"},
+		{Type: "tool.execution_start", ToolName: "create_file", FilePath: "main.go"},
+		{Type: "tool.execution_complete", ToolName: "create_file", Duration: 150.0, ToolSuccess: &boolTrue},
+		{Type: "tool.execution_start", ToolName: "edit_file", MCPServerName: "editor"},
+		{Type: "tool.execution_complete", ToolName: "edit_file", Duration: 80.0, ToolSuccess: &boolFalse, Error: "conflict"},
+		{Type: "assistant.intent", Intent: "fixing imports"},
+		{Type: "assistant.message"},
+		{Type: "assistant.turn_end"},
+	}
+
+	tl := BuildActionTimeline(events)
+	if tl == nil {
+		t.Fatal("expected non-nil timeline")
+	}
+
+	// Verify entries (tool.execution_complete updates existing entries, doesn't create new ones)
+	if len(tl.Entries) != 7 {
+		t.Fatalf("expected 7 entries, got %d", len(tl.Entries))
+	}
+
+	// Verify turn_start
+	if tl.Entries[0].Type != "turn_start" || tl.Entries[0].TurnNumber != 1 {
+		t.Errorf("entry 0: expected turn_start turn=1, got %s turn=%d", tl.Entries[0].Type, tl.Entries[0].TurnNumber)
+	}
+
+	// Verify tool_call with completion data
+	if tl.Entries[2].Type != "tool_call" || tl.Entries[2].ToolName != "create_file" {
+		t.Errorf("entry 2: expected tool_call create_file, got %s %s", tl.Entries[2].Type, tl.Entries[2].ToolName)
+	}
+	if tl.Entries[2].Duration != 150.0 {
+		t.Errorf("entry 2: expected duration 150, got %.1f", tl.Entries[2].Duration)
+	}
+	if tl.Entries[2].Success == nil || !*tl.Entries[2].Success {
+		t.Error("entry 2: expected success=true")
+	}
+	if tl.Entries[2].FilePath != "main.go" {
+		t.Errorf("entry 2: expected file_path main.go, got %q", tl.Entries[2].FilePath)
+	}
+
+	// Verify failed tool (entry index 3)
+	if tl.Entries[3].ToolName != "edit_file" || tl.Entries[3].Error != "conflict" {
+		t.Errorf("entry 3: expected edit_file with conflict error, got %s err=%s", tl.Entries[3].ToolName, tl.Entries[3].Error)
+	}
+	if tl.Entries[3].MCPServer != "editor" {
+		t.Errorf("entry 3: expected mcp_server editor, got %q", tl.Entries[3].MCPServer)
+	}
+
+	// Verify intent (entry index 4)
+	if tl.Entries[4].Type != "intent" || tl.Entries[4].Intent != "fixing imports" {
+		t.Errorf("entry 4: expected intent 'fixing imports', got type=%s intent=%q", tl.Entries[4].Type, tl.Entries[4].Intent)
+	}
+
+	// Verify summary
+	if tl.Summary.TotalActions != 7 {
+		t.Errorf("summary: expected 7 total actions, got %d", tl.Summary.TotalActions)
+	}
+	if tl.Summary.TotalToolCalls != 2 {
+		t.Errorf("summary: expected 2 tool calls, got %d", tl.Summary.TotalToolCalls)
+	}
+	if tl.Summary.TotalTurns != 1 {
+		t.Errorf("summary: expected 1 turn, got %d", tl.Summary.TotalTurns)
+	}
+	if tl.Summary.ToolCallDuration != 230.0 {
+		t.Errorf("summary: expected tool duration 230, got %.1f", tl.Summary.ToolCallDuration)
+	}
+	if tl.Summary.ToolSuccesses != 1 {
+		t.Errorf("summary: expected 1 success, got %d", tl.Summary.ToolSuccesses)
+	}
+	if tl.Summary.ToolFailures != 1 {
+		t.Errorf("summary: expected 1 failure, got %d", tl.Summary.ToolFailures)
+	}
+}
+
+func TestBuildActionTimelineEmpty(t *testing.T) {
+	tl := BuildActionTimeline(nil)
+	if tl != nil {
+		t.Error("expected nil timeline for empty events")
+	}
+	tl = BuildActionTimeline([]SessionEventRecord{})
+	if tl != nil {
+		t.Error("expected nil timeline for zero-length events")
+	}
+}
+
+func TestActionTimelineJSONRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+
+	boolTrue := true
+	events := []SessionEventRecord{
+		{Type: "assistant.turn_start"},
+		{Type: "tool.execution_start", ToolName: "create_file"},
+		{Type: "tool.execution_complete", ToolName: "create_file", Duration: 100.0, ToolSuccess: &boolTrue},
+		{Type: "assistant.message"},
+		{Type: "assistant.turn_end"},
+	}
+
+	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
+		PromptID:       "timeline-roundtrip",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-15T10:00:00Z",
+		Duration:       10.0,
+		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.py"},
+		SessionEvents:  events,
+		EventCount:     5,
+		Success:        true,
+	}
+
+	p := &prompt.Prompt{
+		ID:         "timeline-roundtrip",
+		Properties: map[string]string{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+	}
+
+	// WriteReport should auto-build the timeline
+	reportPath, err := WriteReport(r, dir, "run-tl", p)
+	if err != nil {
+		t.Fatalf("WriteReport failed: %v", err)
+	}
+
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("failed to read report: %v", err)
+	}
+
+	var parsed EvalReport
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if parsed.ActionTimeline == nil {
+		t.Fatal("expected action_timeline in JSON output")
+	}
+	if len(parsed.ActionTimeline.Entries) != 4 {
+		t.Errorf("expected 4 timeline entries, got %d", len(parsed.ActionTimeline.Entries))
+	}
+	if parsed.ActionTimeline.Summary.TotalToolCalls != 1 {
+		t.Errorf("expected 1 tool call in summary, got %d", parsed.ActionTimeline.Summary.TotalToolCalls)
+	}
+	if parsed.ActionTimeline.Summary.ToolCallDuration != 100.0 {
+		t.Errorf("expected tool duration 100, got %.1f", parsed.ActionTimeline.Summary.ToolCallDuration)
+	}
+
+	// Verify the timeline entry details survive round-trip
+	var foundToolCall bool
+	for _, e := range parsed.ActionTimeline.Entries {
+		if e.Type == "tool_call" && e.ToolName == "create_file" {
+			foundToolCall = true
+			if e.Duration != 100.0 {
+				t.Errorf("tool_call duration: expected 100, got %.1f", e.Duration)
+			}
+			if e.Success == nil || !*e.Success {
+				t.Error("tool_call: expected success=true")
+			}
+		}
+	}
+	if !foundToolCall {
+		t.Error("expected to find tool_call entry for create_file")
+	}
+}
+
+func TestActionTimelinePresetNotOverwritten(t *testing.T) {
+	dir := t.TempDir()
+
+	// Pre-set a timeline — WriteReport should not overwrite it.
+	preset := &ActionTimelineReport{
+		Entries: []ActionTimelineEntry{{Index: 1, Type: "custom"}},
+		Summary: ActionTimelineSummary{TotalActions: 99},
+	}
+
+	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
+		PromptID:       "timeline-preset",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-15T10:00:00Z",
+		Duration:       5.0,
+		PromptMeta:     map[string]any{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.go"},
+		SessionEvents:  []SessionEventRecord{{Type: "assistant.message"}},
+		ActionTimeline: preset,
+		Success:        true,
+	}
+
+	p := &prompt.Prompt{
+		ID:         "timeline-preset",
+		Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"},
+	}
+
+	reportPath, err := WriteReport(r, dir, "run-preset", p)
+	if err != nil {
+		t.Fatalf("WriteReport failed: %v", err)
+	}
+
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("failed to read: %v", err)
+	}
+
+	var parsed EvalReport
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if parsed.ActionTimeline.Summary.TotalActions != 99 {
+		t.Errorf("expected preset total_actions=99, got %d", parsed.ActionTimeline.Summary.TotalActions)
+	}
+}
+
 func TestMigrateToV2(t *testing.T) {
 	r := &EvalReport{
 		PromptID:   "migrate-test",

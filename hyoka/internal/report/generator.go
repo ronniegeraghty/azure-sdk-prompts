@@ -34,6 +34,11 @@ func WriteReport(r *EvalReport, outputDir string, runID string, p *prompt.Prompt
 		return "", fmt.Errorf("creating report directory: %w", err)
 	}
 
+	// Build the action timeline from session events if not already set.
+	if r.ActionTimeline == nil && len(r.SessionEvents) > 0 {
+		r.ActionTimeline = BuildActionTimeline(r.SessionEvents)
+	}
+
 	// Truncate verbose fields when the report is excessively large.
 	TruncateReport(r)
 
