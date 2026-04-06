@@ -601,8 +601,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	start := time.Now()
 
 	evalReport := &report.EvalReport{
-		PromptID:   task.Prompt.ID,
-		ConfigName: task.Config.Name,
+		SchemaVersion: report.CurrentSchemaVersion,
+		PromptID:      task.Prompt.ID,
+		ConfigName:    task.Config.Name,
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),
 		PromptMeta: map[string]any{
 			"service":     task.Prompt.Service(),
@@ -950,23 +951,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				if aggErr != nil {
 					glg.Error("Failed to aggregate grader results", "error", aggErr)
 				} else {
-					reportResults := make([]report.GraderResultEntry, len(agg.Results))
+					reportResults := make([]report.GraderResult, len(agg.Results))
 					for i, r := range agg.Results {
-						reportResults[i] = report.GraderResultEntry{
-							Name:    r.Name,
-							Kind:    r.Kind,
-							Passed:  r.Pass,
-							Score:   r.Score,
-							Message: r.Message,
-							Weight:  r.Weight,
-							Gate:    r.Gate,
+						reportResults[i] = report.GraderResult{
+							GraderName: r.Name,
+							GraderType: r.Kind,
+							Summary:    r.Message,
 						}
 					}
-					evalReport.GraderAgg = &report.GraderAggregateEntry{
-						Results: reportResults,
-						Score:   agg.Score,
-						Passed:  agg.Pass,
-					}
+					evalReport.GraderResults = reportResults
 
 					if !agg.Pass && !evalFailed {
 						evalReport.Success = false
@@ -1034,6 +1027,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			} else {
 				evalReport.ReviewPanel = panel
 				evalReport.Review = consolidated
+				evalReport.GraderResults = report.GraderResultsFromReview(consolidated, panel)
 				// With criteria-based scoring, success = all criteria passed
 				if !evalFailed {
 					evalReport.Success = consolidated.Scores.AllPassed()
@@ -1053,6 +1047,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", err))
 			} else {
 				evalReport.Review = reviewResult
+				evalReport.GraderResults = report.GraderResultsFromReview(reviewResult, nil)
 				// With criteria-based scoring, success = all criteria passed
 				if !evalFailed {
 					evalReport.Success = reviewResult.Scores.AllPassed()

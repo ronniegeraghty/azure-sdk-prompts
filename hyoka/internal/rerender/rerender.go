@@ -57,12 +57,21 @@ func rerenderRun(reportsDir, runID string) error {
 
 	// Re-render each individual report
 	var allReports []*report.EvalReport
+	migrated := 0
 	for _, rf := range reportFiles {
 		evalReport, err := loadReport(rf)
 		if err != nil {
 			fmt.Printf("  ⚠️  skipping %s: %v\n", rf, err)
 			continue
 		}
+
+		// Migrate to v2 schema in-place
+		if changed, merr := migrateReport(evalReport, rf); merr != nil {
+			fmt.Printf("  ⚠️  migration failed for %s: %v\n", rf, merr)
+		} else if changed {
+			migrated++
+		}
+
 		allReports = append(allReports, evalReport)
 
 		// Determine report directory components from the path
@@ -91,7 +100,11 @@ func rerenderRun(reportsDir, runID string) error {
 		}
 	}
 
-	fmt.Printf("✅ Re-rendered %d report(s) for run %s\n", len(reportFiles), runID)
+	fmt.Printf("✅ Re-rendered %d report(s) for run %s", len(reportFiles), runID)
+	if migrated > 0 {
+		fmt.Printf(" (%d migrated to v%d)", migrated, report.CurrentSchemaVersion)
+	}
+	fmt.Println()
 	return nil
 }
 
@@ -135,6 +148,23 @@ func loadReport(path string) (*report.EvalReport, error) {
 		return nil, err
 	}
 	return &r, nil
+}
+
+// migrateReport upgrades a report to the current schema version and writes
+// the updated JSON back to disk. Returns true if the report was modified.
+func migrateReport(r *report.EvalReport, path string) (bool, error) {
+	if r.SchemaVersion >= report.CurrentSchemaVersion {
+		return false, nil
+	}
+	report.MigrateToV2(r)
+	data, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return false, fmt.Errorf("marshaling migrated report: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return false, fmt.Errorf("writing migrated report: %w", err)
+	}
+	return true, nil
 }
 
 func extractMeta(r *report.EvalReport) (service, plane, language, category string) {
