@@ -39,6 +39,10 @@ func TestWriteMarkdownReport(t *testing.T) {
 			Issues:       []string{"Missing retry logic"},
 			Strengths:    []string{"Clean code structure"},
 		},
+		GraderResults: []GraderResult{
+			{GraderName: "md-grader", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Grader output for MD"},
+			{GraderName: "consensus", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "MD consensus", IsConsensus: true},
+		},
 		SessionEvents: []SessionEventRecord{
 			{Type: "user.message", Content: "Write a dotnet storage auth sample"},
 			{Type: "assistant.reasoning", Content: "I need to create an auth sample"},
@@ -84,6 +88,10 @@ func TestWriteMarkdownReport(t *testing.T) {
 		"8.2s",
 		"Review",
 		"3.1s",
+		"Grader Results",
+		"md-grader",
+		"Grader output for MD",
+		"MD consensus",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
