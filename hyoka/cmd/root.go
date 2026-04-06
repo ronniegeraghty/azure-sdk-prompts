@@ -53,6 +53,7 @@ root.AddCommand(serveCmd())
 root.AddCommand(pluginsCmd())
 root.AddCommand(cleanCmd())
 	root.AddCommand(compareCmd())
+root.AddCommand(initCmd())
 
 return root
 }
