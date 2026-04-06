@@ -384,12 +384,58 @@ func BuildActionTimelineWithSetup(events []SessionEventRecord, setup *SessionSet
 			turnNumber++
 			summary.TotalTurns++
 			summary.TotalActions++
+			index++
+			entries = append(entries, ActionTimelineEntry{
+				Index:      index,
+				TurnNumber: turnNumber,
+				Type:       "turn_start",
+			})
 		case "assistant.turn_end":
 			summary.TotalActions++
+			index++
+			entries = append(entries, ActionTimelineEntry{
+				Index:      index,
+				TurnNumber: turnNumber,
+				Type:       "turn_end",
+			})
+		case "assistant.reasoning":
+			summary.TotalActions++
+			index++
+			entries = append(entries, ActionTimelineEntry{
+				Index:      index,
+				TurnNumber: turnNumber,
+				Type:       "reasoning",
+			})
+		case "assistant.message":
+			summary.TotalActions++
+			index++
+			entries = append(entries, ActionTimelineEntry{
+				Index:      index,
+				TurnNumber: turnNumber,
+				Type:       "message",
+			})
+		case "assistant.intent":
+			summary.TotalActions++
+			index++
+			entries = append(entries, ActionTimelineEntry{
+				Index:      index,
+				TurnNumber: turnNumber,
+				Type:       "intent",
+				Intent:     ev.Intent,
+			})
 		case "tool.execution_start":
 			summary.TotalToolCalls++
 			summary.TotalActions++
 			summary.ToolCalls++
+			index++
+			entries = append(entries, ActionTimelineEntry{
+				Index:      index,
+				TurnNumber: turnNumber,
+				Type:       "tool_call",
+				ToolName:   ev.ToolName,
+				MCPServer:  ev.MCPServerName,
+				FilePath:   ev.FilePath,
+			})
 			reportEvents = append(reportEvents, ActionEventReport{
 				Sequence:   seq,
 				Type:       "tool_call",
@@ -399,9 +445,17 @@ func BuildActionTimelineWithSetup(events []SessionEventRecord, setup *SessionSet
 				MCPServer:  ev.MCPServerName,
 			})
 		case "tool.execution_complete":
-			summary.TotalActions++
 			summary.ToolCallDuration += ev.Duration
 			summary.TotalDurationMs += ev.Duration
+			// Update the matching tool_call entry with completion data.
+			for i := len(entries) - 1; i >= 0; i-- {
+				if entries[i].Type == "tool_call" && entries[i].ToolName == ev.ToolName && entries[i].Duration == 0 {
+					entries[i].Duration = ev.Duration
+					entries[i].Success = ev.ToolSuccess
+					entries[i].Error = ev.Error
+					break
+				}
+			}
 			if ev.ToolSuccess != nil {
 				if *ev.ToolSuccess {
 					summary.ToolSuccesses++

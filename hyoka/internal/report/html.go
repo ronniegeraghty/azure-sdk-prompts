@@ -636,6 +636,9 @@ func htmlFuncMap() template.FuncMap {
 		"derefBool": func(b *bool) bool {
 			return b != nil && *b
 		},
+		"mul": func(a, b float64) float64 {
+			return a * b
+		},
 		"reportLink": func(r *EvalReport) string {
 			service, _ := r.PromptMeta["service"].(string)
 			plane, _ := r.PromptMeta["plane"].(string)

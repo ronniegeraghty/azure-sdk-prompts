@@ -474,23 +474,91 @@
 <div class="section">
   <div class="section-header"><span class="icon">🎯</span><h2>Grader Results ({{len .GraderResults}} graders)</h2></div>
   <div class="section-body">
-    <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;table-layout:auto">
+    {{range .GraderResults}}
+    <div style="margin-bottom:1.5rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff">
+      <div style="padding:0.75rem 1rem;display:flex;align-items:center;gap:0.75rem;background:#f8fafc;border-bottom:1px solid var(--border)">
+        <code style="font-weight:600">{{.GraderName}}</code>
+        <span style="font-size:0.8rem;padding:2px 8px;border-radius:4px;background:#e2e8f0">{{.GraderType}}</span>
+        {{if .Gate}}{{if and .Pass (derefBool .Pass)}}<span style="color:var(--green);font-weight:600">GATE PASSED</span>{{else}}<span style="color:var(--red);font-weight:600">GATE FAILED</span>{{end}}{{end}}
+      </div>
+      <div style="padding:0.75rem 1rem">
+        {{if gt .Score 0.0}}
+        <div class="score-bar" style="height:8px;background:#e2e8f0;border-radius:4px;margin-bottom:0.5rem">
+          <div class="score-bar-fill" style="height:100%;border-radius:4px;width:{{printf "%.0f" (mul .Score 100.0)}}%;background:var(--green)"></div>
+        </div>
+        {{end}}
+        {{if .Summary}}<p style="font-size:0.85rem;color:var(--text-muted)">{{.Summary}}</p>{{end}}
+        {{if .FileDetails}}
+        <table style="width:100%;border-collapse:collapse;margin-top:0.5rem">
+          {{range .FileDetails.CheckedFiles}}
+          <tr>
+            <td style="padding:0.25rem 0.5rem"><code>{{.Path}}</code></td>
+            <td style="padding:0.25rem 0.5rem">{{if .Exists}}<span style="color:var(--green)">exists</span>{{else}}<span style="color:var(--red)">missing</span>{{end}}</td>
+            {{if .Pattern}}<td style="padding:0.25rem 0.5rem"><code>{{.Pattern}}</code></td>{{end}}
+          </tr>
+          {{end}}
+        </table>
+        {{end}}
+        {{if .ProgramDetails}}
+        <div style="margin-top:0.5rem">
+          <div><strong>Command:</strong> <code>{{.ProgramDetails.Command}}</code></div>
+          <div><strong>Exit code:</strong> {{.ProgramDetails.ExitCode}}</div>
+          {{if .ProgramDetails.Stdout}}<details><summary>Show stdout</summary><pre>{{.ProgramDetails.Stdout}}</pre></details>{{end}}
+          {{if .ProgramDetails.Stderr}}<details><summary>Show stderr</summary><pre>{{.ProgramDetails.Stderr}}</pre></details>{{end}}
+        </div>
+        {{end}}
+        {{if .PromptDetails}}
+        <div style="margin-top:0.5rem">
+          <div>{{.PromptDetails.Model}} — {{.PromptDetails.RawScore}}/{{.PromptDetails.MaxScore}}</div>
+          {{if .PromptDetails.Rubric}}<details><summary>Show rubric</summary><pre>{{.PromptDetails.Rubric}}</pre></details>{{end}}
+          {{if .PromptDetails.Reasoning}}<details><summary>Show LLM reasoning</summary><p>{{.PromptDetails.Reasoning}}</p></details>{{end}}
+        </div>
+        {{end}}
+        {{if .BehaviorDetails}}
+        <div style="margin-top:0.5rem">
+          {{if .BehaviorDetails.MissingTools}}<div><strong>Missing tools:</strong> {{range .BehaviorDetails.MissingTools}}<code>{{.}}</code> {{end}}</div>{{end}}
+          {{if .BehaviorDetails.Violations}}<ul>{{range .BehaviorDetails.Violations}}<li>{{.}}</li>{{end}}</ul>{{end}}
+          {{if .BehaviorDetails.ToolCounts}}<details><summary>Tool call counts</summary><ul>{{range $k, $v := .BehaviorDetails.ToolCounts}}<li>{{$k}}: {{$v}}</li>{{end}}</ul></details>{{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- ━━ Score Breakdown ━━ -->
+{{if .ScoreBreakdown}}
+<div class="section">
+  <div class="section-header"><span class="icon">📊</span><h2>Score Breakdown</h2></div>
+  <div class="section-body">
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem"><code>{{.ScoreBreakdown.Formula}}</code></p>
+    {{if .ScoreBreakdown.GateFailed}}<div style="padding:0.5rem 0.75rem;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;margin-bottom:0.75rem;color:var(--red)">⚠️ Gate failure — final score overridden to 0. Failed: {{range .ScoreBreakdown.GateFailedNames}}<code>{{.}}</code> {{end}}</div>{{end}}
+    <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden">
       <thead><tr>
-        <th style="background:#f8fafc;padding:0.75rem;text-align:left;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Grader</th>
-        <th style="background:#f8fafc;padding:0.75rem;text-align:center;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Type</th>
-        <th style="background:#f8fafc;padding:0.75rem;text-align:center;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Score</th>
-        <th style="background:#f8fafc;padding:0.75rem;text-align:left;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Summary</th>
+        <th style="background:#f8fafc;padding:0.5rem;text-align:left;font-size:0.85rem;border-bottom:2px solid var(--border)">Grader</th>
+        <th style="background:#f8fafc;padding:0.5rem;text-align:center;font-size:0.85rem;border-bottom:2px solid var(--border)">Score</th>
+        <th style="background:#f8fafc;padding:0.5rem;text-align:center;font-size:0.85rem;border-bottom:2px solid var(--border)">Weight</th>
+        <th style="background:#f8fafc;padding:0.5rem;text-align:center;font-size:0.85rem;border-bottom:2px solid var(--border)">Weighted</th>
+        <th style="background:#f8fafc;padding:0.5rem;text-align:center;font-size:0.85rem;border-bottom:2px solid var(--border)">Contribution</th>
       </tr></thead>
       <tbody>
-        {{range .GraderResults}}
-        <tr{{if .IsConsensus}} style="font-weight:700;border-top:2px solid var(--border)"{{end}}>
-          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;white-space:nowrap">{{if .IsConsensus}}🏆 {{end}}<code>{{.GraderName}}</code></td>
-          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;text-align:center"><span style="font-size:0.8rem;padding:2px 8px;border-radius:4px;background:#f1f5f9">{{.GraderType}}</span></td>
-          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;text-align:center"><strong style="color:{{scoreColor .OverallScore .MaxScore}}">{{.OverallScore}}/{{.MaxScore}}</strong></td>
-          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;font-size:0.85rem;color:var(--text-muted)">{{truncate .Summary 200}}</td>
+      {{range .ScoreBreakdown.Contributions}}
+        <tr>
+          <td style="padding:0.5rem"><code>{{.Name}}</code> <span style="font-size:0.75rem;color:var(--text-muted)">({{.Kind}})</span>{{if .Gate}} 🚧{{end}}</td>
+          <td style="padding:0.5rem;text-align:center">{{printf "%.2f" .Score}}</td>
+          <td style="padding:0.5rem;text-align:center">{{printf "%.1f" .Weight}}</td>
+          <td style="padding:0.5rem;text-align:center">{{printf "%.2f" .WeightedScore}}</td>
+          <td style="padding:0.5rem;text-align:center">{{printf "%.1f" .ContributionPct}}%</td>
         </tr>
-        {{end}}
+      {{end}}
       </tbody>
+      <tfoot><tr style="font-weight:700;border-top:2px solid var(--border)">
+        <td style="padding:0.5rem">Final Score</td>
+        <td colspan="3" style="padding:0.5rem;text-align:center">{{printf "%.2f" .ScoreBreakdown.FinalScore}}</td>
+        <td style="padding:0.5rem;text-align:center">{{printf "%.1f" .ScoreBreakdown.FinalScorePct}}%</td>
+      </tr></tfoot>
     </table>
   </div>
 </div>
