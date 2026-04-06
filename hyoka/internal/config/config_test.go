@@ -689,3 +689,87 @@ func TestValidateRejectsEmptyGeneratorModel(t *testing.T) {
 		t.Errorf("got %q, want %q", err.Error(), want)
 	}
 }
+
+func TestParseSessionLimits(t *testing.T) {
+data := []byte(`
+configs:
+  - name: with-limits
+    description: "Config with session limits"
+    generator:
+      model: "claude-opus-4.6"
+    limits:
+      max_turns: 25
+      max_files: 50
+      max_output_size: "1MB"
+      max_session_actions: 100
+`)
+cfg, err := Parse(data)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+lim := cfg.Configs[0].Limits
+if lim == nil {
+t.Fatal("expected Limits to be non-nil")
+}
+if lim.MaxTurns != 25 {
+t.Errorf("expected MaxTurns=25, got %d", lim.MaxTurns)
+}
+if lim.MaxFiles != 50 {
+t.Errorf("expected MaxFiles=50, got %d", lim.MaxFiles)
+}
+if lim.MaxOutputSize != "1MB" {
+t.Errorf("expected MaxOutputSize='1MB', got %q", lim.MaxOutputSize)
+}
+if lim.MaxSessionActions != 100 {
+t.Errorf("expected MaxSessionActions=100, got %d", lim.MaxSessionActions)
+}
+}
+
+func TestParseSessionLimitsOmitted(t *testing.T) {
+data := []byte(`
+configs:
+  - name: no-limits
+    description: "Config without limits"
+    generator:
+      model: "gpt-4"
+`)
+cfg, err := Parse(data)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if cfg.Configs[0].Limits != nil {
+t.Errorf("expected Limits to be nil when omitted, got %+v", cfg.Configs[0].Limits)
+}
+}
+
+func TestParseSessionLimitsPartial(t *testing.T) {
+data := []byte(`
+configs:
+  - name: partial-limits
+    description: "Config with partial limits"
+    generator:
+      model: "gpt-4"
+    limits:
+      max_turns: 10
+`)
+cfg, err := Parse(data)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+lim := cfg.Configs[0].Limits
+if lim == nil {
+t.Fatal("expected Limits to be non-nil")
+}
+if lim.MaxTurns != 10 {
+t.Errorf("expected MaxTurns=10, got %d", lim.MaxTurns)
+}
+if lim.MaxFiles != 0 {
+t.Errorf("expected MaxFiles=0 (zero value), got %d", lim.MaxFiles)
+}
+if lim.MaxOutputSize != "" {
+t.Errorf("expected MaxOutputSize='' (zero value), got %q", lim.MaxOutputSize)
+}
+if lim.MaxSessionActions != 0 {
+t.Errorf("expected MaxSessionActions=0 (zero value), got %d", lim.MaxSessionActions)
+}
+}
