@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ronniegeraghty/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/internal/utils"
 )
 
@@ -137,6 +138,47 @@ func (w *Workspace) CopyFilesTo(destDir string) ([]string, error) {
 	}
 
 	return files, nil
+}
+
+// CopyStarterFiles copies the starter project declared in the prompt into
+// the workspace directory. Only files from the declared starter directory are
+// copied — hidden files, symlinks, and build artifacts are excluded by copyDir.
+// Returns the list of files copied (relative to the workspace root) and a nil
+// error on success. Returns (nil, nil) when the prompt has no starter project.
+func (w *Workspace) CopyStarterFiles(p *prompt.Prompt) ([]string, error) {
+	if p.StarterProject == "" {
+		return nil, nil
+	}
+	starterDir := resolveStarterDir(p)
+	info, err := os.Stat(starterDir)
+	if err != nil {
+		return nil, fmt.Errorf("starter project %q: %w", p.StarterProject, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("starter project %q is not a directory", p.StarterProject)
+	}
+	if err := copyDir(starterDir, w.Dir); err != nil {
+		return nil, fmt.Errorf("copying starter project: %w", err)
+	}
+	files, err := listFiles(w.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("listing starter files: %w", err)
+	}
+	if len(files) == 0 {
+		slog.Warn("Starter project directory contains no files", "dir", starterDir)
+	}
+	return files, nil
+}
+
+// resolveStarterDir returns the absolute path to a prompt's starter project
+// directory. If StarterProject is relative, it is resolved relative to the
+// prompt file's directory.
+func resolveStarterDir(p *prompt.Prompt) string {
+	dir := p.StarterProject
+	if !filepath.IsAbs(dir) && p.FilePath != "" {
+		dir = filepath.Join(filepath.Dir(p.FilePath), dir)
+	}
+	return dir
 }
 
 // listFiles is a helper used by Workspace and CopilotSDKEvaluator.

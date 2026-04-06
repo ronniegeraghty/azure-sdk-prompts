@@ -78,28 +78,7 @@ func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
 
 // Evaluate runs a prompt through a real Copilot session and returns generated files and events.
 func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
-	// Copy starter project if configured
-	var starterFiles []string
-	if p.StarterProject != "" {
-		starterDir := resolveStarterDir(p)
-		info, err := os.Stat(starterDir)
-		if err != nil {
-			return nil, fmt.Errorf("starter project %q: %w", p.StarterProject, err)
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("starter project %q is not a directory", p.StarterProject)
-		}
-		if err := copyDir(starterDir, workDir); err != nil {
-			return nil, fmt.Errorf("copying starter project: %w", err)
-		}
-		starterFiles, err = listFiles(workDir)
-		if err != nil {
-			return nil, fmt.Errorf("listing starter files: %w", err)
-		}
-		if len(starterFiles) == 0 {
-			slog.Warn("Starter project directory contains no files", "dir", starterDir)
-		}
-	}
+	// Starter files are copied by the engine before Evaluate is called (#127).
 
 	// Create Copilot client
 	opts := *e.clientOpts
@@ -556,7 +535,6 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				ToolCalls:      extractToolCalls(capturedEvts),
 				SessionEvents:  captured,
 				Success:        true, // Let engine.go guardrail set the proper failure
-				StarterFiles:   starterFiles,
 			}, nil
 		}
 
@@ -596,7 +574,6 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		SessionEvents:  capturedRecords,
 		Success:        !hasError,
 		Error:          "",
-		StarterFiles:   starterFiles,
 	}, nil
 }
 
@@ -838,15 +815,4 @@ func toolArgSummary(event copilot.SessionEvent) string {
 		}
 	}
 	return ""
-}
-
-
-// resolveStarterDir returns the absolute path to a prompt's starter project directory.
-// If StarterProject is relative, it is resolved relative to the prompt file's directory.
-func resolveStarterDir(p *prompt.Prompt) string {
-	dir := p.StarterProject
-	if !filepath.IsAbs(dir) && p.FilePath != "" {
-		dir = filepath.Join(filepath.Dir(p.FilePath), dir)
-	}
-	return dir
 }

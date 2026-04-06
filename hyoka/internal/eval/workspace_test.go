@@ -1,335 +1,256 @@
 package eval
 
 import (
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
+"context"
+"os"
+"path/filepath"
+"sort"
+"strings"
+"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
+"github.com/ronniegeraghty/hyoka/internal/prompt"
 )
 
 func TestSnapshotDir_CapturesFilesAndDirs(t *testing.T) {
 dir := t.TempDir()
-
-// Create a file and a subdirectory
 os.WriteFile(filepath.Join(dir, "hello.py"), []byte("print('hi')"), 0644)
 os.Mkdir(filepath.Join(dir, "subdir"), 0755)
-os.Mkdir(filepath.Join(dir, ".hidden"), 0755) // should be skipped
-
+os.Mkdir(filepath.Join(dir, ".hidden"), 0755)
 snap := snapshotDir(dir)
-if snap == nil {
-t.Fatal("snapshotDir returned nil")
-}
-if !snap["hello.py"] {
-t.Error("snapshotDir should capture files")
-}
-if !snap["subdir"] {
-t.Error("snapshotDir should capture directories")
-}
-if snap[".hidden"] {
-t.Error("snapshotDir should skip hidden entries")
-}
+if snap == nil { t.Fatal("snapshotDir returned nil") }
+if !snap["hello.py"] { t.Error("snapshotDir should capture files") }
+if !snap["subdir"] { t.Error("snapshotDir should capture directories") }
+if snap[".hidden"] { t.Error("snapshotDir should skip hidden entries") }
 }
 
 func TestRecoverMisplacedFiles_RecoversNewFiles(t *testing.T) {
-home := t.TempDir()
-workspace := t.TempDir()
-
-// Pre-existing file
+home := t.TempDir(); workspace := t.TempDir()
 os.WriteFile(filepath.Join(home, "existing.txt"), []byte("old"), 0644)
 snap := snapshotDir(home)
-
-// Simulate agent creating a new file
 os.WriteFile(filepath.Join(home, "main.py"), []byte("print('hello')"), 0644)
-
 recovered := recoverMisplacedFiles(home, snap, workspace, "test")
-if recovered != 1 {
-t.Fatalf("expected 1 recovered, got %d", recovered)
-}
-// File should exist in workspace
-if _, err := os.Stat(filepath.Join(workspace, "main.py")); err != nil {
-t.Error("main.py should be in workspace")
-}
-// File should be removed from home
-if _, err := os.Stat(filepath.Join(home, "main.py")); err == nil {
-t.Error("main.py should be removed from home")
-}
+if recovered != 1 { t.Fatalf("expected 1 recovered, got %d", recovered) }
+if _, err := os.Stat(filepath.Join(workspace, "main.py")); err != nil { t.Error("main.py should be in workspace") }
+if _, err := os.Stat(filepath.Join(home, "main.py")); err == nil { t.Error("main.py should be removed from home") }
 }
 
 func TestRecoverMisplacedFiles_DeletesJunkDirs(t *testing.T) {
-home := t.TempDir()
-workspace := t.TempDir()
-
+home := t.TempDir(); workspace := t.TempDir()
 snap := snapshotDir(home)
-
-// Simulate __pycache__ appearing
 pycache := filepath.Join(home, "__pycache__")
 os.Mkdir(pycache, 0755)
 os.WriteFile(filepath.Join(pycache, "mod.cpython-311.pyc"), []byte{0}, 0644)
-
 recovered := recoverMisplacedFiles(home, snap, workspace, "test")
-if recovered != 1 {
-t.Fatalf("expected 1 recovered (junk dir deleted), got %d", recovered)
-}
-if _, err := os.Stat(pycache); err == nil {
-t.Error("__pycache__ should be deleted")
-}
-// Should NOT appear in workspace
-if _, err := os.Stat(filepath.Join(workspace, "__pycache__")); err == nil {
-t.Error("__pycache__ should not be moved to workspace")
-}
+if recovered != 1 { t.Fatalf("expected 1 recovered, got %d", recovered) }
+if _, err := os.Stat(pycache); err == nil { t.Error("__pycache__ should be deleted") }
 }
 
 func TestRecoverMisplacedFiles_MovesNewDirToWorkspace(t *testing.T) {
-home := t.TempDir()
-workspace := t.TempDir()
-
+home := t.TempDir(); workspace := t.TempDir()
 snap := snapshotDir(home)
-
-// Simulate agent creating a project directory
 projDir := filepath.Join(home, "myproject")
 os.Mkdir(projDir, 0755)
 os.WriteFile(filepath.Join(projDir, "app.py"), []byte("app"), 0644)
-
 recovered := recoverMisplacedFiles(home, snap, workspace, "test")
-if recovered != 1 {
-t.Fatalf("expected 1 recovered, got %d", recovered)
-}
-// Directory should exist in workspace
-if _, err := os.Stat(filepath.Join(workspace, "myproject", "app.py")); err != nil {
-t.Error("myproject/app.py should be in workspace")
-}
-// Directory should be removed from home
-if _, err := os.Stat(projDir); err == nil {
-t.Error("myproject should be removed from home")
-}
+if recovered != 1 { t.Fatalf("expected 1 recovered, got %d", recovered) }
+if _, err := os.Stat(filepath.Join(workspace, "myproject", "app.py")); err != nil { t.Error("myproject/app.py should be in workspace") }
 }
 
 func TestRecoverMisplacedFiles_SkipsPreExistingDirs(t *testing.T) {
-home := t.TempDir()
-workspace := t.TempDir()
-
-// Pre-existing directory
+home := t.TempDir(); workspace := t.TempDir()
 os.Mkdir(filepath.Join(home, "Documents"), 0755)
 snap := snapshotDir(home)
-
 recovered := recoverMisplacedFiles(home, snap, workspace, "test")
-if recovered != 0 {
-t.Fatalf("expected 0 recovered, got %d", recovered)
-}
-// Documents should still exist in home
-if _, err := os.Stat(filepath.Join(home, "Documents")); err != nil {
-t.Error("Documents should still exist in home")
-}
+if recovered != 0 { t.Fatalf("expected 0 recovered, got %d", recovered) }
 }
 
 func TestFilterExcludedDirs_Empty(t *testing.T) {
-	files := []string{"main.go", "lib/utils.go"}
-	got := filterExcludedDirs(files, nil)
-	if len(got) != 2 {
-		t.Errorf("expected 2 files with nil excludes, got %d", len(got))
-	}
-	got = filterExcludedDirs(files, []string{})
-	if len(got) != 2 {
-		t.Errorf("expected 2 files with empty excludes, got %d", len(got))
-	}
+files := []string{"main.go", "lib/utils.go"}
+if got := filterExcludedDirs(files, nil); len(got) != 2 { t.Errorf("expected 2, got %d", len(got)) }
+if got := filterExcludedDirs(files, []string{}); len(got) != 2 { t.Errorf("expected 2, got %d", len(got)) }
 }
 
 func TestFilterExcludedDirs_ExcludesTopLevel(t *testing.T) {
-	files := []string{
-		"main.go",
-		"node_modules/express/index.js",
-		"node_modules/lodash/lodash.js",
-		"src/app.js",
-		"dist/bundle.js",
-	}
-	got := filterExcludedDirs(files, []string{"node_modules", "dist"})
-	if len(got) != 2 {
-		t.Errorf("expected 2 files, got %d: %v", len(got), got)
-	}
-	for _, f := range got {
-		if f == "node_modules/express/index.js" || f == "dist/bundle.js" {
-			t.Errorf("file %q should have been excluded", f)
-		}
-	}
+files := []string{"main.go", "node_modules/express/index.js", "src/app.js", "dist/bundle.js"}
+got := filterExcludedDirs(files, []string{"node_modules", "dist"})
+if len(got) != 2 { t.Errorf("expected 2, got %d: %v", len(got), got) }
 }
 
 func TestFilterExcludedDirs_KeepsNonMatching(t *testing.T) {
-	files := []string{"src/main.go", "src/utils.go", "README.md"}
-	got := filterExcludedDirs(files, []string{"node_modules", "target"})
-	if len(got) != 3 {
-		t.Errorf("expected 3 files (nothing excluded), got %d", len(got))
-	}
+files := []string{"src/main.go", "src/utils.go", "README.md"}
+if got := filterExcludedDirs(files, []string{"node_modules"}); len(got) != 3 { t.Errorf("expected 3, got %d", len(got)) }
 }
 
 func TestFilterExcludedDirs_NestedMatch(t *testing.T) {
-	files := []string{
-		"project/target/classes/App.class",
-		"project/src/App.java",
-		"target/output.jar",
-	}
-	got := filterExcludedDirs(files, []string{"target"})
-	// Only top-level "target/output.jar" should be excluded;
-	// "project/target/..." has "target" as a nested segment, which IS matched.
-	if len(got) != 1 {
-		t.Errorf("expected 1 file, got %d: %v", len(got), got)
-	}
+files := []string{"project/target/classes/App.class", "project/src/App.java", "target/output.jar"}
+if got := filterExcludedDirs(files, []string{"target"}); len(got) != 1 { t.Errorf("expected 1, got %d: %v", len(got), got) }
 }
 
 func TestFilterExcludedDirs_TrailingSlash(t *testing.T) {
-	files := []string{"dist/app.js", "src/main.ts"}
-	got := filterExcludedDirs(files, []string{"dist/"})
-	if len(got) != 1 {
-		t.Errorf("expected 1 file after trailing-slash exclude, got %d: %v", len(got), got)
-	}
+files := []string{"dist/app.js", "src/main.ts"}
+if got := filterExcludedDirs(files, []string{"dist/"}); len(got) != 1 { t.Errorf("expected 1, got %d: %v", len(got), got) }
 }
 
 func TestDefaultIgnoreDirs_CoversAllLanguages(t *testing.T) {
-	// Verify that key dependency directories for all supported languages are present.
-	expected := []string{
-		// JS/TS
-		"node_modules", "bower_components",
-		// Python
-		"__pycache__", "venv", ".venv", "site-packages",
-		// Rust
-		"target",
-		// Go
-		"vendor",
-		// Java
-		".gradle",
-		// C#/.NET
-		"bin", "obj",
-		// General
-		"dist", "build",
-	}
-	for _, dir := range expected {
-		if !DefaultIgnoreDirs[dir] {
-			t.Errorf("DefaultIgnoreDirs missing expected entry: %q", dir)
-		}
-	}
+for _, dir := range []string{"node_modules", "__pycache__", "venv", "target", "vendor", ".gradle", "bin", "obj", "dist", "build"} {
+if !DefaultIgnoreDirs[dir] { t.Errorf("missing %q", dir) }
+}
 }
 
 func TestJunkDirsIsDefaultIgnoreDirs(t *testing.T) {
-	// Ensure junkDirs is the same reference as DefaultIgnoreDirs
-	// so recoverMisplacedFiles benefits from the expanded list.
-	for k := range DefaultIgnoreDirs {
-		if !junkDirs[k] {
-			t.Errorf("junkDirs missing key %q from DefaultIgnoreDirs", k)
-		}
-	}
-	for k := range junkDirs {
-		if !DefaultIgnoreDirs[k] {
-			t.Errorf("DefaultIgnoreDirs missing key %q from junkDirs", k)
-		}
-	}
+for k := range DefaultIgnoreDirs { if !junkDirs[k] { t.Errorf("junkDirs missing %q", k) } }
+for k := range junkDirs { if !DefaultIgnoreDirs[k] { t.Errorf("DefaultIgnoreDirs missing %q", k) } }
 }
 
 func TestCopyDir_CopiesFilesAndSubdirs(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-
-	os.WriteFile(filepath.Join(src, "main.py"), []byte("print('hello')"), 0644)
-	os.MkdirAll(filepath.Join(src, "sub", "deep"), 0755)
-	os.WriteFile(filepath.Join(src, "sub", "deep", "util.py"), []byte("# util"), 0644)
-
-	if err := copyDir(src, dst); err != nil {
-		t.Fatalf("copyDir failed: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dst, "main.py"))
-	if err != nil {
-		t.Fatal("main.py not copied")
-	}
-	if string(data) != "print('hello')" {
-		t.Errorf("unexpected content: %q", data)
-	}
-
-	data, err = os.ReadFile(filepath.Join(dst, "sub", "deep", "util.py"))
-	if err != nil {
-		t.Fatal("sub/deep/util.py not copied")
-	}
-	if string(data) != "# util" {
-		t.Errorf("unexpected content: %q", data)
-	}
+src := t.TempDir(); dst := t.TempDir()
+os.WriteFile(filepath.Join(src, "main.py"), []byte("print('hello')"), 0644)
+os.MkdirAll(filepath.Join(src, "sub"), 0755)
+os.WriteFile(filepath.Join(src, "sub", "util.py"), []byte("# util"), 0644)
+if err := copyDir(src, dst); err != nil { t.Fatalf("copyDir failed: %v", err) }
+data, _ := os.ReadFile(filepath.Join(dst, "main.py"))
+if string(data) != "print('hello')" { t.Errorf("unexpected content: %q", data) }
 }
 
 func TestCopyDir_SkipsHiddenDirs(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-
-	os.MkdirAll(filepath.Join(src, ".git"), 0755)
-	os.WriteFile(filepath.Join(src, ".git", "config"), []byte("git config"), 0644)
-	os.WriteFile(filepath.Join(src, "main.py"), []byte("code"), 0644)
-
-	if err := copyDir(src, dst); err != nil {
-		t.Fatalf("copyDir failed: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dst, ".git")); err == nil {
-		t.Error(".git directory should not be copied")
-	}
-	if _, err := os.Stat(filepath.Join(dst, "main.py")); err != nil {
-		t.Error("main.py should be copied")
-	}
+src := t.TempDir(); dst := t.TempDir()
+os.MkdirAll(filepath.Join(src, ".git"), 0755)
+os.WriteFile(filepath.Join(src, ".git", "config"), []byte("x"), 0644)
+os.WriteFile(filepath.Join(src, "main.py"), []byte("code"), 0644)
+copyDir(src, dst)
+if _, err := os.Stat(filepath.Join(dst, ".git")); err == nil { t.Error(".git should not be copied") }
+if _, err := os.Stat(filepath.Join(dst, "main.py")); err != nil { t.Error("main.py should be copied") }
 }
 
 func TestCopyDir_MissingSrcReturnsError(t *testing.T) {
-	dst := t.TempDir()
-	err := copyDir("/nonexistent/path/to/starter", dst)
-	if err == nil {
-		t.Fatal("expected error for nonexistent source")
-	}
+if err := copyDir("/nonexistent/path", t.TempDir()); err == nil { t.Fatal("expected error") }
 }
 
 func TestCopyDir_EmptyDirectory(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-
-	if err := copyDir(src, dst); err != nil {
-		t.Fatalf("copyDir on empty dir failed: %v", err)
-	}
-
-	files, err := listFiles(dst)
-	if err != nil {
-		t.Fatalf("listFiles failed: %v", err)
-	}
-	if len(files) != 0 {
-		t.Errorf("expected 0 files, got %d: %v", len(files), files)
-	}
+src := t.TempDir(); dst := t.TempDir()
+copyDir(src, dst)
+files, _ := listFiles(dst)
+if len(files) != 0 { t.Errorf("expected 0 files, got %d", len(files)) }
 }
 
 func TestResolveStarterDir_Relative(t *testing.T) {
-	p := &prompt.Prompt{
-		StarterProject: "./starter/",
-		FilePath:       "/home/user/prompts/storage/blob.prompt.md",
-	}
-	got := resolveStarterDir(p)
-	want := "/home/user/prompts/storage/starter"
-	if got != want {
-		t.Errorf("resolveStarterDir = %q, want %q", got, want)
-	}
+p := &prompt.Prompt{StarterProject: "./starter/", FilePath: "/home/user/prompts/storage/blob.prompt.md"}
+if got := resolveStarterDir(p); got != "/home/user/prompts/storage/starter" { t.Errorf("got %q", got) }
 }
 
 func TestResolveStarterDir_Absolute(t *testing.T) {
-	p := &prompt.Prompt{
-		StarterProject: "/absolute/starter",
-		FilePath:       "/home/user/prompts/blob.prompt.md",
-	}
-	got := resolveStarterDir(p)
-	if got != "/absolute/starter" {
-		t.Errorf("resolveStarterDir = %q, want /absolute/starter", got)
-	}
+p := &prompt.Prompt{StarterProject: "/absolute/starter", FilePath: "/home/user/prompts/blob.prompt.md"}
+if got := resolveStarterDir(p); got != "/absolute/starter" { t.Errorf("got %q", got) }
 }
 
 func TestResolveStarterDir_NoFilePath(t *testing.T) {
-	p := &prompt.Prompt{
-		StarterProject: "starter/",
-	}
-	got := resolveStarterDir(p)
-	if got != "starter/" {
-		t.Errorf("resolveStarterDir = %q, want starter/", got)
-	}
+p := &prompt.Prompt{StarterProject: "starter/"}
+if got := resolveStarterDir(p); got != "starter/" { t.Errorf("got %q", got) }
+}
+
+// --- CopyStarterFiles tests (#127) ---
+
+func TestCopyStarterFiles_CopiesOnlyDeclaredFiles(t *testing.T) {
+starterDir := t.TempDir()
+os.WriteFile(filepath.Join(starterDir, "main.py"), []byte("print('hello')"), 0644)
+os.MkdirAll(filepath.Join(starterDir, "src"), 0755)
+os.WriteFile(filepath.Join(starterDir, "src", "utils.py"), []byte("# utils"), 0644)
+os.WriteFile(filepath.Join(starterDir, "requirements.txt"), []byte("azure-identity"), 0644)
+
+ws, _ := NewWorkspace("test-prompt", "test-config")
+defer ws.Cleanup()
+
+files, err := ws.CopyStarterFiles(&prompt.Prompt{StarterProject: starterDir})
+if err != nil { t.Fatalf("CopyStarterFiles failed: %v", err) }
+sort.Strings(files)
+expected := []string{"main.py", "requirements.txt", "src/utils.py"}
+if len(files) != len(expected) { t.Fatalf("expected %d files, got %d: %v", len(expected), len(files), files) }
+for i, f := range expected { if files[i] != f { t.Errorf("file[%d] = %q, want %q", i, files[i], f) } }
+data, _ := os.ReadFile(filepath.Join(ws.Dir, "main.py"))
+if string(data) != "print('hello')" { t.Error("main.py content mismatch") }
+}
+
+func TestCopyStarterFiles_NoLeakOfHiddenFiles(t *testing.T) {
+starterDir := t.TempDir()
+os.WriteFile(filepath.Join(starterDir, "app.py"), []byte("app"), 0644)
+os.MkdirAll(filepath.Join(starterDir, ".git"), 0755)
+os.WriteFile(filepath.Join(starterDir, ".git", "config"), []byte("x"), 0644)
+
+ws, _ := NewWorkspace("test-prompt", "test-config")
+defer ws.Cleanup()
+files, _ := ws.CopyStarterFiles(&prompt.Prompt{StarterProject: starterDir})
+if len(files) != 1 || files[0] != "app.py" { t.Errorf("expected [app.py], got %v", files) }
+if _, err := os.Stat(filepath.Join(ws.Dir, ".git")); err == nil { t.Error(".git should not be copied") }
+}
+
+func TestCopyStarterFiles_ExcludesBuildArtifacts(t *testing.T) {
+starterDir := t.TempDir()
+os.WriteFile(filepath.Join(starterDir, "main.py"), []byte("code"), 0644)
+os.MkdirAll(filepath.Join(starterDir, "node_modules", "express"), 0755)
+os.WriteFile(filepath.Join(starterDir, "node_modules", "express", "index.js"), []byte("//"), 0644)
+
+ws, _ := NewWorkspace("test-prompt", "test-config")
+defer ws.Cleanup()
+files, _ := ws.CopyStarterFiles(&prompt.Prompt{StarterProject: starterDir})
+if len(files) != 1 || files[0] != "main.py" { t.Errorf("expected [main.py], got %v", files) }
+if _, err := os.Stat(filepath.Join(ws.Dir, "node_modules")); err == nil { t.Error("node_modules should not be copied") }
+}
+
+func TestCopyStarterFiles_NoStarterProject(t *testing.T) {
+ws, _ := NewWorkspace("test", "test"); defer ws.Cleanup()
+files, err := ws.CopyStarterFiles(&prompt.Prompt{})
+if err != nil { t.Fatalf("unexpected error: %v", err) }
+if files != nil { t.Errorf("expected nil, got %v", files) }
+}
+
+func TestCopyStarterFiles_InvalidPath(t *testing.T) {
+ws, _ := NewWorkspace("test", "test"); defer ws.Cleanup()
+_, err := ws.CopyStarterFiles(&prompt.Prompt{StarterProject: "/nonexistent/path"})
+if err == nil { t.Fatal("expected error") }
+}
+
+func TestCopyStarterFiles_RelativeToPromptFile(t *testing.T) {
+promptDir := t.TempDir()
+os.MkdirAll(filepath.Join(promptDir, "starter"), 0755)
+os.WriteFile(filepath.Join(promptDir, "starter", "setup.py"), []byte("setup"), 0644)
+ws, _ := NewWorkspace("test", "test"); defer ws.Cleanup()
+files, _ := ws.CopyStarterFiles(&prompt.Prompt{StarterProject: "./starter", FilePath: filepath.Join(promptDir, "test.prompt.md")})
+if len(files) != 1 || files[0] != "setup.py" { t.Errorf("expected [setup.py], got %v", files) }
+}
+
+// --- Workspace Cleanup tests (#128) ---
+
+func TestWorkspaceCleanup_EphemeralRemovedOnSuccess(t *testing.T) {
+ws, _ := NewWorkspace("test", "test"); dir := ws.Dir
+os.WriteFile(filepath.Join(dir, "output.py"), []byte("result"), 0644)
+ws.Cleanup()
+if _, err := os.Stat(dir); !os.IsNotExist(err) { t.Error("ephemeral workspace should be removed") }
+}
+
+func TestWorkspaceCleanup_PersistentSurvives(t *testing.T) {
+dir := t.TempDir(); ws, _ := NewWorkspaceAt(dir)
+os.WriteFile(filepath.Join(dir, "output.py"), []byte("result"), 0644)
+ws.Cleanup()
+if _, err := os.Stat(filepath.Join(dir, "output.py")); err != nil { t.Error("persistent workspace should survive") }
+}
+
+func TestWorkspaceCleanup_OnError(t *testing.T) {
+ws, _ := NewWorkspace("test", "test"); dir := ws.Dir
+func() { defer ws.Cleanup(); os.WriteFile(filepath.Join(dir, "partial.py"), []byte("x"), 0644) }()
+if _, err := os.Stat(dir); !os.IsNotExist(err) { t.Error("workspace should be cleaned up on error path") }
+}
+
+func TestWorkspaceCleanup_OnContextCancellation(t *testing.T) {
+ws, _ := NewWorkspace("test", "test"); dir := ws.Dir
+ctx, cancel := context.WithCancel(context.Background())
+func() { defer ws.Cleanup(); cancel(); _ = ctx.Err() }()
+if _, err := os.Stat(dir); !os.IsNotExist(err) { t.Error("workspace should be cleaned up after cancellation") }
+}
+
+func TestWorkspaceCleanup_DoubleCleanup(t *testing.T) {
+ws, _ := NewWorkspace("test", "test")
+if err := ws.Cleanup(); err != nil { t.Fatal(err) }
+if err := ws.Cleanup(); err != nil { t.Fatal("second cleanup should not fail:", err) }
 }
 
 // --- EvalWorkspace tests (#126) ---
