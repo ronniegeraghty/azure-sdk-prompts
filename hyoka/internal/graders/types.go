@@ -108,8 +108,8 @@ ExpectedActions []string `yaml:"expected_actions" json:"expected_actions"`
 type ToolConstraintConfig struct {
 Required  []string `yaml:"required,omitempty" json:"required,omitempty"`
 Forbidden []string `yaml:"forbidden,omitempty" json:"forbidden,omitempty"`
-MinCalls  int      `yaml:"min_calls,omitempty" json:"min_calls,omitempty"`
-MaxCalls  int      `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
+MinCalls  map[string]int `yaml:"min_calls,omitempty" json:"min_calls,omitempty"`
+MaxCalls  map[string]int `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
 }
 
 // EffectiveWeight returns the grader's weight, defaulting to 1.0 if unset.

@@ -3,6 +3,8 @@ package report
 import (
 	"math"
 	"sort"
+
+	"github.com/ronniegeraghty/hyoka/internal/pairwise"
 )
 
 // DurationStats holds min/avg/max duration statistics with source labels for tooltips.
@@ -67,6 +69,9 @@ type SummaryStats struct {
 
 	// Tool usage
 	ToolStats []ToolStat `json:"tool_stats"`
+
+	// Pairwise tool impact (#123)
+	PairwiseImpacts []pairwise.ToolImpact `json:"pairwise_impacts,omitempty"`
 }
 
 // ComputeSummaryStats computes aggregate statistics from a RunSummary.
@@ -232,6 +237,11 @@ func ComputeSummaryStats(s *RunSummary) *SummaryStats {
 	sort.Slice(stats.ToolStats, func(i, j int) bool {
 		return stats.ToolStats[i].Count > stats.ToolStats[j].Count
 	})
+
+	// Pairwise aggregation (#123)
+	if len(s.PairwiseResults) > 0 {
+		stats.PairwiseImpacts = pairwise.AggregateImpacts(s.PairwiseResults)
+	}
 
 	return stats
 }

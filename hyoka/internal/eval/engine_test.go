@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -390,6 +391,9 @@ func TestGuardrailMaxOutputSize(t *testing.T) {
 
 func TestGuardrailDefaultValues(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	if engine.opts.MaxTurns != 25 {
+		t.Errorf("default MaxTurns: expected 25, got %d", engine.opts.MaxTurns)
+	}
 	if engine.opts.MaxSessionActions != 50 {
 		t.Errorf("default MaxSessionActions: expected 50, got %d", engine.opts.MaxSessionActions)
 	}
@@ -399,6 +403,72 @@ func TestGuardrailDefaultValues(t *testing.T) {
 	if engine.opts.MaxOutputSize != 1048576 {
 		t.Errorf("default MaxOutputSize: expected 1048576, got %d", engine.opts.MaxOutputSize)
 	}
+}
+
+func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "no-limits", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
+	lim := engine.resolveLimits(cfg)
+	if lim.maxTurns != 25 { t.Errorf("expected maxTurns 25, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 50 { t.Errorf("expected maxSessionActions 50, got %d", lim.maxSessionActions) }
+	if lim.maxFiles != 50 { t.Errorf("expected maxFiles 50, got %d", lim.maxFiles) }
+	if lim.maxOutputSize != 1048576 { t.Errorf("expected maxOutputSize 1048576, got %d", lim.maxOutputSize) }
+}
+
+func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "zero", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{}}
+	lim := engine.resolveLimits(cfg)
+	if lim.maxTurns != 25 { t.Errorf("expected 25, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
+	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
+	if lim.maxOutputSize != 1048576 { t.Errorf("expected 1048576, got %d", lim.maxOutputSize) }
+}
+
+func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "custom", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxFiles: 20, MaxOutputSize: 524288, MaxSessionActions: 30}}
+	lim := engine.resolveLimits(cfg)
+	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 30 { t.Errorf("expected 30, got %d", lim.maxSessionActions) }
+	if lim.maxFiles != 20 { t.Errorf("expected 20, got %d", lim.maxFiles) }
+	if lim.maxOutputSize != 524288 { t.Errorf("expected 524288, got %d", lim.maxOutputSize) }
+}
+
+func TestResolveLimitsPartialOverride(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "partial", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10}}
+	lim := engine.resolveLimits(cfg)
+	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
+	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
+	if lim.maxOutputSize != 1048576 { t.Errorf("expected 1048576, got %d", lim.maxOutputSize) }
+}
+
+func TestConfigLimitsRespectedByGuardrail(t *testing.T) {
+	outputDir := t.TempDir()
+	engine := NewEngine(&manyTurnsEvaluator{turnCount: 15}, quietOpts(EngineOptions{Workers: 1, OutputDir: outputDir, SkipReview: true}))
+	prompts := []*prompt.Prompt{{ID: "config-limit-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}}}
+	configs := []config.ToolConfig{{Name: "strict", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 5, MaxSessionActions: 99}}}
+	summary, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	r := summary.Results[0]
+	if r.Success { t.Error("expected guardrail to fail") }
+	if !strings.Contains(r.GuardrailAbortReason, "turn count") { t.Errorf("expected turn count guardrail, got %q", r.GuardrailAbortReason) }
+	if r.GuardrailMaxTurns != 5 { t.Errorf("expected GuardrailMaxTurns 5, got %d", r.GuardrailMaxTurns) }
+	if r.GuardrailMaxSessionActions != 99 { t.Errorf("expected GuardrailMaxSessionActions 99, got %d", r.GuardrailMaxSessionActions) }
+}
+
+func TestConfigLimitsOverrideEngineDefaults(t *testing.T) {
+	outputDir := t.TempDir()
+	engine := NewEngine(&manyFilesEvaluator{fileCount: 10}, quietOpts(EngineOptions{Workers: 1, OutputDir: outputDir, SkipReview: true, MaxFiles: 100}))
+	prompts := []*prompt.Prompt{{ID: "override-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}}}
+	configs := []config.ToolConfig{{Name: "restrictive", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxFiles: 3}}}
+	summary, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	r := summary.Results[0]
+	if r.Success { t.Error("expected config-level MaxFiles=3 to fail") }
+	if !strings.Contains(r.GuardrailAbortReason, "file count") { t.Errorf("expected file count guardrail, got %q", r.GuardrailAbortReason) }
 }
 
 // Integration-style: full stub eval lifecycle — verifies reports are generated and result is consistent.
@@ -458,11 +528,14 @@ func TestStubEvalLifecycle(t *testing.T) {
 	}
 
 	// Verify guardrail limits are recorded
-	if r.GuardrailMaxTurns != 50 {
-		t.Errorf("expected GuardrailMaxTurns 50, got %d", r.GuardrailMaxTurns)
+	if r.GuardrailMaxTurns != 25 {
+		t.Errorf("expected GuardrailMaxTurns 25, got %d", r.GuardrailMaxTurns)
 	}
 	if r.GuardrailMaxFiles != 50 {
 		t.Errorf("expected GuardrailMaxFiles 50, got %d", r.GuardrailMaxFiles)
+	}
+	if r.GuardrailMaxSessionActions != 50 {
+		t.Errorf("expected GuardrailMaxSessionActions 50, got %d", r.GuardrailMaxSessionActions)
 	}
 
 	// Verify report files exist on disk
@@ -751,6 +824,57 @@ func TestCriteriaDirEmpty(t *testing.T) {
 	// Should fall back to prompt-only criteria
 	if !strings.Contains(reviewer.capturedCriteria, "Prompt specific criterion") {
 		t.Errorf("expected prompt criteria as fallback, got: %s", reviewer.capturedCriteria)
+	}
+}
+
+// TestCancelledContextNoGoroutineLeak verifies that goroutines spawned by
+// Engine.Run terminate promptly when the parent context is already cancelled.
+// This catches semaphore-acquisition leaks (#129).
+func TestCancelledContextNoGoroutineLeak(t *testing.T) {
+	outputDir := t.TempDir()
+	// Use 1 worker but many tasks — excess goroutines would block on
+	// semaphore acquisition if context cancellation is not respected.
+	engine := NewEngine(&slowEvaluator{}, quietOpts(EngineOptions{
+		Workers:    1,
+		OutputDir:  outputDir,
+		SkipReview: true,
+	}))
+
+	prompts := []*prompt.Prompt{
+		{ID: "leak-1", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+		{ID: "leak-2", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+		{ID: "leak-3", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+		{ID: "leak-4", Properties: map[string]string{"service": "s", "plane": "data-plane", "language": "go", "category": "c"}},
+	}
+	configs := []config.ToolConfig{
+		{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	}
+
+	before := runtime.NumGoroutine()
+
+	// Context is already cancelled — all goroutines should bail immediately.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := engine.Run(ctx, prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Allow goroutines a brief window to wind down.
+	deadline := time.After(2 * time.Second)
+	for {
+		after := runtime.NumGoroutine()
+		// Tolerate a small delta for unrelated runtime goroutines.
+		if after <= before+2 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("goroutine leak: before=%d, after=%d (delta %d)", before, after, after-before)
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
 	}
 }
 

@@ -7,8 +7,9 @@ import "fmt"
 // When the When map has entries, all key-value pairs must match the
 // prompt's properties for the tool to be included.
 type ToolEntry struct {
-Name string            `yaml:"name" json:"name"`
-When map[string]string `yaml:"when,omitempty" json:"when,omitempty"`
+Name     string            `yaml:"name" json:"name"`
+When     map[string]string `yaml:"when,omitempty" json:"when,omitempty"`
+AlwaysOn bool              `yaml:"always_on,omitempty" json:"always_on,omitempty"`
 }
 
 // ResolveTools evaluates tool entries against prompt properties and returns

@@ -7,9 +7,59 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/ronniegeraghty/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/internal/utils"
 )
+
+// EvalWorkspacePrefix is the directory name prefix used for isolated evaluation
+// workspaces. The clean command uses this to find orphan workspaces.
+const EvalWorkspacePrefix = "hyoka-eval-"
+
+// EvalWorkspace is an isolated per-session workspace directory. Each evaluation
+// session gets its own empty workspace so the Copilot agent cannot see or
+// modify files from the user's development environment. The workspace is
+// created before the session starts and removed after it completes.
+type EvalWorkspace struct {
+	// Dir is the absolute path to the isolated workspace directory.
+	Dir string
+	// CreatedAt records when the workspace was created, used by the clean
+	// command to identify stale orphan workspaces.
+	CreatedAt time.Time
+}
+
+// NewEvalWorkspace creates an empty isolated workspace in the OS temp
+// directory. The directory name begins with EvalWorkspacePrefix so the clean
+// command can discover orphan workspaces after a crash.
+func NewEvalWorkspace() (*EvalWorkspace, error) {
+	dir, err := os.MkdirTemp("", EvalWorkspacePrefix)
+	if err != nil {
+		return nil, fmt.Errorf("creating isolated eval workspace: %w", err)
+	}
+	return &EvalWorkspace{
+		Dir:       dir,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+// CopyStarterFiles copies a starter project into the workspace.
+func (w *EvalWorkspace) CopyStarterFiles(starterDir string) error {
+	return copyDir(starterDir, w.Dir)
+}
+
+// ListFiles returns all non-hidden files in the workspace, relative to its root.
+func (w *EvalWorkspace) ListFiles() ([]string, error) {
+	return listFiles(w.Dir)
+}
+
+// Cleanup removes the workspace directory. Safe to call multiple times.
+func (w *EvalWorkspace) Cleanup() error {
+	if w == nil || w.Dir == "" {
+		return nil
+	}
+	return os.RemoveAll(w.Dir)
+}
 
 // Workspace manages a directory for an evaluation run.
 type Workspace struct {
@@ -88,6 +138,47 @@ func (w *Workspace) CopyFilesTo(destDir string) ([]string, error) {
 	}
 
 	return files, nil
+}
+
+// CopyStarterFiles copies the starter project declared in the prompt into
+// the workspace directory. Only files from the declared starter directory are
+// copied — hidden files, symlinks, and build artifacts are excluded by copyDir.
+// Returns the list of files copied (relative to the workspace root) and a nil
+// error on success. Returns (nil, nil) when the prompt has no starter project.
+func (w *Workspace) CopyStarterFiles(p *prompt.Prompt) ([]string, error) {
+	if p.StarterProject == "" {
+		return nil, nil
+	}
+	starterDir := resolveStarterDir(p)
+	info, err := os.Stat(starterDir)
+	if err != nil {
+		return nil, fmt.Errorf("starter project %q: %w", p.StarterProject, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("starter project %q is not a directory", p.StarterProject)
+	}
+	if err := copyDir(starterDir, w.Dir); err != nil {
+		return nil, fmt.Errorf("copying starter project: %w", err)
+	}
+	files, err := listFiles(w.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("listing starter files: %w", err)
+	}
+	if len(files) == 0 {
+		slog.Warn("Starter project directory contains no files", "dir", starterDir)
+	}
+	return files, nil
+}
+
+// resolveStarterDir returns the absolute path to a prompt's starter project
+// directory. If StarterProject is relative, it is resolved relative to the
+// prompt file's directory.
+func resolveStarterDir(p *prompt.Prompt) string {
+	dir := p.StarterProject
+	if !filepath.IsAbs(dir) && p.FilePath != "" {
+		dir = filepath.Join(filepath.Dir(p.FilePath), dir)
+	}
+	return dir
 }
 
 // listFiles is a helper used by Workspace and CopilotSDKEvaluator.

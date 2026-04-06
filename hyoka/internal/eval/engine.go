@@ -15,6 +15,7 @@ import (
 
 	"github.com/ronniegeraghty/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
@@ -74,6 +75,7 @@ type EngineOptions struct {
 	ConfirmLargeRuns bool
 	AutoConfirm      bool
 	// Generator guardrails (#35)
+	MaxTurns          int
 	MaxSessionActions int
 	MaxFiles          int
 	MaxOutputSize     int64
@@ -87,6 +89,8 @@ type EngineOptions struct {
 	MonitorResources bool
 	// Tiered criteria (#30)
 	CriteriaDir string // Directory containing attribute-matched criteria YAML files.
+	// Pluggable graders (#136)
+	GradersDir string // Directory containing grader config YAML files.
 	// Directory exclusion (#63)
 	ExcludeDirs []string // Directories to exclude from generated_files output.
 	// Output writer for user-facing messages (defaults to os.Stdout).
@@ -103,6 +107,7 @@ type Engine struct {
 	opts            EngineOptions
 	tracker         *ProcessTracker
 	graderConfigs   []criteria.GraderConfig // attribute-matched grader configs (#30)
+	pluginGraders   []graders.GraderConfig  // pluggable grader configs (#136)
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
@@ -136,6 +141,9 @@ func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFa
 		opts.OutputDir = "./reports"
 	}
 	// Generator guardrail defaults (#35)
+	if opts.MaxTurns <= 0 {
+		opts.MaxTurns = 25
+	}
 	if opts.MaxSessionActions <= 0 {
 		opts.MaxSessionActions = 50
 	}
@@ -192,6 +200,24 @@ func (e *Engine) loadCriteria() {
 	slog.Info("Loaded grader configs", "configs", len(configs), "dir", e.opts.CriteriaDir)
 }
 
+// loadGraders loads pluggable grader configs if GradersDir is configured (#136).
+func (e *Engine) loadGraders() {
+	if e.opts.GradersDir == "" {
+		return
+	}
+	if _, err := os.Stat(e.opts.GradersDir); os.IsNotExist(err) {
+		slog.Debug("Graders directory does not exist, skipping", "dir", e.opts.GradersDir)
+		return
+	}
+	gcf, err := graders.LoadDir(e.opts.GradersDir)
+	if err != nil {
+		slog.Warn("Failed to load grader configs", "dir", e.opts.GradersDir, "error", err)
+		return
+	}
+	e.pluginGraders = gcf.Graders
+	slog.Info("Loaded pluggable grader configs", "graders", len(gcf.Graders), "dir", e.opts.GradersDir)
+}
+
 // mergedCriteria returns the combined attribute-matched + prompt-specific
 // evaluation criteria text for the given prompt.
 func (e *Engine) mergedCriteria(p *prompt.Prompt) string {
@@ -226,10 +252,49 @@ type EvalTask struct {
 	Config config.ToolConfig
 }
 
+// resolvedLimits holds the effective guardrail limits for a single eval,
+// resolved from config-level overrides and engine-level defaults.
+type resolvedLimits struct {
+	maxTurns          int
+	maxFiles          int
+	maxOutputSize     int64
+	maxSessionActions int
+}
+
+// resolveLimits merges per-config session limits with engine defaults.
+// Config values > 0 take precedence; zero values fall back to engine defaults.
+func (e *Engine) resolveLimits(cfg config.ToolConfig) resolvedLimits {
+	rl := resolvedLimits{
+		maxTurns:          e.opts.MaxTurns,
+		maxFiles:          e.opts.MaxFiles,
+		maxOutputSize:     e.opts.MaxOutputSize,
+		maxSessionActions: e.opts.MaxSessionActions,
+	}
+	if cfg.Limits == nil {
+		return rl
+	}
+	if cfg.Limits.MaxTurns > 0 {
+		rl.maxTurns = cfg.Limits.MaxTurns
+	}
+	if cfg.Limits.MaxFiles > 0 {
+		rl.maxFiles = cfg.Limits.MaxFiles
+	}
+	if cfg.Limits.MaxOutputSize > 0 {
+		rl.maxOutputSize = cfg.Limits.MaxOutputSize
+	}
+	if cfg.Limits.MaxSessionActions > 0 {
+		rl.maxSessionActions = cfg.Limits.MaxSessionActions
+	}
+	return rl
+}
+
 // Run executes evaluations for the given prompts crossed with configs.
 func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []config.ToolConfig) (*report.RunSummary, error) {
 	// Load grader configs (#30) if configured.
 	e.loadCriteria()
+
+	// Load pluggable grader configs (#136) if configured.
+	e.loadGraders()
 
 	// Build task list (cross product: prompts × configs)
 	var tasks []EvalTask
@@ -360,10 +425,20 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			defer wg.Done()
 
 			// Acquire session semaphore first to limit total Copilot sessions.
-			sessionSem <- struct{}{}
+			// Use select so context cancellation unblocks waiting goroutines
+			// instead of leaking them (#129).
+			select {
+			case sessionSem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-sessionSem }()
 
-			sem <- struct{}{}
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-sem }()
 
 			taskName := t.Prompt.ID + "/" + t.Config.Name
@@ -526,8 +601,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	start := time.Now()
 
 	evalReport := &report.EvalReport{
-		PromptID:   task.Prompt.ID,
-		ConfigName: task.Config.Name,
+		SchemaVersion: report.CurrentSchemaVersion,
+		PromptID:      task.Prompt.ID,
+		ConfigName:    task.Config.Name,
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),
 		PromptMeta: map[string]any{
 			"service":     task.Prompt.Service(),
@@ -542,11 +618,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			"name":  task.Config.Name,
 			"model": task.Config.Generator.Model,
 		},
-		// Guardrail limits recorded for report transparency (#35)
-		GuardrailMaxTurns:      e.opts.MaxSessionActions,
-		GuardrailMaxFiles:      e.opts.MaxFiles,
-		GuardrailMaxOutputSize: e.opts.MaxOutputSize,
 	}
+
+	// Resolve effective limits: per-config overrides → engine defaults (#125)
+	lim := e.resolveLimits(task.Config)
+	evalReport.GuardrailMaxTurns = lim.maxTurns
+	evalReport.GuardrailMaxFiles = lim.maxFiles
+	evalReport.GuardrailMaxOutputSize = lim.maxOutputSize
+	evalReport.GuardrailMaxSessionActions = lim.maxSessionActions
+
 	if len(task.Prompt.Tags) > 0 {
 		evalReport.PromptMeta["tags"] = strings.Join(task.Prompt.Tags, ", ")
 	}
@@ -567,21 +647,35 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		return evalReport
 	}
 
-	// Create an isolated temporary workspace for the generator (#26).
+	// Create an isolated temporary workspace for the generator (#26, #126).
 	// The agent writes files here — not directly to the report tree.
 	// After generation, files are copied to the persistent report directory.
-	genDir, err := os.MkdirTemp("", "hyoka-gen-*")
+	genWs, err := NewWorkspace(task.Prompt.ID, task.Config.Name)
 	if err != nil {
 		evalReport.Error = fmt.Sprintf("generator workspace setup failed: %v", err)
 		evalReport.ErrorDetails = err.Error()
 		evalReport.ErrorCategory = "generation_failure"
-		evalReport.FailureReason = fmt.Sprintf("Could not create isolated generator workspace: %v", err)
+		evalReport.FailureReason = fmt.Sprintf("Could not create isolated eval workspace: %v", err)
 		evalReport.Duration = time.Since(start).Seconds()
 		return evalReport
 	}
-	defer os.RemoveAll(genDir)
+	defer genWs.Cleanup()
+	genDir := genWs.Dir
 
-	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir)
+	// Copy starter files into the generator workspace before evaluation (#127).
+	starterFiles, starterErr := genWs.CopyStarterFiles(task.Prompt)
+	if starterErr != nil {
+		evalReport.Error = fmt.Sprintf("starter file copy failed: %v", starterErr)
+		evalReport.ErrorDetails = starterErr.Error()
+		evalReport.ErrorCategory = "generation_failure"
+		evalReport.FailureReason = fmt.Sprintf("Could not copy starter project: %v", starterErr)
+		evalReport.Duration = time.Since(start).Seconds()
+		return evalReport
+	}
+	evalReport.StarterFiles = starterFiles
+
+	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
+		"starter_files", len(starterFiles))
 
 	// Snapshot home directory and CWD before eval so we can recover misplaced files after
 	homeDir, _ := os.UserHomeDir()
@@ -632,7 +726,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		evalReport.SessionEvents = result.SessionEvents
 		evalReport.IsStub = result.IsStub
 		evalReport.Success = result.Success
-		evalReport.StarterFiles = result.StarterFiles
 	}
 
 	// Collect generated files — workspace listing is the primary source since
@@ -768,8 +861,23 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.Environment = env
 
-	// Generator guardrail checks (#35)
+	// Generator guardrail checks (#35, #125)
 	if !evalFailed {
+		// Check turn count (assistant.message events = conversation turns)
+		turnCount := 0
+		for _, ev := range evalReport.SessionEvents {
+			if ev.Type == "assistant.message" {
+				turnCount++
+			}
+		}
+		if turnCount > lim.maxTurns {
+			reason := fmt.Sprintf("guardrail: turn count %d exceeded limit of %d", turnCount, lim.maxTurns)
+			evalReport.GuardrailAbortReason = reason
+			evalReport.Error = reason
+			evalReport.Success = false
+			lg.Warn("Guardrail triggered", "reason", reason, "turns", turnCount, "max_turns", lim.maxTurns)
+		}
+
 		// Check action count (count reasoning, message, and tool_execution_start events as actions)
 		actionCount := 0
 		for _, ev := range evalReport.SessionEvents {
@@ -777,21 +885,21 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				actionCount++
 			}
 		}
-		if actionCount > e.opts.MaxSessionActions {
-			reason := fmt.Sprintf("guardrail: action count %d exceeded limit of %d", actionCount, e.opts.MaxSessionActions)
+		if actionCount > lim.maxSessionActions {
+			reason := fmt.Sprintf("guardrail: action count %d exceeded limit of %d", actionCount, lim.maxSessionActions)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "actions", actionCount, "max_session_actions", e.opts.MaxSessionActions)
+			lg.Warn("Guardrail triggered", "reason", reason, "actions", actionCount, "max_session_actions", lim.maxSessionActions)
 		}
 
 		// Check file count
-		if len(generatedFiles) > e.opts.MaxFiles {
-			reason := fmt.Sprintf("guardrail: file count %d exceeded limit of %d", len(generatedFiles), e.opts.MaxFiles)
+		if len(generatedFiles) > lim.maxFiles {
+			reason := fmt.Sprintf("guardrail: file count %d exceeded limit of %d", len(generatedFiles), lim.maxFiles)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "files", len(generatedFiles), "max_files", e.opts.MaxFiles)
+			lg.Warn("Guardrail triggered", "reason", reason, "files", len(generatedFiles), "max_files", lim.maxFiles)
 		}
 
 		// Check total output size
@@ -805,12 +913,70 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				totalSize += info.Size()
 			}
 		}
-		if totalSize > e.opts.MaxOutputSize {
-			reason := fmt.Sprintf("guardrail: total output size %d bytes exceeded limit of %d bytes", totalSize, e.opts.MaxOutputSize)
+		if totalSize > lim.maxOutputSize {
+			reason := fmt.Sprintf("guardrail: total output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "total_size", totalSize, "max_size", e.opts.MaxOutputSize)
+			lg.Warn("Guardrail triggered", "reason", reason, "total_size", totalSize, "max_size", lim.maxOutputSize)
+		}
+	}
+
+	// Pluggable grader execution (#136) — runs after generation, before review.
+	if len(e.pluginGraders) > 0 && len(generatedFiles) > 0 {
+		glg := logging.WithPhase(lg, "grading")
+
+		props := map[string]string{
+			"language": task.Prompt.Language(),
+			"service":  task.Prompt.Service(),
+			"plane":    task.Prompt.Plane(),
+			"category": task.Prompt.Category(),
+			"sdk":      task.Prompt.SDKPackage(),
+		}
+
+		applicable := graders.ApplicableGraders(e.pluginGraders, props)
+		glg.Debug("Applicable graders", "total", len(e.pluginGraders), "applicable", len(applicable))
+
+		if len(applicable) > 0 {
+			instances, err := graders.InstantiateGraders(applicable)
+			if err != nil {
+				glg.Error("Failed to instantiate graders", "error", err)
+			} else {
+				input := graders.GraderInput{
+					WorkspacePath: genWs.Dir,
+				}
+
+				results := graders.RunGraders(ctx, instances, applicable, input)
+				agg, aggErr := graders.AggregateResults(results)
+				if aggErr != nil {
+					glg.Error("Failed to aggregate grader results", "error", aggErr)
+				} else {
+					reportResults := make([]report.GraderResult, len(agg.Results))
+					for i, r := range agg.Results {
+						reportResults[i] = report.GraderResult{
+							GraderName: r.Name,
+							GraderType: r.Kind,
+							Summary:    r.Message,
+						}
+					}
+					evalReport.GraderResults = reportResults
+
+					if !agg.Pass && !evalFailed {
+						evalReport.Success = false
+						if agg.GateFailed {
+							evalReport.FailureReason = "gate grader(s) failed"
+						}
+					}
+
+					glg.Info("Grader execution complete",
+						"graders", len(results),
+						"score", fmt.Sprintf("%.2f", agg.Score),
+						"passed", agg.Pass,
+						"gate_failed", agg.GateFailed)
+					sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
+						agg.Score*100, countPassed(results), len(results)))
+				}
+			}
 		}
 	}
 
@@ -861,6 +1027,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			} else {
 				evalReport.ReviewPanel = panel
 				evalReport.Review = consolidated
+				evalReport.GraderResults = report.GraderResultsFromReview(consolidated, panel)
 				// With criteria-based scoring, success = all criteria passed
 				if !evalFailed {
 					evalReport.Success = consolidated.Scores.AllPassed()
@@ -880,6 +1047,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", err))
 			} else {
 				evalReport.Review = reviewResult
+				evalReport.GraderResults = report.GraderResultsFromReview(reviewResult, nil)
 				// With criteria-based scoring, success = all criteria passed
 				if !evalFailed {
 					evalReport.Success = reviewResult.Scores.AllPassed()
@@ -1080,4 +1248,15 @@ func writeReviewedFiles(dir string, files []report.ReviewedFile) error {
 		}
 	}
 	return nil
+}
+
+// countPassed returns the number of passed results in a grader result list.
+func countPassed(results []graders.GraderResult) int {
+	n := 0
+	for _, r := range results {
+		if r.Pass {
+			n++
+		}
+	}
+	return n
 }

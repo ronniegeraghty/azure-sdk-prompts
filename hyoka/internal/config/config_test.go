@@ -689,3 +689,56 @@ func TestValidateRejectsEmptyGeneratorModel(t *testing.T) {
 		t.Errorf("got %q, want %q", err.Error(), want)
 	}
 }
+
+func TestParseSessionLimits(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: with-limits
+    generator:
+      model: "gpt-4"
+    limits:
+      max_turns: 10
+      max_files: 20
+      max_output_size: 524288
+      max_session_actions: 30
+`)
+	cfg, err := Parse(data)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	lim := cfg.Configs[0].Limits
+	if lim == nil { t.Fatal("expected Limits to be set") }
+	if lim.MaxTurns != 10 { t.Errorf("MaxTurns: expected 10, got %d", lim.MaxTurns) }
+	if lim.MaxFiles != 20 { t.Errorf("MaxFiles: expected 20, got %d", lim.MaxFiles) }
+	if lim.MaxOutputSize != 524288 { t.Errorf("MaxOutputSize: expected 524288, got %d", lim.MaxOutputSize) }
+	if lim.MaxSessionActions != 30 { t.Errorf("MaxSessionActions: expected 30, got %d", lim.MaxSessionActions) }
+}
+
+func TestParseSessionLimitsOmitted(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: no-limits
+    generator:
+      model: "gpt-4"
+`)
+	cfg, err := Parse(data)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if cfg.Configs[0].Limits != nil { t.Error("expected Limits to be nil when omitted") }
+}
+
+func TestParseSessionLimitsPartial(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: partial-limits
+    generator:
+      model: "gpt-4"
+    limits:
+      max_turns: 15
+`)
+	cfg, err := Parse(data)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	lim := cfg.Configs[0].Limits
+	if lim == nil { t.Fatal("expected Limits to be set") }
+	if lim.MaxTurns != 15 { t.Errorf("MaxTurns: expected 15, got %d", lim.MaxTurns) }
+	if lim.MaxFiles != 0 { t.Errorf("MaxFiles: expected 0, got %d", lim.MaxFiles) }
+	if lim.MaxOutputSize != 0 { t.Errorf("MaxOutputSize: expected 0, got %d", lim.MaxOutputSize) }
+	if lim.MaxSessionActions != 0 { t.Errorf("MaxSessionActions: expected 0, got %d", lim.MaxSessionActions) }
+}

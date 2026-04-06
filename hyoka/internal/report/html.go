@@ -634,6 +634,21 @@ func htmlFuncMap() template.FuncMap {
 			// Use forward slashes for HTML links (filepath.Join uses OS-native backslashes on Windows)
 			return strings.Join([]string{"results", service, plane, language, category, r.PromptID, r.ConfigName, "report.html"}, "/")
 		},
+		"impactFmt": func(v float64) string {
+			if v > 0 {
+				return fmt.Sprintf("+%.1f", v)
+			}
+			return fmt.Sprintf("%.1f", v)
+		},
+		"impactColor": func(v float64) string {
+			if v > 0 {
+				return "var(--green)"
+			}
+			if v < 0 {
+				return "var(--red)"
+			}
+			return "var(--gray)"
+		},
 	}
 }
 
@@ -1074,6 +1089,34 @@ const reportTemplate = `<!DOCTYPE html>
   </div>
 </div>
 {{end}}
+
+<!-- ━━ Grader Results ━━ -->
+{{if .GraderResults}}
+<div class="section">
+  <div class="section-header"><span class="icon">🎯</span><h2>Grader Results ({{len .GraderResults}} graders)</h2></div>
+  <div class="section-body">
+    <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;table-layout:auto">
+      <thead><tr>
+        <th style="background:#f8fafc;padding:0.75rem;text-align:left;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Grader</th>
+        <th style="background:#f8fafc;padding:0.75rem;text-align:center;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Type</th>
+        <th style="background:#f8fafc;padding:0.75rem;text-align:center;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Score</th>
+        <th style="background:#f8fafc;padding:0.75rem;text-align:left;font-size:0.85rem;color:var(--text-muted);border-bottom:2px solid var(--border)">Summary</th>
+      </tr></thead>
+      <tbody>
+        {{range .GraderResults}}
+        <tr{{if .IsConsensus}} style="font-weight:700;border-top:2px solid var(--border)"{{end}}>
+          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;white-space:nowrap">{{if .IsConsensus}}🏆 {{end}}<code>{{.GraderName}}</code></td>
+          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;text-align:center"><span style="font-size:0.8rem;padding:2px 8px;border-radius:4px;background:#f1f5f9">{{.GraderType}}</span></td>
+          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;text-align:center"><strong style="color:{{scoreColor .OverallScore .MaxScore}}">{{.OverallScore}}/{{.MaxScore}}</strong></td>
+          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;font-size:0.85rem;color:var(--text-muted)">{{truncate .Summary 200}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
 {{if .GeneratedFiles}}
 <div class="section">
   <div class="section-header"><span class="icon">📁</span><h2>Generated Files ({{.FileCount}})</h2>{{if gt .FileCount 0}}<span style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">{{fileTypeSummary .GeneratedFiles}}</span>{{end}}</div>
@@ -1359,6 +1402,48 @@ const summaryTemplate = `<!DOCTYPE html>
     {{end}}
   </tbody>
 </table>
+{{end}}
+
+<!-- ━━ Pairwise Tool Impact (#123) ━━ -->
+{{if .Stats.PairwiseImpacts}}
+<h2>Pairwise Tool Impact</h2>
+<p style="color:var(--text-muted);font-size:0.9rem">Impact = baseline score &minus; score without tool. Positive means the tool helps.</p>
+<table class="detail-table">
+  <thead><tr><th>Tool</th><th>Impact</th><th>Baseline</th><th>Without</th><th>Baseline Pass</th><th>Without Pass</th></tr></thead>
+  <tbody>
+    {{range .Stats.PairwiseImpacts}}
+    <tr>
+      <td><span class="tool-tag">{{.ToolName}}</span></td>
+      <td style="color:{{impactColor .Impact}};font-weight:700">{{impactFmt .Impact}}</td>
+      <td>{{printf "%.1f" .BaselineScore}}</td>
+      <td>{{printf "%.1f" .WithoutScore}}</td>
+      <td>{{statusIcon .BaselinePass}}</td>
+      <td>{{statusIcon .WithoutPass}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+
+{{if .Summary.PairwiseResults}}
+<h2>Pairwise Details (per Prompt)</h2>
+{{range .Summary.PairwiseResults}}
+<h3 style="margin-top:1.5rem"><code>{{.PromptID}}</code></h3>
+<p>Baseline: <strong>{{.Baseline.ConfigName}}</strong> &mdash; {{.Baseline.Score}}/{{.Baseline.MaxScore}}</p>
+<table class="detail-table">
+  <thead><tr><th>Tool Removed</th><th>Impact</th><th>Without Score</th><th>Pass</th></tr></thead>
+  <tbody>
+    {{range .Impacts}}
+    <tr>
+      <td><span class="tool-tag">{{.ToolName}}</span></td>
+      <td style="color:{{impactColor .Impact}};font-weight:700">{{impactFmt .Impact}}</td>
+      <td>{{printf "%.1f" .WithoutScore}}</td>
+      <td>{{statusIcon .WithoutPass}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
 {{end}}
 {{end}}
 

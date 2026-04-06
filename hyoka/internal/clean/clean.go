@@ -38,6 +38,9 @@ type Result struct {
 	// Process cleanup stats.
 	ProcessesFound  int
 	ProcessesKilled int
+	// Orphan workspace cleanup stats (#128).
+	OrphanWorkspacesFound   int
+	OrphanWorkspacesRemoved int
 }
 
 // copilotStateDirFn returns the Copilot CLI state directory.
@@ -85,13 +88,24 @@ func Run(opts Options) (*Result, error) {
 		fmt.Fprintf(opts.Out, "Warning: session cleanup: %v\n", err)
 	}
 
-	// Phase 3: Clean old log files (only with --all since we can't
+	// Phase 3: Clean orphan eval workspaces left in the OS temp directory
+	// after a crash (#126).
+	if err := cleanOrphanWorkspaces(opts, result); err != nil {
+		fmt.Fprintf(opts.Out, "Warning: workspace cleanup: %v\n", err)
+	}
+
+	// Phase 4: Clean old log files (only with --all since we can't
 	// distinguish hyoka-spawned logs from Copilot CLI logs).
 	if opts.All {
 		logsDir := filepath.Join(stateDir, "logs")
 		if err := cleanLogs(logsDir, opts, result); err != nil {
 			fmt.Fprintf(opts.Out, "Warning: log cleanup: %v\n", err)
 		}
+	}
+
+	// Phase 4: Clean orphaned temp workspace directories (#128).
+	if err := cleanOrphanWorkspaces(opts, result); err != nil {
+		fmt.Fprintf(opts.Out, "Warning: workspace cleanup: %v\n", err)
 	}
 
 	return result, nil
@@ -184,6 +198,52 @@ func formatProcessInfo(p HyokaProcessInfo) string {
 		desc += fmt.Sprintf("  config=%s", p.Config)
 	}
 	return desc
+}
+
+// hyokaTempPrefixes are the prefixes used by hyoka for ephemeral temp directories.
+var hyokaTempPrefixes = []string{"hyoka-gen-", "hyoka-config-", "hyoka-review-", "hyoka-"}
+
+// tempDirFn returns the OS temp directory. Package-level variable so tests can override it.
+var tempDirFn = os.TempDir
+
+// cleanOrphanWorkspaces removes hyoka temp directories that were not cleaned up
+// due to crashes, panics, or context cancellation (#128).
+func cleanOrphanWorkspaces(opts Options, result *Result) error {
+	tmpDir := tempDirFn()
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		return fmt.Errorf("reading temp dir: %w", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		isHyoka := false
+		for _, prefix := range hyokaTempPrefixes {
+			if strings.HasPrefix(name, prefix) {
+				isHyoka = true
+				break
+			}
+		}
+		if !isHyoka {
+			continue
+		}
+		result.OrphanWorkspacesFound++
+		wsPath := filepath.Join(tmpDir, name)
+		size := dirSize(wsPath)
+		if opts.DryRun {
+			fmt.Fprintf(opts.Out, "  [dry-run] would remove orphan workspace %s (%s)\n", name, humanBytes(size))
+		} else {
+			if err := os.RemoveAll(wsPath); err != nil {
+				fmt.Fprintf(opts.Out, "  warning: failed to remove orphan workspace %s: %v\n", name, err)
+				continue
+			}
+			result.OrphanWorkspacesRemoved++
+			result.BytesFreed += size
+		}
+	}
+	return nil
 }
 
 // cleanSessions removes stale session-state directories.
@@ -293,6 +353,7 @@ func isHyokaSession(sessionPath string) bool {
 		if strings.Contains(content, "hyoka") ||
 			strings.Contains(content, "reports/") ||
 			strings.Contains(content, "hyoka-gen-") ||
+			strings.Contains(content, "hyoka-eval-") ||
 			strings.Contains(content, "hyoka-config-") {
 			return true
 		}
@@ -306,6 +367,7 @@ func isHyokaSession(sessionPath string) bool {
 		if strings.Contains(content, "hyoka") ||
 			strings.Contains(content, "reports/") ||
 			strings.Contains(content, "hyoka-gen-") ||
+			strings.Contains(content, "hyoka-eval-") ||
 			strings.Contains(content, "hyoka-config-") {
 			return true
 		}

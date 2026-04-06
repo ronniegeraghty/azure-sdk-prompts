@@ -2,8 +2,28 @@
 package report
 
 import (
+	"github.com/ronniegeraghty/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/internal/review"
 )
+
+// CurrentSchemaVersion is the latest report schema version.
+// v1 = legacy monolithic ReviewResult; v2 = grader-based.
+const CurrentSchemaVersion = 2
+
+// GraderResult holds the output from a single grader (LLM reviewer, build check, etc.).
+type GraderResult struct {
+	GraderName   string              `json:"grader_name"`
+	GraderType   string              `json:"grader_type"` // "review", "build", "lint", "test"
+	Model        string              `json:"model,omitempty"`
+	Scores       review.ReviewScores `json:"scores"`
+	OverallScore int                 `json:"overall_score"`
+	MaxScore     int                 `json:"max_score"`
+	Summary      string              `json:"summary"`
+	Issues       []string            `json:"issues,omitempty"`
+	Strengths    []string            `json:"strengths,omitempty"`
+	Duration     float64             `json:"duration_seconds,omitempty"`
+	IsConsensus  bool                `json:"is_consensus,omitempty"`
+}
 
 // SessionEventRecord is a serializable representation of a Copilot session event.
 type SessionEventRecord struct {
@@ -75,6 +95,7 @@ type ResourceStats struct {
 
 // EvalReport contains the results of a single prompt evaluation.
 type EvalReport struct {
+	SchemaVersion  int                   `json:"schema_version"`
 	PromptID       string                `json:"prompt_id"`
 	ConfigName     string                `json:"config_name"`
 	Timestamp      string                `json:"timestamp"`
@@ -88,6 +109,7 @@ type EvalReport struct {
 	ReviewedFiles  []ReviewedFile        `json:"reviewed_files,omitempty"`
 	Review         *review.ReviewResult  `json:"review,omitempty"`
 	ReviewPanel    []review.ReviewResult `json:"review_panel,omitempty"`
+	GraderResults  []GraderResult        `json:"grader_results,omitempty"`
 	ToolUsage      *ToolUsageResult      `json:"tool_usage,omitempty"`
 	SessionEvents  []SessionEventRecord  `json:"session_events,omitempty"`
 	EventCount     int                   `json:"event_count"`
@@ -102,10 +124,11 @@ type EvalReport struct {
 	IsStub         bool                  `json:"is_stub,omitempty"`
 	RerunCommand   string                `json:"rerunCommand,omitempty"`
 	// Generator guardrails (#35)
-	GuardrailMaxTurns      int    `json:"guardrail_max_turns,omitempty"`
-	GuardrailMaxFiles      int    `json:"guardrail_max_files,omitempty"`
-	GuardrailMaxOutputSize int64  `json:"guardrail_max_output_size,omitempty"`
-	GuardrailAbortReason   string `json:"guardrail_abort_reason,omitempty"`
+	GuardrailMaxTurns          int    `json:"guardrail_max_turns,omitempty"`
+	GuardrailMaxFiles          int    `json:"guardrail_max_files,omitempty"`
+	GuardrailMaxOutputSize     int64  `json:"guardrail_max_output_size,omitempty"`
+	GuardrailMaxSessionActions int    `json:"guardrail_max_session_actions,omitempty"`
+	GuardrailAbortReason       string `json:"guardrail_abort_reason,omitempty"`
 }
 
 // RunResourceStats holds aggregate resource utilization across all evals (#45).
@@ -132,4 +155,63 @@ type RunSummary struct {
 	Results      []*EvalReport `json:"results,omitempty"`
 	Analysis     string        `json:"analysis,omitempty"`
 	ResourceUsage  *RunResourceStats `json:"resource_usage,omitempty"` // Aggregate resource stats (#45)
+	PairwiseResults []*pairwise.PairwiseReport `json:"pairwise_results,omitempty"` // Per-prompt pairwise impact (#123)
+}
+
+// GraderResultsFromReview converts legacy ReviewResult data into []GraderResult.
+// If panel is non-empty, each panel member becomes a grader entry and the
+// consolidated review becomes the consensus entry.
+func GraderResultsFromReview(consolidated *review.ReviewResult, panel []review.ReviewResult) []GraderResult {
+	if consolidated == nil {
+		return nil
+	}
+	var results []GraderResult
+	for i := range panel {
+		r := &panel[i]
+		name := r.Model
+		if name == "" {
+			name = "reviewer"
+		}
+		results = append(results, GraderResult{
+			GraderName:   name,
+			GraderType:   "review",
+			Model:        r.Model,
+			Scores:       r.Scores,
+			OverallScore: r.OverallScore,
+			MaxScore:     r.MaxScore,
+			Summary:      r.Summary,
+			Issues:       r.Issues,
+			Strengths:    r.Strengths,
+		})
+	}
+	consensusName := consolidated.Model
+	if consensusName == "" {
+		consensusName = "consensus"
+	}
+	results = append(results, GraderResult{
+		GraderName:   consensusName,
+		GraderType:   "review",
+		Model:        consolidated.Model,
+		Scores:       consolidated.Scores,
+		OverallScore: consolidated.OverallScore,
+		MaxScore:     consolidated.MaxScore,
+		Summary:      consolidated.Summary,
+		Issues:       consolidated.Issues,
+		Strengths:    consolidated.Strengths,
+		IsConsensus:  len(panel) > 0,
+	})
+	return results
+}
+
+// MigrateToV2 upgrades a v1 (or v0) EvalReport to the current v2 schema.
+// It populates GraderResults from the existing Review/ReviewPanel fields
+// and sets SchemaVersion. The function is idempotent.
+func MigrateToV2(r *EvalReport) {
+	if r.SchemaVersion >= CurrentSchemaVersion {
+		return
+	}
+	if len(r.GraderResults) == 0 && r.Review != nil {
+		r.GraderResults = GraderResultsFromReview(r.Review, r.ReviewPanel)
+	}
+	r.SchemaVersion = CurrentSchemaVersion
 }
