@@ -74,6 +74,7 @@ type EngineOptions struct {
 	ConfirmLargeRuns bool
 	AutoConfirm      bool
 	// Generator guardrails (#35)
+	MaxTurns          int
 	MaxSessionActions int
 	MaxFiles          int
 	MaxOutputSize     int64
@@ -136,6 +137,9 @@ func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFa
 		opts.OutputDir = "./reports"
 	}
 	// Generator guardrail defaults (#35)
+	if opts.MaxTurns <= 0 {
+		opts.MaxTurns = 25
+	}
 	if opts.MaxSessionActions <= 0 {
 		opts.MaxSessionActions = 50
 	}
@@ -224,6 +228,42 @@ func (e *Engine) SetPanelReviewer(pr *review.PanelReviewer) {
 type EvalTask struct {
 	Prompt *prompt.Prompt
 	Config config.ToolConfig
+}
+
+// resolvedLimits holds the effective guardrail limits for a single eval,
+// resolved from config-level overrides and engine-level defaults.
+type resolvedLimits struct {
+	maxTurns          int
+	maxFiles          int
+	maxOutputSize     int64
+	maxSessionActions int
+}
+
+// resolveLimits merges per-config session limits with engine defaults.
+// Config values > 0 take precedence; zero values fall back to engine defaults.
+func (e *Engine) resolveLimits(cfg config.ToolConfig) resolvedLimits {
+	rl := resolvedLimits{
+		maxTurns:          e.opts.MaxTurns,
+		maxFiles:          e.opts.MaxFiles,
+		maxOutputSize:     e.opts.MaxOutputSize,
+		maxSessionActions: e.opts.MaxSessionActions,
+	}
+	if cfg.Limits == nil {
+		return rl
+	}
+	if cfg.Limits.MaxTurns > 0 {
+		rl.maxTurns = cfg.Limits.MaxTurns
+	}
+	if cfg.Limits.MaxFiles > 0 {
+		rl.maxFiles = cfg.Limits.MaxFiles
+	}
+	if cfg.Limits.MaxOutputSize > 0 {
+		rl.maxOutputSize = cfg.Limits.MaxOutputSize
+	}
+	if cfg.Limits.MaxSessionActions > 0 {
+		rl.maxSessionActions = cfg.Limits.MaxSessionActions
+	}
+	return rl
 }
 
 // Run executes evaluations for the given prompts crossed with configs.
@@ -552,11 +592,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			"name":  task.Config.Name,
 			"model": task.Config.Generator.Model,
 		},
-		// Guardrail limits recorded for report transparency (#35)
-		GuardrailMaxTurns:      e.opts.MaxSessionActions,
-		GuardrailMaxFiles:      e.opts.MaxFiles,
-		GuardrailMaxOutputSize: e.opts.MaxOutputSize,
 	}
+
+	// Resolve effective limits: per-config overrides → engine defaults (#125)
+	lim := e.resolveLimits(task.Config)
+	evalReport.GuardrailMaxTurns = lim.maxTurns
+	evalReport.GuardrailMaxFiles = lim.maxFiles
+	evalReport.GuardrailMaxOutputSize = lim.maxOutputSize
+	evalReport.GuardrailMaxSessionActions = lim.maxSessionActions
+
 	if len(task.Prompt.Tags) > 0 {
 		evalReport.PromptMeta["tags"] = strings.Join(task.Prompt.Tags, ", ")
 	}
@@ -780,8 +824,23 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.Environment = env
 
-	// Generator guardrail checks (#35)
+	// Generator guardrail checks (#35, #125)
 	if !evalFailed {
+		// Check turn count (assistant.message events = conversation turns)
+		turnCount := 0
+		for _, ev := range evalReport.SessionEvents {
+			if ev.Type == "assistant.message" {
+				turnCount++
+			}
+		}
+		if turnCount > lim.maxTurns {
+			reason := fmt.Sprintf("guardrail: turn count %d exceeded limit of %d", turnCount, lim.maxTurns)
+			evalReport.GuardrailAbortReason = reason
+			evalReport.Error = reason
+			evalReport.Success = false
+			lg.Warn("Guardrail triggered", "reason", reason, "turns", turnCount, "max_turns", lim.maxTurns)
+		}
+
 		// Check action count (count reasoning, message, and tool_execution_start events as actions)
 		actionCount := 0
 		for _, ev := range evalReport.SessionEvents {
@@ -789,21 +848,21 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				actionCount++
 			}
 		}
-		if actionCount > e.opts.MaxSessionActions {
-			reason := fmt.Sprintf("guardrail: action count %d exceeded limit of %d", actionCount, e.opts.MaxSessionActions)
+		if actionCount > lim.maxSessionActions {
+			reason := fmt.Sprintf("guardrail: action count %d exceeded limit of %d", actionCount, lim.maxSessionActions)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "actions", actionCount, "max_session_actions", e.opts.MaxSessionActions)
+			lg.Warn("Guardrail triggered", "reason", reason, "actions", actionCount, "max_session_actions", lim.maxSessionActions)
 		}
 
 		// Check file count
-		if len(generatedFiles) > e.opts.MaxFiles {
-			reason := fmt.Sprintf("guardrail: file count %d exceeded limit of %d", len(generatedFiles), e.opts.MaxFiles)
+		if len(generatedFiles) > lim.maxFiles {
+			reason := fmt.Sprintf("guardrail: file count %d exceeded limit of %d", len(generatedFiles), lim.maxFiles)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "files", len(generatedFiles), "max_files", e.opts.MaxFiles)
+			lg.Warn("Guardrail triggered", "reason", reason, "files", len(generatedFiles), "max_files", lim.maxFiles)
 		}
 
 		// Check total output size
@@ -817,12 +876,12 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				totalSize += info.Size()
 			}
 		}
-		if totalSize > e.opts.MaxOutputSize {
-			reason := fmt.Sprintf("guardrail: total output size %d bytes exceeded limit of %d bytes", totalSize, e.opts.MaxOutputSize)
+		if totalSize > lim.maxOutputSize {
+			reason := fmt.Sprintf("guardrail: total output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "total_size", totalSize, "max_size", e.opts.MaxOutputSize)
+			lg.Warn("Guardrail triggered", "reason", reason, "total_size", totalSize, "max_size", lim.maxOutputSize)
 		}
 	}
 

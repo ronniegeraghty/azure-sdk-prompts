@@ -101,11 +101,12 @@ type EvalReport struct {
 	FailureReason  string                `json:"failure_reason,omitempty"` // human-readable explanation of failure
 	IsStub         bool                  `json:"is_stub,omitempty"`
 	RerunCommand   string                `json:"rerunCommand,omitempty"`
-	// Generator guardrails (#35)
-	GuardrailMaxTurns      int    `json:"guardrail_max_turns,omitempty"`
-	GuardrailMaxFiles      int    `json:"guardrail_max_files,omitempty"`
-	GuardrailMaxOutputSize int64  `json:"guardrail_max_output_size,omitempty"`
-	GuardrailAbortReason   string `json:"guardrail_abort_reason,omitempty"`
+	// Generator guardrails (#35, #125)
+	GuardrailMaxTurns          int    `json:"guardrail_max_turns,omitempty"`
+	GuardrailMaxFiles          int    `json:"guardrail_max_files,omitempty"`
+	GuardrailMaxOutputSize     int64  `json:"guardrail_max_output_size,omitempty"`
+	GuardrailMaxSessionActions int    `json:"guardrail_max_session_actions,omitempty"`
+	GuardrailAbortReason       string `json:"guardrail_abort_reason,omitempty"`
 }
 
 // RunResourceStats holds aggregate resource utilization across all evals (#45).
