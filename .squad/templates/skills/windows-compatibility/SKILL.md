@@ -10,6 +10,8 @@ source: "earned (multiple Windows-specific bugs: colons in filenames, git -C fai
 
 Squad runs on Windows, macOS, and Linux. Several bugs have been traced to platform-specific assumptions: ISO timestamps with colons (illegal on Windows), `git -C` with Windows paths (unreliable), forward-slash paths in Node.js on Windows.
 
+> **Status (fixed):** All 17 existing `.squad/` files with colons in timestamps have been renamed to use hyphens. Templates now instruct agents to use hyphenated timestamps in filenames (e.g., `2026-04-04T03-55-26Z`).
+
 ## Patterns
 
 ### Filenames & Timestamps

@@ -37,6 +37,10 @@ func TestWriteHTMLReport(t *testing.T) {
 			Issues:       []string{"Missing retry logic"},
 			Strengths:    []string{"Clean code structure"},
 		},
+		GraderResults: []GraderResult{
+			{GraderName: "test-grader", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Grader says good"},
+			{GraderName: "consensus", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Consensus result", IsConsensus: true},
+		},
 		SessionEvents: []SessionEventRecord{
 			{Type: "user.message", Content: "Write a dotnet storage auth sample"},
 			{Type: "assistant.reasoning", Content: "I need to create an auth sample"},
@@ -78,6 +82,10 @@ func TestWriteHTMLReport(t *testing.T) {
 		"Back to Summary",
 		"File created",
 		"150ms",
+		"Grader Results",
+		"test-grader",
+		"Grader says good",
+		"Consensus result",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {

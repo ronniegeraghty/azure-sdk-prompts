@@ -215,7 +215,7 @@ The emoji makes task spawn notifications visually consistent with the launch tab
 
 **When you detect a directive:**
 
-1. Write it immediately to `.squad/decisions/inbox/copilot-directive-{timestamp}.md` using this format:
+1. Write it immediately to `.squad/decisions/inbox/copilot-directive-{timestamp}.md` (use hyphens in timestamps for Windows compatibility, e.g., `2026-04-04T03-55-26Z`) using this format:
    ```
    ### {timestamp}: User directive
    **By:** {user name} (via Copilot)
@@ -588,7 +588,7 @@ To enable full parallelism, shared writes use a drop-box pattern that eliminates
 - All agents READ from `.squad/decisions.md` at spawn time (last-merged snapshot)
 
 **orchestration-log/** — Scribe writes one entry per agent after each batch:
-- `.squad/orchestration-log/{timestamp}-{agent-name}.md`
+- `.squad/orchestration-log/{timestamp}-{agent-name}.md` (use hyphens in timestamps, e.g., `2026-04-04T03-55-26Z`, for Windows compatibility)
 - The coordinator passes a spawn manifest to Scribe; Scribe creates the files
 - Format matches the existing orchestration log entry template
 - Append-only, never edited after write
@@ -673,7 +673,7 @@ When worktree mode is enabled, the coordinator creates dedicated worktrees for i
 
 Orchestration log entries are written by **Scribe**, not the coordinator. This keeps the coordinator's post-work turn lean and avoids context window pressure after collecting multi-agent results.
 
-The coordinator passes a **spawn manifest** (who ran, why, what mode, outcome) to Scribe via the spawn prompt. Scribe writes one entry per agent at `.squad/orchestration-log/{timestamp}-{agent-name}.md`.
+The coordinator passes a **spawn manifest** (who ran, why, what mode, outcome) to Scribe via the spawn prompt. Scribe writes one entry per agent at `.squad/orchestration-log/{timestamp}-{agent-name}.md`. Use hyphens instead of colons in the timestamp portion of filenames (e.g., `2026-04-04T03-55-26Z`) for Windows compatibility.
 
 Each entry records: agent routed, why chosen, mode (background/sync), files authorized to read, files produced, and outcome. See `.squad/templates/orchestration-log.md` for the field format.
 
@@ -858,8 +858,8 @@ prompt: |
   SPAWN MANIFEST: {spawn_manifest}
 
   Tasks (in order):
-  1. ORCHESTRATION LOG: Write .squad/orchestration-log/{timestamp}-{agent}.md per agent. Use ISO 8601 UTC timestamp.
-  2. SESSION LOG: Write .squad/log/{timestamp}-{topic}.md. Brief. Use ISO 8601 UTC timestamp.
+  1. ORCHESTRATION LOG: Write .squad/orchestration-log/{timestamp}-{agent}.md per agent. Use ISO 8601 UTC timestamp with hyphens instead of colons (e.g., `2026-04-04T03-55-26Z`) for Windows compatibility.
+  2. SESSION LOG: Write .squad/log/{timestamp}-{topic}.md. Brief. Use ISO 8601 UTC timestamp with hyphens instead of colons for Windows compatibility.
   3. DECISION INBOX: Merge .squad/decisions/inbox/ → decisions.md, delete inbox files. Deduplicate.
   4. CROSS-AGENT: Append team updates to affected agents' history.md.
   5. DECISIONS ARCHIVE: If decisions.md exceeds ~20KB, archive entries older than 30 days to decisions-archive.md.

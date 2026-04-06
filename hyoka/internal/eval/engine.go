@@ -102,7 +102,7 @@ type Engine struct {
 	reviewerFactory ReviewerFactory
 	opts            EngineOptions
 	tracker         *ProcessTracker
-	criteriaSets    []criteria.CriteriaSet // Tier 2 attribute-matched criteria (#30)
+	graderConfigs   []criteria.GraderConfig // attribute-matched grader configs (#30)
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
@@ -174,7 +174,7 @@ func (e *Engine) printf(format string, args ...any) {
 	fmt.Fprintf(e.opts.Stdout, format, args...)
 }
 
-// loadCriteria loads Tier 2 criteria sets if CriteriaDir is configured.
+// loadCriteria loads grader configs if CriteriaDir is configured.
 func (e *Engine) loadCriteria() {
 	if e.opts.CriteriaDir == "" {
 		return
@@ -183,26 +183,26 @@ func (e *Engine) loadCriteria() {
 		slog.Debug("Criteria directory does not exist, skipping", "dir", e.opts.CriteriaDir)
 		return
 	}
-	sets, err := criteria.LoadDir(e.opts.CriteriaDir)
+	configs, err := criteria.LoadDir(e.opts.CriteriaDir)
 	if err != nil {
-		slog.Warn("Failed to load criteria sets", "dir", e.opts.CriteriaDir, "error", err)
+		slog.Warn("Failed to load grader configs", "dir", e.opts.CriteriaDir, "error", err)
 		return
 	}
-	e.criteriaSets = sets
-	slog.Info("Loaded attribute-matched criteria", "sets", len(sets), "dir", e.opts.CriteriaDir)
+	e.graderConfigs = configs
+	slog.Info("Loaded grader configs", "configs", len(configs), "dir", e.opts.CriteriaDir)
 }
 
-// mergedCriteria returns the combined Tier 2 + Tier 3 evaluation criteria
-// text for the given prompt.
+// mergedCriteria returns the combined attribute-matched + prompt-specific
+// evaluation criteria text for the given prompt.
 func (e *Engine) mergedCriteria(p *prompt.Prompt) string {
-	attrs := criteria.PromptAttrs{
-		Language: p.Language,
-		Service:  p.Service,
-		Plane:    p.Plane,
-		Category: p.Category,
-		SDK:      p.SDKPackage,
+	props := map[string]string{
+		"language": p.Language(),
+		"service":  p.Service(),
+		"plane":    p.Plane(),
+		"category": p.Category(),
+		"sdk":      p.SDKPackage(),
 	}
-	matched := criteria.MatchingCriteria(e.criteriaSets, attrs)
+	matched := criteria.MatchingGraders(e.graderConfigs, props)
 	merged := criteria.MergeCriteria(matched, p.EvaluationCriteria)
 	if merged == "" {
 		return p.EvaluationCriteria
@@ -228,7 +228,7 @@ type EvalTask struct {
 
 // Run executes evaluations for the given prompts crossed with configs.
 func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []config.ToolConfig) (*report.RunSummary, error) {
-	// Load tiered criteria sets (#30) if configured.
+	// Load grader configs (#30) if configured.
 	e.loadCriteria()
 
 	// Build task list (cross product: prompts × configs)
@@ -530,13 +530,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		ConfigName: task.Config.Name,
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),
 		PromptMeta: map[string]any{
-			"service":     task.Prompt.Service,
-			"plane":       task.Prompt.Plane,
-			"language":    task.Prompt.Language,
-			"category":    task.Prompt.Category,
-			"description": task.Prompt.Description,
-			"difficulty":  task.Prompt.Difficulty,
-			"sdk_package": task.Prompt.SDKPackage,
+			"service":     task.Prompt.Service(),
+			"plane":       task.Prompt.Plane(),
+			"language":    task.Prompt.Language(),
+			"category":    task.Prompt.Category(),
+			"description": task.Prompt.Description(),
+			"difficulty":  task.Prompt.Difficulty(),
+			"sdk_package": task.Prompt.SDKPackage(),
 		},
 		ConfigUsed: map[string]any{
 			"name":  task.Config.Name,
@@ -665,7 +665,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		lg.Warn("Failed to copy generated files to report dir", "error", err)
 	}
 
-	generatedFiles, _ := ws.ListFiles()
+	generatedFiles, listErr := ws.ListFiles()
+	if listErr != nil {
+		lg.Warn("Failed to list workspace files", "error", listErr)
+	}
 	if len(generatedFiles) == 0 && result != nil && len(result.GeneratedFiles) > 0 {
 		generatedFiles = result.GeneratedFiles
 	}
@@ -723,10 +726,17 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			}
 		}
 	}
+	// Resolve tools for reporting — mirrors the resolution in buildSessionConfig.
+	var reportAvailableTools []string
+	if len(task.Config.Generator.Tools) > 0 {
+		reportAvailableTools = config.ResolveTools(task.Config.Generator.Tools, mergePromptProperties(task.Prompt))
+	} else {
+		reportAvailableTools = task.Config.Generator.AvailableTools
+	}
 	env := &report.EnvironmentInfo{
 		Model:            task.Config.Generator.Model,
 		SkillDirectories: skillDirectories,
-		AvailableTools:   task.Config.Generator.AvailableTools,
+		AvailableTools:   reportAvailableTools,
 		ExcludedTools:    task.Config.Generator.ExcludedTools,
 		SafetyBoundaries: true,
 		AllowCloud:       false,
@@ -827,7 +837,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			referenceDir = task.Prompt.ReferenceAnswer
 		}
 
-		// Merge tiered evaluation criteria (#30)
+		// Merge evaluation criteria (#30)
 		evalCriteria := e.mergedCriteria(task.Prompt)
 
 		// Create reviewer for this specific config using the factory (#92)
@@ -925,13 +935,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Write HTML report
 	if _, err := report.WriteHTMLReport(evalReport, e.opts.OutputDir, runID,
-		task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
+		task.Prompt.Service(), task.Prompt.Plane(), task.Prompt.Language(), task.Prompt.Category()); err != nil {
 		lg.Error("Failed to write HTML report", "error", err)
 	}
 
 	// Write Markdown report
 	if _, err := report.WriteMarkdownReport(evalReport, e.opts.OutputDir, runID,
-		task.Prompt.Service, task.Prompt.Plane, task.Prompt.Language, task.Prompt.Category); err != nil {
+		task.Prompt.Service(), task.Prompt.Plane(), task.Prompt.Language(), task.Prompt.Category()); err != nil {
 		lg.Error("Failed to write Markdown report", "error", err)
 	}
 

@@ -81,14 +81,24 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	// Copy starter project if configured
 	var starterFiles []string
 	if p.StarterProject != "" {
-		starterDir := p.StarterProject
-		if !filepath.IsAbs(starterDir) && p.FilePath != "" {
-			starterDir = filepath.Join(filepath.Dir(p.FilePath), starterDir)
+		starterDir := resolveStarterDir(p)
+		info, err := os.Stat(starterDir)
+		if err != nil {
+			return nil, fmt.Errorf("starter project %q: %w", p.StarterProject, err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("starter project %q is not a directory", p.StarterProject)
 		}
 		if err := copyDir(starterDir, workDir); err != nil {
 			return nil, fmt.Errorf("copying starter project: %w", err)
 		}
-		starterFiles, _ = listFiles(workDir)
+		starterFiles, err = listFiles(workDir)
+		if err != nil {
+			return nil, fmt.Errorf("listing starter files: %w", err)
+		}
+		if len(starterFiles) == 0 {
+			slog.Warn("Starter project directory contains no files", "dir", starterDir)
+		}
 	}
 
 	// Create Copilot client
@@ -155,7 +165,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	}
 	defer os.RemoveAll(configDir)
 
-	sessionCfg := e.buildSessionConfig(cfg, workDir, configDir)
+	sessionCfg := e.buildSessionConfig(cfg, workDir, configDir, mergePromptProperties(p))
 
 	// Subscribe to events with detailed capture and debug logging.
 	// This MUST be set before CreateSession — the SDK reads OnEvent during
@@ -534,7 +544,10 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		// post-generation guardrail in engine.go can mark the eval as failed
 		// with a proper reason instead of treating it as an SDK error.
 		if actionLimitHit {
-			generatedFiles, _ := listFiles(workDir)
+			generatedFiles, listErr := listFiles(workDir)
+			if listErr != nil {
+				lg.Warn("Failed to list generated files after action-limit", "dir", workDir, "error", listErr)
+			}
 			lg.Warn("Returning partial results after action-limit cancellation",
 				"actions", actionCounter, "files", len(generatedFiles))
 			return &EvalResult{
@@ -564,7 +577,10 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	copy(capturedRecords, sessionRecords)
 	mu.Unlock()
 
-	generatedFiles, _ := listFiles(workDir)
+	generatedFiles, listErr := listFiles(workDir)
+	if listErr != nil {
+		lg.Warn("Failed to list generated files", "dir", workDir, "error", listErr)
+	}
 	toolCalls := extractToolCalls(capturedEvents)
 	hasError := hasSessionError(capturedEvents)
 
@@ -636,7 +652,16 @@ func (e *CopilotSDKEvaluator) Client(ctx context.Context, workDir string) (*copi
 	return client, nil
 }
 
-func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string) *copilot.SessionConfig {
+// mergePromptProperties builds a property map from a prompt's metadata fields.
+// This map is used by ResolveTools to evaluate conditional tool entries.
+func mergePromptProperties(p *prompt.Prompt) map[string]string {
+	if p.Properties != nil {
+		return p.Properties
+	}
+	return make(map[string]string)
+}
+
+func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
 	// Build skill directories from the new Generator.Skills list
 	var skillDirs []string
 	if cfg.Generator != nil {
@@ -647,45 +672,11 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		}
 	}
 
-	// System message ensures the agent creates actual code files in the workspace
-	// rather than responding with inline text or writing files to the wrong directory.
-	// The create tool requires an explicit 'path' parameter — without it, files land in ~.
-	// Also constrains bash usage, discourages web_fetch research, and standardizes on python3.
-	systemMsg := fmt.Sprintf(
-		"You are a code generation agent. Your working directory is: %s\n"+
-			"CRITICAL FILE CREATION RULES:\n"+
-			"1. Always write code to files using the create tool — never just explain code in text.\n"+
-			"2. Always create files using the create tool. Never provide code inline in your response.\n"+
-			"3. Every create call MUST include the 'path' parameter with a FULL ABSOLUTE PATH.\n"+
-			"4. Every file path MUST start with: %s/\n"+
-			"5. Example: create with path=\"%s/main.py\"\n"+
-			"6. NEVER omit the path parameter. NEVER use relative paths.\n"+
-			"7. NEVER create files outside your working directory.\n"+
-			"BASH RULES:\n"+
-			"8. When using bash, always cd to %s first. Never run commands from ~ or any directory outside your workspace.\n"+
-			"RESEARCH RULES:\n"+
-			"9. Do not use web_fetch to research documentation. Focus on generating code files based on the prompt.\n"+
-			"PYTHON RULES:\n"+
-			"10. Use python3 (not python) for all Python scripts and commands.",
-		workDir, workDir, workDir, workDir,
-	)
-
-	// Safety boundaries (#36): prevent real Azure resource provisioning unless --allow-cloud is set.
-	if !e.allowCloud {
-		systemMsg += "\n\nSAFETY BOUNDARIES:\n" +
-			"11. Do NOT provision real Azure resources. Do NOT run `az` CLI commands that create, update, or delete resources.\n" +
-			"12. Do NOT use `az group create`, `az storage account create`, `az webapp create`, or any destructive Azure CLI commands.\n" +
-			"13. Use mock data, environment variables, or local emulators (e.g., Azurite for Storage, CosmosDB emulator) for connection strings.\n" +
-			"14. Generate code that can run locally without cloud dependencies. Use placeholder values like `os.Getenv(\"AZURE_STORAGE_CONNECTION_STRING\")` for configuration.\n" +
-			"15. If the prompt asks for infrastructure provisioning, generate Bicep/ARM templates or Terraform files instead of running live commands."
-	}
+	// Use the config-driven system prompt (#115, #116). The default is zero
+	// system prompt — all behavioral instructions belong in the config YAML.
 
 	sc := &copilot.SessionConfig{
 		Model: cfg.Generator.Model,
-		SystemMessage: &copilot.SystemMessageConfig{
-			Mode:    "append",
-			Content: systemMsg,
-		},
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
@@ -735,10 +726,21 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		SkillDirectories: skillDirs,
 	}
 
-	// Only set AvailableTools/ExcludedTools when non-empty.
+	// Resolve tools: new conditional format (generator.tools) takes precedence
+	// over legacy flat lists (generator.available_tools / excluded_tools).
 	// An empty slice serializes as JSON [] which tells the CLI "zero tools" —
 	// nil serializes as null which means "all default tools available."
-	availableTools := cfg.Generator.AvailableTools
+	var availableTools []string
+	if len(cfg.Generator.Tools) > 0 {
+		availableTools = config.ResolveTools(cfg.Generator.Tools, promptProps)
+		slog.Debug("Resolved conditional tools",
+			"entries", len(cfg.Generator.Tools),
+			"matched", len(availableTools),
+			"tools", availableTools,
+			"properties", promptProps)
+	} else {
+		availableTools = cfg.Generator.AvailableTools
+	}
 	excludedTools := cfg.Generator.ExcludedTools
 	if len(availableTools) > 0 {
 		sc.AvailableTools = availableTools
@@ -836,4 +838,15 @@ func toolArgSummary(event copilot.SessionEvent) string {
 		}
 	}
 	return ""
+}
+
+
+// resolveStarterDir returns the absolute path to a prompt's starter project directory.
+// If StarterProject is relative, it is resolved relative to the prompt file's directory.
+func resolveStarterDir(p *prompt.Prompt) string {
+	dir := p.StarterProject
+	if !filepath.IsAbs(dir) && p.FilePath != "" {
+		dir = filepath.Join(filepath.Dir(p.FilePath), dir)
+	}
+	return dir
 }

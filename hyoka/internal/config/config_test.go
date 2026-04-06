@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -542,6 +543,59 @@ t.Fatal("expected error for remote skill without repo")
 }
 }
 
+func TestParseDuplicateConfigNamesRejected(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: same-name
+    description: "First"
+    generator:
+      model: "gpt-4"
+  - name: same-name
+    description: "Second"
+    generator:
+      model: "claude-sonnet-4.5"
+`)
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected error for duplicate config names within a file")
+	}
+	if got := err.Error(); !strings.Contains(got, "duplicate config name") {
+		t.Errorf("expected duplicate config name error, got: %v", err)
+	}
+}
+
+func TestLoadDirDuplicateConfigNamesAcrossFiles(t *testing.T) {
+	dir := t.TempDir()
+	file1 := []byte(`
+configs:
+  - name: shared-name
+    description: "In file1"
+    generator:
+      model: "gpt-4"
+`)
+	file2 := []byte(`
+configs:
+  - name: shared-name
+    description: "In file2"
+    generator:
+      model: "claude-sonnet-4.5"
+`)
+	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), file1, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.yaml"), file2, 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadDir(dir)
+	if err == nil {
+		t.Fatal("expected error for duplicate config names across files")
+	}
+	got := err.Error()
+	if !strings.Contains(got, "duplicate config name") || !strings.Contains(got, "a.yaml") || !strings.Contains(got, "b.yaml") {
+		t.Errorf("expected error mentioning duplicate name and both files, got: %v", err)
+	}
+}
+
 func TestGeneratorModelDirectAccess(t *testing.T) {
 	c := ToolConfig{
 		Name: "test",
@@ -551,5 +605,87 @@ func TestGeneratorModelDirectAccess(t *testing.T) {
 	}
 	if c.Generator.Model != "new-model" {
 		t.Errorf("expected 'new-model', got %q", c.Generator.Model)
+	}
+}
+
+func TestValidateRejectsNilGenerator(t *testing.T) {
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{Name: "no-gen"},
+		},
+	}
+	err := cf.Validate()
+	if err == nil {
+		t.Fatal("expected error for nil generator")
+	}
+	want := `config "no-gen": generator.model is required`
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
+	}
+}
+
+func TestParseSystemPrompt(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: with-system-prompt
+    description: "Config with system prompts"
+    generator:
+      model: "claude-opus-4.6"
+      system_prompt: "You are an Azure SDK expert."
+    reviewer:
+      models:
+        - "gpt-4.1"
+      system_prompt: "Review code for Azure best practices."
+`)
+	cfg, err := Parse(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	c := cfg.Configs[0]
+	if c.Generator.SystemPrompt != "You are an Azure SDK expert." {
+		t.Errorf("expected generator system_prompt 'You are an Azure SDK expert.', got %q", c.Generator.SystemPrompt)
+	}
+	if c.Reviewer.SystemPrompt != "Review code for Azure best practices." {
+		t.Errorf("expected reviewer system_prompt 'Review code for Azure best practices.', got %q", c.Reviewer.SystemPrompt)
+	}
+}
+
+func TestParseSystemPromptOmitted(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: no-system-prompt
+    description: "Config without system prompts"
+    generator:
+      model: "gpt-4"
+    reviewer:
+      models:
+        - "gpt-4.1"
+`)
+	cfg, err := Parse(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	c := cfg.Configs[0]
+	if c.Generator.SystemPrompt != "" {
+		t.Errorf("expected empty generator system_prompt, got %q", c.Generator.SystemPrompt)
+	}
+	if c.Reviewer.SystemPrompt != "" {
+		t.Errorf("expected empty reviewer system_prompt, got %q", c.Reviewer.SystemPrompt)
+	}
+}
+
+func TestValidateRejectsEmptyGeneratorModel(t *testing.T) {
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{Name: "empty-model", Generator: &GeneratorConfig{Model: ""}},
+		},
+	}
+	err := cf.Validate()
+	if err == nil {
+		t.Fatal("expected error for empty generator model")
+	}
+	want := `config "empty-model": generator.model is required`
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
 	}
 }

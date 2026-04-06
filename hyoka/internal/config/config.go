@@ -33,17 +33,20 @@ type Skill struct {
 // GeneratorConfig holds all configuration for the code generation agent.
 type GeneratorConfig struct {
 	Model          string                `yaml:"model" json:"model"`
+	SystemPrompt   string                `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
 	Skills         []Skill               `yaml:"skills,omitempty" json:"skills,omitempty"`
 	MCPServers     map[string]*MCPServer `yaml:"mcp_servers,omitempty" json:"mcp_servers,omitempty"`
+	Tools          []ToolEntry           `yaml:"tools,omitempty" json:"tools,omitempty"`
 	AvailableTools []string              `yaml:"available_tools,omitempty" json:"available_tools,omitempty"`
 	ExcludedTools  []string              `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`
 }
 
 // ReviewerConfig holds all configuration for the review/grading plane.
 type ReviewerConfig struct {
-	Model  string  `yaml:"model,omitempty" json:"model,omitempty"`
-	Models []string `yaml:"models,omitempty" json:"models,omitempty"`
-	Skills []Skill  `yaml:"skills,omitempty" json:"skills,omitempty"`
+	Model        string   `yaml:"model,omitempty" json:"model,omitempty"`
+	Models       []string `yaml:"models,omitempty" json:"models,omitempty"`
+	SystemPrompt string   `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	Skills       []Skill  `yaml:"skills,omitempty" json:"skills,omitempty"`
 }
 
 // ToolConfig represents a single evaluation configuration.
@@ -80,6 +83,7 @@ return nil, fmt.Errorf("reading config directory %s: %w", dir, err)
 }
 
 merged := &ConfigFile{}
+nameSource := make(map[string]string) // config name → source filename
 for _, e := range entries {
 if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
 continue
@@ -87,6 +91,12 @@ continue
 cf, err := Load(filepath.Join(dir, e.Name()))
 if err != nil {
 return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
+}
+for _, c := range cf.Configs {
+if prev, ok := nameSource[c.Name]; ok {
+return nil, fmt.Errorf("duplicate config name %q found in files %s and %s", c.Name, prev, e.Name())
+}
+nameSource[c.Name] = e.Name()
 }
 merged.Configs = append(merged.Configs, cf.Configs...)
 }
@@ -119,15 +129,29 @@ func (cf *ConfigFile) Validate() error {
 	if len(cf.Configs) == 0 {
 		return fmt.Errorf("no configs defined")
 	}
+	namesSeen := make(map[string]int, len(cf.Configs))
 	for i, c := range cf.Configs {
 		if c.Name == "" {
 			return fmt.Errorf("config at index %d has no name", i)
 		}
+		// Generator with a model is required for every config.
+		if c.Generator == nil || c.Generator.Model == "" {
+			return fmt.Errorf("config %q: generator.model is required", c.Name)
+		}
+		if prev, ok := namesSeen[c.Name]; ok {
+			return fmt.Errorf("duplicate config name %q at index %d and %d", c.Name, prev, i)
+		}
+		namesSeen[c.Name] = i
 		// Validate generator/reviewer skills have correct type
 		if c.Generator != nil {
 			for _, s := range c.Generator.Skills {
 				if err := validateSkill(s); err != nil {
 					return fmt.Errorf("config %q generator skill: %w", c.Name, err)
+				}
+			}
+			for j, te := range c.Generator.Tools {
+				if err := validateToolEntry(te, c.Name, j); err != nil {
+					return err
 				}
 			}
 		}

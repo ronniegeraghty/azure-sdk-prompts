@@ -41,7 +41,7 @@ func (s *slowEvaluator) Evaluate(ctx context.Context, _ *prompt.Prompt, _ *confi
 
 func TestStubEvaluator(t *testing.T) {
 stub := &StubEvaluator{}
-p := &prompt.Prompt{ID: "test-prompt", Language: "go"}
+p := &prompt.Prompt{ID: "test-prompt", Properties: map[string]string{"language": "go"}}
 cfg := &config.ToolConfig{Name: "test-config", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 
 result, err := stub.Evaluate(context.Background(), p, cfg, t.TempDir())
@@ -66,8 +66,8 @@ DryRun:  true,
 }))
 
 prompts := []*prompt.Prompt{
-{ID: "p1", Service: "storage", Language: "dotnet"},
-{ID: "p2", Service: "keyvault", Language: "python"},
+{ID: "p1", Properties: map[string]string{"service": "storage", "language": "dotnet"}},
+{ID: "p2", Properties: map[string]string{"service": "keyvault", "language": "python"}},
 }
 configs := []config.ToolConfig{
 {Name: "baseline", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -100,7 +100,7 @@ OutputDir: outputDir,
 }))
 
 prompts := []*prompt.Prompt{
-{ID: "test-prompt", Service: "storage", Plane: "data-plane", Language: "go", Category: "auth"},
+{ID: "test-prompt", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
 }
 configs := []config.ToolConfig{
 {Name: "test-config", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -126,7 +126,7 @@ func TestEngineRunCapturesGeneratedFiles(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "filelist-test", Service: "storage", Plane: "data-plane", Language: "python", Category: "crud"},
+		{ID: "filelist-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "python", "category": "crud"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "baseline", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -155,7 +155,7 @@ func TestEngineRunTimeoutError(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "timeout-test", Service: "storage", Plane: "data-plane", Language: "go", Category: "auth"},
+		{ID: "timeout-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "baseline", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -299,7 +299,7 @@ func TestGuardrailMaxFiles(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "guardrail-files", Service: "storage", Plane: "data-plane", Language: "go", Category: "auth"},
+		{ID: "guardrail-files", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -331,7 +331,7 @@ func TestGuardrailMaxTurns(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "guardrail-turns", Service: "storage", Plane: "data-plane", Language: "go", Category: "auth"},
+		{ID: "guardrail-turns", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -365,7 +365,7 @@ func TestGuardrailMaxOutputSize(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "guardrail-size", Service: "storage", Plane: "data-plane", Language: "go", Category: "auth"},
+		{ID: "guardrail-size", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -411,7 +411,7 @@ func TestStubEvalLifecycle(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "lifecycle-test", Service: "storage", Plane: "data-plane", Language: "go", Category: "crud"},
+		{ID: "lifecycle-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "baseline", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -482,9 +482,9 @@ func TestMultiPromptMultiConfigFanOut(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "p1", Service: "storage", Plane: "data-plane", Language: "go", Category: "crud"},
-		{ID: "p2", Service: "keyvault", Plane: "data-plane", Language: "python", Category: "auth"},
-		{ID: "p3", Service: "cosmos-db", Plane: "data-plane", Language: "java", Category: "query"},
+		{ID: "p1", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"}},
+		{ID: "p2", Properties: map[string]string{"service": "keyvault", "plane": "data-plane", "language": "python", "category": "auth"}},
+		{ID: "p3", Properties: map[string]string{"service": "cosmos-db", "plane": "data-plane", "language": "java", "category": "query"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "config-a", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -538,7 +538,7 @@ func TestPhaseDurationTracking(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "timing-test", Service: "storage", Plane: "data-plane", Language: "go", Category: "crud"},
+		{ID: "timing-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -576,10 +576,18 @@ func TestLargeRunAutoConfirmBypass(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		prompts = append(prompts, &prompt.Prompt{
 			ID:       fmt.Sprintf("auto-confirm-%d", i),
-			Service:  "storage",
-			Plane:    "data-plane",
-			Language: "go",
-			Category: "crud",
+
+			Properties: map[string]string{
+
+				"service":  "storage",
+
+				"plane":    "data-plane",
+
+				"language": "go",
+
+				"category": "crud",
+
+			},
 		})
 	}
 	configs := []config.ToolConfig{
@@ -610,10 +618,18 @@ func TestLargeRunConfirmAbort(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		prompts = append(prompts, &prompt.Prompt{
 			ID:       fmt.Sprintf("abort-%d", i),
-			Service:  "storage",
-			Plane:    "data-plane",
-			Language: "go",
-			Category: "crud",
+
+			Properties: map[string]string{
+
+				"service":  "storage",
+
+				"plane":    "data-plane",
+
+				"language": "go",
+
+				"category": "crud",
+
+			},
 		})
 	}
 
@@ -648,15 +664,16 @@ func (c *capturingReviewer) Review(_ context.Context, _ string, _ string, _ stri
 }
 
 func TestCriteriaMergedIntoReview(t *testing.T) {
-	// Create criteria directory with a language-matched file
+	// Create criteria directory with a language-matched grader config
 	criteriaDir := t.TempDir()
 	os.MkdirAll(filepath.Join(criteriaDir, "language"), 0755)
 	os.WriteFile(filepath.Join(criteriaDir, "language", "go.yaml"), []byte(`
-match:
+when:
   language: go
-criteria:
+graders:
   - name: Uses DefaultAzureCredential
-    description: Must use azidentity.DefaultAzureCredential
+    weight: 1.0
+    prompt: Must use azidentity.DefaultAzureCredential
 `), 0644)
 
 	reviewer := &capturingReviewer{}
@@ -668,8 +685,8 @@ criteria:
 
 	prompts := []*prompt.Prompt{
 		{
-			ID: "criteria-test", Service: "storage", Plane: "data-plane",
-			Language: "go", Category: "crud",
+			ID: "criteria-test", Properties: map[string]string{"service": "storage", "plane": "data-plane",
+				"language": "go", "category": "crud"},
 			EvaluationCriteria: "- Must handle errors properly",
 		},
 	}
@@ -681,10 +698,10 @@ criteria:
 	}
 
 	if !strings.Contains(reviewer.capturedCriteria, "DefaultAzureCredential") {
-		t.Errorf("expected tier 2 criteria in review, got: %s", reviewer.capturedCriteria)
+		t.Errorf("expected grader criteria in review, got: %s", reviewer.capturedCriteria)
 	}
 	if !strings.Contains(reviewer.capturedCriteria, "handle errors properly") {
-		t.Errorf("expected tier 3 criteria in review, got: %s", reviewer.capturedCriteria)
+		t.Errorf("expected prompt criteria in review, got: %s", reviewer.capturedCriteria)
 	}
 }
 
@@ -698,7 +715,7 @@ func TestCriteriaDirNotExist(t *testing.T) {
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "dir-test", Service: "storage", Language: "go", Plane: "data-plane", Category: "crud"},
+		{ID: "dir-test", Properties: map[string]string{"service": "storage", "language": "go", "plane": "data-plane", "category": "crud"}},
 	}
 	configs := []config.ToolConfig{{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}}
 
@@ -719,8 +736,8 @@ func TestCriteriaDirEmpty(t *testing.T) {
 
 	prompts := []*prompt.Prompt{
 		{
-			ID: "empty-criteria", Service: "storage", Language: "go",
-			Plane: "data-plane", Category: "crud",
+			ID: "empty-criteria", Properties: map[string]string{"service": "storage", "language": "go",
+				"plane": "data-plane", "category": "crud"},
 			EvaluationCriteria: "- Prompt specific criterion",
 		},
 	}
