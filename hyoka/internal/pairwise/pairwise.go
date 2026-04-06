@@ -5,6 +5,8 @@ package pairwise
 
 import (
 	"fmt"
+	"math"
+	"sort"
 
 	"github.com/ronniegeraghty/hyoka/internal/config"
 )
@@ -165,4 +167,139 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 	}
 
 	return dst
+}
+
+// VariantResult holds the evaluation outcome for a single pairwise variant.
+type VariantResult struct {
+ConfigName  string `json:"config_name"`
+RemovedTool string `json:"removed_tool,omitempty"`
+Score       int    `json:"score"`
+MaxScore    int    `json:"max_score"`
+Success     bool   `json:"success"`
+}
+
+// ToolImpact holds the computed impact of a single tool.
+type ToolImpact struct {
+ToolName      string  `json:"tool_name"`
+Impact        float64 `json:"impact"`
+BaselineScore float64 `json:"baseline_score"`
+WithoutScore  float64 `json:"without_score"`
+BaselinePass  bool    `json:"baseline_pass"`
+WithoutPass   bool    `json:"without_pass"`
+}
+
+// PairwiseReport holds the complete pairwise comparison results for a prompt.
+type PairwiseReport struct {
+PromptID string          `json:"prompt_id"`
+Baseline VariantResult   `json:"baseline"`
+Variants []VariantResult `json:"variants"`
+Impacts  []ToolImpact    `json:"impacts"`
+}
+
+// normalizeScore converts a raw score/maxScore pair to a 0-100 scale.
+func normalizeScore(score, maxScore int) float64 {
+if maxScore <= 0 {
+return 0
+}
+return math.Round(float64(score)/float64(maxScore)*1000) / 10
+}
+
+// ComputeImpacts calculates per-tool impact from a baseline and a set of variants.
+func ComputeImpacts(promptID string, results []VariantResult) (*PairwiseReport, error) {
+var baseline *VariantResult
+var variants []VariantResult
+
+for i := range results {
+if results[i].RemovedTool == "" {
+baseline = &results[i]
+} else {
+variants = append(variants, results[i])
+}
+}
+
+if baseline == nil {
+return nil, fmt.Errorf("pairwise: no baseline found for prompt %s", promptID)
+}
+
+baselineNorm := normalizeScore(baseline.Score, baseline.MaxScore)
+
+impacts := make([]ToolImpact, 0, len(variants))
+for _, v := range variants {
+withoutNorm := normalizeScore(v.Score, v.MaxScore)
+impacts = append(impacts, ToolImpact{
+ToolName:      v.RemovedTool,
+Impact:        math.Round((baselineNorm-withoutNorm)*10) / 10,
+BaselineScore: baselineNorm,
+WithoutScore:  withoutNorm,
+BaselinePass:  baseline.Success,
+WithoutPass:   v.Success,
+})
+}
+
+SortByImpact(impacts)
+
+return &PairwiseReport{
+PromptID: promptID,
+Baseline: *baseline,
+Variants: variants,
+Impacts:  impacts,
+}, nil
+}
+
+// SortByImpact sorts impacts by impact score descending.
+func SortByImpact(impacts []ToolImpact) {
+sort.Slice(impacts, func(i, j int) bool {
+if impacts[i].Impact != impacts[j].Impact {
+return impacts[i].Impact > impacts[j].Impact
+}
+return impacts[i].ToolName < impacts[j].ToolName
+})
+}
+
+// AggregateImpacts merges impacts from multiple prompts into a single per-tool summary.
+func AggregateImpacts(reports []*PairwiseReport) []ToolImpact {
+type accum struct {
+totalImpact   float64
+totalBaseline float64
+totalWithout  float64
+count         int
+baselinePass  int
+withoutPass   int
+}
+
+byTool := make(map[string]*accum)
+for _, r := range reports {
+for _, imp := range r.Impacts {
+a, ok := byTool[imp.ToolName]
+if !ok {
+a = &accum{}
+byTool[imp.ToolName] = a
+}
+a.totalImpact += imp.Impact
+a.totalBaseline += imp.BaselineScore
+a.totalWithout += imp.WithoutScore
+a.count++
+if imp.BaselinePass {
+a.baselinePass++
+}
+if imp.WithoutPass {
+a.withoutPass++
+}
+}
+}
+
+result := make([]ToolImpact, 0, len(byTool))
+for tool, a := range byTool {
+result = append(result, ToolImpact{
+ToolName:      tool,
+Impact:        math.Round(a.totalImpact/float64(a.count)*10) / 10,
+BaselineScore: math.Round(a.totalBaseline/float64(a.count)*10) / 10,
+WithoutScore:  math.Round(a.totalWithout/float64(a.count)*10) / 10,
+BaselinePass:  a.baselinePass == a.count,
+WithoutPass:   a.withoutPass == a.count,
+})
+}
+
+SortByImpact(result)
+return result
 }

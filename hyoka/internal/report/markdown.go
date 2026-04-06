@@ -287,6 +287,25 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		}
 	}
 
+	// Grader Results summary
+	if len(r.GraderResults) > 0 {
+		b.WriteString("## Grader Results\n\n")
+		b.WriteString("| Grader | Type | Score | Summary |\n")
+		b.WriteString("|--------|------|-------|----------|\n")
+		for _, g := range r.GraderResults {
+			prefix := ""
+			if g.IsConsensus {
+				prefix = "🏆 "
+			}
+			summary := g.Summary
+			if len(summary) > 80 {
+				summary = summary[:80] + "…"
+			}
+			fmt.Fprintf(&b, "| %s`%s` | %s | %d/%d | %s |\n", prefix, g.GraderName, g.GraderType, g.OverallScore, g.MaxScore, summary)
+		}
+		b.WriteString("\n")
+	}
+
 	// Re-run command
 	if r.RerunCommand != "" {
 		b.WriteString("## Re-run Command\n\n")
@@ -481,6 +500,55 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 			fmt.Fprintf(&b, "| %s | %d | %d | %d | %.1f%% |\n", ts.Name, ts.Count, ts.Successes, ts.Failures, ts.Rate)
 		}
 		b.WriteString("\n")
+	}
+
+	// Pairwise Tool Impact (#123)
+	if len(stats.PairwiseImpacts) > 0 {
+		b.WriteString("## Pairwise Tool Impact\n\n")
+		b.WriteString("Impact = baseline score − score without tool (positive = tool helps).\n\n")
+		b.WriteString("| Tool | Impact | Baseline | Without | Baseline Pass | Without Pass |\n")
+		b.WriteString("|------|--------|----------|---------|---------------|-------------|\n")
+		for _, imp := range stats.PairwiseImpacts {
+			bPass := "✅"
+			if !imp.BaselinePass {
+				bPass = "❌"
+			}
+			wPass := "✅"
+			if !imp.WithoutPass {
+				wPass = "❌"
+			}
+			sign := ""
+			if imp.Impact > 0 {
+				sign = "+"
+			}
+			fmt.Fprintf(&b, "| %s | %s%.1f | %.1f | %.1f | %s | %s |\n",
+				imp.ToolName, sign, imp.Impact, imp.BaselineScore, imp.WithoutScore, bPass, wPass)
+		}
+		b.WriteString("\n")
+	}
+
+	// Per-prompt pairwise details
+	if len(s.PairwiseResults) > 0 {
+		b.WriteString("## Pairwise Details (per Prompt)\n\n")
+		for _, pr := range s.PairwiseResults {
+			fmt.Fprintf(&b, "### %s\n\n", pr.PromptID)
+			fmt.Fprintf(&b, "Baseline: **%s** — %d/%d\n\n", pr.Baseline.ConfigName, pr.Baseline.Score, pr.Baseline.MaxScore)
+			b.WriteString("| Tool Removed | Impact | Without Score | Pass |\n")
+			b.WriteString("|-------------|--------|---------------|------|\n")
+			for _, imp := range pr.Impacts {
+				pass := "✅"
+				if !imp.WithoutPass {
+					pass = "❌"
+				}
+				sign := ""
+				if imp.Impact > 0 {
+					sign = "+"
+				}
+				fmt.Fprintf(&b, "| %s | %s%.1f | %.1f | %s |\n",
+					imp.ToolName, sign, imp.Impact, imp.WithoutScore, pass)
+			}
+			b.WriteString("\n")
+		}
 	}
 
 	if err := os.WriteFile(summaryPath, []byte(b.String()), 0644); err != nil {
