@@ -15,6 +15,7 @@ import (
 
 	"github.com/ronniegeraghty/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
@@ -88,6 +89,8 @@ type EngineOptions struct {
 	MonitorResources bool
 	// Tiered criteria (#30)
 	CriteriaDir string // Directory containing attribute-matched criteria YAML files.
+	// Pluggable graders (#136)
+	GradersDir string // Directory containing grader config YAML files.
 	// Directory exclusion (#63)
 	ExcludeDirs []string // Directories to exclude from generated_files output.
 	// Output writer for user-facing messages (defaults to os.Stdout).
@@ -104,6 +107,7 @@ type Engine struct {
 	opts            EngineOptions
 	tracker         *ProcessTracker
 	graderConfigs   []criteria.GraderConfig // attribute-matched grader configs (#30)
+	pluginGraders   []graders.GraderConfig  // pluggable grader configs (#136)
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
@@ -196,6 +200,24 @@ func (e *Engine) loadCriteria() {
 	slog.Info("Loaded grader configs", "configs", len(configs), "dir", e.opts.CriteriaDir)
 }
 
+// loadGraders loads pluggable grader configs if GradersDir is configured (#136).
+func (e *Engine) loadGraders() {
+	if e.opts.GradersDir == "" {
+		return
+	}
+	if _, err := os.Stat(e.opts.GradersDir); os.IsNotExist(err) {
+		slog.Debug("Graders directory does not exist, skipping", "dir", e.opts.GradersDir)
+		return
+	}
+	gcf, err := graders.LoadDir(e.opts.GradersDir)
+	if err != nil {
+		slog.Warn("Failed to load grader configs", "dir", e.opts.GradersDir, "error", err)
+		return
+	}
+	e.pluginGraders = gcf.Graders
+	slog.Info("Loaded pluggable grader configs", "graders", len(gcf.Graders), "dir", e.opts.GradersDir)
+}
+
 // mergedCriteria returns the combined attribute-matched + prompt-specific
 // evaluation criteria text for the given prompt.
 func (e *Engine) mergedCriteria(p *prompt.Prompt) string {
@@ -270,6 +292,9 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig) resolvedLimits {
 func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []config.ToolConfig) (*report.RunSummary, error) {
 	// Load grader configs (#30) if configured.
 	e.loadCriteria()
+
+	// Load pluggable grader configs (#136) if configured.
+	e.loadGraders()
 
 	// Build task list (cross product: prompts × configs)
 	var tasks []EvalTask
@@ -896,6 +921,72 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
+	// Pluggable grader execution (#136) — runs after generation, before review.
+	if len(e.pluginGraders) > 0 && len(generatedFiles) > 0 {
+		glg := logging.WithPhase(lg, "grading")
+
+		props := map[string]string{
+			"language": task.Prompt.Language(),
+			"service":  task.Prompt.Service(),
+			"plane":    task.Prompt.Plane(),
+			"category": task.Prompt.Category(),
+			"sdk":      task.Prompt.SDKPackage(),
+		}
+
+		applicable := graders.ApplicableGraders(e.pluginGraders, props)
+		glg.Debug("Applicable graders", "total", len(e.pluginGraders), "applicable", len(applicable))
+
+		if len(applicable) > 0 {
+			instances, err := graders.InstantiateGraders(applicable)
+			if err != nil {
+				glg.Error("Failed to instantiate graders", "error", err)
+			} else {
+				input := graders.GraderInput{
+					WorkspacePath: genWs.Dir,
+				}
+
+				results := graders.RunGraders(ctx, instances, applicable, input)
+				agg, aggErr := graders.AggregateResults(results)
+				if aggErr != nil {
+					glg.Error("Failed to aggregate grader results", "error", aggErr)
+				} else {
+					reportResults := make([]report.GraderResultEntry, len(agg.Results))
+					for i, r := range agg.Results {
+						reportResults[i] = report.GraderResultEntry{
+							Name:    r.Name,
+							Kind:    r.Kind,
+							Passed:  r.Pass,
+							Score:   r.Score,
+							Message: r.Message,
+							Weight:  r.Weight,
+							Gate:    r.Gate,
+						}
+					}
+					evalReport.GraderResults = &report.GraderAggregateEntry{
+						Results: reportResults,
+						Score:   agg.Score,
+						Passed:  agg.Pass,
+					}
+
+					if !agg.Pass && !evalFailed {
+						evalReport.Success = false
+						if agg.GateFailed {
+							evalReport.FailureReason = "gate grader(s) failed"
+						}
+					}
+
+					glg.Info("Grader execution complete",
+						"graders", len(results),
+						"score", fmt.Sprintf("%.2f", agg.Score),
+						"passed", agg.Pass,
+						"gate_failed", agg.GateFailed)
+					sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
+						agg.Score*100, countPassed(results), len(results)))
+				}
+			}
+		}
+	}
+
 	// Code review — use panel reviewer if available, otherwise single reviewer
 	// Uses its own independent timeout context (fixes issue #3).
 	if !e.opts.SkipReview && len(generatedFiles) > 0 {
@@ -1162,4 +1253,15 @@ func writeReviewedFiles(dir string, files []report.ReviewedFile) error {
 		}
 	}
 	return nil
+}
+
+// countPassed returns the number of passed results in a grader result list.
+func countPassed(results []graders.GraderResult) int {
+	n := 0
+	for _, r := range results {
+		if r.Pass {
+			n++
+		}
+	}
+	return n
 }
