@@ -29,9 +29,10 @@ Files         []FileEntry    // Listing of files in the workspace
 
 // ActionEvent represents a single agent action from the session log.
 type ActionEvent struct {
-Tool   string `json:"tool"`
-Action string `json:"action"`
-Path   string `json:"path,omitempty"`
+Tool       string `json:"tool"`
+Action     string `json:"action"`
+Path       string `json:"path,omitempty"`
+TurnNumber int    `json:"turn_number,omitempty"`
 }
 
 // PromptMetadata holds prompt frontmatter fields relevant to grading.
@@ -93,14 +94,27 @@ type PromptGraderDetails struct {
 Model     string `json:"model"`
 Rubric    string `json:"rubric"`
 Reasoning string `json:"reasoning"`
+RawScore  int    `json:"raw_score,omitempty"`
+MaxScore  int    `json:"max_score,omitempty"`
 }
 
 // BehaviorGraderDetails holds agent behavior analysis specifics.
 type BehaviorGraderDetails struct {
-ToolsUsed     []string `json:"tools_used,omitempty"`
-ForbiddenUsed []string `json:"forbidden_used,omitempty"`
-TurnCount     int      `json:"turn_count"`
-Violations    []string `json:"violations,omitempty"`
+ToolsUsed        []string       `json:"tools_used,omitempty"`
+MissingTools     []string       `json:"missing_tools,omitempty"`
+ForbiddenUsed    []string       `json:"forbidden_used,omitempty"`
+TurnCount        int            `json:"turn_count,omitempty"`
+MaxTurns         int            `json:"max_turns,omitempty"`
+ActualTurns      int            `json:"actual_turns,omitempty"`
+TotalActions     int            `json:"total_actions,omitempty"`
+TurnLimitHit     bool           `json:"turn_limit_hit,omitempty"`
+Violations       []string       `json:"violations,omitempty"`
+SequenceMatch    bool           `json:"sequence_match,omitempty"`
+ExpectedSequence []string       `json:"expected_sequence,omitempty"`
+ActualSequence   []string       `json:"actual_sequence,omitempty"`
+MatchedActions   int            `json:"matched_actions,omitempty"`
+ConstraintsMet   bool           `json:"constraints_met,omitempty"`
+ToolCounts       map[string]int `json:"tool_counts,omitempty"`
 }
 
 // AggregateResult holds the final aggregated score from all graders.
