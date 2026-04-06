@@ -129,6 +129,39 @@
   .tl-card details summary { font-size: 0.85rem; font-weight: 500; }
   .tl-card pre { font-size: 0.8rem; margin: 0.25rem 0 0 0; max-height: 300px; overflow-y: auto; }
   .tl-error { color: var(--red); font-size: 0.85rem; margin-top: 0.3rem; }
+
+  {{if .ActionTimeline}}
+  /* ━━ Action Timeline ━━ */
+  .atl-section { margin-bottom: 1.25rem; }
+  .atl-summary-bar { display: flex; flex-wrap: wrap; gap: 1rem; padding: 0.75rem 1rem; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem; }
+  .atl-stat { display: flex; align-items: center; gap: 0.25rem; }
+  .atl-stat strong { color: var(--text); }
+  .atl-stat span { color: var(--text-muted); }
+  .atl-filter { margin-bottom: 0.75rem; }
+  .atl-filter input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; background: var(--card-bg); color: var(--text); }
+  .atl-filter input::placeholder { color: var(--text-muted); }
+  .atl-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card-bg); }
+  .atl-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+  .atl-row:last-child { border-bottom: none; }
+  .atl-row.atl-tool_call { border-left: 3px solid var(--indigo); }
+  .atl-row.atl-turn_start { border-left: 3px solid var(--blue); background: #f8fafc; }
+  .atl-row.atl-turn_end { border-left: 3px solid var(--blue); background: #f8fafc; }
+  .atl-row.atl-reasoning { border-left: 3px solid #93c5fd; }
+  .atl-row.atl-message { border-left: 3px solid #6366f1; }
+  .atl-row.atl-intent { border-left: 3px solid var(--purple); }
+  .atl-idx { min-width: 2rem; color: var(--text-muted); font-family: monospace; font-size: 0.8rem; text-align: right; padding-top: 0.1rem; }
+  .atl-icon { font-size: 0.9rem; min-width: 1.5rem; text-align: center; padding-top: 0.1rem; }
+  .atl-body { flex: 1; min-width: 0; }
+  .atl-label { font-weight: 600; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .atl-label code { font-size: 0.82em; color: var(--purple); background: #f3f0ff; padding: 1px 6px; border-radius: 3px; }
+  .atl-meta { display: flex; gap: 0.75rem; font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem; }
+  .atl-success { color: var(--green); }
+  .atl-failure { color: var(--red); }
+  .atl-row details { margin-top: 0.3rem; }
+  .atl-row details summary { font-size: 0.82rem; font-weight: 500; color: var(--text-muted); cursor: pointer; }
+  .atl-row details summary:hover { color: var(--blue); }
+  .atl-row pre { font-size: 0.78rem; margin: 0.2rem 0 0 0; max-height: 200px; overflow-y: auto; }
+  {{end}}
 </style>
 </head>
 <body>
@@ -516,6 +549,52 @@
 </div>
 {{end}}
 
+
+<!-- ━━ Action Timeline ━━ -->
+{{if .ActionTimeline}}
+<div class="section atl-section">
+  <div class="section-header"><span class="icon">📊</span><h2>Action Timeline</h2><span style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">{{.ActionTimeline.Summary.TotalActions}} actions</span></div>
+  <div class="section-body">
+    <details>
+      <summary>Show action timeline ({{.ActionTimeline.Summary.TotalActions}} actions, {{.ActionTimeline.Summary.TotalToolCalls}} tool calls)</summary>
+
+      <div class="atl-summary-bar" style="margin-top:0.75rem">
+        <div class="atl-stat"><strong>{{.ActionTimeline.Summary.TotalActions}}</strong> <span>actions</span></div>
+        <div class="atl-stat"><strong>{{.ActionTimeline.Summary.TotalToolCalls}}</strong> <span>tool calls</span></div>
+        <div class="atl-stat"><strong>{{.ActionTimeline.Summary.TotalTurns}}</strong> <span>turns</span></div>
+        <div class="atl-stat"><strong>{{fmtDurationMs .ActionTimeline.Summary.ToolCallDuration}}</strong> <span>tool duration</span></div>
+        <div class="atl-stat"><strong class="atl-success">{{.ActionTimeline.Summary.ToolSuccesses}}</strong> <span>succeeded</span></div>
+        {{if gt .ActionTimeline.Summary.ToolFailures 0}}<div class="atl-stat"><strong class="atl-failure">{{.ActionTimeline.Summary.ToolFailures}}</strong> <span>failed</span></div>{{end}}
+      </div>
+
+      <div class="atl-filter">
+        <input type="text" id="atl-search" placeholder="Filter timeline… (tool name, type, file path)" oninput="(function(v){document.querySelectorAll('.atl-row').forEach(function(r){r.style.display=r.textContent.toLowerCase().indexOf(v)!==-1?'':'none'})})(this.value.toLowerCase())">
+      </div>
+
+      <div class="atl-list">
+        {{range .ActionTimeline.Entries}}
+        <div class="atl-row atl-{{.Type}}">
+          <div class="atl-idx">{{.Index}}</div>
+          <div class="atl-icon">{{if eq .Type "tool_call"}}🔧{{else if eq .Type "turn_start"}}▶{{else if eq .Type "turn_end"}}⏹{{else if eq .Type "reasoning"}}🤔{{else if eq .Type "message"}}💬{{else if eq .Type "intent"}}🎯{{else}}·{{end}}</div>
+          <div class="atl-body">
+            <div class="atl-label">
+              {{if eq .Type "tool_call"}}<code>{{.ToolName}}</code>{{if .MCPServer}}<span style="font-size:0.75rem;color:var(--text-muted);font-weight:400">via {{.MCPServer}}</span>{{end}}{{else if eq .Type "turn_start"}}Turn {{.TurnNumber}} start{{else if eq .Type "turn_end"}}Turn {{.TurnNumber}} end{{else if eq .Type "reasoning"}}Reasoning{{else if eq .Type "message"}}Message{{else if eq .Type "intent"}}Intent: {{.Intent}}{{else}}{{.Type}}{{end}}
+            </div>
+            <div class="atl-meta">
+              {{if .TurnNumber}}<span>Turn {{.TurnNumber}}</span>{{end}}
+              {{if gt .Duration 0.0}}<span>{{fmtDurationMs .Duration}}</span>{{end}}
+              {{if .FilePath}}<span>📄 {{.FilePath}}</span>{{end}}
+              {{if .Success}}{{if derefBool .Success}}<span class="atl-success">✅</span>{{else}}<span class="atl-failure">❌</span>{{end}}{{end}}
+            </div>
+            {{if .Error}}<details><summary>Show error</summary><pre>{{.Error}}</pre></details>{{end}}
+          </div>
+        </div>
+        {{end}}
+      </div>
+    </details>
+  </div>
+</div>
+{{end}}
 
 <!-- ━━ Re-run Command ━━ -->
 {{if .RerunCommand}}

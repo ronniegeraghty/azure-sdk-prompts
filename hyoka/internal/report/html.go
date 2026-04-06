@@ -523,6 +523,12 @@ func htmlFuncMap() template.FuncMap {
 		"fmtDuration": func(d float64) string {
 			return fmt.Sprintf("%.1fs", d)
 		},
+		"fmtDurationMs": func(ms float64) string {
+			if ms >= 1000 {
+				return fmt.Sprintf("%.1fs", ms/1000)
+			}
+			return fmt.Sprintf("%.0fms", ms)
+		},
 		"truncate": func(s string, n int) string {
 			if len(s) <= n {
 				return s
@@ -626,6 +632,9 @@ func htmlFuncMap() template.FuncMap {
 				return "✅"
 			}
 			return "❌"
+		},
+		"derefBool": func(b *bool) bool {
+			return b != nil && *b
 		},
 		"reportLink": func(r *EvalReport) string {
 			service, _ := r.PromptMeta["service"].(string)
