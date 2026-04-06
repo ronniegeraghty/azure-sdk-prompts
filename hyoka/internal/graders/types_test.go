@@ -59,8 +59,10 @@ graders:
     config:
       required: ["azure-mcp"]
       forbidden: ["dangerous"]
-      min_calls: 1
-      max_calls: 50
+      min_calls:
+        azure-mcp: 1
+      max_calls:
+        azure-mcp: 50
     weight: 0.5
 `
 gcf, err := Parse([]byte(yaml))
@@ -142,8 +144,8 @@ if err != nil {
 t.Fatalf("DecodeConfig tool_constraint: %v", err)
 }
 tc := cfg.(*ToolConstraintConfig)
-if tc.MinCalls != 1 || tc.MaxCalls != 50 {
-t.Errorf("tool_constraint: min=%d max=%d", tc.MinCalls, tc.MaxCalls)
+if tc.MinCalls["azure-mcp"] != 1 || tc.MaxCalls["azure-mcp"] != 50 {
+t.Errorf("tool_constraint: min=%v max=%v", tc.MinCalls, tc.MaxCalls)
 }
 }
 

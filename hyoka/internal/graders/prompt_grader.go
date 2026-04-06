@@ -20,14 +20,6 @@ type LLMCaller interface {
 	Call(ctx context.Context, model string, prompt string) (string, error)
 }
 
-// PromptGraderDetails captures the full details of a prompt grader evaluation.
-type PromptGraderDetails struct {
-	Model     string `json:"model"`
-	Rubric    string `json:"rubric"`
-	Reasoning string `json:"reasoning"`
-	RawScore  int    `json:"raw_score"`
-	MaxScore  int    `json:"max_score"`
-}
 
 // PromptGradeResult holds the normalized output of a prompt grader.
 type PromptGradeResult struct {
