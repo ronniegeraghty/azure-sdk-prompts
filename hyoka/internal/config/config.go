@@ -49,6 +49,14 @@ type ReviewerConfig struct {
 	Skills       []Skill  `yaml:"skills,omitempty" json:"skills,omitempty"`
 }
 
+// SessionLimits holds configurable guardrails for a Copilot session.
+type SessionLimits struct {
+	MaxTurns          int    `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
+	MaxFiles          int    `yaml:"max_files,omitempty" json:"max_files,omitempty"`
+	MaxOutputSize     string `yaml:"max_output_size,omitempty" json:"max_output_size,omitempty"`
+	MaxSessionActions int    `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
+}
+
 // ToolConfig represents a single evaluation configuration.
 type ToolConfig struct {
 	Name        string           `yaml:"name" json:"name"`
@@ -56,6 +64,7 @@ type ToolConfig struct {
 	Generator   *GeneratorConfig `yaml:"generator,omitempty" json:"generator,omitempty"`
 	Reviewer    *ReviewerConfig  `yaml:"reviewer,omitempty" json:"reviewer,omitempty"`
 	Plugins     []string         `yaml:"plugins,omitempty" json:"plugins,omitempty"`
+	Limits      *SessionLimits   `yaml:"limits,omitempty" json:"limits,omitempty"`
 }
 
 // ConfigFile represents the top-level config file structure.
