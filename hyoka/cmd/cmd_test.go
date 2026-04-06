@@ -67,6 +67,7 @@ falseFlags := []string{
 "allow-cloud",
 "monitor-resources",
 "strict-cleanup",
+"pairwise",
 }
 
 for _, name := range falseFlags {
@@ -255,6 +256,51 @@ cmd.SetErr(io.Discard)
 cmd.SetArgs([]string{"--plugins-dir", t.TempDir()})
 if err := cmd.Execute(); err != nil {
 t.Fatalf("plugins with empty dir failed: %v", err)
+}
+}
+
+func TestPairwiseFlagWiring(t *testing.T) {
+cmd := runCmd()
+cmd.SilenceErrors = true
+cmd.SilenceUsage = true
+
+// Verify flag exists with correct default
+f := cmd.Flags().Lookup("pairwise")
+if f == nil {
+t.Fatal("expected --pairwise flag to be registered")
+}
+if f.DefValue != "false" {
+t.Errorf("--pairwise default: expected %q, got %q", "false", f.DefValue)
+}
+if f.Shorthand != "P" {
+t.Errorf("--pairwise shorthand: expected %q, got %q", "P", f.Shorthand)
+}
+
+// Verify --pairwise can be set
+if err := cmd.ParseFlags([]string{"--pairwise"}); err != nil {
+t.Fatalf("parsing --pairwise: %v", err)
+}
+val, err := cmd.Flags().GetBool("pairwise")
+if err != nil {
+t.Fatalf("getting --pairwise value: %v", err)
+}
+if !val {
+t.Error("--pairwise should be true after being set")
+}
+
+// Verify -P shorthand works
+cmd2 := runCmd()
+cmd2.SilenceErrors = true
+cmd2.SilenceUsage = true
+if err := cmd2.ParseFlags([]string{"-P"}); err != nil {
+t.Fatalf("parsing -P: %v", err)
+}
+val2, err := cmd2.Flags().GetBool("pairwise")
+if err != nil {
+t.Fatalf("getting -P value: %v", err)
+}
+if !val2 {
+t.Error("-P shorthand should set --pairwise to true")
 }
 }
 

@@ -11,6 +11,7 @@ import (
 copilot "github.com/github/copilot-sdk/go"
 "github.com/ronniegeraghty/hyoka/internal/config"
 "github.com/ronniegeraghty/hyoka/internal/eval"
+"github.com/ronniegeraghty/hyoka/internal/pairwise"
 "github.com/ronniegeraghty/hyoka/internal/prompt"
 "github.com/ronniegeraghty/hyoka/internal/report"
 "github.com/ronniegeraghty/hyoka/internal/review"
@@ -58,6 +59,8 @@ criteriaDir string
 excludeDirs string
 // Session timeout
 sessionTimeout string
+// Pairwise tool-ablation (#121)
+pairwiseMode bool
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -102,6 +105,8 @@ cmd.Flags().StringVar(&f.criteriaDir, "criteria-dir", "", "Directory containing 
 cmd.Flags().StringVar(&f.excludeDirs, "exclude-dirs", "", "Comma-separated directories to exclude from generated_files output (e.g., node_modules,target,dist)")
 // Session timeout
 cmd.Flags().StringVar(&f.sessionTimeout, "session-timeout", "10m", "Maximum duration for a single generation or review session (e.g., 10m, 30m, 1h)")
+// Pairwise tool-ablation (#121)
+cmd.Flags().BoolVarP(&f.pairwiseMode, "pairwise", "P", false, "Expand each config into N+1 pairwise tool-ablation variants")
 }
 
 func buildFilter(f *runFlags) prompt.Filter {
@@ -198,6 +203,18 @@ configs[i].Generator = &config.GeneratorConfig{}
 }
 configs[i].Generator.Model = f.model
 }
+}
+
+// Pairwise tool-ablation expansion (#121)
+if f.pairwiseMode {
+var expanded []config.ToolConfig
+for _, c := range configs {
+variants := pairwise.ExpandPairwise(c)
+slog.Info("Expanded config into pairwise variants", "config", c.Name, "variants", len(variants))
+fmt.Printf("Expanded config %q into %d pairwise variants\n", c.Name, len(variants))
+expanded = append(expanded, variants...)
+}
+configs = expanded
 }
 
 // Resolve relative skill_directories in configs to absolute paths
