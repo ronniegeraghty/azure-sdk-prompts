@@ -3,6 +3,7 @@ package eval
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
@@ -328,5 +329,131 @@ func TestResolveStarterDir_NoFilePath(t *testing.T) {
 	got := resolveStarterDir(p)
 	if got != "starter/" {
 		t.Errorf("resolveStarterDir = %q, want starter/", got)
+	}
+}
+
+// --- EvalWorkspace tests (#126) ---
+
+func TestNewEvalWorkspace_CreatesIsolatedDir(t *testing.T) {
+	ws, err := NewEvalWorkspace()
+	if err != nil {
+		t.Fatalf("NewEvalWorkspace() error: %v", err)
+	}
+	defer ws.Cleanup()
+
+	info, err := os.Stat(ws.Dir)
+	if err != nil {
+		t.Fatalf("workspace dir does not exist: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("workspace path is not a directory")
+	}
+	if !strings.HasPrefix(filepath.Base(ws.Dir), EvalWorkspacePrefix) {
+		t.Errorf("workspace dir %q does not have prefix %q", ws.Dir, EvalWorkspacePrefix)
+	}
+	entries, err := os.ReadDir(ws.Dir)
+	if err != nil {
+		t.Fatalf("reading workspace dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("workspace should be empty, got %d entries", len(entries))
+	}
+	if ws.CreatedAt.IsZero() {
+		t.Error("CreatedAt should be set")
+	}
+}
+
+func TestEvalWorkspace_Cleanup(t *testing.T) {
+	ws, err := NewEvalWorkspace()
+	if err != nil {
+		t.Fatalf("NewEvalWorkspace() error: %v", err)
+	}
+	dir := ws.Dir
+	os.WriteFile(filepath.Join(dir, "test.py"), []byte("code"), 0644)
+	if err := ws.Cleanup(); err != nil {
+		t.Fatalf("Cleanup() error: %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("workspace dir should be removed after Cleanup")
+	}
+	if err := ws.Cleanup(); err != nil {
+		t.Errorf("second Cleanup() should not error, got: %v", err)
+	}
+}
+
+func TestEvalWorkspace_CleanupNil(t *testing.T) {
+	var ws *EvalWorkspace
+	if err := ws.Cleanup(); err != nil {
+		t.Errorf("Cleanup on nil workspace should not error, got: %v", err)
+	}
+}
+
+func TestEvalWorkspace_CopyStarterFiles(t *testing.T) {
+	ws, err := NewEvalWorkspace()
+	if err != nil {
+		t.Fatalf("NewEvalWorkspace() error: %v", err)
+	}
+	defer ws.Cleanup()
+	starterDir := t.TempDir()
+	os.WriteFile(filepath.Join(starterDir, "main.py"), []byte("starter"), 0644)
+	os.MkdirAll(filepath.Join(starterDir, "lib"), 0755)
+	os.WriteFile(filepath.Join(starterDir, "lib", "utils.py"), []byte("utils"), 0644)
+	if err := ws.CopyStarterFiles(starterDir); err != nil {
+		t.Fatalf("CopyStarterFiles() error: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(ws.Dir, "main.py"))
+	if err != nil {
+		t.Fatal("main.py not copied to workspace")
+	}
+	if string(data) != "starter" {
+		t.Errorf("unexpected content: %q", data)
+	}
+	data, err = os.ReadFile(filepath.Join(ws.Dir, "lib", "utils.py"))
+	if err != nil {
+		t.Fatal("lib/utils.py not copied to workspace")
+	}
+	if string(data) != "utils" {
+		t.Errorf("unexpected content: %q", data)
+	}
+}
+
+func TestEvalWorkspace_ListFiles(t *testing.T) {
+	ws, err := NewEvalWorkspace()
+	if err != nil {
+		t.Fatalf("NewEvalWorkspace() error: %v", err)
+	}
+	defer ws.Cleanup()
+	files, err := ws.ListFiles()
+	if err != nil {
+		t.Fatalf("ListFiles() error: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("expected 0 files, got %d", len(files))
+	}
+	os.WriteFile(filepath.Join(ws.Dir, "app.py"), []byte("app"), 0644)
+	os.MkdirAll(filepath.Join(ws.Dir, "pkg"), 0755)
+	os.WriteFile(filepath.Join(ws.Dir, "pkg", "mod.py"), []byte("mod"), 0644)
+	files, err = ws.ListFiles()
+	if err != nil {
+		t.Fatalf("ListFiles() error: %v", err)
+	}
+	if len(files) != 2 {
+		t.Errorf("expected 2 files, got %d: %v", len(files), files)
+	}
+}
+
+func TestEvalWorkspace_IsIsolated(t *testing.T) {
+	ws, err := NewEvalWorkspace()
+	if err != nil {
+		t.Fatalf("NewEvalWorkspace() error: %v", err)
+	}
+	defer ws.Cleanup()
+	cwdFiles, _ := os.ReadDir(".")
+	wsFiles, _ := os.ReadDir(ws.Dir)
+	if len(cwdFiles) == 0 {
+		t.Skip("CWD has no files")
+	}
+	if len(wsFiles) != 0 {
+		t.Errorf("workspace should be empty (isolated from CWD), got %d entries", len(wsFiles))
 	}
 }

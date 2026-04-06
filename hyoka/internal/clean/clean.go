@@ -38,6 +38,9 @@ type Result struct {
 	// Process cleanup stats.
 	ProcessesFound  int
 	ProcessesKilled int
+	// Orphan workspace cleanup stats (#126).
+	WorkspacesFound   int
+	WorkspacesRemoved int
 }
 
 // copilotStateDirFn returns the Copilot CLI state directory.
@@ -85,7 +88,13 @@ func Run(opts Options) (*Result, error) {
 		fmt.Fprintf(opts.Out, "Warning: session cleanup: %v\n", err)
 	}
 
-	// Phase 3: Clean old log files (only with --all since we can't
+	// Phase 3: Clean orphan eval workspaces left in the OS temp directory
+	// after a crash (#126).
+	if err := cleanOrphanWorkspaces(opts, result); err != nil {
+		fmt.Fprintf(opts.Out, "Warning: workspace cleanup: %v\n", err)
+	}
+
+	// Phase 4: Clean old log files (only with --all since we can't
 	// distinguish hyoka-spawned logs from Copilot CLI logs).
 	if opts.All {
 		logsDir := filepath.Join(stateDir, "logs")
@@ -293,6 +302,7 @@ func isHyokaSession(sessionPath string) bool {
 		if strings.Contains(content, "hyoka") ||
 			strings.Contains(content, "reports/") ||
 			strings.Contains(content, "hyoka-gen-") ||
+			strings.Contains(content, "hyoka-eval-") ||
 			strings.Contains(content, "hyoka-config-") {
 			return true
 		}
@@ -306,12 +316,50 @@ func isHyokaSession(sessionPath string) bool {
 		if strings.Contains(content, "hyoka") ||
 			strings.Contains(content, "reports/") ||
 			strings.Contains(content, "hyoka-gen-") ||
+			strings.Contains(content, "hyoka-eval-") ||
 			strings.Contains(content, "hyoka-config-") {
 			return true
 		}
 	}
 
 	return false
+}
+
+// evalWorkspacePrefix is the directory name prefix for isolated eval workspaces.
+// Must match eval.EvalWorkspacePrefix. Duplicated here to avoid an import cycle.
+const evalWorkspacePrefix = "hyoka-eval-"
+
+// cleanOrphanWorkspaces scans the OS temp directory for leftover hyoka-eval-*
+// workspace directories that were not cleaned up (e.g. after a crash).
+func cleanOrphanWorkspaces(opts Options, result *Result) error {
+	tmpDir := os.TempDir()
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		return fmt.Errorf("reading temp dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), evalWorkspacePrefix) {
+			continue
+		}
+		result.WorkspacesFound++
+		wsPath := filepath.Join(tmpDir, entry.Name())
+		size := dirSize(wsPath)
+
+		if opts.DryRun {
+			fmt.Fprintf(opts.Out, "  [dry-run] would remove orphan workspace %s (%s)\n",
+				entry.Name(), humanBytes(size))
+		} else {
+			if err := os.RemoveAll(wsPath); err != nil {
+				fmt.Fprintf(opts.Out, "  warning: failed to remove workspace %s: %v\n", entry.Name(), err)
+				continue
+			}
+			result.WorkspacesRemoved++
+			result.BytesFreed += size
+			slog.Debug("Removed orphan eval workspace", "path", wsPath)
+		}
+	}
+	return nil
 }
 
 // dirSize returns the total size of all files in a directory tree.

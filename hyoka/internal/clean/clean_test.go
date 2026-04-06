@@ -163,6 +163,7 @@ func TestIsHyokaSession(t *testing.T) {
 		expect  bool
 	}{
 		{"hyoka-gen workspace", "cwd: /tmp/hyoka-gen-abc123", true},
+		{"hyoka-eval workspace", "cwd: /tmp/hyoka-eval-abc123", true},
 		{"reports dir", "cwd: /home/user/projects/hyoka/reports/20240101", true},
 		{"hyoka-config", "configDir: /tmp/hyoka-config-xyz", true},
 		{"random project", "cwd: /home/user/myproject", false},
@@ -301,5 +302,63 @@ func TestFormatProcessInfo(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tc.expect)
 			}
 		})
+	}
+}
+
+// --- Orphan workspace cleanup tests (#126) ---
+
+func TestCleanOrphanWorkspaces_FindsAndRemoves(t *testing.T) {
+	ws1, err := os.MkdirTemp("", "hyoka-eval-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(ws1, "test.py"), []byte("orphan"), 0o644)
+	ws2, err := os.MkdirTemp("", "hyoka-eval-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	result := &Result{}
+	err = cleanOrphanWorkspaces(Options{Out: &buf}, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.WorkspacesFound < 2 {
+		t.Errorf("expected at least 2 orphan workspaces found, got %d", result.WorkspacesFound)
+	}
+	if result.WorkspacesRemoved < 2 {
+		t.Errorf("expected at least 2 orphan workspaces removed, got %d", result.WorkspacesRemoved)
+	}
+	if _, err := os.Stat(ws1); !os.IsNotExist(err) {
+		t.Errorf("orphan workspace should be removed: %s", ws1)
+	}
+	if _, err := os.Stat(ws2); !os.IsNotExist(err) {
+		t.Errorf("orphan workspace should be removed: %s", ws2)
+	}
+}
+
+func TestCleanOrphanWorkspaces_DryRun(t *testing.T) {
+	ws, err := os.MkdirTemp("", "hyoka-eval-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(ws)
+	var buf bytes.Buffer
+	result := &Result{}
+	err = cleanOrphanWorkspaces(Options{DryRun: true, Out: &buf}, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.WorkspacesFound < 1 {
+		t.Errorf("expected at least 1 workspace found, got %d", result.WorkspacesFound)
+	}
+	if result.WorkspacesRemoved != 0 {
+		t.Errorf("expected 0 removed in dry-run, got %d", result.WorkspacesRemoved)
+	}
+	if _, err := os.Stat(ws); err != nil {
+		t.Error("workspace should still exist in dry-run mode")
+	}
+	if !strings.Contains(buf.String(), "[dry-run] would remove orphan workspace") {
+		t.Errorf("expected dry-run message, got %q", buf.String())
 	}
 }
