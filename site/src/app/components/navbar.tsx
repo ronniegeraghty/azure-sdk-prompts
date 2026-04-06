@@ -7,6 +7,7 @@ const navLinks = [
   { to: "/how-it-works", label: "How It Works" },
   { to: "/runs", label: "Runs" },
   { to: "/prompts", label: "Prompts" },
+  { to: "/pairwise", label: "Pairwise" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/docs", label: "Docs" },
 ];
