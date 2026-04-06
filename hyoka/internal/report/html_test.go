@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/build"
 	"github.com/ronniegeraghty/hyoka/internal/review"
 )
 
@@ -22,12 +21,6 @@ func TestWriteHTMLReport(t *testing.T) {
 		PromptMeta: map[string]any{"service": "storage", "language": "dotnet"},
 		ConfigUsed: map[string]any{"name": "baseline", "model": "gpt-4"},
 		GeneratedFiles: []string{"Program.cs"},
-		Build: &build.BuildResult{
-			Language: "dotnet",
-			Command:  "dotnet build",
-			ExitCode: 0,
-			Success:  true,
-		},
 		Review: &review.ReviewResult{
 			Scores: review.ReviewScores{
 				Criteria: []review.CriterionResult{
@@ -43,6 +36,10 @@ func TestWriteHTMLReport(t *testing.T) {
 			Summary:      "Good implementation",
 			Issues:       []string{"Missing retry logic"},
 			Strengths:    []string{"Clean code structure"},
+		},
+		GraderResults: []GraderResult{
+			{GraderName: "test-grader", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Grader says good"},
+			{GraderName: "consensus", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Consensus result", IsConsensus: true},
 		},
 		SessionEvents: []SessionEventRecord{
 			{Type: "user.message", Content: "Write a dotnet storage auth sample"},
@@ -75,7 +72,6 @@ func TestWriteHTMLReport(t *testing.T) {
 		"Code Builds",
 		"Good implementation",
 		"Program.cs",
-		"dotnet build",
 		"Generation Timeline",
 		"Write a dotnet storage auth sample",
 		"I need to create an auth sample",
@@ -86,6 +82,10 @@ func TestWriteHTMLReport(t *testing.T) {
 		"Back to Summary",
 		"File created",
 		"150ms",
+		"Grader Results",
+		"test-grader",
+		"Grader says good",
+		"Consensus result",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
@@ -93,7 +93,7 @@ func TestWriteHTMLReport(t *testing.T) {
 		}
 	}
 
-	expectedDir := filepath.Join(dir, "20240115-100000", "results", "storage", "data-plane", "dotnet", "authentication", "baseline")
+	expectedDir := filepath.Join(dir, "20240115-100000", "results", "storage", "data-plane", "dotnet", "authentication", "test-prompt", "baseline")
 	if _, err := os.Stat(expectedDir); err != nil {
 		t.Errorf("expected directory %s to exist", expectedDir)
 	}
@@ -151,27 +151,23 @@ func TestWriteSummaryHTML(t *testing.T) {
 				PromptID:   "prompt-a",
 				ConfigName: "baseline",
 				Success:    true,
-				Build:      &build.BuildResult{Success: true},
 				Review:     &review.ReviewResult{OverallScore: 4, MaxScore: 5},
 			},
 			{
 				PromptID:   "prompt-a",
 				ConfigName: "azure-mcp",
 				Success:    true,
-				Build:      &build.BuildResult{Success: true},
 				Review:     &review.ReviewResult{OverallScore: 5, MaxScore: 5},
 			},
 			{
 				PromptID:   "prompt-b",
 				ConfigName: "baseline",
 				Success:    false,
-				Build:      &build.BuildResult{Success: false},
 			},
 			{
 				PromptID:   "prompt-b",
 				ConfigName: "azure-mcp",
 				Success:    true,
-				Build:      &build.BuildResult{Success: true},
 				Review:     &review.ReviewResult{OverallScore: 3, MaxScore: 5},
 			},
 		},
@@ -220,7 +216,7 @@ func TestWriteSummaryHTML(t *testing.T) {
 func TestWriteSummaryHTMLNoBuild(t *testing.T) {
 	dir := t.TempDir()
 
-	// Simulate Copilot-verified results (no Build, only Verification)
+	// Simulate results (no Build)
 	s := &RunSummary{
 		RunID:      "20240201-090000",
 		Timestamp:  "2024-02-01T09:00:00Z",
@@ -229,9 +225,9 @@ func TestWriteSummaryHTMLNoBuild(t *testing.T) {
 		Failed:     1,
 		Duration:   60.0,
 		Results: []*EvalReport{
-			{PromptID: "p1", ConfigName: "baseline", Success: true, Verification: &VerifyResult{Pass: true}},
-			{PromptID: "p1", ConfigName: "mcp", Success: true, Verification: &VerifyResult{Pass: true}, Review: &review.ReviewResult{OverallScore: 3, MaxScore: 5}},
-			{PromptID: "p2", ConfigName: "baseline", Success: false, Verification: &VerifyResult{Pass: false}},
+			{PromptID: "p1", ConfigName: "baseline", Success: true},
+			{PromptID: "p1", ConfigName: "mcp", Success: true, Review: &review.ReviewResult{OverallScore: 3, MaxScore: 5}},
+			{PromptID: "p2", ConfigName: "baseline", Success: false},
 		},
 	}
 
@@ -260,8 +256,8 @@ func TestWriteSummaryHTMLNoBuild(t *testing.T) {
 func TestBuildMatrix(t *testing.T) {
 	s := &RunSummary{
 		Results: []*EvalReport{
-			{PromptID: "p1", ConfigName: "c1", Success: true, Build: &build.BuildResult{Success: true}, Review: &review.ReviewResult{OverallScore: 4, MaxScore: 5}},
-			{PromptID: "p1", ConfigName: "c2", Success: false, Build: &build.BuildResult{Success: false}},
+			{PromptID: "p1", ConfigName: "c1", Success: true, Review: &review.ReviewResult{OverallScore: 4, MaxScore: 5}},
+			{PromptID: "p1", ConfigName: "c2", Success: false},
 			{PromptID: "p2", ConfigName: "c1", Error: "timeout"},
 		},
 	}
@@ -281,9 +277,6 @@ func TestBuildMatrix(t *testing.T) {
 	}
 	if cell.Score != 4 {
 		t.Errorf("expected score 4, got %d", cell.Score)
-	}
-	if !cell.BuildPass {
-		t.Error("expected build pass")
 	}
 	if !cell.Success {
 		t.Error("expected Success=true for p1/c1")
@@ -381,5 +374,87 @@ func TestBuildReportData(t *testing.T) {
 	}
 	if len(d.TimelineSteps) >= 6 && d.TimelineSteps[5].StepType != "complete" {
 		t.Errorf("expected last step to be complete, got %q", d.TimelineSteps[5].StepType)
+	}
+}
+
+func TestWriteHTMLReportPhaseTimings(t *testing.T) {
+	dir := t.TempDir()
+
+	r := &EvalReport{
+		PromptID:           "timing-test",
+		ConfigName:         "baseline",
+		Timestamp:          "2024-01-15T10:00:00Z",
+		Duration:           45.3,
+		GenerationDuration: 20.1,
+		ReviewDuration:     15.2,
+		PromptMeta:         map[string]any{"service": "storage", "language": "go"},
+		ConfigUsed:         map[string]any{"name": "baseline", "model": "gpt-4"},
+		GeneratedFiles:     []string{"main.go"},
+		Success:            true,
+		Environment: &EnvironmentInfo{
+			Model: "gpt-4",
+		},
+	}
+
+	reportPath, err := WriteHTMLReport(r, dir, "20240115-100000", "storage", "data-plane", "go", "crud")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("failed to read report: %v", err)
+	}
+
+	content := string(data)
+	for _, want := range []string{
+		"Generation Duration",
+		"Review Duration",
+		"20.1s",
+		"15.2s",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("HTML report missing phase timing %q", want)
+		}
+	}
+}
+
+func TestWriteSummaryHTMLAvgPhaseTimings(t *testing.T) {
+	dir := t.TempDir()
+
+	summary := &RunSummary{
+		RunID:                 "20240115-100000",
+		Timestamp:             "2024-01-15T10:00:00Z",
+		TotalEvals:            2,
+		Passed:                2,
+		Duration:              90.0,
+		AvgGenerationDuration: 18.5,
+		AvgReviewDuration:     12.8,
+		Results: []*EvalReport{
+			{PromptID: "p1", ConfigName: "c1", Success: true, Duration: 45.0},
+			{PromptID: "p2", ConfigName: "c1", Success: true, Duration: 45.0},
+		},
+	}
+
+	_, err := WriteSummaryHTML(summary, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "20240115-100000", "summary.html"))
+	if err != nil {
+		t.Fatalf("failed to read summary: %v", err)
+	}
+
+	content := string(data)
+	for _, want := range []string{
+		"Avg Generation",
+		"Avg Review",
+		"18.5s",
+		"12.8s",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("Summary HTML missing avg phase timing %q", want)
+		}
 	}
 }

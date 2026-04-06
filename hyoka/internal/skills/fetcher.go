@@ -4,6 +4,7 @@ package skills
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,7 @@ func ResolveSkillDirs(skills []config.Skill, baseDir string) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("resolving local skill %q: %w", s.Path, err)
 			}
+			slog.Debug("Resolved local skill", "path", s.Path, "resolved_count", len(resolved))
 			dirs = append(dirs, resolved...)
 		case "remote":
 			dir, err := fetchRemote(s, baseDir)
@@ -54,6 +56,7 @@ func resolveLocal(path, baseDir string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid glob pattern %q: %w", path, err)
 		}
+		slog.Debug("Skills glob expansion", "pattern", path, "matches", len(matches))
 		// Filter to directories only
 		var dirs []string
 		for _, m := range matches {
@@ -62,7 +65,10 @@ func resolveLocal(path, baseDir string) ([]string, error) {
 				continue
 			}
 			if info.IsDir() {
-				abs, _ := filepath.Abs(m)
+				abs, absErr := filepath.Abs(m)
+				if absErr != nil {
+					slog.Warn("Failed to resolve absolute path", "path", m, "error", absErr)
+				}
 				dirs = append(dirs, abs)
 			}
 		}
@@ -76,13 +82,19 @@ func resolveLocal(path, baseDir string) ([]string, error) {
 	}
 	for _, c := range candidates {
 		if info, err := os.Stat(c); err == nil && info.IsDir() {
-			abs, _ := filepath.Abs(c)
+			abs, absErr := filepath.Abs(c)
+			if absErr != nil {
+				slog.Warn("Failed to resolve absolute path", "path", c, "error", absErr)
+			}
 			return []string{abs}, nil
 		}
 	}
 
 	// Path doesn't exist yet — return absolute form anyway
-	abs, _ := filepath.Abs(path)
+	abs, absErr := filepath.Abs(path)
+	if absErr != nil {
+		slog.Warn("Failed to resolve absolute path", "path", path, "error", absErr)
+	}
 	return []string{abs}, nil
 }
 
@@ -106,6 +118,7 @@ func fetchRemote(s config.Skill, baseDir string) (string, error) {
 	}
 
 	fmt.Printf("Fetching remote skill: %s (repo: %s)\n", s.Name, s.Repo)
+	slog.Info("Fetching remote skill", "skill", s.Name, "repo", s.Repo)
 	cmd := exec.Command("npx", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -113,6 +126,9 @@ func fetchRemote(s config.Skill, baseDir string) (string, error) {
 		return "", fmt.Errorf("npx skills add: %w", err)
 	}
 
-	abs, _ := filepath.Abs(installDir)
+	abs, absErr := filepath.Abs(installDir)
+	if absErr != nil {
+		slog.Warn("Failed to resolve absolute install path", "path", installDir, "error", absErr)
+	}
 	return abs, nil
 }

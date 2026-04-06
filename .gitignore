@@ -26,3 +26,24 @@ reports/runs/_tmp_eval/
 # Tool evaluation output
 # Evaluation reports
 reports/
+*.test
+
+# Logs
+logs/
+*.log
+*-debug.log
+
+# Agent workspace
+.agents/
+.claude/
+skills-lock.json
+
+# Built binary
+/hyoka/azsdk-prompt-eval
+# Squad: ignore runtime state (logs, inbox, sessions)
+.squad/orchestration-log/
+.squad/log/
+.squad/decisions/inbox/
+.squad/sessions/
+# Squad: SubSquad activation file (local to this machine)
+.squad-workstream

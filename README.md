@@ -6,7 +6,7 @@ A curated library of prompts for evaluating how well AI agents generate Azure SD
 
 ### Prerequisites
 
-- **Go 1.24.5+** — to build and run the tool
+- **Go 1.26.1+** — to build and run the tool
 - **GitHub Copilot CLI** — the SDK communicates with Copilot via the CLI in server mode. Must be installed and authenticated:
   - Install: follow [GitHub Copilot CLI setup](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
   - Authenticate: run `copilot` once to complete OAuth device flow, or set `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` env var
@@ -61,6 +61,7 @@ Every code-generation session is automatically aborted if it exceeds any of thes
 | Turn count | 25 | `--max-turns` | Prevents runaway conversations |
 | File count | 50 | `--max-files` | Prevents excessive file creation |
 | Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (supports KB, MB suffixes) |
+| Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
 
 When a guardrail trips, the evaluation is marked as failed with a clear reason (e.g., `guardrail: turn count 26 exceeded limit of 25`).
 
@@ -79,7 +80,7 @@ When a run would execute **more than 10 evaluations**, hyoka shows a summary and
 
 ### Process Lifecycle
 
-hyoka tracks all spawned Copilot processes and terminates them on completion or interrupt (Ctrl+C). The cleanup sequence sends SIGTERM, waits up to 5 seconds, then SIGKILL — no more orphaned processes consuming resources after a run.
+hyoka tracks all spawned Copilot processes and terminates them on completion or interrupt (Ctrl+C). The cleanup sequence sends SIGTERM, waits up to 5 seconds, then SIGKILL — no more orphaned processes consuming resources after a run. All SDK-spawned processes are tagged with `HYOKA_SESSION=true` in their environment, enabling `hyoka clean` to find and kill orphans even from crashed runs.
 
 ### Smart Concurrency
 
@@ -109,6 +110,9 @@ Did you mean one of these?
 | `hyoka trends` | | Generate historical trend reports with AI analysis |
 | `hyoka report` | | Re-render HTML/MD reports from existing JSON data |
 | `hyoka new-prompt` | | Scaffold a new prompt file interactively |
+| `hyoka serve` | | Launch local web UI for browsing reports |
+| `hyoka plugins` | | List registered plugins |
+| `hyoka clean` | | Remove stale session state and orphaned SDK processes |
 | `hyoka version` | | Print version |
 
 ### Filtering
@@ -150,7 +154,7 @@ hyoka list --json
 | `--progress` | `auto` | Progress display mode: `auto`, `live`, `log`, `off` |
 | `--skip-tests` | `false` | Skip test generation |
 | `--skip-review` | `false` | Skip code review |
-| `--verify-build` | `false` | Run build verification (in addition to Copilot verification) |
+| `--verify-build` | `false` | Run build verification on generated code |
 | `--stub` | `false` | Use stub evaluator (no Copilot SDK) |
 | `--dry-run` | `false` | List matching prompts without running |
 | `--workers` | CPU cores (max 8) | Parallel evaluation workers |
@@ -158,17 +162,26 @@ hyoka list --json
 | `--timeout` | `300` | Per-prompt timeout in seconds |
 | `-y` / `--yes` | `false` | Skip confirmation prompt for large runs (>10 evaluations) |
 | `--all-configs` | `false` | Required when running all configs without a `--config` filter |
+| `--config` | | Config name(s) to run — use quotes for multiple: `"name1,name2"` |
 | `--max-turns` | `25` | Maximum conversation turns per generation before aborting |
 | `--max-files` | `50` | Maximum generated files per evaluation before aborting |
 | `--max-output-size` | `1MB` | Maximum total output size per evaluation (supports KB, MB suffixes) |
+| `--max-session-actions` | `50` | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
 | `--allow-cloud` | `false` | Allow generated code to provision real Azure resources |
 | `--sandbox` | `true` | Alias confirming safe/local-only mode (default behavior) |
+| `--criteria-dir` | (none) | Directory with attribute-matched criteria YAML files (e.g., `criteria/`) |
+| `--strict-cleanup` | `false` | Fail run if orphaned Copilot processes remain after cleanup |
+| `--monitor-resources` | `false` | Monitor CPU and memory usage of Copilot sessions during evaluation |
+| `--generate-timeout` | `600` | Generation phase timeout in seconds |
+| `--build-timeout` | `300` | Build verification timeout in seconds |
+| `--review-timeout` | `300` | Review phase timeout in seconds |
+| `--exclude-dirs` | | Comma-separated directories to exclude from generated_files output |
 
 ### Run Command Examples
 
 ```bash
 # Skip confirmation for large runs (CI-friendly)
-go run ./hyoka run --prompt-id my-prompt --config baseline -y
+go run ./hyoka run --prompt-id my-prompt --config "baseline/claude-sonnet-4.5" -y
 
 # Run all prompts × all configs (requires --all-configs + -y for non-interactive)
 go run ./hyoka run --all-configs -y
@@ -208,8 +221,11 @@ hyoka run --prompt-id storage-dp-dotnet-auth
 hyoka run --config baseline/claude-sonnet-4.5
 
 # Run multiple configs (produces comparison data)
-hyoka run --config baseline/claude-sonnet-4.5,azure-mcp/claude-sonnet-4.5
+# Note: multiple config names must be quoted and comma-separated
+hyoka run --config "baseline/claude-sonnet-4.5,azure-mcp/claude-sonnet-4.5"
 ```
+
+> ⚠️ **Config names use the `name:` field from your YAML files**, not the filename. Multiple configs must be quoted: `--config "config1,config2"`. See [Configuration Guide](docs/configuration.md) for the full name-to-filename mapping.
 
 #### Custom Configs
 
@@ -340,18 +356,27 @@ hyoka/
 ├── hyoka/                              # Go eval tool (hyoka)
 │   ├── cmd/hyoka/main.go
 │   ├── go.mod / go.sum
-│   └── internal/                      # config, prompt, eval, build, report,
-│       │                              #   validate, trends, verify, review
-│       ├── config/
-│       ├── prompt/
-│       ├── eval/
-│       ├── build/
-│       ├── report/
-│       ├── trends/
-│       ├── verify/
-│       ├── review/
-│       │   └── rubric.md              # Criteria-based scoring rubric (embedded)
-│       └── validate/
+│   └── internal/                      # All internal packages
+│       ├── build/                     # Language-specific build verification
+│       ├── checkenv/                  # Environment prerequisite validation
+│       ├── clean/                     # Session state & orphan process cleanup
+│       ├── config/                    # Config loading & parsing
+│       ├── criteria/                  # Tiered evaluation criteria system
+│       ├── eval/                      # Evaluation engine (generation + orchestration)
+│       ├── history/                   # Run history tracking
+│       ├── logging/                   # Structured slog logging utilities
+│       ├── manifest/                  # Dependency manifest
+│       ├── plugin/                    # Composable plugin system
+│       ├── progress/                  # Progress display (live, log, off)
+│       ├── prompt/                    # Prompt loading, filtering, validation
+│       ├── rerender/                  # Report re-rendering from JSON
+│       ├── report/                    # Report generation (JSON, HTML, Markdown)
+│       ├── review/                    # Multi-model review panel + rubric
+│       ├── serve/                     # Local web server for report browsing
+│       ├── skills/                    # Skill fetching (local + remote)
+│       ├── trends/                    # Cross-run trend analysis
+│       ├── utils/                     # Shared utility functions
+│       └── validate/                  # Prompt schema validation
 ├── reports/                           # Evaluation output
 │   └── <run-id>/
 │       ├── summary.{json,html,md}
@@ -359,7 +384,12 @@ hyoka/
 │           └── report.{json,html,md}
 ├── docs/                              # Documentation
 │   ├── getting-started.md
-│   └── cleanup-plan.md
+│   ├── architecture.md
+│   ├── cli-reference.md
+│   ├── configuration.md
+│   ├── prompt-authoring.md
+│   ├── guardrails.md
+│   └── contributing.md
 └── templates/
     └── prompt-template.prompt.md
 ```
@@ -389,10 +419,10 @@ Every prompt uses YAML frontmatter:
 - **Phase 2:** ✅ Copilot SDK integration — live agent evaluation with code generation and criteria-based review panel
 - **Phase 3:** ✅ Tool matrix, MCP server attachment, skill loading, cross-config comparison
 - **Phase 4:** ✅ Guardrails, safety boundaries, smart concurrency, process lifecycle, prompt discovery
-- **Phase 5:** In progress — Evaluation quality (check-env, expected_tools, reviewer skills)
-- **Phase 6:** Planned — Polish (report re-rendering, embedded CLI, progress bars)
+- **Phase 5:** ✅ Evaluation quality (check-env, expected_tools, reviewer skills, report re-rendering)
+- **Phase 6:** Planned — Polish (embedded CLI, progress bars, web dashboard)
 
-See [`hyoka/README.md`](hyoka/README.md) for full CLI reference and configuration docs.
+See [CLI Reference](docs/cli-reference.md) and [Configuration Guide](docs/configuration.md) for detailed documentation.
 
 ## License
 

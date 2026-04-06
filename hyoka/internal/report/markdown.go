@@ -12,7 +12,7 @@ import (
 func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service, plane, language, category string) (string, error) {
 	reportDir := filepath.Join(
 		outputDir, runID, "results",
-		service, plane, language, category, r.ConfigName,
+		service, plane, language, category, r.PromptID, r.ConfigName,
 	)
 	if err := os.MkdirAll(reportDir, 0755); err != nil {
 		return "", fmt.Errorf("creating markdown report directory: %w", err)
@@ -51,11 +51,73 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 	}
 	b.WriteString("\n")
 
+	// Phase Timing
+	if r.GenerationDuration > 0 || r.ReviewDuration > 0 {
+		b.WriteString("## Phase Timing\n\n")
+		b.WriteString("| Phase | Duration |\n")
+		b.WriteString("|-------|----------|\n")
+		if r.GenerationDuration > 0 {
+			fmt.Fprintf(&b, "| Generation | %.1fs |\n", r.GenerationDuration)
+		}
+		if r.ReviewDuration > 0 {
+			fmt.Fprintf(&b, "| Review | %.1fs |\n", r.ReviewDuration)
+		}
+		fmt.Fprintf(&b, "| **Total** | **%.1fs** |\n", r.Duration)
+		b.WriteString("\n")
+	}
+
 	// Config used
 	if len(r.ConfigUsed) > 0 {
 		b.WriteString("## Configuration\n\n")
 		for k, v := range r.ConfigUsed {
 			fmt.Fprintf(&b, "- **%s:** %v\n", k, v)
+		}
+		b.WriteString("\n")
+	}
+
+	// Environment & Configuration
+	if r.Environment != nil {
+		env := r.Environment
+		b.WriteString("## Environment & Configuration\n\n")
+		b.WriteString("| Setting | Value |\n")
+		b.WriteString("|---------|-------|\n")
+		fmt.Fprintf(&b, "| Model | %s |\n", env.Model)
+		if len(env.SkillDirectories) > 0 {
+			fmt.Fprintf(&b, "| Skill Directories | %s |\n", strings.Join(env.SkillDirectories, ", "))
+		}
+		if len(env.SkillsLoaded) > 0 {
+			fmt.Fprintf(&b, "| Skills Loaded | %s |\n", strings.Join(env.SkillsLoaded, ", "))
+		}
+		if len(env.SkillsInvoked) > 0 {
+			fmt.Fprintf(&b, "| Skills Invoked | %s |\n", strings.Join(env.SkillsInvoked, ", "))
+		}
+		if len(env.AvailableTools) > 0 {
+			fmt.Fprintf(&b, "| Available Tools | %s |\n", strings.Join(env.AvailableTools, ", "))
+		}
+		if len(env.ExcludedTools) > 0 {
+			fmt.Fprintf(&b, "| Excluded Tools | %s |\n", strings.Join(env.ExcludedTools, ", "))
+		}
+		if len(env.MCPServers) > 0 {
+			fmt.Fprintf(&b, "| MCP Servers | %s |\n", strings.Join(env.MCPServers, ", "))
+		}
+		safetyStr := "❌ Off"
+		if env.SafetyBoundaries {
+			safetyStr = "✅ Active"
+		}
+		fmt.Fprintf(&b, "| Safety Boundaries | %s |\n", safetyStr)
+		cloudStr := "❌ Denied"
+		if env.AllowCloud {
+			cloudStr = "✅ Allowed"
+		}
+		fmt.Fprintf(&b, "| Cloud Access | %s |\n", cloudStr)
+		if env.TotalInputTokens > 0 || env.TotalOutputTokens > 0 {
+			fmt.Fprintf(&b, "| Token Usage | in=%d out=%d |\n", env.TotalInputTokens, env.TotalOutputTokens)
+		}
+		if env.TurnCount > 0 {
+			fmt.Fprintf(&b, "| Turn Count | %d |\n", env.TurnCount)
+		}
+		if env.ContextTruncated {
+			b.WriteString("| Context Truncated | ⚠️ Yes |\n")
 		}
 		b.WriteString("\n")
 	}
@@ -158,24 +220,6 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		b.WriteString("\n\n")
 	}
 
-	// Verification
-	if r.Verification != nil {
-		b.WriteString("## Verification\n\n")
-		verResult := "❌ FAIL"
-		if r.Verification.Pass {
-			verResult = "✅ PASS"
-		}
-		fmt.Fprintf(&b, "**Result:** %s\n\n", verResult)
-		if r.Verification.Summary != "" {
-			fmt.Fprintf(&b, "**Summary:** %s\n\n", r.Verification.Summary)
-		}
-		if r.Verification.Reasoning != "" {
-			b.WriteString("**Reasoning:**\n\n")
-			b.WriteString(r.Verification.Reasoning)
-			b.WriteString("\n\n")
-		}
-	}
-
 	// Tool usage evaluation
 	if r.ToolUsage != nil {
 		b.WriteString("## Tool Usage Evaluation\n\n")
@@ -199,29 +243,6 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 			fmt.Fprintf(&b, "| Extra | %s |\n", strings.Join(r.ToolUsage.ExtraTools, ", "))
 		}
 		b.WriteString("\n")
-	}
-
-	// Build
-	if r.Build != nil {
-		b.WriteString("## Build Verification\n\n")
-		buildResult := "❌ FAIL"
-		if r.Build.Success {
-			buildResult = "✅ PASS"
-		}
-		fmt.Fprintf(&b, "**Result:** %s | **Language:** %s | **Command:** `%s` | **Exit Code:** %d\n\n",
-			buildResult, r.Build.Language, r.Build.Command, r.Build.ExitCode)
-		if r.Build.Stdout != "" || r.Build.Stderr != "" {
-			output := r.Build.Stdout
-			if r.Build.Stderr != "" {
-				if output != "" {
-					output += "\n"
-				}
-				output += r.Build.Stderr
-			}
-			b.WriteString("<details>\n<summary>Build Output</summary>\n\n")
-			fmt.Fprintf(&b, "```\n%s\n```\n\n", truncateStr(output, 5000))
-			b.WriteString("</details>\n\n")
-		}
 	}
 
 	// Review scores
@@ -264,6 +285,25 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 			}
 			b.WriteString("\n")
 		}
+	}
+
+	// Grader Results summary
+	if len(r.GraderResults) > 0 {
+		b.WriteString("## Grader Results\n\n")
+		b.WriteString("| Grader | Type | Score | Summary |\n")
+		b.WriteString("|--------|------|-------|----------|\n")
+		for _, g := range r.GraderResults {
+			prefix := ""
+			if g.IsConsensus {
+				prefix = "🏆 "
+			}
+			summary := g.Summary
+			if len(summary) > 80 {
+				summary = summary[:80] + "…"
+			}
+			fmt.Fprintf(&b, "| %s`%s` | %s | %d/%d | %s |\n", prefix, g.GraderName, g.GraderType, g.OverallScore, g.MaxScore, summary)
+		}
+		b.WriteString("\n")
 	}
 
 	// Re-run command
@@ -389,7 +429,7 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 		category, _ := r.PromptMeta["category"].(string)
 		promptCell := r.PromptID
 		if service != "" && plane != "" && language != "" && category != "" {
-			link := filepath.Join("results", service, plane, language, category, r.ConfigName, "report.md")
+			link := strings.Join([]string{"results", service, plane, language, category, r.ConfigName, "report.md"}, "/")
 			promptCell = fmt.Sprintf("[%s](%s)", r.PromptID, link)
 		}
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %.1fs | %d |\n",
@@ -460,6 +500,55 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 			fmt.Fprintf(&b, "| %s | %d | %d | %d | %.1f%% |\n", ts.Name, ts.Count, ts.Successes, ts.Failures, ts.Rate)
 		}
 		b.WriteString("\n")
+	}
+
+	// Pairwise Tool Impact (#123)
+	if len(stats.PairwiseImpacts) > 0 {
+		b.WriteString("## Pairwise Tool Impact\n\n")
+		b.WriteString("Impact = baseline score − score without tool (positive = tool helps).\n\n")
+		b.WriteString("| Tool | Impact | Baseline | Without | Baseline Pass | Without Pass |\n")
+		b.WriteString("|------|--------|----------|---------|---------------|-------------|\n")
+		for _, imp := range stats.PairwiseImpacts {
+			bPass := "✅"
+			if !imp.BaselinePass {
+				bPass = "❌"
+			}
+			wPass := "✅"
+			if !imp.WithoutPass {
+				wPass = "❌"
+			}
+			sign := ""
+			if imp.Impact > 0 {
+				sign = "+"
+			}
+			fmt.Fprintf(&b, "| %s | %s%.1f | %.1f | %.1f | %s | %s |\n",
+				imp.ToolName, sign, imp.Impact, imp.BaselineScore, imp.WithoutScore, bPass, wPass)
+		}
+		b.WriteString("\n")
+	}
+
+	// Per-prompt pairwise details
+	if len(s.PairwiseResults) > 0 {
+		b.WriteString("## Pairwise Details (per Prompt)\n\n")
+		for _, pr := range s.PairwiseResults {
+			fmt.Fprintf(&b, "### %s\n\n", pr.PromptID)
+			fmt.Fprintf(&b, "Baseline: **%s** — %d/%d\n\n", pr.Baseline.ConfigName, pr.Baseline.Score, pr.Baseline.MaxScore)
+			b.WriteString("| Tool Removed | Impact | Without Score | Pass |\n")
+			b.WriteString("|-------------|--------|---------------|------|\n")
+			for _, imp := range pr.Impacts {
+				pass := "✅"
+				if !imp.WithoutPass {
+					pass = "❌"
+				}
+				sign := ""
+				if imp.Impact > 0 {
+					sign = "+"
+				}
+				fmt.Fprintf(&b, "| %s | %s%.1f | %.1f | %s |\n",
+					imp.ToolName, sign, imp.Impact, imp.WithoutScore, pass)
+			}
+			b.WriteString("\n")
+		}
 	}
 
 	if err := os.WriteFile(summaryPath, []byte(b.String()), 0644); err != nil {
