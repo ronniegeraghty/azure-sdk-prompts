@@ -624,8 +624,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Create an isolated temporary workspace for the generator (#26, #126).
 	// The agent writes files here — not directly to the report tree.
 	// After generation, files are copied to the persistent report directory.
-	// The workspace is empty to prevent leakage from the user's dev environment.
-	evalWs, err := NewEvalWorkspace()
+	genWs, err := NewWorkspace(task.Prompt.ID, task.Config.Name)
 	if err != nil {
 		evalReport.Error = fmt.Sprintf("generator workspace setup failed: %v", err)
 		evalReport.ErrorDetails = err.Error()
@@ -634,10 +633,23 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		evalReport.Duration = time.Since(start).Seconds()
 		return evalReport
 	}
-	defer evalWs.Cleanup()
-	genDir := evalWs.Dir
+	defer genWs.Cleanup()
+	genDir := genWs.Dir
 
-	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir)
+	// Copy starter files into the generator workspace before evaluation (#127).
+	starterFiles, starterErr := genWs.CopyStarterFiles(task.Prompt)
+	if starterErr != nil {
+		evalReport.Error = fmt.Sprintf("starter file copy failed: %v", starterErr)
+		evalReport.ErrorDetails = starterErr.Error()
+		evalReport.ErrorCategory = "generation_failure"
+		evalReport.FailureReason = fmt.Sprintf("Could not copy starter project: %v", starterErr)
+		evalReport.Duration = time.Since(start).Seconds()
+		return evalReport
+	}
+	evalReport.StarterFiles = starterFiles
+
+	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
+		"starter_files", len(starterFiles))
 
 	// Snapshot home directory and CWD before eval so we can recover misplaced files after
 	homeDir, _ := os.UserHomeDir()
@@ -688,7 +700,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		evalReport.SessionEvents = result.SessionEvents
 		evalReport.IsStub = result.IsStub
 		evalReport.Success = result.Success
-		evalReport.StarterFiles = result.StarterFiles
 	}
 
 	// Collect generated files — workspace listing is the primary source since

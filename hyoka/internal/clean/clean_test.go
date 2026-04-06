@@ -305,60 +305,50 @@ func TestFormatProcessInfo(t *testing.T) {
 	}
 }
 
-// --- Orphan workspace cleanup tests (#126) ---
+// --- Orphan workspace cleanup tests (#128) ---
 
 func TestCleanOrphanWorkspaces_FindsAndRemoves(t *testing.T) {
-	ws1, err := os.MkdirTemp("", "hyoka-eval-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(ws1, "test.py"), []byte("orphan"), 0o644)
-	ws2, err := os.MkdirTemp("", "hyoka-eval-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var buf bytes.Buffer
-	result := &Result{}
-	err = cleanOrphanWorkspaces(Options{Out: &buf}, result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.WorkspacesFound < 2 {
-		t.Errorf("expected at least 2 orphan workspaces found, got %d", result.WorkspacesFound)
-	}
-	if result.WorkspacesRemoved < 2 {
-		t.Errorf("expected at least 2 orphan workspaces removed, got %d", result.WorkspacesRemoved)
-	}
-	if _, err := os.Stat(ws1); !os.IsNotExist(err) {
-		t.Errorf("orphan workspace should be removed: %s", ws1)
-	}
-	if _, err := os.Stat(ws2); !os.IsNotExist(err) {
-		t.Errorf("orphan workspace should be removed: %s", ws2)
-	}
+tmpDir := t.TempDir()
+os.MkdirAll(filepath.Join(tmpDir, "hyoka-gen-abc123"), 0755)
+os.WriteFile(filepath.Join(tmpDir, "hyoka-gen-abc123", "main.py"), []byte("code"), 0644)
+os.MkdirAll(filepath.Join(tmpDir, "hyoka-config-xyz456"), 0755)
+os.MkdirAll(filepath.Join(tmpDir, "hyoka-review-def789"), 0755)
+os.MkdirAll(filepath.Join(tmpDir, "other-project"), 0755)
+
+origFn := tempDirFn; tempDirFn = func() string { return tmpDir }; defer func() { tempDirFn = origFn }()
+origStateFn := copilotStateDirFn; copilotStateDirFn = func() string { return t.TempDir() }; defer func() { copilotStateDirFn = origStateFn }()
+
+var buf bytes.Buffer
+result, err := Run(Options{Out: &buf})
+if err != nil { t.Fatal(err) }
+if result.OrphanWorkspacesFound != 3 { t.Errorf("expected 3 found, got %d", result.OrphanWorkspacesFound) }
+if result.OrphanWorkspacesRemoved != 3 { t.Errorf("expected 3 removed, got %d", result.OrphanWorkspacesRemoved) }
+for _, name := range []string{"hyoka-gen-abc123", "hyoka-config-xyz456", "hyoka-review-def789"} {
+if _, err := os.Stat(filepath.Join(tmpDir, name)); !os.IsNotExist(err) { t.Errorf("%s should be removed", name) }
+}
+if _, err := os.Stat(filepath.Join(tmpDir, "other-project")); err != nil { t.Error("non-hyoka dir should remain") }
 }
 
 func TestCleanOrphanWorkspaces_DryRun(t *testing.T) {
-	ws, err := os.MkdirTemp("", "hyoka-eval-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(ws)
-	var buf bytes.Buffer
-	result := &Result{}
-	err = cleanOrphanWorkspaces(Options{DryRun: true, Out: &buf}, result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.WorkspacesFound < 1 {
-		t.Errorf("expected at least 1 workspace found, got %d", result.WorkspacesFound)
-	}
-	if result.WorkspacesRemoved != 0 {
-		t.Errorf("expected 0 removed in dry-run, got %d", result.WorkspacesRemoved)
-	}
-	if _, err := os.Stat(ws); err != nil {
-		t.Error("workspace should still exist in dry-run mode")
-	}
-	if !strings.Contains(buf.String(), "[dry-run] would remove orphan workspace") {
-		t.Errorf("expected dry-run message, got %q", buf.String())
-	}
+tmpDir := t.TempDir()
+os.MkdirAll(filepath.Join(tmpDir, "hyoka-gen-test1"), 0755)
+origFn := tempDirFn; tempDirFn = func() string { return tmpDir }; defer func() { tempDirFn = origFn }()
+origStateFn := copilotStateDirFn; copilotStateDirFn = func() string { return t.TempDir() }; defer func() { copilotStateDirFn = origStateFn }()
+
+var buf bytes.Buffer
+result, _ := Run(Options{DryRun: true, Out: &buf})
+if result.OrphanWorkspacesFound != 1 { t.Errorf("expected 1 found, got %d", result.OrphanWorkspacesFound) }
+if result.OrphanWorkspacesRemoved != 0 { t.Errorf("expected 0 removed, got %d", result.OrphanWorkspacesRemoved) }
+if !strings.Contains(buf.String(), "[dry-run] would remove orphan workspace") { t.Errorf("expected dry-run msg, got %q", buf.String()) }
+}
+
+func TestCleanOrphanWorkspaces_NoOrphans(t *testing.T) {
+tmpDir := t.TempDir()
+os.MkdirAll(filepath.Join(tmpDir, "some-other-app"), 0755)
+origFn := tempDirFn; tempDirFn = func() string { return tmpDir }; defer func() { tempDirFn = origFn }()
+origStateFn := copilotStateDirFn; copilotStateDirFn = func() string { return t.TempDir() }; defer func() { copilotStateDirFn = origStateFn }()
+
+var buf bytes.Buffer
+result, _ := Run(Options{Out: &buf})
+if result.OrphanWorkspacesFound != 0 { t.Errorf("expected 0, got %d", result.OrphanWorkspacesFound) }
 }
