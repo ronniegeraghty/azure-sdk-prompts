@@ -1,83 +1,363 @@
 package eval
 
-import "time"
+import (
+	"github.com/ronniegeraghty/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/internal/report"
+)
 
-// ActionEvent captures a single agent action during an evaluation session.
-// This is the rich timeline event used for report rendering, distinct from
-// the lightweight graders.ActionEvent used for rubric evaluation.
+// maxActionFieldLen is the maximum length for truncated input/output fields.
+const maxActionFieldLen = 512
+
+// ActionEvent represents a single captured agent action with full detail.
 type ActionEvent struct {
-	Timestamp  time.Time     `json:"timestamp"`
-	Type       string        `json:"type"`                  // "tool_call", "file_read", "file_write", "bash", "response"
-	Tool       string        `json:"tool"`                  // Tool name (e.g., "editFile", "bash")
-	Input      string        `json:"input"`                 // Tool input (truncated if large)
-	Output     string        `json:"output"`                // Tool output (truncated if large)
-	Duration   time.Duration `json:"duration"`              // Wall-clock duration of this action
-	TurnNumber int           `json:"turn_number"`           // Which conversation turn this belongs to
-	Success    bool          `json:"success"`               // Whether the action completed successfully
-	Error      string        `json:"error,omitempty"`       // Error message if action failed
+	Sequence   int     `json:"sequence"`              // ordinal position in the timeline
+	Type       string  `json:"type"`                  // classified action type
+	Tool       string  `json:"tool,omitempty"`         // tool name (for tool_call, file_read, file_write, bash)
+	Action     string  `json:"action,omitempty"`       // sub-action (e.g., "start", "complete")
+	Path       string  `json:"path,omitempty"`         // file path when applicable
+	Input      string  `json:"input,omitempty"`        // truncated tool arguments
+	Output     string  `json:"output,omitempty"`       // truncated tool result
+	Error      string  `json:"error,omitempty"`        // error message if failed
+	Success    *bool   `json:"success,omitempty"`      // tool execution success
+	DurationMs float64 `json:"duration_ms,omitempty"`  // duration in milliseconds
+	TurnNumber int     `json:"turn_number,omitempty"`  // assistant turn number
+	MCPServer  string  `json:"mcp_server,omitempty"`   // MCP server name
 }
 
-// ActionTimeline aggregates all action events from a session with computed
-// summary statistics. It provides the full action history for report rendering.
+// ActionSummary holds aggregate statistics about the action timeline.
+type ActionSummary struct {
+	TotalEvents     int            `json:"total_events"`
+	TotalTurns      int            `json:"total_turns"`
+	ToolCalls       int            `json:"tool_calls"`
+	FileReads       int            `json:"file_reads"`
+	FileWrites      int            `json:"file_writes"`
+	BashCommands    int            `json:"bash_commands"`
+	MCPCalls        int            `json:"mcp_calls"`
+	Errors          int            `json:"errors"`
+	ToolBreakdown   map[string]int `json:"tool_breakdown"`
+	TotalDurationMs float64        `json:"total_duration_ms,omitempty"`
+}
+
+// ActionTimeline holds an ordered sequence of ActionEvents with summary stats.
 type ActionTimeline struct {
-	Events        []ActionEvent   `json:"events"`
-	TotalTurns    int             `json:"total_turns"`
-	TotalDuration time.Duration   `json:"total_duration"`
-	Summary       TimelineSummary `json:"summary"`
+	Events  []ActionEvent `json:"events"`
+	Summary ActionSummary `json:"summary"`
 }
 
-// TimelineSummary provides aggregate counts of action types within a timeline.
-type TimelineSummary struct {
-	ToolCalls  int `json:"tool_calls"`
-	FileReads  int `json:"file_reads"`
-	FileWrites int `json:"file_writes"`
-	BashCmds   int `json:"bash_commands"`
-}
-
-// NewActionTimeline builds an ActionTimeline from a slice of events, computing
-// the total turns, total duration, and per-type summary counts.
-func NewActionTimeline(events []ActionEvent) *ActionTimeline {
-	tl := &ActionTimeline{
-		Events: events,
+// NewActionTimeline creates an empty ActionTimeline ready for use.
+func NewActionTimeline() *ActionTimeline {
+	return &ActionTimeline{
+		Events: []ActionEvent{},
+		Summary: ActionSummary{
+			ToolBreakdown: make(map[string]int),
+		},
 	}
+}
 
-	if len(events) == 0 {
+// classifyEventType maps a SessionEventRecord type string to a higher-level
+// action type for the timeline.
+func classifyEventType(evType, toolName string) (actionType, action string) {
+	switch evType {
+	case "tool.execution_start":
+		action = "start"
+		switch {
+		case isFileReadTool(toolName):
+			actionType = "file_read"
+		case isFileWriteTool(toolName):
+			actionType = "file_write"
+		case isBashTool(toolName):
+			actionType = "bash"
+		default:
+			actionType = "tool_call"
+		}
+	case "tool.execution_complete":
+		action = "complete"
+		switch {
+		case isFileReadTool(toolName):
+			actionType = "file_read"
+		case isFileWriteTool(toolName):
+			actionType = "file_write"
+		case isBashTool(toolName):
+			actionType = "bash"
+		default:
+			actionType = "tool_call"
+		}
+	case "assistant.turn_start":
+		actionType = "turn_start"
+	case "assistant.turn_end":
+		actionType = "turn_end"
+	case "assistant.reasoning":
+		actionType = "reasoning"
+	case "assistant.message":
+		actionType = "message"
+	case "assistant.intent":
+		actionType = "intent"
+	case "session.workspace_file_changed":
+		actionType = "file_change"
+	case "command.execute":
+		actionType = "bash"
+		action = "start"
+	case "command.completed":
+		actionType = "bash"
+		action = "complete"
+	case "external_tool.requested":
+		actionType = "mcp_call"
+		action = "start"
+	case "external_tool.completed":
+		actionType = "mcp_call"
+		action = "complete"
+	case "skill.invoked":
+		actionType = "skill"
+	case "session.error":
+		actionType = "error"
+	case "session.warning":
+		actionType = "warning"
+	case "session.truncation":
+		actionType = "truncation"
+	case "session.compaction_start":
+		actionType = "compaction"
+		action = "start"
+	case "session.compaction_complete":
+		actionType = "compaction"
+		action = "complete"
+	case "abort":
+		actionType = "abort"
+	default:
+		actionType = "other"
+	}
+	return actionType, action
+}
+
+// isFileReadTool returns true for tools that read files.
+func isFileReadTool(name string) bool {
+	switch name {
+	case "view", "read_file", "get_file_contents", "read":
+		return true
+	}
+	return false
+}
+
+// isBashTool returns true for shell/command tools.
+func isBashTool(name string) bool {
+	switch name {
+	case "bash", "shell", "run_command", "execute_command":
+		return true
+	}
+	return false
+}
+
+// BuildActionTimeline converts SessionEventRecords into a structured ActionTimeline.
+func BuildActionTimeline(records []report.SessionEventRecord) *ActionTimeline {
+	tl := NewActionTimeline()
+	if len(records) == 0 {
 		return tl
 	}
 
-	maxTurn := 0
-	var totalDur time.Duration
-	for _, e := range events {
-		totalDur += e.Duration
-		if e.TurnNumber > maxTurn {
-			maxTurn = e.TurnNumber
+	turnTracker := 0
+	for i, rec := range records {
+		actionType, action := classifyEventType(rec.Type, rec.ToolName)
+
+		ev := ActionEvent{
+			Sequence:   i,
+			Type:       actionType,
+			Action:     action,
+			TurnNumber: rec.TurnNumber,
 		}
-		switch e.Type {
-		case "tool_call":
-			tl.Summary.ToolCalls++
-		case "file_read":
-			tl.Summary.FileReads++
-		case "file_write":
-			tl.Summary.FileWrites++
-		case "bash":
-			tl.Summary.BashCmds++
+
+		// Track turn number from turn_start events
+		if rec.TurnNumber > 0 {
+			turnTracker = rec.TurnNumber
 		}
+		if ev.TurnNumber == 0 && turnTracker > 0 {
+			ev.TurnNumber = turnTracker
+		}
+
+		// Tool name
+		if rec.ToolName != "" {
+			ev.Tool = rec.ToolName
+		}
+
+		// File path
+		if rec.FilePath != "" {
+			ev.Path = rec.FilePath
+		}
+
+		// Input (tool args)
+		if rec.ToolArgs != "" {
+			ev.Input = truncateField(rec.ToolArgs, maxActionFieldLen)
+		} else if rec.CommandText != "" {
+			ev.Input = truncateField(rec.CommandText, maxActionFieldLen)
+		}
+
+		// Output (tool result or content)
+		if rec.ToolResult != "" {
+			ev.Output = truncateField(rec.ToolResult, maxActionFieldLen)
+		} else if rec.Content != "" && actionType != "reasoning" && actionType != "message" {
+			ev.Output = truncateField(rec.Content, maxActionFieldLen)
+		}
+
+		// Error
+		if rec.Error != "" {
+			ev.Error = rec.Error
+		}
+
+		// Success
+		if rec.ToolSuccess != nil {
+			s := *rec.ToolSuccess
+			ev.Success = &s
+		}
+
+		// Duration
+		if rec.Duration > 0 {
+			ev.DurationMs = rec.Duration
+		}
+
+		// MCP server
+		if rec.MCPServerName != "" {
+			ev.MCPServer = rec.MCPServerName
+		}
+
+		tl.Events = append(tl.Events, ev)
 	}
 
-	tl.TotalTurns = maxTurn
-	tl.TotalDuration = totalDur
+	// Compute summary
+	tl.Summary = computeSummary(tl.Events)
 	return tl
 }
 
-// TruncateField truncates s to maxLen characters, appending an ellipsis
-// indicator when truncation occurs. Returns s unchanged if within limit.
-func TruncateField(s string, maxLen int) string {
-	if maxLen <= 0 || len(s) <= maxLen {
+// computeSummary aggregates statistics from action events.
+func computeSummary(events []ActionEvent) ActionSummary {
+	s := ActionSummary{
+		TotalEvents:   len(events),
+		ToolBreakdown: make(map[string]int),
+	}
+
+	turnsSeen := make(map[int]bool)
+	for _, ev := range events {
+		if ev.TurnNumber > 0 {
+			turnsSeen[ev.TurnNumber] = true
+		}
+
+		switch ev.Type {
+		case "tool_call":
+			if ev.Action == "start" {
+				s.ToolCalls++
+				if ev.Tool != "" {
+					s.ToolBreakdown[ev.Tool]++
+				}
+			}
+		case "file_read":
+			if ev.Action == "start" {
+				s.FileReads++
+				if ev.Tool != "" {
+					s.ToolBreakdown[ev.Tool]++
+				}
+			}
+		case "file_write":
+			if ev.Action == "start" {
+				s.FileWrites++
+				if ev.Tool != "" {
+					s.ToolBreakdown[ev.Tool]++
+				}
+			}
+		case "bash":
+			if ev.Action == "start" {
+				s.BashCommands++
+				if ev.Tool != "" {
+					s.ToolBreakdown[ev.Tool]++
+				}
+			}
+		case "mcp_call":
+			if ev.Action == "start" {
+				s.MCPCalls++
+				if ev.Tool != "" {
+					s.ToolBreakdown[ev.Tool]++
+				}
+			}
+		}
+
+		if ev.Error != "" {
+			s.Errors++
+		}
+
+		// Sum durations from "complete" events only to avoid double-counting
+		if ev.DurationMs > 0 && ev.Action == "complete" {
+			s.TotalDurationMs += ev.DurationMs
+		}
+	}
+
+	s.TotalTurns = len(turnsSeen)
+	return s
+}
+
+// truncateField truncates a string to maxLen, appending "…" if truncated.
+func truncateField(s string, maxLen int) string {
+	if len(s) <= maxLen {
 		return s
 	}
-	suffix := "... [truncated]"
-	if maxLen <= len(suffix) {
-		return s[:maxLen]
+	return s[:maxLen] + "…"
+}
+
+// ToGraderActionLog converts the timeline into []graders.ActionEvent for
+// pluggable grader input. Only "start" events for tool executions are included
+// to match grader expectations.
+func (tl *ActionTimeline) ToGraderActionLog() []graders.ActionEvent {
+	if tl == nil {
+		return nil
 	}
-	return s[:maxLen-len(suffix)] + suffix
+	var out []graders.ActionEvent
+	for _, ev := range tl.Events {
+		if ev.Action != "start" && ev.Action != "" {
+			continue
+		}
+		switch ev.Type {
+		case "tool_call", "file_read", "file_write", "bash", "mcp_call":
+			out = append(out, graders.ActionEvent{
+				Tool:       ev.Tool,
+				Action:     ev.Type,
+				Path:       ev.Path,
+				TurnNumber: ev.TurnNumber,
+			})
+		}
+	}
+	return out
+}
+
+// ToReport converts the eval ActionTimeline into the report-serializable form.
+func (tl *ActionTimeline) ToReport() *report.ActionTimelineReport {
+	if tl == nil {
+		return nil
+	}
+	r := &report.ActionTimelineReport{
+		Events: make([]report.ActionEventReport, len(tl.Events)),
+		Summary: report.ActionSummaryReport{
+			TotalEvents:     tl.Summary.TotalEvents,
+			TotalTurns:      tl.Summary.TotalTurns,
+			ToolCalls:       tl.Summary.ToolCalls,
+			FileReads:       tl.Summary.FileReads,
+			FileWrites:      tl.Summary.FileWrites,
+			BashCommands:    tl.Summary.BashCommands,
+			MCPCalls:        tl.Summary.MCPCalls,
+			Errors:          tl.Summary.Errors,
+			ToolBreakdown:   tl.Summary.ToolBreakdown,
+			TotalDurationMs: tl.Summary.TotalDurationMs,
+		},
+	}
+	for i, ev := range tl.Events {
+		r.Events[i] = report.ActionEventReport{
+			Sequence:   ev.Sequence,
+			Type:       ev.Type,
+			Tool:       ev.Tool,
+			Action:     ev.Action,
+			Path:       ev.Path,
+			Input:      ev.Input,
+			Output:     ev.Output,
+			Error:      ev.Error,
+			Success:    ev.Success,
+			DurationMs: ev.DurationMs,
+			TurnNumber: ev.TurnNumber,
+			MCPServer:  ev.MCPServer,
+		}
+	}
+	return r
 }

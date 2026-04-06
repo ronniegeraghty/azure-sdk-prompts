@@ -13,7 +13,7 @@ const CurrentSchemaVersion = 2
 // GraderResult holds the output from a single grader (LLM reviewer, build check, etc.).
 type GraderResult struct {
 	GraderName   string              `json:"grader_name"`
-	GraderType   string              `json:"grader_type"` // "review", "build", "lint", "test"
+	GraderType   string              `json:"grader_type"` // "review", "file", "program", "prompt", "behavior", etc.
 	Model        string              `json:"model,omitempty"`
 	Scores       review.ReviewScores `json:"scores"`
 	OverallScore int                 `json:"overall_score"`
@@ -23,6 +23,67 @@ type GraderResult struct {
 	Strengths    []string            `json:"strengths,omitempty"`
 	Duration     float64             `json:"duration_seconds,omitempty"`
 	IsConsensus  bool                `json:"is_consensus,omitempty"`
+
+	// Grader-system fields (populated for pluggable graders).
+	Score  float64 `json:"score,omitempty"`  // 0.0–1.0 normalized
+	Weight float64 `json:"weight,omitempty"` // Weight for aggregation
+	Pass   *bool   `json:"pass,omitempty"`   // nil for legacy review-type graders
+	Gate   bool    `json:"gate,omitempty"`   // Gate grader flag
+
+	// Typed details — only one populated per result.
+	FileDetails     *FileGraderDetail     `json:"file_details,omitempty"`
+	ProgramDetails  *ProgramGraderDetail  `json:"program_details,omitempty"`
+	PromptDetails   *PromptGraderDetail   `json:"prompt_details,omitempty"`
+	BehaviorDetails *BehaviorGraderDetail `json:"behavior_details,omitempty"`
+}
+
+// FileCheckDetail records the outcome of a single file check.
+type FileCheckDetail struct {
+	Path           string `json:"path"`
+	Exists         bool   `json:"exists"`
+	PatternMatched *bool  `json:"pattern_matched,omitempty"`
+	Pattern        string `json:"pattern,omitempty"`
+}
+
+// FileGraderDetail holds file-check specifics.
+type FileGraderDetail struct {
+	CheckedFiles []FileCheckDetail `json:"checked_files"`
+}
+
+// ProgramGraderDetail holds program execution specifics.
+type ProgramGraderDetail struct {
+	Command  string `json:"command"`
+	ExitCode int    `json:"exit_code"`
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+}
+
+// PromptGraderDetail holds LLM-as-judge specifics.
+type PromptGraderDetail struct {
+	Model     string `json:"model"`
+	Rubric    string `json:"rubric"`
+	Reasoning string `json:"reasoning"`
+	RawScore  int    `json:"raw_score,omitempty"`
+	MaxScore  int    `json:"max_score,omitempty"`
+}
+
+// BehaviorGraderDetail holds agent behavior analysis specifics.
+type BehaviorGraderDetail struct {
+	ToolsUsed        []string       `json:"tools_used,omitempty"`
+	MissingTools     []string       `json:"missing_tools,omitempty"`
+	ForbiddenUsed    []string       `json:"forbidden_used,omitempty"`
+	TurnCount        int            `json:"turn_count,omitempty"`
+	MaxTurns         int            `json:"max_turns,omitempty"`
+	ActualTurns      int            `json:"actual_turns,omitempty"`
+	TotalActions     int            `json:"total_actions,omitempty"`
+	TurnLimitHit     bool           `json:"turn_limit_hit,omitempty"`
+	Violations       []string       `json:"violations,omitempty"`
+	SequenceMatch    bool           `json:"sequence_match,omitempty"`
+	ExpectedSequence []string       `json:"expected_sequence,omitempty"`
+	ActualSequence   []string       `json:"actual_sequence,omitempty"`
+	MatchedActions   int            `json:"matched_actions,omitempty"`
+	ConstraintsMet   bool           `json:"constraints_met,omitempty"`
+	ToolCounts       map[string]int `json:"tool_counts,omitempty"`
 }
 
 // SessionEventRecord is a serializable representation of a Copilot session event.
@@ -93,6 +154,42 @@ type ResourceStats struct {
 	SampleCount    int     `json:"sample_count"`
 }
 
+// ActionTimelineReport is the serializable form of an action timeline for JSON reports (#139).
+type ActionTimelineReport struct {
+	Events  []ActionEventReport `json:"events"`
+	Summary ActionSummaryReport `json:"summary"`
+}
+
+// ActionEventReport represents a single agent action in a report.
+type ActionEventReport struct {
+	Sequence   int     `json:"sequence"`
+	Type       string  `json:"type"`
+	Tool       string  `json:"tool,omitempty"`
+	Action     string  `json:"action,omitempty"`
+	Path       string  `json:"path,omitempty"`
+	Input      string  `json:"input,omitempty"`
+	Output     string  `json:"output,omitempty"`
+	Error      string  `json:"error,omitempty"`
+	Success    *bool   `json:"success,omitempty"`
+	DurationMs float64 `json:"duration_ms,omitempty"`
+	TurnNumber int     `json:"turn_number,omitempty"`
+	MCPServer  string  `json:"mcp_server,omitempty"`
+}
+
+// ActionSummaryReport holds aggregate statistics for the timeline.
+type ActionSummaryReport struct {
+	TotalEvents     int            `json:"total_events"`
+	TotalTurns      int            `json:"total_turns"`
+	ToolCalls       int            `json:"tool_calls"`
+	FileReads       int            `json:"file_reads"`
+	FileWrites      int            `json:"file_writes"`
+	BashCommands    int            `json:"bash_commands"`
+	MCPCalls        int            `json:"mcp_calls"`
+	Errors          int            `json:"errors"`
+	ToolBreakdown   map[string]int `json:"tool_breakdown"`
+	TotalDurationMs float64        `json:"total_duration_ms,omitempty"`
+}
+
 // EvalReport contains the results of a single prompt evaluation.
 type EvalReport struct {
 	SchemaVersion  int                   `json:"schema_version"`
@@ -112,6 +209,7 @@ type EvalReport struct {
 	GraderResults  []GraderResult        `json:"grader_results,omitempty"`
 	ToolUsage      *ToolUsageResult      `json:"tool_usage,omitempty"`
 	SessionEvents  []SessionEventRecord  `json:"session_events,omitempty"`
+	ActionTimeline *ActionTimelineReport `json:"action_timeline,omitempty"` // Structured action log (#139)
 	EventCount     int                   `json:"event_count"`
 	ToolCalls      []string              `json:"tool_calls"`
 	Environment    *EnvironmentInfo      `json:"environment,omitempty"`

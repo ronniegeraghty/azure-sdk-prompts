@@ -25,15 +25,16 @@ import (
 
 // EvalResult holds the raw output from a Copilot evaluation.
 type EvalResult struct {
-	GeneratedFiles []string
-	EventCount     int
-	ToolCalls      []string
-	SessionEvents  []report.SessionEventRecord
-	Success        bool
-	Error          string
-	ErrorDetails   string
-	IsStub         bool
-	StarterFiles   []string
+	GeneratedFiles  []string
+	EventCount      int
+	ToolCalls       []string
+	SessionEvents   []report.SessionEventRecord
+	ActionTimeline  *ActionTimeline
+	Success         bool
+	Error           string
+	ErrorDetails    string
+	IsStub          bool
+	StarterFiles    []string
 }
 
 // CopilotEvaluator defines the interface for running evaluations.
@@ -720,6 +721,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			evalReport.EventCount = result.EventCount
 			evalReport.ToolCalls = result.ToolCalls
 			evalReport.IsStub = result.IsStub
+			if result.ActionTimeline != nil {
+				evalReport.ActionTimeline = result.ActionTimeline.ToReport()
+			}
 		}
 		// Don't return early — continue to collect files and run review for diagnostics
 	}
@@ -730,6 +734,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		evalReport.SessionEvents = result.SessionEvents
 		evalReport.IsStub = result.IsStub
 		evalReport.Success = result.Success
+		if result.ActionTimeline != nil {
+			evalReport.ActionTimeline = result.ActionTimeline.ToReport()
+		}
 	}
 
 	// Collect generated files — workspace listing is the primary source since
@@ -949,6 +956,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				input := graders.GraderInput{
 					WorkspacePath: genWs.Dir,
 				}
+				// Populate ActionLog from the structured action timeline (#139)
+				if result != nil && result.ActionTimeline != nil {
+					input.ActionLog = result.ActionTimeline.ToGraderActionLog()
+				}
 
 				results := graders.RunGraders(ctx, instances, applicable, input)
 				agg, aggErr := graders.AggregateResults(results)
@@ -957,11 +968,55 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				} else {
 					reportResults := make([]report.GraderResult, len(agg.Results))
 					for i, r := range agg.Results {
-						reportResults[i] = report.GraderResult{
+						pass := r.Pass
+						rr := report.GraderResult{
 							GraderName: r.Name,
 							GraderType: r.Kind,
 							Summary:    r.Message,
+							Score:      r.Score,
+							Weight:     r.Weight,
+							Pass:       &pass,
+							Gate:       r.Gate,
 						}
+						if r.FileDetails != nil {
+							checks := make([]report.FileCheckDetail, len(r.FileDetails.CheckedFiles))
+							for j, c := range r.FileDetails.CheckedFiles {
+								checks[j] = report.FileCheckDetail{
+									Path: c.Path, Exists: c.Exists,
+									PatternMatched: c.PatternMatched, Pattern: c.Pattern,
+								}
+							}
+							rr.FileDetails = &report.FileGraderDetail{CheckedFiles: checks}
+						}
+						if r.ProgramDetails != nil {
+							rr.ProgramDetails = &report.ProgramGraderDetail{
+								Command: r.ProgramDetails.Command, ExitCode: r.ProgramDetails.ExitCode,
+								Stdout: r.ProgramDetails.Stdout, Stderr: r.ProgramDetails.Stderr,
+							}
+						}
+						if r.PromptDetails != nil {
+							rr.PromptDetails = &report.PromptGraderDetail{
+								Model: r.PromptDetails.Model, Rubric: r.PromptDetails.Rubric,
+								Reasoning: r.PromptDetails.Reasoning,
+								RawScore: r.PromptDetails.RawScore, MaxScore: r.PromptDetails.MaxScore,
+							}
+						}
+						if r.BehaviorDetails != nil {
+							rr.BehaviorDetails = &report.BehaviorGraderDetail{
+								ToolsUsed: r.BehaviorDetails.ToolsUsed, MissingTools: r.BehaviorDetails.MissingTools,
+								ForbiddenUsed: r.BehaviorDetails.ForbiddenUsed,
+								TurnCount: r.BehaviorDetails.TurnCount, MaxTurns: r.BehaviorDetails.MaxTurns,
+								ActualTurns: r.BehaviorDetails.ActualTurns, TotalActions: r.BehaviorDetails.TotalActions,
+								TurnLimitHit: r.BehaviorDetails.TurnLimitHit, Violations: r.BehaviorDetails.Violations,
+								SequenceMatch: r.BehaviorDetails.SequenceMatch,
+								ExpectedSequence: r.BehaviorDetails.ExpectedSequence,
+								ActualSequence: r.BehaviorDetails.ActualSequence,
+								MatchedActions: r.BehaviorDetails.MatchedActions,
+								ConstraintsMet: r.BehaviorDetails.ConstraintsMet,
+								ToolCounts: r.BehaviorDetails.ToolCounts,
+							}
+						}
+						reportResults[i] = rr
 					}
 					evalReport.GraderResults = reportResults
 

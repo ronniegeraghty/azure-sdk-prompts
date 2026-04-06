@@ -1,3 +1,5 @@
+//go:build integration
+
 package eval
 
 import (

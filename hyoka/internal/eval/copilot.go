@@ -534,16 +534,18 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				EventCount:     len(captured),
 				ToolCalls:      extractToolCalls(capturedEvts),
 				SessionEvents:  captured,
+				ActionTimeline: BuildActionTimeline(captured),
 				Success:        true, // Let engine.go guardrail set the proper failure
 			}, nil
 		}
 
 		return &EvalResult{
-			SessionEvents: captured,
-			EventCount:    len(captured),
-			ToolCalls:     extractToolCalls(capturedEvts),
-			Error:         fmt.Sprintf("prompt send failed: %v", err),
-			ErrorDetails:  err.Error(),
+			SessionEvents:  captured,
+			ActionTimeline: BuildActionTimeline(captured),
+			EventCount:     len(captured),
+			ToolCalls:      extractToolCalls(capturedEvts),
+			Error:          fmt.Sprintf("prompt send failed: %v", err),
+			ErrorDetails:   err.Error(),
 		}, fmt.Errorf("sending prompt: %w", err)
 	}
 
@@ -572,6 +574,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		EventCount:     len(capturedEvents),
 		ToolCalls:      toolCalls,
 		SessionEvents:  capturedRecords,
+		ActionTimeline: BuildActionTimeline(capturedRecords),
 		Success:        !hasError,
 		Error:          "",
 	}, nil
