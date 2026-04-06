@@ -7,9 +7,58 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ronniegeraghty/hyoka/internal/utils"
 )
+
+// EvalWorkspacePrefix is the directory name prefix used for isolated evaluation
+// workspaces. The clean command uses this to find orphan workspaces.
+const EvalWorkspacePrefix = "hyoka-eval-"
+
+// EvalWorkspace is an isolated per-session workspace directory. Each evaluation
+// session gets its own empty workspace so the Copilot agent cannot see or
+// modify files from the user's development environment. The workspace is
+// created before the session starts and removed after it completes.
+type EvalWorkspace struct {
+	// Dir is the absolute path to the isolated workspace directory.
+	Dir string
+	// CreatedAt records when the workspace was created, used by the clean
+	// command to identify stale orphan workspaces.
+	CreatedAt time.Time
+}
+
+// NewEvalWorkspace creates an empty isolated workspace in the OS temp
+// directory. The directory name begins with EvalWorkspacePrefix so the clean
+// command can discover orphan workspaces after a crash.
+func NewEvalWorkspace() (*EvalWorkspace, error) {
+	dir, err := os.MkdirTemp("", EvalWorkspacePrefix)
+	if err != nil {
+		return nil, fmt.Errorf("creating isolated eval workspace: %w", err)
+	}
+	return &EvalWorkspace{
+		Dir:       dir,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+// CopyStarterFiles copies a starter project into the workspace.
+func (w *EvalWorkspace) CopyStarterFiles(starterDir string) error {
+	return copyDir(starterDir, w.Dir)
+}
+
+// ListFiles returns all non-hidden files in the workspace, relative to its root.
+func (w *EvalWorkspace) ListFiles() ([]string, error) {
+	return listFiles(w.Dir)
+}
+
+// Cleanup removes the workspace directory. Safe to call multiple times.
+func (w *EvalWorkspace) Cleanup() error {
+	if w == nil || w.Dir == "" {
+		return nil
+	}
+	return os.RemoveAll(w.Dir)
+}
 
 // Workspace manages a directory for an evaluation run.
 type Workspace struct {
