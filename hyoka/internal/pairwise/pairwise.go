@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/ronniegeraghty/hyoka/internal/config"
 )
@@ -39,22 +40,25 @@ func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
 	return variants
 }
 
-// collectTogglable returns deduplicated tool names eligible for toggling.
-// Order: ToolEntry names first (preserving order), then AvailableTools.
+// collectTogglable returns deduplicated item names eligible for toggling.
+// Order: ToolEntry names first (preserving order), then AvailableTools,
+// then MCP servers (sorted alphabetically), then generator skills.
+// MCP servers are prefixed with "mcp:" and skills with "skill:" to
+// distinguish them from regular tools.
 func collectTogglable(cfg config.ToolConfig) []string {
 	if cfg.Generator == nil {
 		return nil
 	}
 
 	seen := make(map[string]bool)
-	var tools []string
+	var items []string
 
 	for _, te := range cfg.Generator.Tools {
 		if te.AlwaysOn || seen[te.Name] {
 			continue
 		}
 		seen[te.Name] = true
-		tools = append(tools, te.Name)
+		items = append(items, te.Name)
 	}
 
 	for _, name := range cfg.Generator.AvailableTools {
@@ -62,16 +66,67 @@ func collectTogglable(cfg config.ToolConfig) []string {
 			continue
 		}
 		seen[name] = true
-		tools = append(tools, name)
+		items = append(items, name)
 	}
 
-	return tools
+	// MCP servers sorted for deterministic variant order.
+	mcpKeys := make([]string, 0, len(cfg.Generator.MCPServers))
+	for k := range cfg.Generator.MCPServers {
+		mcpKeys = append(mcpKeys, k)
+	}
+	sort.Strings(mcpKeys)
+	for _, k := range mcpKeys {
+		key := "mcp:" + k
+		if !seen[key] {
+			seen[key] = true
+			items = append(items, key)
+		}
+	}
+
+	// Generator skills.
+	for _, s := range cfg.Generator.Skills {
+		key := "skill:" + skillKey(s)
+		if key == "skill:" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		items = append(items, key)
+	}
+
+	return items
 }
 
-// removeTool removes a named tool from both Generator.Tools and
-// Generator.AvailableTools in the given config.
+// skillKey returns a stable identifier for a Skill entry.
+func skillKey(s config.Skill) string {
+	if s.Path != "" {
+		return s.Path
+	}
+	return s.Name
+}
+
+// removeTool removes a named item from the config. Items prefixed with
+// "mcp:" are removed from Generator.MCPServers; items prefixed with
+// "skill:" are removed from Generator.Skills; all others are removed
+// from Generator.Tools and Generator.AvailableTools.
 func removeTool(cfg *config.ToolConfig, name string) {
 	if cfg.Generator == nil {
+		return
+	}
+
+	if strings.HasPrefix(name, "mcp:") {
+		delete(cfg.Generator.MCPServers, strings.TrimPrefix(name, "mcp:"))
+		return
+	}
+
+	if strings.HasPrefix(name, "skill:") {
+		id := strings.TrimPrefix(name, "skill:")
+		var kept []config.Skill
+		for _, s := range cfg.Generator.Skills {
+			if skillKey(s) != id {
+				kept = append(kept, s)
+			}
+		}
+		cfg.Generator.Skills = kept
 		return
 	}
 

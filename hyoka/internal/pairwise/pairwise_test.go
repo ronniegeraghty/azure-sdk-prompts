@@ -3,6 +3,8 @@ package pairwise
 import (
 	"math"
 	"testing"
+
+	"github.com/ronniegeraghty/hyoka/internal/config"
 )
 
 func TestComputeImpacts(t *testing.T) {
@@ -213,6 +215,216 @@ func TestAggregateImpacts(t *testing.T) {
 	// tool-b: WithoutPass should be true (all passed)
 	if agg[1].WithoutPass != true {
 		t.Error("expected tool-b WithoutPass true")
+	}
+}
+
+// --- ExpandPairwise / collectTogglable / removeTool tests ---
+
+func TestExpandPairwiseBasicTools(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "test",
+		Generator: &config.GeneratorConfig{
+			Tools: []config.ToolEntry{
+				{Name: "tool-a"},
+				{Name: "tool-b", AlwaysOn: true},
+			},
+			AvailableTools: []string{"tool-c"},
+		},
+	}
+	variants := ExpandPairwise(cfg)
+	// baseline + tool-a + tool-c (tool-b is AlwaysOn)
+	if len(variants) != 3 {
+		t.Fatalf("expected 3 variants, got %d", len(variants))
+	}
+	if variants[0].Name != "test/baseline" {
+		t.Errorf("expected baseline, got %s", variants[0].Name)
+	}
+	if variants[1].Name != "test/without-tool-a" {
+		t.Errorf("expected without-tool-a, got %s", variants[1].Name)
+	}
+	if variants[2].Name != "test/without-tool-c" {
+		t.Errorf("expected without-tool-c, got %s", variants[2].Name)
+	}
+}
+
+func TestExpandPairwiseMCPServers(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "azure-mcp/claude-opus-4.6",
+		Generator: &config.GeneratorConfig{
+			MCPServers: map[string]*config.MCPServer{
+				"azure": {Type: "stdio", Command: "npx"},
+				"redis": {Type: "stdio", Command: "redis-mcp"},
+			},
+		},
+	}
+	variants := ExpandPairwise(cfg)
+	// baseline + azure + redis = 3
+	if len(variants) != 3 {
+		t.Fatalf("expected 3 variants, got %d", len(variants))
+	}
+	if variants[0].Name != "azure-mcp/claude-opus-4.6/baseline" {
+		t.Errorf("expected baseline, got %s", variants[0].Name)
+	}
+	// Sorted alphabetically: azure before redis
+	if variants[1].Name != "azure-mcp/claude-opus-4.6/without-mcp:azure" {
+		t.Errorf("expected without-mcp:azure, got %s", variants[1].Name)
+	}
+	if variants[2].Name != "azure-mcp/claude-opus-4.6/without-mcp:redis" {
+		t.Errorf("expected without-mcp:redis, got %s", variants[2].Name)
+	}
+	// Verify azure MCP server is removed from variant 1
+	if _, ok := variants[1].Generator.MCPServers["azure"]; ok {
+		t.Error("expected azure MCP server to be removed in variant 1")
+	}
+	if _, ok := variants[1].Generator.MCPServers["redis"]; !ok {
+		t.Error("expected redis MCP server to be kept in variant 1")
+	}
+	// Verify redis MCP server is removed from variant 2
+	if _, ok := variants[2].Generator.MCPServers["redis"]; ok {
+		t.Error("expected redis MCP server to be removed in variant 2")
+	}
+	if _, ok := variants[2].Generator.MCPServers["azure"]; !ok {
+		t.Error("expected azure MCP server to be kept in variant 2")
+	}
+}
+
+func TestExpandPairwiseSkills(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "baseline-skills/opus",
+		Generator: &config.GeneratorConfig{
+			Skills: []config.Skill{
+				{Type: "local", Path: "skills/generator/azure-sdk.md"},
+				{Type: "remote", Name: "copilot-best-practices", Repo: "github/copilot-skills"},
+			},
+		},
+	}
+	variants := ExpandPairwise(cfg)
+	// baseline + 2 skills = 3
+	if len(variants) != 3 {
+		t.Fatalf("expected 3 variants, got %d", len(variants))
+	}
+	if variants[1].Name != "baseline-skills/opus/without-skill:skills/generator/azure-sdk.md" {
+		t.Errorf("unexpected variant name: %s", variants[1].Name)
+	}
+	if variants[2].Name != "baseline-skills/opus/without-skill:copilot-best-practices" {
+		t.Errorf("unexpected variant name: %s", variants[2].Name)
+	}
+	// Verify local skill removed in variant 1
+	if len(variants[1].Generator.Skills) != 1 {
+		t.Fatalf("expected 1 skill remaining, got %d", len(variants[1].Generator.Skills))
+	}
+	if variants[1].Generator.Skills[0].Name != "copilot-best-practices" {
+		t.Errorf("expected copilot-best-practices kept, got %s", variants[1].Generator.Skills[0].Name)
+	}
+	// Verify remote skill removed in variant 2
+	if len(variants[2].Generator.Skills) != 1 {
+		t.Fatalf("expected 1 skill remaining, got %d", len(variants[2].Generator.Skills))
+	}
+	if variants[2].Generator.Skills[0].Path != "skills/generator/azure-sdk.md" {
+		t.Errorf("expected azure-sdk.md kept, got %s", variants[2].Generator.Skills[0].Path)
+	}
+}
+
+func TestExpandPairwiseMixed(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "full",
+		Generator: &config.GeneratorConfig{
+			Tools:          []config.ToolEntry{{Name: "tool-x"}},
+			AvailableTools: []string{"tool-y"},
+			MCPServers: map[string]*config.MCPServer{
+				"azure": {Type: "stdio", Command: "npx"},
+			},
+			Skills: []config.Skill{
+				{Type: "local", Path: "skills/gen.md"},
+			},
+		},
+	}
+	variants := ExpandPairwise(cfg)
+	// baseline + tool-x + tool-y + mcp:azure + skill:skills/gen.md = 5
+	if len(variants) != 5 {
+		t.Fatalf("expected 5 variants, got %d", len(variants))
+	}
+	names := make([]string, len(variants))
+	for i, v := range variants {
+		names[i] = v.Name
+	}
+	expected := []string{
+		"full/baseline",
+		"full/without-tool-x",
+		"full/without-tool-y",
+		"full/without-mcp:azure",
+		"full/without-skill:skills/gen.md",
+	}
+	for i, exp := range expected {
+		if names[i] != exp {
+			t.Errorf("variant %d: expected %s, got %s", i, exp, names[i])
+		}
+	}
+}
+
+func TestExpandPairwiseNilGenerator(t *testing.T) {
+	cfg := config.ToolConfig{Name: "empty"}
+	variants := ExpandPairwise(cfg)
+	// Only baseline when nothing to toggle
+	if len(variants) != 1 {
+		t.Fatalf("expected 1 variant (baseline only), got %d", len(variants))
+	}
+}
+
+func TestRemoveToolMCP(t *testing.T) {
+	cfg := config.ToolConfig{
+		Generator: &config.GeneratorConfig{
+			MCPServers: map[string]*config.MCPServer{
+				"azure": {Type: "stdio"},
+				"redis": {Type: "stdio"},
+			},
+		},
+	}
+	removeTool(&cfg, "mcp:azure")
+	if _, ok := cfg.Generator.MCPServers["azure"]; ok {
+		t.Error("expected azure removed")
+	}
+	if _, ok := cfg.Generator.MCPServers["redis"]; !ok {
+		t.Error("expected redis kept")
+	}
+}
+
+func TestRemoveToolSkill(t *testing.T) {
+	cfg := config.ToolConfig{
+		Generator: &config.GeneratorConfig{
+			Skills: []config.Skill{
+				{Type: "local", Path: "a.md"},
+				{Type: "local", Path: "b.md"},
+			},
+		},
+	}
+	removeTool(&cfg, "skill:a.md")
+	if len(cfg.Generator.Skills) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(cfg.Generator.Skills))
+	}
+	if cfg.Generator.Skills[0].Path != "b.md" {
+		t.Errorf("expected b.md kept, got %s", cfg.Generator.Skills[0].Path)
+	}
+}
+
+func TestCloneDoesNotMutateOriginalMCP(t *testing.T) {
+	orig := config.ToolConfig{
+		Name: "orig",
+		Generator: &config.GeneratorConfig{
+			MCPServers: map[string]*config.MCPServer{
+				"azure": {Type: "stdio", Command: "npx", Args: []string{"@azure/mcp"}},
+			},
+			Skills: []config.Skill{{Type: "local", Path: "s.md"}},
+		},
+	}
+	cloned := cloneToolConfig(orig)
+	removeTool(&cloned, "mcp:azure")
+	removeTool(&cloned, "skill:s.md")
+	if _, ok := orig.Generator.MCPServers["azure"]; !ok {
+		t.Error("original MCP servers should not be affected by clone mutation")
+	}
+	if len(orig.Generator.Skills) != 1 {
+		t.Error("original skills should not be affected by clone mutation")
 	}
 }
 
