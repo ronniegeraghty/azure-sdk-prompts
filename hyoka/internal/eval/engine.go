@@ -120,16 +120,6 @@ func NewEngine(evaluator CopilotEvaluator, opts EngineOptions) *Engine {
 	return NewEngineWithReviewerFactory(evaluator, nil, opts)
 }
 
-// NewEngineWithReviewer creates a new Engine with an evaluator and reviewer.
-// Deprecated: Use NewEngineWithReviewerFactory instead.
-func NewEngineWithReviewer(evaluator CopilotEvaluator, reviewer review.Reviewer, opts EngineOptions) *Engine {
-	// Backward compatibility: wrap the single reviewer in a factory
-	factory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
-		return reviewer, nil, nil
-	}
-	return NewEngineWithReviewerFactory(evaluator, factory, opts)
-}
-
 // NewEngineWithReviewerFactory creates a new Engine with an evaluator and reviewer factory.
 func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFactory, opts EngineOptions) *Engine {
 	if opts.Workers <= 0 {
@@ -239,16 +229,6 @@ func (e *Engine) mergedCriteria(p *prompt.Prompt) string {
 		return p.EvaluationCriteria
 	}
 	return merged
-}
-
-// SetPanelReviewer configures a multi-model review panel.
-// Deprecated: Use NewEngineWithReviewerFactory instead.
-func (e *Engine) SetPanelReviewer(pr *review.PanelReviewer) {
-	// Backward compatibility: wrap the panel reviewer in a factory
-	e.reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
-		pr.SetSessionTimeout(e.opts.SessionTimeout)
-		return nil, pr, nil
-	}
 }
 
 // EvalTask represents a single prompt+config evaluation to run.

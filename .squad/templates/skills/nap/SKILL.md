@@ -1,3 +1,11 @@
+---
+name: "nap"
+description: "Context hygiene — compress, prune, archive .squad/ state"
+domain: "team-optimization"
+confidence: "medium"
+source: "manual — Squad maintenance workflow"
+---
+
 # Skill: nap
 
 > Context hygiene — compress, prune, archive .squad/ state

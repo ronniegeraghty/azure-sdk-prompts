@@ -1,3 +1,11 @@
+---
+name: "model-selection"
+description: "Determines which LLM model to use for each agent spawn based on 4-layer hierarchy"
+domain: "orchestration"
+confidence: "high"
+source: "squad.agent.md — Per-Agent Model Selection section"
+---
+
 # Model Selection
 
 > Determines which LLM model to use for each agent spawn.

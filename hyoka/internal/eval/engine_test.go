@@ -806,7 +806,10 @@ graders:
 `), 0644)
 
 	reviewer := &capturingReviewer{}
-	engine := NewEngineWithReviewer(&StubEvaluator{}, reviewer, quietOpts(EngineOptions{
+	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+		return reviewer, nil, nil
+	}
+	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, reviewerFactory, quietOpts(EngineOptions{
 		Workers:     1,
 		OutputDir:   t.TempDir(),
 		CriteriaDir: criteriaDir,
@@ -857,7 +860,10 @@ func TestCriteriaDirNotExist(t *testing.T) {
 func TestCriteriaDirEmpty(t *testing.T) {
 	// Empty criteria dir should work fine — no criteria matched
 	reviewer := &capturingReviewer{}
-	engine := NewEngineWithReviewer(&StubEvaluator{}, reviewer, quietOpts(EngineOptions{
+	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+		return reviewer, nil, nil
+	}
+	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, reviewerFactory, quietOpts(EngineOptions{
 		Workers:     1,
 		OutputDir:   t.TempDir(),
 		CriteriaDir: t.TempDir(), // empty dir

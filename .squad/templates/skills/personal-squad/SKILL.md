@@ -1,3 +1,11 @@
+---
+name: "personal-squad"
+description: "User-level personal agents that travel across projects via Ghost Protocol"
+domain: "orchestration"
+confidence: "medium"
+source: "squad.agent.md — Personal Squad section"
+---
+
 # Personal Squad — Skill Document
 
 ## What is a Personal Squad?
