@@ -267,6 +267,9 @@ type EvalReport struct {
 	GuardrailMaxOutputSize     int64  `json:"guardrail_max_output_size,omitempty"`
 	GuardrailMaxSessionActions int    `json:"guardrail_max_session_actions,omitempty"`
 	GuardrailAbortReason       string `json:"guardrail_abort_reason,omitempty"`
+	// Action limit soft cap — generation stopped but review proceeds with partial results
+	ActionLimitReached bool `json:"action_limit_reached,omitempty"`
+	ActionCount        int  `json:"action_count,omitempty"`
 }
 
 // ToolLoadResult records the outcome of loading a single tool, skill, or MCP server.
