@@ -35,6 +35,10 @@ type EvalResult struct {
 	ErrorDetails   string
 	IsStub         bool
 	StarterFiles   []string
+	// CleanupFn deletes session state after the caller has consumed the
+	// workspace files. Must be called after copying generated files out
+	// of the workspace directory (#261). Nil for stub evaluators.
+	CleanupFn func()
 }
 
 // CopilotEvaluator defines the interface for running evaluations.
@@ -100,6 +104,11 @@ type EngineOptions struct {
 	GradersDir string // Directory containing grader config YAML files.
 	// Directory exclusion (#63)
 	ExcludeDirs []string // Directories to exclude from generated_files output.
+	// Pre-flight model availability check (#264).
+	// When true, the engine queries the Copilot backend for available models
+	// before starting evaluations and fails fast if any configured model
+	// (generator or reviewer) is unavailable.
+	CheckModels bool
 	// Output writer for user-facing messages (defaults to os.Stdout).
 	Stdout io.Writer
 	// Tracker overrides the default process tracker (used in tests to avoid
@@ -315,6 +324,20 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	e.printf("\n📊 Evaluation plan: %d evaluations (%d prompts × %d configs)\n", evalCount, len(prompts), len(configs))
 	e.printf("   Estimated Copilot sessions: %d (%s)\n", estimatedSessions, sessionLabel)
 	e.printf("   Workers: %d | Max sessions: %d\n\n", e.opts.Workers, maxSessions)
+
+	// Pre-flight model availability check (#264). Query the backend for
+	// available models and fail fast if any configured model is unavailable.
+	// This prevents mid-eval failures from unavailable reviewer models
+	// (e.g. gemini-3-pro-preview).
+	if e.opts.CheckModels {
+		if checker, ok := e.evaluator.(*CopilotSDKEvaluator); ok {
+			e.printf("🔍 Checking model availability...\n")
+			if err := checker.ValidateModelAvailability(ctx, configs); err != nil {
+				return nil, fmt.Errorf("pre-flight check failed: %w", err)
+			}
+			e.printf("✅ All models available\n\n")
+		}
+	}
 
 	// Confirmation prompt for large runs (#34)
 	if evalCount > 10 && e.opts.ConfirmLargeRuns && !e.opts.AutoConfirm {
@@ -763,6 +786,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Copy generated files from isolated workspace to persistent report directory (#26)
 	if err := copyDir(genDir, ws.Dir); err != nil {
 		lg.Warn("Failed to copy generated files to report dir", "error", err)
+	}
+
+	// Release session state AFTER workspace files are safely copied (#261).
+	// Previously, Evaluate's defer called DeleteSession before returning,
+	// which removed workspace artifacts before copyDir could read them.
+	// Baseline configs (no MCP) were affected because there were no MCP
+	// server processes keeping files alive during cleanup.
+	if result != nil && result.CleanupFn != nil {
+		result.CleanupFn()
 	}
 
 	generatedFiles, listErr := ws.ListFiles()
