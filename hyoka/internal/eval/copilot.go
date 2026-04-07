@@ -821,7 +821,10 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 				"Then use that information to generate higher-quality code.",
 			strings.Join(mcpNames, ", "),
 		)
-		sc.SystemMessage.Content = systemMsg
+		sc.SystemMessage = &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: systemMsg,
+		}
 	} else {
 		slog.Debug("No MCP servers configured")
 	}
