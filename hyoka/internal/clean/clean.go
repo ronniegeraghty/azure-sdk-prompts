@@ -103,11 +103,6 @@ func Run(opts Options) (*Result, error) {
 		}
 	}
 
-	// Phase 4: Clean orphaned temp workspace directories (#128).
-	if err := cleanOrphanWorkspaces(opts, result); err != nil {
-		fmt.Fprintf(opts.Out, "Warning: workspace cleanup: %v\n", err)
-	}
-
 	return result, nil
 }
 
