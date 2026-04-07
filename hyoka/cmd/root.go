@@ -6,7 +6,7 @@ import (
 )
 
 // Version is the CLI version, set at build time or defaulting here.
-var Version = "1.0.0"
+var Version = "0.3.0"
 
 // Execute creates the root command tree and runs it.
 func Execute() error {
