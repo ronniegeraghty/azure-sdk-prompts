@@ -6,7 +6,7 @@ import (
 )
 
 // Version is the CLI version, set at build time or defaulting here.
-var Version = "0.2.0"
+var Version = "0.3.0"
 
 // Execute creates the root command tree and runs it.
 func Execute() error {
@@ -52,6 +52,8 @@ root.AddCommand(newPromptCmd())
 root.AddCommand(serveCmd())
 root.AddCommand(pluginsCmd())
 root.AddCommand(cleanCmd())
+	root.AddCommand(compareCmd())
+root.AddCommand(initCmd())
 
 return root
 }

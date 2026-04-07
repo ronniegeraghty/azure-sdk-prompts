@@ -1,7 +1,11 @@
 package cmd
 
 import (
+"bytes"
 "io"
+"os"
+"path/filepath"
+"strings"
 "testing"
 )
 
@@ -304,6 +308,60 @@ t.Error("-P shorthand should set --pairwise to true")
 }
 }
 
+func TestRunCmdPairwiseDryRunWithMCPConfig(t *testing.T) {
+cmd := runCmd()
+cmd.SilenceErrors = true
+cmd.SilenceUsage = true
+
+repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+if err != nil {
+t.Fatalf("resolving repo root: %v", err)
+}
+
+args := []string{
+"--dry-run",
+"--pairwise",
+"--prompt-id", "key-vault-dp-python-crud",
+"--config", "azure-mcp/claude-opus-4.6",
+"--prompts", filepath.Join(repoRoot, "prompts"),
+"--config-dir", filepath.Join(repoRoot, "configs"),
+"--progress", "off",
+"--output", filepath.Join(repoRoot, "reports"),
+}
+cmd.SetArgs(args)
+
+oldStdout := os.Stdout
+reader, writer, err := os.Pipe()
+if err != nil {
+t.Fatalf("creating stdout pipe: %v", err)
+}
+os.Stdout = writer
+t.Cleanup(func() {
+os.Stdout = oldStdout
+})
+
+outputCh := make(chan string, 1)
+go func() {
+var buf bytes.Buffer
+_, _ = io.Copy(&buf, reader)
+_ = reader.Close()
+outputCh <- buf.String()
+}()
+
+execErr := cmd.Execute()
+_ = writer.Close()
+os.Stdout = oldStdout
+output := <-outputCh
+
+if execErr != nil {
+t.Fatalf("run command failed: %v", execErr)
+}
+
+if !strings.Contains(output, "Expanded config \"azure-mcp/claude-opus-4.6\" into 2 pairwise variants") {
+t.Errorf("expected pairwise expansion output, got: %s", output)
+}
+}
+
 func TestCleanCmdHelp(t *testing.T) {
 cmd := cleanCmd()
 cmd.SetOut(io.Discard)
@@ -321,7 +379,7 @@ for _, sub := range cmd.Commands() {
 names[sub.Name()] = true
 }
 
-expected := []string{"run", "list", "validate", "check-env", "configs", "trends", "report", "serve", "plugins", "new-prompt", "version", "clean"}
+expected := []string{"run", "list", "validate", "check-env", "configs", "trends", "report", "serve", "plugins", "new-prompt", "version", "clean", "compare", "init"}
 for _, name := range expected {
 if !names[name] {
 t.Errorf("expected subcommand %q to be registered", name)

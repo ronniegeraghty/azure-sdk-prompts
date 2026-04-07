@@ -2,9 +2,10 @@ package graders
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/report"
 	"gopkg.in/yaml.v3"
 )
 
@@ -100,7 +101,7 @@ func TestNewGraderToolConstraintKind(t *testing.T) {
 	gc := GraderConfig{
 		Kind:   KindToolConstraint,
 		Name:   "test_tc",
-		Config: makeYAMLNode(t, "required: [\"a\"]\nmin_calls: 1"),
+		Config: makeYAMLNode(t, "required: [\"a\"]\nmin_calls:\n  a: 1"),
 	}
 	g, err := NewGrader(gc)
 	if err != nil {
@@ -149,8 +150,12 @@ func TestRunGradersAppliesWeightAndGate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	input := &GraderInput{
-		GeneratedFiles: []string{"main.py"},
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "main.py"), []byte("pass"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	input := GraderInput{
+		WorkspacePath: tmpDir,
 	}
 	results := RunGraders(context.Background(), instances, configs, input)
 	if len(results) != 1 {
@@ -162,7 +167,7 @@ func TestRunGradersAppliesWeightAndGate(t *testing.T) {
 	if !results[0].Gate {
 		t.Error("expected gate=true")
 	}
-	if !results[0].Passed {
+	if !results[0].Pass {
 		t.Error("expected pass")
 	}
 }
@@ -176,17 +181,17 @@ func TestRunGradersWithSessionEvents(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	input := &GraderInput{
-		ToolCalls: []string{"azure-mcp", "read_file"},
-		SessionEvents: []report.SessionEventRecord{
-			{Type: "assistant.turn_start"},
+	input := GraderInput{
+		ActionLog: []ActionEvent{
+			{Tool: "azure-mcp", Action: "call"},
+			{Tool: "read_file", Action: "call"},
 		},
 	}
 	results := RunGraders(context.Background(), instances, configs, input)
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if !results[0].Passed {
+	if !results[0].Pass {
 		t.Errorf("expected pass, got: %s", results[0].Message)
 	}
 }

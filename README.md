@@ -48,6 +48,30 @@ hyoka run --prompts ~/projects/hyoka/prompts
 
 > **Smart path detection:** `hyoka` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `hyoka/` directory both work without extra flags.
 
+### Creating a `.hyoka` Project Directory
+
+To organize prompts, configs, and skills for your own evaluations, initialize a `.hyoka` project directory:
+
+```bash
+# Create a .hyoka directory with standard subdirectories
+hyoka init
+
+# Organize your own prompts and configs
+cd .hyoka
+# Add prompts/ configs/ criteria/ skills/
+
+# Run evaluations against your local project
+hyoka run --service my-service --config my-config
+```
+
+The `init` command creates:
+- `configs/` — evaluation configuration YAML files
+- `prompts/` — custom prompt library
+- `criteria/` — attribute-matched grader criteria
+- `skills/` — Copilot skills (generator and reviewer)
+- `reports/` — evaluation output (auto-added to .gitignore)
+- `.gitignore` — excludes `reports/` from version control
+
 ## Safety & Guardrails
 
 hyoka includes built-in protections that keep evaluation runs safe, bounded, and predictable by default. No extra flags are needed — everything below is on unless you opt out.
@@ -58,10 +82,11 @@ Every code-generation session is automatically aborted if it exceeds any of thes
 
 | Limit | Default | Flag | Purpose |
 |-------|---------|------|---------|
-| Turn count | 25 | `--max-turns` | Prevents runaway conversations |
+| Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
 | File count | 50 | `--max-files` | Prevents excessive file creation |
 | Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (supports KB, MB suffixes) |
-| Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
+
+Prompts can override these defaults via frontmatter fields (`max_session_actions`, `max_turns`). The resolution order is: prompt frontmatter > config YAML > CLI flag > engine default.
 
 When a guardrail trips, the evaluation is marked as failed with a clear reason (e.g., `guardrail: turn count 26 exceeded limit of 25`).
 
@@ -71,6 +96,8 @@ By default, generators receive a system instruction that **prevents real Azure r
 - Use mock data, environment variables, and local emulators (Azurite, CosmosDB emulator)
 - Generate Bicep/ARM/Terraform templates instead of running live `az` CLI commands
 - Use placeholder values like `os.Getenv("AZURE_STORAGE_CONNECTION_STRING")`
+
+The system prompt can be customized per generator/reviewer in the config file. If not specified, defaults to zero (no additional system instruction beyond Copilot's defaults).
 
 Use `--allow-cloud` to opt out and permit real resource provisioning.
 
@@ -104,13 +131,15 @@ Did you mean one of these?
 |---------|-------|-------------|
 | `hyoka run` | | Run evaluations against prompts |
 | `hyoka list` | `ls` | List prompts matching filters |
+| `hyoka init` | | Scaffold a `.hyoka` project directory |
+| `hyoka compare` | | Compare evaluation results between configs, runs, or time periods |
 | `hyoka configs` | | Show available tool configurations |
 | `hyoka validate` | | Validate prompt frontmatter against schema |
 | `hyoka check-env` | `env` | Check for required language toolchains and tools |
 | `hyoka trends` | | Generate historical trend reports with AI analysis |
 | `hyoka report` | | Re-render HTML/MD reports from existing JSON data |
 | `hyoka new-prompt` | | Scaffold a new prompt file interactively |
-| `hyoka serve` | | Launch local web UI for browsing reports |
+| `hyoka serve` | | Launch local web UI for browsing reports (React dashboard) |
 | `hyoka plugins` | | List registered plugins |
 | `hyoka clean` | | Remove stale session state and orphaned SDK processes |
 | `hyoka version` | | Print version |
@@ -149,12 +178,12 @@ hyoka list --json
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--pairwise` / `-P` | `false` | Expand each config into N+1 pairwise tool-ablation variants for regression testing |
 | `--analyze` | `true` | AI-powered trend analysis after run |
 | `--skip-trends` | `false` | Skip automatic trend analysis after run |
 | `--progress` | `auto` | Progress display mode: `auto`, `live`, `log`, `off` |
 | `--skip-tests` | `false` | Skip test generation |
 | `--skip-review` | `false` | Skip code review |
-| `--verify-build` | `false` | Run build verification on generated code |
 | `--stub` | `false` | Use stub evaluator (no Copilot SDK) |
 | `--dry-run` | `false` | List matching prompts without running |
 | `--workers` | CPU cores (max 8) | Parallel evaluation workers |
@@ -163,18 +192,15 @@ hyoka list --json
 | `-y` / `--yes` | `false` | Skip confirmation prompt for large runs (>10 evaluations) |
 | `--all-configs` | `false` | Required when running all configs without a `--config` filter |
 | `--config` | | Config name(s) to run — use quotes for multiple: `"name1,name2"` |
-| `--max-turns` | `25` | Maximum conversation turns per generation before aborting |
+| `--max-session-actions` | `50` | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
 | `--max-files` | `50` | Maximum generated files per evaluation before aborting |
 | `--max-output-size` | `1MB` | Maximum total output size per evaluation (supports KB, MB suffixes) |
 | `--max-session-actions` | `50` | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
 | `--allow-cloud` | `false` | Allow generated code to provision real Azure resources |
-| `--sandbox` | `true` | Alias confirming safe/local-only mode (default behavior) |
 | `--criteria-dir` | (none) | Directory with attribute-matched criteria YAML files (e.g., `criteria/`) |
 | `--strict-cleanup` | `false` | Fail run if orphaned Copilot processes remain after cleanup |
 | `--monitor-resources` | `false` | Monitor CPU and memory usage of Copilot sessions during evaluation |
-| `--generate-timeout` | `600` | Generation phase timeout in seconds |
-| `--build-timeout` | `300` | Build verification timeout in seconds |
-| `--review-timeout` | `300` | Review phase timeout in seconds |
+| `--session-timeout` | `600` | Maximum time in seconds for any single session phase to complete |
 | `--exclude-dirs` | | Comma-separated directories to exclude from generated_files output |
 
 ### Run Command Examples
@@ -187,13 +213,64 @@ go run ./hyoka run --prompt-id my-prompt --config "baseline/claude-sonnet-4.5" -
 go run ./hyoka run --all-configs -y
 
 # Tighten guardrails for faster iteration
-go run ./hyoka run --max-turns 10 --max-files 20
+go run ./hyoka run --max-session-actions 10 --max-files 20
 
 # Allow real Azure resource provisioning (use with caution)
 go run ./hyoka run --allow-cloud
 
 # Limit concurrent Copilot sessions on a shared machine
 go run ./hyoka run --max-sessions 4 --workers 2
+```
+
+### Init Command
+
+Initialize a `.hyoka` project directory with standard subdirectories:
+
+```bash
+# Create a .hyoka project directory in the current working directory
+hyoka init
+```
+
+This scaffolds:
+- `configs/` — evaluation config YAML files
+- `prompts/` — prompt library (.prompt.md files)
+- `criteria/` — attribute-matched grader criteria
+- `skills/` — Copilot skills (generator and reviewer)
+- `reports/` — evaluation output directory (added to .gitignore)
+
+Running `init` again on an existing `.hyoka` directory is safe (idempotent).
+
+### Compare Command
+
+Compare evaluation results to identify regressions and improvements across three modes:
+
+```bash
+# Config comparison — compare two configs across all shared prompts
+hyoka compare --config-a baseline/claude-sonnet-4.5 --config-b azure-mcp/claude-sonnet-4.5
+
+# Run comparison — compare results from two specific evaluation runs
+hyoka compare --run-a <run-id-1> --run-b <run-id-2>
+
+# Temporal comparison — compare a config before and after a date
+hyoka compare --config baseline/claude-opus-4.6 --since 2025-01-15
+```
+
+The compare command analyzes pass/fail deltas, score changes, and highlights regressions per prompt. Output includes:
+- Summary statistics (pass/fail counts, avg scores)
+- Per-prompt delta analysis
+- Top improvements and regressions
+- Details on failed/broken evaluations
+
+### Tools Command
+
+Manage and list tools available to the generator agent:
+
+```bash
+# List all available tools
+hyoka tools list
+
+# Add a new tool configuration
+hyoka tools add --name my-tool --description "Tool description"
 ```
 
 ### Validating Prompts
@@ -237,35 +314,36 @@ configs:
     description: "My custom evaluation config"
     generator:
       model: "claude-sonnet-4.5"
-      skills:
-        - type: remote
-          name: azure-keyvault-py
+      tools:
+        - name: azure-keyvault-py
+          type: skill
+          source: remote
           repo: microsoft/skills
-        - type: local
+        - name: generator-skills
+          type: skill
+          source: local
           path: "./skills/generator"
-      mcp_servers:
-        azure:
-          type: local
+        - name: azure
+          type: mcp
           command: npx
           args: ["-y", "@azure/mcp@latest"]
-          tools: ["*"]
     reviewer:
       models:
         - "claude-opus-4.6"
         - "gemini-3-pro-preview"
         - "gpt-4.1"
-      skills:
-        - type: local
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
           path: "./skills/reviewer"
 ```
 
 Then run with: `hyoka run --config-file configs/my-custom-config.yaml`
 
-> **Backward compatibility:** Legacy top-level fields (`model`, `reviewer_models`, `skill_directories`, `generator_skill_directories`, etc.) still work. They are automatically migrated to the `generator`/`reviewer` sub-structs at parse time.
+#### Skills in `tools`
 
-#### Unified Skills
-
-Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. The unified `skills:` list replaces the old `skill_directories`, `generator_skill_directories`, and `reviewer_skill_directories` fields.
+Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. They are configured as `tools` entries with `type: skill` in the generator or reviewer section.
 
 Each skill has a `type`:
 
@@ -279,11 +357,14 @@ Each skill has a `type`:
 ```yaml
 generator:
   model: "claude-sonnet-4.5"
-  skills:
-    - type: remote
-      name: azure-keyvault-py
+  tools:
+    - name: azure-keyvault-py
+      type: skill
+      source: remote
       repo: microsoft/skills
-    - type: local
+    - name: generator-skills
+      type: skill
+      source: local
       path: "./skills/generator"
 ```
 
@@ -294,8 +375,10 @@ reviewer:
   models:
     - "claude-opus-4.6"
     - "gpt-4.1"
-  skills:
-    - type: local
+  tools:
+    - name: reviewer-skills
+      type: skill
+      source: local
       path: "./skills/reviewer"
 ```
 

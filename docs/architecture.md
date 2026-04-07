@@ -8,10 +8,10 @@ Hyoka is a Go CLI tool that evaluates AI agents generating Azure SDK code. It se
 
 ```
 hyoka/                         # Go module (github.com/ronniegeraghty/hyoka)
-├── main.go                    # CLI entry point (cobra). Parses flags, wires pipeline.
+├── cmd/hyoka/main.go          # CLI entry point (cobra). Parses flags, wires pipeline.
 └── internal/
     ├── config/config.go       # Loads YAML config files (models, skills, MCP servers)
-    ├── prompt/                # Loads prompt .md files, parses YAML frontmatter
+    ├── prompt/                # Loads prompt .md/.yaml files, parses frontmatter
     │   ├── loader.go          #   Discovers prompts from prompts/ directory tree
     │   ├── parser.go          #   Parses frontmatter + body from markdown
     │   └── types.go           #   Prompt struct definition
@@ -39,6 +39,10 @@ hyoka/                         # Go module (github.com/ronniegeraghty/hyoka)
     │   ├── summary_stats.go   #   Aggregate statistics
     │   └── types.go           #   EvalReport struct
     │
+    ├── compare/               # Cross-config and cross-run comparison engine
+    ├── graders/               # Attribute-matched grading criteria
+    ├── init/                  # Project directory scaffolding (hyoka init)
+    ├── tools/                 # Tool registry and management
     ├── logging/logging.go     # slog setup, EvalLogger helper, CLI flag integration
     ├── progress/              # Live terminal display (TUI during eval runs)
     ├── trends/                # Cross-run trend analysis
@@ -47,17 +51,11 @@ hyoka/                         # Go module (github.com/ronniegeraghty/hyoka)
     ├── rerender/              # Re-render reports from existing JSON
     ├── manifest/              # Prompt manifest generation
     ├── checkenv/              # Environment prerequisite checks
+    ├── clean/                 # Session state & orphan process cleanup
     ├── utils/                 # Shared helpers
     ├── criteria/              # Tiered evaluation criteria (attribute-matched YAML)
     ├── plugin/                # Composable plugin system (bundles skills + MCP servers)
-    └── serve/                 # Local web server for browsing eval reports
-
-configs/                       # Evaluation config YAML files
-prompts/                       # Prompt library (organized by language/service)
-skills/                        # Copilot skills (generator/ and reviewer/)
-criteria/                      # Tiered criteria YAML (language/ and service/ subdirs)
-reports/                       # Generated output (gitignored)
-docs/                          # Documentation
+    └── serve/                 # Local web server for browsing eval reports (React dashboard)
 ```
 
 ## Eval Pipeline
@@ -75,7 +73,7 @@ A single evaluation flows through these stages:
         ▼
  ┌─────────────┐     Optional: runs real build commands
  │  build/       │──→ go build, dotnet build, npm install, etc.
- └──────┬──────┘     (enabled with --verify-build)
+ └──────┬──────┘     (configurable via tool settings)
         ▼
  ┌─────────────┐     Multiple LLMs score code against rubric
  │  review/      │──→ each model reviews independently,
@@ -100,6 +98,12 @@ The review phase sends generated code to multiple LLMs (e.g., Claude, Gemini, GP
 ### Skills
 Copilot skills (SKILL.md files) provide domain knowledge to the generator and reviewer sessions. Skills can be local (in `skills/`) or remote (fetched from GitHub repos before eval starts).
 
+### Project Directory (`.hyoka`)
+The `hyoka init` command scaffolds a `.hyoka` project directory containing `configs/`, `prompts/`, `criteria/`, `skills/`, and `reports/` subdirectories. This allows teams to maintain their own evaluation setups outside the main repository.
+
+### Graders
+Attribute-matched grading criteria (YAML files in `criteria/`) activate based on prompt metadata (language, service, plane). Graders are merged with prompt-specific criteria and general rubric criteria to form the final scoring criteria list sent to reviewers.
+
 ### Guardrails
 - **Turn limit**: 25 assistant turns per generation (prevents runaway sessions)
 - **File limit**: 50 generated files max
@@ -112,12 +116,17 @@ Copilot skills (SKILL.md files) provide domain knowledge to the generator and re
 ```bash
 hyoka run           # Run evaluations (main command)
 hyoka list          # List available prompts
+hyoka init          # Scaffold a .hyoka project directory
+hyoka compare       # Compare evaluation results between configs/runs
+hyoka tools         # Manage and list available tools
+hyoka configs       # List available configurations
 hyoka validate      # Validate prompt frontmatter
 hyoka check-env     # Verify prerequisites
 hyoka trends        # Analyze trends across runs
 hyoka report        # Re-generate reports from JSON
-hyoka serve         # Launch local web UI for browsing reports
+hyoka serve         # Launch local web UI for browsing reports (React dashboard)
 hyoka plugins       # List registered plugins
+hyoka clean         # Remove stale session state and orphaned processes
 hyoka version       # Print version
 ```
 
@@ -125,9 +134,19 @@ Key flags for `hyoka run`:
 - `--prompt-id` — Run a single prompt
 - `--language` / `--service` — Filter prompts
 - `--config-file` — Use a specific config
+- `--pairwise` / `-P` — Expand configs into pairwise tool-ablation variants
 - `--log-level debug` — Structured debug logging
 - `--log-file path` — Redirect logs to file
-- `--verify-build` — Run real build verification
 - `--skip-review` — Skip the review phase
 - `--criteria-dir` — Directory with tiered criteria YAML files
 - `--strict-cleanup` — Fail run if orphaned processes detected after cleanup
+
+### Reports and Action Timeline
+
+Each evaluation produces a report containing:
+- **Summary statistics** — pass/fail counts, average scores, per-criteria breakdowns
+- **Action timeline** — chronological log of all generator actions (file creates, tool calls, reasoning steps)
+- **Generated files** — full content of all files produced by the generator
+- **Review results** — individual reviewer scores and the consolidated consensus
+
+Reports are written in JSON, HTML, and Markdown formats to `reports/<run-id>/`.

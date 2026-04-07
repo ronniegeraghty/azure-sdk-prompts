@@ -11,6 +11,18 @@ import (
 "github.com/spf13/cobra"
 )
 
+func noPromptsFoundError(promptsDir string) error {
+	nearMisses := prompt.ScanNearMisses(promptsDir)
+	fmt.Printf("\u2717 No prompts found in %s\n", promptsDir)
+	if len(nearMisses) > 0 {
+		fmt.Println("\nDid you mean one of these?")
+		for _, nm := range nearMisses {
+			fmt.Printf("  %s\n", nm)
+		}
+	}
+	return fmt.Errorf("no prompts found in %s", promptsDir)
+}
+
 func validateCmd() *cobra.Command {
 var promptsDir string
 
@@ -24,26 +36,10 @@ allOK := true
 
 result, err := validate.Validate(promptsDir)
 if err != nil {
-nearMisses := prompt.ScanNearMisses(promptsDir)
-fmt.Printf("\u2717 No prompts found in %s\n", promptsDir)
-if len(nearMisses) > 0 {
-fmt.Println("\nDid you mean one of these?")
-for _, nm := range nearMisses {
-fmt.Printf("  %s\n", nm)
-}
-}
-os.Exit(1)
+return noPromptsFoundError(promptsDir)
 }
 if result.TotalFiles == 0 {
-nearMisses := prompt.ScanNearMisses(promptsDir)
-fmt.Printf("\u2717 No prompts found in %s\n", promptsDir)
-if len(nearMisses) > 0 {
-fmt.Println("\nDid you mean one of these?")
-for _, nm := range nearMisses {
-fmt.Printf("  %s\n", nm)
-}
-}
-os.Exit(1)
+return noPromptsFoundError(promptsDir)
 }
 fmt.Println(validate.FormatResult(result))
 if !result.OK() {
@@ -77,7 +73,7 @@ fmt.Printf("\u2717 %d of %d config(s) have errors\n", configErrors, configCount)
 }
 
 if !allOK {
-os.Exit(1)
+return fmt.Errorf("validation failed: one or more prompts or configs have errors")
 }
 return nil
 },

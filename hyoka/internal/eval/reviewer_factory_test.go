@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"io"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/internal/config"
@@ -92,34 +91,6 @@ func TestReviewerFactoryPerConfig(t *testing.T) {
 		t.Error("expected factory to be called for config-sonnet")
 	} else if len(sonnetModels) != 1 || sonnetModels[0] != "claude-sonnet-4.5" {
 		t.Errorf("expected config-sonnet to have sonnet model, got %v", sonnetModels)
-	}
-}
-
-// TestReviewerFactoryBackwardCompat verifies that the deprecated
-// NewEngineWithReviewer still works (backward compatibility).
-func TestReviewerFactoryBackwardCompat(t *testing.T) {
-	// Create a stub reviewer
-	reviewer := &review.StubReviewer{}
-
-	// Create engine using deprecated method
-	engine := NewEngineWithReviewer(&StubEvaluator{}, reviewer, quietOpts(EngineOptions{
-		OutputDir:    t.TempDir(),
-		SkipTests:    true,
-		SkipReview:   false,
-		DryRun:       false,
-		Workers:      1,
-		ProgressMode: "off",
-		Stdout:       io.Discard,
-	}))
-
-	// Verify engine was created
-	if engine == nil {
-		t.Fatal("expected engine to be created")
-	}
-
-	// Verify factory was set (even though we used the old constructor)
-	if engine.reviewerFactory == nil {
-		t.Error("expected reviewerFactory to be set for backward compat")
 	}
 }
 

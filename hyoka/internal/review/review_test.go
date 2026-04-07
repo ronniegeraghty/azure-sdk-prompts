@@ -1,11 +1,15 @@
 package review
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	copilot "github.com/github/copilot-sdk/go"
 )
 
 // ---------------------------------------------------------------------------
@@ -916,3 +920,798 @@ func TestPanelReviewer_SetSystemPrompt(t *testing.T) {
 		t.Errorf("expected custom systemPrompt, got %q", p.systemPrompt)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// CopilotReviewer.Review error-path tests
+// ---------------------------------------------------------------------------
+
+func TestCopilotReviewerReviewNoGeneratedFiles(t *testing.T) {
+emptyDir := t.TempDir()
+r := NewCopilotReviewer(nil, "test-model", 50)
+_, err := r.Review(context.Background(), "prompt", emptyDir, "", "")
+if err == nil {
+t.Fatal("expected error for empty workDir")
+}
+if !strings.Contains(err.Error(), "no generated files") {
+t.Errorf("error = %q, want to contain 'no generated files'", err.Error())
+}
+}
+
+func TestCopilotReviewerReviewNonexistentWorkDir(t *testing.T) {
+r := NewCopilotReviewer(nil, "test-model", 50)
+_, err := r.Review(context.Background(), "prompt", "/nonexistent/dir/abc", "", "")
+if err == nil {
+t.Fatal("expected error for nonexistent workDir")
+}
+}
+
+func TestCopilotReviewerSettersEdgeCases(t *testing.T) {
+tests := []struct {
+name  string
+check func(t *testing.T)
+}{
+{
+name: "SetSkillDirectories nil",
+check: func(t *testing.T) {
+r := NewCopilotReviewer(nil, "", 50)
+r.SetSkillDirectories(nil)
+if r.skillDirectories != nil {
+t.Error("expected nil skillDirectories")
+}
+},
+},
+{
+name: "SetSkillDirectories empty",
+check: func(t *testing.T) {
+r := NewCopilotReviewer(nil, "", 50)
+r.SetSkillDirectories([]string{})
+if len(r.skillDirectories) != 0 {
+t.Error("expected empty skillDirectories")
+}
+},
+},
+{
+name: "SetSessionTimeout zero",
+check: func(t *testing.T) {
+r := NewCopilotReviewer(nil, "", 50)
+r.SetSessionTimeout(0)
+if r.sessionTimeout != 0 {
+t.Errorf("expected zero timeout, got %v", r.sessionTimeout)
+}
+},
+},
+}
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+tt.check(t)
+})
+}
+}
+
+// ---------------------------------------------------------------------------
+// PanelReviewer.ReviewPanel error-path tests
+// ---------------------------------------------------------------------------
+
+func TestPanelReviewerReviewPanelNoModels(t *testing.T) {
+p := NewPanelReviewer(nil, []string{}, 50)
+_, _, err := p.ReviewPanel(context.Background(), "prompt", t.TempDir(), "", "")
+if err == nil {
+t.Fatal("expected error for empty models")
+}
+if !strings.Contains(err.Error(), "no reviewer models configured") {
+t.Errorf("error = %q, want 'no reviewer models configured'", err.Error())
+}
+}
+
+func TestPanelReviewerReviewPanelNoGeneratedFiles(t *testing.T) {
+emptyDir := t.TempDir()
+p := NewPanelReviewer(nil, []string{"model-a"}, 50)
+_, _, err := p.ReviewPanel(context.Background(), "prompt", emptyDir, "", "")
+if err == nil {
+t.Fatal("expected error for empty workDir")
+}
+if !strings.Contains(err.Error(), "no generated files to review") {
+t.Errorf("error = %q, want 'no generated files to review'", err.Error())
+}
+}
+
+func TestPanelReviewerReviewDelegatesToReviewPanel(t *testing.T) {
+p := NewPanelReviewer(nil, []string{}, 50)
+_, err := p.Review(context.Background(), "prompt", t.TempDir(), "", "")
+if err == nil {
+t.Fatal("expected error")
+}
+if !strings.Contains(err.Error(), "no reviewer models configured") {
+t.Errorf("Review should delegate to ReviewPanel, got: %v", err)
+}
+}
+
+func TestPanelReviewerReviewPanelCancelledContext(t *testing.T) {
+workDir := t.TempDir()
+os.WriteFile(filepath.Join(workDir, "main.go"), []byte("package main"), 0644)
+p := NewPanelReviewer(nil, []string{"model-a", "model-b"}, 50)
+
+ctx, cancel := context.WithCancel(context.Background())
+cancel()
+
+_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "", "")
+if err == nil {
+t.Fatal("expected error for cancelled context")
+}
+if !strings.Contains(err.Error(), "all reviewers failed") {
+t.Errorf("error = %q, want 'all reviewers failed'", err.Error())
+}
+}
+
+// ---------------------------------------------------------------------------
+// Additional parseReviewResponse edge cases
+// ---------------------------------------------------------------------------
+
+func TestParseReviewResponseEdgeCases(t *testing.T) {
+tests := []struct {
+name    string
+input   string
+wantErr bool
+check   func(t *testing.T, r *ReviewResult)
+}{
+{
+name:  "extra fields ignored",
+input: `{"scores":{"criteria":[{"name":"A","passed":true}]},"overall_score":1,"max_score":1,"summary":"ok","issues":[],"strengths":[],"extra_field":"ignored"}`,
+check: func(t *testing.T, r *ReviewResult) {
+if r.OverallScore != 1 {
+t.Errorf("OverallScore = %d, want 1", r.OverallScore)
+}
+},
+},
+{
+name:  "criteria with empty reason",
+input: `{"scores":{"criteria":[{"name":"Build","passed":true,"reason":""}]},"overall_score":1,"max_score":1,"summary":"good","issues":[],"strengths":[]}`,
+check: func(t *testing.T, r *ReviewResult) {
+if r.Scores.Criteria[0].Reason != "" {
+t.Errorf("expected empty reason, got %q", r.Scores.Criteria[0].Reason)
+}
+},
+},
+{
+name:    "truncated json",
+input:   `{"scores":{"criteria":[{"name":"A","pas`,
+wantErr: true,
+},
+{
+name:  "explicit max_score preserved",
+input: `{"scores":{"criteria":[{"name":"A","passed":true}]},"overall_score":1,"max_score":5,"summary":"test","issues":[],"strengths":[]}`,
+check: func(t *testing.T, r *ReviewResult) {
+if r.MaxScore != 5 {
+t.Errorf("MaxScore = %d, want 5", r.MaxScore)
+}
+},
+},
+}
+
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+result, err := parseReviewResponse(tt.input)
+if tt.wantErr {
+if err == nil {
+t.Error("expected error")
+}
+return
+}
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if tt.check != nil {
+tt.check(t, result)
+}
+})
+}
+}
+
+// ---------------------------------------------------------------------------
+// Additional averageReview edge cases
+// ---------------------------------------------------------------------------
+
+func TestAverageReviewAllEmptyCriteria(t *testing.T) {
+panel := []ReviewResult{
+{Scores: ReviewScores{Criteria: nil}},
+{Scores: ReviewScores{Criteria: nil}},
+}
+result := averageReview(panel)
+if len(result.Scores.Criteria) != 0 {
+t.Errorf("expected 0 criteria, got %d", len(result.Scores.Criteria))
+}
+if result.OverallScore != 0 {
+t.Errorf("OverallScore = %d, want 0", result.OverallScore)
+}
+}
+
+func TestAverageReviewNilIssuesAndStrengths(t *testing.T) {
+panel := []ReviewResult{
+{
+Scores:    ReviewScores{Criteria: []CriterionResult{{Name: "A", Passed: true}}},
+Issues:    nil,
+Strengths: nil,
+},
+}
+result := averageReview(panel)
+if result.OverallScore != 1 {
+t.Errorf("OverallScore = %d, want 1", result.OverallScore)
+}
+}
+
+// ---------------------------------------------------------------------------
+// Additional copyDirToTemp edge cases
+// ---------------------------------------------------------------------------
+
+func TestCopyDirToTempWithNestedDirs(t *testing.T) {
+src := t.TempDir()
+nested := filepath.Join(src, "a", "b", "c")
+os.MkdirAll(nested, 0755)
+os.WriteFile(filepath.Join(nested, "deep.txt"), []byte("deep"), 0644)
+
+dst, err := copyDirToTemp(src, "hyoka-test-*")
+if err != nil {
+t.Fatalf("copyDirToTemp failed: %v", err)
+}
+defer os.RemoveAll(dst)
+
+data, err := os.ReadFile(filepath.Join(dst, "a", "b", "c", "deep.txt"))
+if err != nil {
+t.Fatalf("failed to read deep file: %v", err)
+}
+if string(data) != "deep" {
+t.Errorf("content = %q, want %q", string(data), "deep")
+}
+}
+
+func TestCopyDirToTempNonexistentSource(t *testing.T) {
+_, err := copyDirToTemp("/nonexistent/source/dir", "hyoka-test-*")
+if err == nil {
+t.Fatal("expected error for nonexistent source")
+}
+}
+
+// ---------------------------------------------------------------------------
+// ReviewResult JSON round-trip
+// ---------------------------------------------------------------------------
+
+func TestReviewResultJSONMarshalRoundTrip(t *testing.T) {
+original := ReviewResult{
+Model: "test-model",
+Scores: ReviewScores{Criteria: []CriterionResult{
+{Name: "Build", Passed: true, Reason: "compiles"},
+{Name: "Style", Passed: false, Reason: "needs work"},
+}},
+OverallScore: 1,
+MaxScore:     2,
+Summary:      "Mixed results",
+Issues:       []string{"style issue"},
+Strengths:    []string{"builds"},
+Events:       []ReviewEvent{{Type: "message", Content: "hello"}},
+}
+
+data, err := json.Marshal(original)
+if err != nil {
+t.Fatalf("Marshal failed: %v", err)
+}
+
+var decoded ReviewResult
+if err := json.Unmarshal(data, &decoded); err != nil {
+t.Fatalf("Unmarshal failed: %v", err)
+}
+
+if decoded.Model != original.Model {
+t.Errorf("Model = %q, want %q", decoded.Model, original.Model)
+}
+if decoded.OverallScore != original.OverallScore {
+t.Errorf("OverallScore = %d, want %d", decoded.OverallScore, original.OverallScore)
+}
+if len(decoded.Scores.Criteria) != len(original.Scores.Criteria) {
+t.Errorf("Criteria count = %d, want %d", len(decoded.Scores.Criteria), len(original.Scores.Criteria))
+}
+if len(decoded.Events) != 1 {
+t.Errorf("Events count = %d, want 1", len(decoded.Events))
+}
+}
+
+// ---------------------------------------------------------------------------
+// BuildReviewPrompt additional edge cases
+// ---------------------------------------------------------------------------
+
+func TestBuildReviewPromptSpecialChars(t *testing.T) {
+prompt := "Write code with backticks and bold and special chars"
+generated := map[string]string{
+"test.go": "package main\nfunc main() { fmt.Println(\"hello\") }",
+}
+result := BuildReviewPrompt(prompt, generated, nil, "")
+if !strings.Contains(result, "backticks") {
+t.Error("should preserve special characters in prompt")
+}
+}
+
+// ---------------------------------------------------------------------------
+// NewCopilotReviewer additional edge cases
+// ---------------------------------------------------------------------------
+
+func TestNewCopilotReviewerZeroMaxActions(t *testing.T) {
+r := NewCopilotReviewer(nil, "model", 0)
+if r.maxSessionActions != 0 {
+t.Errorf("maxSessionActions = %d, want 0", r.maxSessionActions)
+}
+}
+
+func TestNewPanelReviewerSingleModel(t *testing.T) {
+p := NewPanelReviewer(nil, []string{"only-model"}, 10)
+if len(p.Models()) != 1 {
+t.Fatalf("Models() count = %d, want 1", len(p.Models()))
+}
+if p.Models()[0] != "only-model" {
+t.Errorf("Models()[0] = %q, want %q", p.Models()[0], "only-model")
+}
+}
+
+func TestNewPanelReviewerNilModels(t *testing.T) {
+p := NewPanelReviewer(nil, nil, 10)
+if p.Models() != nil {
+t.Errorf("expected nil Models(), got %v", p.Models())
+}
+}
+
+// ---------------------------------------------------------------------------
+// PanelReviewer setter edge cases
+// ---------------------------------------------------------------------------
+
+func TestPanelReviewerSetSkillDirectoriesNil(t *testing.T) {
+p := NewPanelReviewer(nil, []string{"m"}, 10)
+p.SetSkillDirectories(nil)
+if p.skillDirectories != nil {
+t.Error("expected nil skillDirectories")
+}
+}
+
+func TestPanelReviewerSetSessionTimeoutZero(t *testing.T) {
+p := NewPanelReviewer(nil, []string{"m"}, 10)
+p.SetSessionTimeout(0)
+if p.sessionTimeout != 0 {
+t.Errorf("expected zero timeout, got %v", p.sessionTimeout)
+}
+}
+
+func TestPanelReviewerReviewPanelWithReferenceDir(t *testing.T) {
+workDir := t.TempDir()
+os.WriteFile(filepath.Join(workDir, "main.go"), []byte("package main"), 0644)
+
+refDir := t.TempDir()
+os.WriteFile(filepath.Join(refDir, "ref.go"), []byte("package ref"), 0644)
+
+p := NewPanelReviewer(nil, []string{"model-a"}, 50)
+
+ctx, cancel := context.WithCancel(context.Background())
+cancel()
+
+_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "some criteria")
+if err == nil {
+t.Fatal("expected error (cancelled context)")
+}
+}
+
+func TestPanelReviewerReviewPanelWithInvalidReferenceDir(t *testing.T) {
+workDir := t.TempDir()
+os.WriteFile(filepath.Join(workDir, "main.go"), []byte("package main"), 0644)
+
+p := NewPanelReviewer(nil, []string{"model-a"}, 50)
+
+ctx, cancel := context.WithCancel(context.Background())
+cancel()
+
+// Non-fatal: reference read failure should not prevent the run
+_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "/nonexistent/ref/dir", "criteria")
+if err == nil {
+t.Fatal("expected error (cancelled context, not ref failure)")
+}
+// Should fail with "all reviewers failed" not reference error
+if !strings.Contains(err.Error(), "all reviewers failed") {
+t.Errorf("error = %q, want 'all reviewers failed'", err.Error())
+}
+}
+
+func TestPanelReviewerReviewPanelWithEmptyReferenceDir(t *testing.T) {
+workDir := t.TempDir()
+os.WriteFile(filepath.Join(workDir, "main.go"), []byte("package main"), 0644)
+
+refDir := t.TempDir() // empty reference dir
+
+p := NewPanelReviewer(nil, []string{"model-a"}, 50)
+
+ctx, cancel := context.WithCancel(context.Background())
+cancel()
+
+_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "")
+if err == nil {
+t.Fatal("expected error (cancelled context)")
+}
+}
+
+func TestCopilotReviewerReviewWithOnlyHiddenFiles(t *testing.T) {
+dir := t.TempDir()
+os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.pyc"), 0644)
+
+r := NewCopilotReviewer(nil, "test-model", 50)
+_, err := r.Review(context.Background(), "prompt", dir, "", "")
+if err == nil {
+t.Fatal("expected error for dir with only hidden files")
+}
+if !strings.Contains(err.Error(), "no generated files") {
+t.Errorf("error = %q, want 'no generated files'", err.Error())
+}
+}
+
+func TestPanelReviewerReviewPanelWithOnlyHiddenFiles(t *testing.T) {
+dir := t.TempDir()
+os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.pyc"), 0644)
+
+p := NewPanelReviewer(nil, []string{"model-a"}, 50)
+_, _, err := p.ReviewPanel(context.Background(), "prompt", dir, "", "")
+if err == nil {
+t.Fatal("expected error for dir with only hidden files")
+}
+if !strings.Contains(err.Error(), "no generated files to review") {
+t.Errorf("error = %q, want 'no generated files to review'", err.Error())
+}
+}
+
+// ---------------------------------------------------------------------------
+// eventCollector tests
+// ---------------------------------------------------------------------------
+
+func TestEventCollectorHandleAssistantMessage(t *testing.T) {
+cancelled := false
+cancel := func() { cancelled = true }
+c := newEventCollector("test-model", 100, cancel)
+
+content := "Hello, world!"
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantMessage,
+Data: copilot.Data{Content: &content},
+})
+
+text, events := c.response()
+if text != "Hello, world!" {
+t.Errorf("assistantContent = %q, want %q", text, "Hello, world!")
+}
+if len(events) != 1 {
+t.Fatalf("events count = %d, want 1", len(events))
+}
+if events[0].Type != string(copilot.SessionEventTypeAssistantMessage) {
+t.Errorf("event type = %q", events[0].Type)
+}
+if events[0].Content != "Hello, world!" {
+t.Errorf("event content = %q", events[0].Content)
+}
+if cancelled {
+t.Error("should not cancel under action limit")
+}
+}
+
+func TestEventCollectorAccumulatesContent(t *testing.T) {
+c := newEventCollector("model", 100, func() {})
+
+part1 := "Hello, "
+part2 := "world!"
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantMessage,
+Data: copilot.Data{Content: &part1},
+})
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantMessage,
+Data: copilot.Data{Content: &part2},
+})
+
+text, events := c.response()
+if text != "Hello, world!" {
+t.Errorf("accumulated content = %q, want %q", text, "Hello, world!")
+}
+if len(events) != 2 {
+t.Errorf("events count = %d, want 2", len(events))
+}
+}
+
+func TestEventCollectorActionLimit(t *testing.T) {
+cancelled := false
+cancel := func() { cancelled = true }
+c := newEventCollector("model", 2, cancel)
+
+// Send 3 action events — limit is 2, so 3rd should trigger cancel
+for i := 0; i < 3; i++ {
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantMessage,
+Data: copilot.Data{},
+})
+}
+
+if !cancelled {
+t.Error("expected cancel after exceeding action limit")
+}
+if !c.actionLimitHit {
+t.Error("expected actionLimitHit to be true")
+}
+}
+
+func TestEventCollectorNoLimitWhenZero(t *testing.T) {
+cancelled := false
+cancel := func() { cancelled = true }
+c := newEventCollector("model", 0, cancel)
+
+for i := 0; i < 100; i++ {
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantMessage,
+Data: copilot.Data{},
+})
+}
+
+if cancelled {
+t.Error("should not cancel when maxActions is 0")
+}
+}
+
+func TestEventCollectorToolEvents(t *testing.T) {
+c := newEventCollector("model", 100, func() {})
+
+toolName := "read_file"
+args := map[string]string{"path": "main.go"}
+resultContent := "file content"
+dur := 42.5
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeToolExecutionStart,
+Data: copilot.Data{
+ToolName:  &toolName,
+Arguments: args,
+},
+})
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeToolExecutionComplete,
+Data: copilot.Data{
+ToolName: &toolName,
+Result:   &copilot.Result{Content: &resultContent},
+Duration: &dur,
+},
+})
+
+_, events := c.response()
+if len(events) != 2 {
+t.Fatalf("events count = %d, want 2", len(events))
+}
+if events[0].ToolName != "read_file" {
+t.Errorf("start event tool = %q", events[0].ToolName)
+}
+if events[0].ToolArgs == "" {
+t.Error("start event should have tool args")
+}
+if events[1].Result != "file content" {
+t.Errorf("complete event result = %q", events[1].Result)
+}
+if events[1].Duration != 42.5 {
+t.Errorf("complete event duration = %f", events[1].Duration)
+}
+}
+
+func TestEventCollectorErrorEvents(t *testing.T) {
+tests := []struct {
+name      string
+errorData *copilot.ErrorUnion
+wantError string
+}{
+{
+name: "error class",
+errorData: &copilot.ErrorUnion{
+ErrorClass: &copilot.ErrorClass{Message: "something broke"},
+},
+wantError: "something broke",
+},
+{
+name:      "error string",
+errorData: &copilot.ErrorUnion{String: strPtr("string error")},
+wantError: "string error",
+},
+}
+
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+c := newEventCollector("model", 100, func() {})
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeToolExecutionComplete,
+Data: copilot.Data{Error: tt.errorData},
+})
+
+_, events := c.response()
+if len(events) != 1 {
+t.Fatalf("events = %d, want 1", len(events))
+}
+if events[0].Error != tt.wantError {
+t.Errorf("error = %q, want %q", events[0].Error, tt.wantError)
+}
+})
+}
+}
+
+func TestEventCollectorTurnEvents(t *testing.T) {
+c := newEventCollector("model", 100, func() {})
+
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantTurnStart,
+Data: copilot.Data{},
+})
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantTurnEnd,
+Data: copilot.Data{},
+})
+
+_, events := c.response()
+if len(events) != 2 {
+t.Fatalf("events = %d, want 2", len(events))
+}
+if events[0].Type != string(copilot.SessionEventTypeAssistantTurnStart) {
+t.Errorf("first event type = %q", events[0].Type)
+}
+if events[1].Type != string(copilot.SessionEventTypeAssistantTurnEnd) {
+t.Errorf("second event type = %q", events[1].Type)
+}
+}
+
+func TestEventCollectorUsageEvent(t *testing.T) {
+c := newEventCollector("model", 100, func() {})
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantUsage,
+Data: copilot.Data{},
+})
+
+_, events := c.response()
+if len(events) != 1 {
+t.Fatalf("events = %d, want 1", len(events))
+}
+}
+
+func TestEventCollectorReasoningCountsAsAction(t *testing.T) {
+cancelled := false
+c := newEventCollector("model", 1, func() { cancelled = true })
+
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantReasoning,
+Data: copilot.Data{},
+})
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantReasoning,
+Data: copilot.Data{},
+})
+
+if !cancelled {
+t.Error("reasoning events should count toward action limit")
+}
+}
+
+func TestEventCollectorToolStartCountsAsAction(t *testing.T) {
+cancelled := false
+c := newEventCollector("model", 1, func() { cancelled = true })
+
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeToolExecutionStart,
+Data: copilot.Data{},
+})
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeToolExecutionStart,
+Data: copilot.Data{},
+})
+
+if !cancelled {
+t.Error("tool start events should count toward action limit")
+}
+}
+
+func TestEventCollectorNilContentNotAccumulated(t *testing.T) {
+c := newEventCollector("model", 100, func() {})
+
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantMessage,
+Data: copilot.Data{Content: nil},
+})
+
+text, _ := c.response()
+if text != "" {
+t.Errorf("expected empty content, got %q", text)
+}
+}
+
+func TestEventCollectorResponseCopiesEvents(t *testing.T) {
+c := newEventCollector("model", 100, func() {})
+content := "test"
+c.handleEvent(copilot.SessionEvent{
+Type: copilot.SessionEventTypeAssistantMessage,
+Data: copilot.Data{Content: &content},
+})
+
+_, events1 := c.response()
+_, events2 := c.response()
+
+// Verify they are separate slices
+if len(events1) != len(events2) {
+t.Error("response should return consistent results")
+}
+}
+
+// ---------------------------------------------------------------------------
+// buildConsolidationPrompt tests
+// ---------------------------------------------------------------------------
+
+func TestBuildConsolidationPrompt(t *testing.T) {
+panel := []ReviewResult{
+{
+Model:        "model-a",
+OverallScore: 2,
+MaxScore:     3,
+Summary:      "Good overall",
+Scores: ReviewScores{Criteria: []CriterionResult{
+{Name: "Build", Passed: true},
+{Name: "Style", Passed: true},
+{Name: "Errors", Passed: false},
+}},
+},
+{
+Model:        "model-b",
+OverallScore: 1,
+MaxScore:     3,
+Summary:      "Needs work",
+Scores: ReviewScores{Criteria: []CriterionResult{
+{Name: "Build", Passed: true},
+{Name: "Style", Passed: false},
+{Name: "Errors", Passed: false},
+}},
+},
+}
+
+prompt := buildConsolidationPrompt("Write Azure code", panel)
+
+checks := []string{
+"senior review consolidator",
+"Original Prompt",
+"Write Azure code",
+"Individual Reviews",
+"Reviewer 1 (model-a)",
+"Reviewer 2 (model-b)",
+"Instructions",
+"consensus review",
+"majority",
+"JSON object",
+}
+
+for _, check := range checks {
+if !strings.Contains(prompt, check) {
+t.Errorf("consolidation prompt missing %q", check)
+}
+}
+}
+
+func TestBuildConsolidationPromptSingleReviewer(t *testing.T) {
+panel := []ReviewResult{{
+Model:   "model-a",
+Summary: "Test",
+Scores:  ReviewScores{Criteria: []CriterionResult{{Name: "A", Passed: true}}},
+}}
+
+prompt := buildConsolidationPrompt("prompt", panel)
+if !strings.Contains(prompt, "Reviewer 1 (model-a)") {
+t.Error("should contain reviewer label")
+}
+}
+
+func TestBuildConsolidationPromptEmpty(t *testing.T) {
+prompt := buildConsolidationPrompt("prompt", nil)
+if !strings.Contains(prompt, "Original Prompt") {
+t.Error("should contain prompt section even with empty panel")
+}
+if !strings.Contains(prompt, "Individual Reviews") {
+t.Error("should contain reviews section even with empty panel")
+}
+}
+
+// helper
+func strPtr(s string) *string { return &s }

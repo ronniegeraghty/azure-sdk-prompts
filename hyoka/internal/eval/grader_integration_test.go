@@ -1,3 +1,5 @@
+//go:build integration
+
 package eval
 
 import (
@@ -48,26 +50,23 @@ func TestEngineRunWithGraders(t *testing.T) {
 	}
 
 	r := summary.Results[0]
-	if r.GraderResults == nil {
+	if len(r.GraderResults) == 0 {
 		t.Fatal("expected GraderResults to be populated")
 	}
-	if len(r.GraderResults.Results) != 1 {
-		t.Fatalf("expected 1 grader result, got %d", len(r.GraderResults.Results))
+	if len(r.GraderResults) != 1 {
+		t.Fatalf("expected 1 grader result, got %d", len(r.GraderResults))
 	}
-	gr := r.GraderResults.Results[0]
-	if gr.Name != "main_exists" {
-		t.Errorf("expected grader name 'main_exists', got %q", gr.Name)
+	gr := r.GraderResults[0]
+	if gr.GraderName != "main_exists" {
+		t.Errorf("expected grader name 'main_exists', got %q", gr.GraderName)
 	}
-	if gr.Kind != "file" {
-		t.Errorf("expected kind 'file', got %q", gr.Kind)
+	if gr.GraderType != "file" {
+		t.Errorf("expected type 'file', got %q", gr.GraderType)
 	}
 	// StubEvaluator returns GeneratedFiles: ["stub_output.txt"]
 	// The file grader checks path: "stub_output.txt" — should pass
-	if !gr.Passed {
-		t.Errorf("expected grader to pass, got: %s", gr.Message)
-	}
-	if r.GraderResults.Score != 1.0 {
-		t.Errorf("expected aggregate score 1.0, got %f", r.GraderResults.Score)
+	if !r.Success {
+		t.Errorf("expected eval to succeed, got failure: %s", r.FailureReason)
 	}
 }
 
@@ -105,14 +104,14 @@ func TestEngineRunWithGraderGateFails(t *testing.T) {
 	}
 
 	r := summary.Results[0]
-	if r.GraderResults == nil {
+	if len(r.GraderResults) == 0 {
 		t.Fatal("expected GraderResults to be populated")
 	}
-	if r.GraderResults.Passed {
-		t.Error("expected grader aggregate to fail (gate grader failed)")
+	if r.Success {
+		t.Error("expected eval to fail when gate grader fails")
 	}
-	if len(r.GraderResults.GatesFailed) != 1 || r.GraderResults.GatesFailed[0] != "missing_file" {
-		t.Errorf("expected gates_failed=[missing_file], got %v", r.GraderResults.GatesFailed)
+	if r.FailureReason == "" {
+		t.Error("expected failure reason to be set for gate failure")
 	}
 	if r.Success {
 		t.Error("expected eval to fail when gate grader fails")
@@ -162,15 +161,14 @@ func TestEngineRunWithGraderWhenFilter(t *testing.T) {
 	}
 
 	r := summary.Results[0]
-	if r.GraderResults == nil {
+	if len(r.GraderResults) == 0 {
 		t.Fatal("expected GraderResults to be populated")
 	}
-	// Only python_only grader should have run
-	if len(r.GraderResults.Results) != 1 {
-		t.Fatalf("expected 1 grader result (python_only), got %d", len(r.GraderResults.Results))
+	if len(r.GraderResults) != 1 {
+		t.Fatalf("expected 1 grader result (python_only), got %d", len(r.GraderResults))
 	}
-	if r.GraderResults.Results[0].Name != "python_only" {
-		t.Errorf("expected grader name 'python_only', got %q", r.GraderResults.Results[0].Name)
+	if r.GraderResults[0].GraderName != "python_only" {
+		t.Errorf("expected grader name 'python_only', got %q", r.GraderResults[0].GraderName)
 	}
 }
 

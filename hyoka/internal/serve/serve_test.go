@@ -551,3 +551,279 @@ func TestAPIPromptDetailNotFound(t *testing.T) {
 		t.Errorf("expected 404, got %d", rec.Code)
 	}
 }
+
+// --- Path traversal tests for all path parameters ---
+
+func TestPathTraversalRunIDAllEndpoints(t *testing.T) {
+	dir := setupTestReports(t)
+	mux := buildMux(Options{ReportsDir: dir})
+
+	// Every endpoint that accepts a runID in the path
+	endpoints := []string{
+		"/api/runs/%s",
+		"/api/runs/%s/eval?path=report.json",
+		"/api/runs/%s/graders",
+		"/api/runs/%s/timeline",
+		"/api/runs/%s/score-breakdown",
+	}
+	traversalPayloads := []string{
+		"../../../etc/passwd",
+		"..",
+		"../../..",
+		"20260327-113302/../../..",
+		"..%2f..%2f",
+	}
+
+	for _, ep := range endpoints {
+		for _, payload := range traversalPayloads {
+			url := strings.Replace(ep, "%s", payload, 1)
+			t.Run(url, func(t *testing.T) {
+				req := httptest.NewRequest("GET", url, nil)
+				rec := httptest.NewRecorder()
+				mux.ServeHTTP(rec, req)
+				if rec.Code == http.StatusOK {
+					t.Errorf("expected non-200 for traversal %q, got %d", url, rec.Code)
+				}
+			})
+		}
+	}
+}
+
+func TestPathTraversalEvalPath(t *testing.T) {
+	dir := setupTestReports(t)
+	mux := buildMux(Options{ReportsDir: dir})
+
+	traversalPaths := []string{
+		"../../etc/passwd",
+		"../../../etc/shadow",
+		"results/../../../etc/passwd",
+		"..\\..\\etc\\passwd",
+	}
+
+	for _, tp := range traversalPaths {
+		t.Run(tp, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/runs/20260327-113302/eval?path="+tp, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code == http.StatusOK {
+				t.Errorf("expected non-200 for eval path traversal %q, got %d", tp, rec.Code)
+			}
+		})
+	}
+}
+
+func TestPathTraversalDocSlug(t *testing.T) {
+	docsDir := setupTestDocs(t)
+	mux := buildMux(Options{ReportsDir: t.TempDir(), DocsDir: docsDir})
+
+	slugs := []string{
+		"../../../etc/passwd",
+		"..",
+		"getting-started/../../etc/passwd",
+	}
+
+	for _, slug := range slugs {
+		t.Run(slug, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/docs/"+slug, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code == http.StatusOK {
+				t.Errorf("expected non-200 for doc slug %q, got %d", slug, rec.Code)
+			}
+		})
+	}
+}
+
+func TestPathTraversalPromptSlug(t *testing.T) {
+	promptsDir := setupTestPrompts(t)
+	mux := buildMux(Options{ReportsDir: t.TempDir(), PromptsDir: promptsDir})
+
+	slugs := []string{
+		"../../../etc/passwd",
+		"..",
+		"test-prompt-one/../../../etc/passwd",
+	}
+
+	for _, slug := range slugs {
+		t.Run(slug, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/prompts/"+slug, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code == http.StatusOK {
+				t.Errorf("expected non-200 for prompt slug %q, got %d", slug, rec.Code)
+			}
+		})
+	}
+}
+
+func TestPathTraversalPromptHistorySlug(t *testing.T) {
+	mux := buildMux(Options{ReportsDir: t.TempDir()})
+
+	slugs := []string{
+		"../../etc/passwd",
+		"..",
+	}
+
+	for _, slug := range slugs {
+		t.Run(slug, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/prompts/"+slug+"/history", nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code == http.StatusOK {
+				t.Errorf("expected non-200 for prompt history slug %q, got %d", slug, rec.Code)
+			}
+		})
+	}
+}
+
+// --- Content-Type verification ---
+
+func TestContentTypeJSON(t *testing.T) {
+	dir := setupTestReports(t)
+	docsDir := setupTestDocs(t)
+	promptsDir := setupTestPrompts(t)
+	mux := buildMux(Options{ReportsDir: dir, DocsDir: docsDir, PromptsDir: promptsDir})
+
+	endpoints := []string{
+		"/api/runs",
+		"/api/runs/20260327-113302",
+		"/api/runs/20260327-113302/eval?path=results/identity/report.json",
+		"/api/docs",
+		"/api/docs/getting-started",
+		"/api/prompts",
+		"/api/prompts/test-prompt-one",
+	}
+
+	for _, ep := range endpoints {
+		t.Run(ep, func(t *testing.T) {
+			req := httptest.NewRequest("GET", ep, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Skipf("endpoint returned %d (not relevant for content-type check)", rec.Code)
+			}
+			ct := rec.Header().Get("Content-Type")
+			if !strings.Contains(ct, "application/json") {
+				t.Errorf("expected application/json, got %q", ct)
+			}
+		})
+	}
+}
+
+// --- CORS on all API responses ---
+
+func TestCORSOnAllAPIEndpoints(t *testing.T) {
+	dir := setupTestReports(t)
+	mux := buildMux(Options{ReportsDir: dir})
+	handler := corsMiddleware(mux)
+
+	endpoints := []string{
+		"/api/runs",
+		"/api/runs/20260327-113302",
+	}
+
+	for _, ep := range endpoints {
+		t.Run("GET "+ep, func(t *testing.T) {
+			req := httptest.NewRequest("GET", ep, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
+				t.Error("expected CORS Allow-Origin header")
+			}
+			if rec.Header().Get("Access-Control-Allow-Methods") == "" {
+				t.Error("expected CORS Allow-Methods header")
+			}
+		})
+
+		t.Run("OPTIONS "+ep, func(t *testing.T) {
+			req := httptest.NewRequest("OPTIONS", ep, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusNoContent {
+				t.Errorf("expected 204 for OPTIONS, got %d", rec.Code)
+			}
+		})
+	}
+}
+
+// --- 404 handling for various invalid routes ---
+
+func TestNotFoundRoutes(t *testing.T) {
+	dir := setupTestReports(t)
+	mux := buildMux(Options{ReportsDir: dir})
+
+	routes := []string{
+		"/api/runs/",
+		"/api/runs/nonexistent-run",
+		"/api/runs/20260327-113302/nonexistent-sub",
+	}
+
+	for _, route := range routes {
+		t.Run(route, func(t *testing.T) {
+			req := httptest.NewRequest("GET", route, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code == http.StatusOK {
+				t.Errorf("expected non-200 for invalid route %q, got %d", route, rec.Code)
+			}
+		})
+	}
+}
+
+// --- Empty slug edge cases ---
+
+func TestEmptyDocSlug(t *testing.T) {
+	docsDir := setupTestDocs(t)
+	mux := buildMux(Options{ReportsDir: t.TempDir(), DocsDir: docsDir})
+
+	req := httptest.NewRequest("GET", "/api/docs/", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for empty doc slug, got %d", rec.Code)
+	}
+}
+
+func TestEmptyPromptSlug(t *testing.T) {
+	promptsDir := setupTestPrompts(t)
+	mux := buildMux(Options{ReportsDir: t.TempDir(), PromptsDir: promptsDir})
+
+	req := httptest.NewRequest("GET", "/api/prompts/", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for empty prompt slug, got %d", rec.Code)
+	}
+}
+
+// --- Prompts endpoint when no PromptsDir ---
+
+func TestPromptsEndpointNoDir(t *testing.T) {
+	mux := buildMux(Options{ReportsDir: t.TempDir()})
+
+	req := httptest.NewRequest("GET", "/api/prompts/some-prompt", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for prompt detail without PromptsDir, got %d", rec.Code)
+	}
+}
+
+// --- SPA fallback edge cases ---
+
+func TestSPAFallbackWithDeepPath(t *testing.T) {
+	reportsDir := setupTestReports(t)
+	siteDir := setupTestSite(t)
+	mux := buildMux(Options{ReportsDir: reportsDir, SiteDir: siteDir})
+
+	req := httptest.NewRequest("GET", "/runs/20260327/prompt/details/view", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for deep SPA route, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "SPA") {
+		t.Error("expected SPA index.html for deep route")
+	}
+}

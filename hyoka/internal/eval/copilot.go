@@ -108,29 +108,43 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 
 	// Track session ID for cleanup — set after CreateSession.
 	var sessionID string
-	// Defer client cleanup (#62). Delete session state first (requires
-	// connected client), then stop the client. DeleteSession sends
-	// session.delete RPC which removes session-state dir AND the SQLite
-	// session-store.db entry — unlike os.RemoveAll which misses the DB.
-	defer func() {
-		if sessionID != "" {
-			deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer deleteCancel()
-			if err := client.DeleteSession(deleteCtx, sessionID); err != nil {
-				slog.Debug("session delete failed, session-state may remain",
-					"sessionID", sessionID, "error", err)
+
+	// buildCleanupFn returns a function that deletes session state and stops
+	// the client. It is stored in EvalResult.CleanupFn so the engine can call
+	// it AFTER copying generated files out of the workspace (#261). Previously,
+	// DeleteSession was deferred here, which removed workspace artifacts before
+	// the engine could copy them — causing baseline configs (which lack MCP
+	// server processes that keep files alive) to report zero generated files.
+	buildCleanupFn := func() func() {
+		return func() {
+			if sessionID != "" {
+				deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer deleteCancel()
+				if err := client.DeleteSession(deleteCtx, sessionID); err != nil {
+					slog.Debug("session delete failed, session-state may remain",
+						"sessionID", sessionID, "error", err)
+				}
+			}
+			done := make(chan struct{})
+			go func() { client.Stop(); close(done) }()
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				client.ForceStop()
+			}
+			// Remove PID files for processes we tracked.
+			for _, cpid := range trackedPIDs {
+				pidfile.Remove(cpid)
 			}
 		}
-		done := make(chan struct{})
-		go func() { client.Stop(); close(done) }()
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			client.ForceStop()
-		}
-		// Remove PID files for processes we tracked.
-		for _, cpid := range trackedPIDs {
-			pidfile.Remove(cpid)
+	}
+
+	// Safety net: if we return early (error paths that don't attach CleanupFn
+	// to a result), ensure the client is stopped and PIDs cleaned up.
+	var cleanupCalled bool
+	defer func() {
+		if !cleanupCalled {
+			buildCleanupFn()()
 		}
 	}()
 
@@ -529,21 +543,26 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 			}
 			lg.Warn("Returning partial results after action-limit cancellation",
 				"actions", actionCounter, "files", len(generatedFiles))
+			cleanupCalled = true
 			return &EvalResult{
 				GeneratedFiles: generatedFiles,
 				EventCount:     len(captured),
 				ToolCalls:      extractToolCalls(capturedEvts),
 				SessionEvents:  captured,
+				ActionTimeline: BuildActionTimeline(captured),
 				Success:        true, // Let engine.go guardrail set the proper failure
+				CleanupFn:      buildCleanupFn(),
 			}, nil
 		}
 
 		return &EvalResult{
-			SessionEvents: captured,
-			EventCount:    len(captured),
-			ToolCalls:     extractToolCalls(capturedEvts),
-			Error:         fmt.Sprintf("prompt send failed: %v", err),
-			ErrorDetails:  err.Error(),
+			SessionEvents:  captured,
+			ActionTimeline: BuildActionTimeline(captured),
+			EventCount:     len(captured),
+			ToolCalls:      extractToolCalls(capturedEvts),
+			Error:          fmt.Sprintf("prompt send failed: %v", err),
+			ErrorDetails:   err.Error(),
+			CleanupFn:      buildCleanupFn(),
 		}, fmt.Errorf("sending prompt: %w", err)
 	}
 
@@ -567,13 +586,16 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		"tool_calls", len(toolCalls),
 		"files", len(generatedFiles))
 
+	cleanupCalled = true
 	return &EvalResult{
 		GeneratedFiles: generatedFiles,
 		EventCount:     len(capturedEvents),
 		ToolCalls:      toolCalls,
 		SessionEvents:  capturedRecords,
+		ActionTimeline: BuildActionTimeline(capturedRecords),
 		Success:        !hasError,
 		Error:          "",
+		CleanupFn:      buildCleanupFn(),
 	}, nil
 }
 
@@ -639,12 +661,12 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 }
 
 func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
-	// Build skill directories from the new Generator.Skills list
+	// Build skill directories from generator tool entries.
 	var skillDirs []string
 	if cfg.Generator != nil {
-		for _, s := range cfg.Generator.Skills {
-			if s.Type == "local" && s.Path != "" {
-				skillDirs = append(skillDirs, s.Path)
+		for _, entry := range cfg.Generator.Tools {
+			if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
+				skillDirs = append(skillDirs, entry.Path)
 			}
 		}
 	}
@@ -653,7 +675,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// system prompt — all behavioral instructions belong in the config YAML.
 
 	sc := &copilot.SessionConfig{
-		Model: cfg.Generator.Model,
+		Model:               cfg.Generator.Model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
@@ -703,20 +725,22 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		SkillDirectories: skillDirs,
 	}
 
-	// Resolve tools: new conditional format (generator.tools) takes precedence
-	// over legacy flat lists (generator.available_tools / excluded_tools).
+	// Resolve tools: conditional tool entries are filtered by prompt properties.
 	// An empty slice serializes as JSON [] which tells the CLI "zero tools" —
 	// nil serializes as null which means "all default tools available."
-	var availableTools []string
-	if len(cfg.Generator.Tools) > 0 {
-		availableTools = config.ResolveTools(cfg.Generator.Tools, promptProps)
+	var toolEntries []config.ToolEntry
+	for _, entry := range cfg.Generator.Tools {
+		if entry.ResolvedType() == "tool" {
+			toolEntries = append(toolEntries, entry)
+		}
+	}
+	availableTools := config.ResolveTools(toolEntries, promptProps)
+	if len(toolEntries) > 0 {
 		slog.Debug("Resolved conditional tools",
-			"entries", len(cfg.Generator.Tools),
+			"entries", len(toolEntries),
 			"matched", len(availableTools),
 			"tools", availableTools,
 			"properties", promptProps)
-	} else {
-		availableTools = cfg.Generator.AvailableTools
 	}
 	excludedTools := cfg.Generator.ExcludedTools
 	if len(availableTools) > 0 {
@@ -727,29 +751,43 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	}
 
 	// Map MCP servers
-	mcpServers := cfg.Generator.MCPServers
-	if len(mcpServers) > 0 {
-		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpServers))
-		for name, srv := range mcpServers {
+	var mcpEntries []config.ToolEntry
+	for _, entry := range cfg.Generator.Tools {
+		if entry.ResolvedType() == "mcp" {
+			mcpEntries = append(mcpEntries, entry)
+		}
+	}
+	if len(mcpEntries) > 0 {
+		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpEntries))
+		for _, entry := range mcpEntries {
 			mcpCfg := copilot.MCPServerConfig{
-				"type":    srv.Type,
-				"command": srv.Command,
-				"args":    srv.Args,
+				"type":    "local",
+				"command": entry.Command,
+				"args":    entry.Args,
 			}
-			if len(srv.Tools) > 0 {
-				mcpCfg["tools"] = srv.Tools
+			if len(entry.MCPTools) > 0 {
+				mcpCfg["tools"] = entry.MCPTools
 			}
-			sc.MCPServers[name] = mcpCfg
+			sc.MCPServers[entry.Name] = mcpCfg
 			slog.Info("MCP server configured",
-				"name", name,
-				"type", srv.Type,
-				"command", srv.Command,
-				"args", srv.Args,
-				"tools", srv.Tools,
+				"name", entry.Name,
+				"type", "local",
+				"command", entry.Command,
+				"args", entry.Args,
+				"tools", entry.MCPTools,
 			)
 		}
 	} else {
 		slog.Debug("No MCP servers configured")
+	}
+
+	// Wire generator system prompt to Copilot SDK session.
+	if cfg.Generator.SystemPrompt != "" {
+		sc.SystemMessage = &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: cfg.Generator.SystemPrompt,
+		}
+		slog.Info("Generator system prompt configured", "length", len(cfg.Generator.SystemPrompt))
 	}
 
 	return sc

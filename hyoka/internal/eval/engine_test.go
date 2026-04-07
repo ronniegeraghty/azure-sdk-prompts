@@ -324,11 +324,11 @@ func TestGuardrailMaxFiles(t *testing.T) {
 
 func TestGuardrailMaxTurns(t *testing.T) {
 	outputDir := t.TempDir()
+	// 30 assistant.message events exceeds the default MaxTurns=25.
 	engine := NewEngine(&manyTurnsEvaluator{turnCount: 30}, quietOpts(EngineOptions{
-		Workers:   1,
-		OutputDir: outputDir,
+		Workers:    1,
+		OutputDir:  outputDir,
 		SkipReview: true,
-		MaxSessionActions:  5,
 	}))
 
 	prompts := []*prompt.Prompt{
@@ -349,8 +349,64 @@ func TestGuardrailMaxTurns(t *testing.T) {
 	if r.Success {
 		t.Error("expected guardrail to fail the eval")
 	}
-	if !strings.Contains(r.GuardrailAbortReason, "action count") {
-		t.Errorf("expected guardrail abort reason about action count, got %q", r.GuardrailAbortReason)
+	if !strings.Contains(r.GuardrailAbortReason, "turn count") {
+		t.Errorf("expected guardrail abort reason about turn count, got %q", r.GuardrailAbortReason)
+	}
+}
+
+// TestActionLimitSoftCap verifies that exceeding the session action limit is
+// treated as a soft cap: the eval is NOT counted as an error, and the review
+// phase determines pass/fail. The report records action_limit_reached and
+// action_count for transparency.
+func TestActionLimitSoftCap(t *testing.T) {
+	outputDir := t.TempDir()
+	// 10 events with MaxSessionActions=5 triggers the soft cap.
+	// MaxTurns=999 prevents the turn-count hard guardrail from firing.
+	engine := NewEngine(&manyTurnsEvaluator{turnCount: 10}, quietOpts(EngineOptions{
+		Workers:           1,
+		OutputDir:         outputDir,
+		SkipReview:        true,
+		MaxTurns:          999,
+		MaxSessionActions: 5,
+	}))
+
+	prompts := []*prompt.Prompt{
+		{ID: "soft-cap-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
+	}
+	configs := []config.ToolConfig{
+		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	}
+
+	summary, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(summary.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(summary.Results))
+	}
+	r := summary.Results[0]
+
+	// Soft cap: no error set, so the eval is NOT counted as "Errors".
+	if r.Error != "" {
+		t.Errorf("expected no error for action limit soft cap, got %q", r.Error)
+	}
+	// With SkipReview, Success stays as returned by evaluator (true).
+	if !r.Success {
+		t.Error("expected success=true when action limit is soft cap with no review")
+	}
+	// The report records that the action limit was reached.
+	if !r.ActionLimitReached {
+		t.Error("expected ActionLimitReached=true")
+	}
+	if r.ActionCount != 10 {
+		t.Errorf("expected ActionCount=10, got %d", r.ActionCount)
+	}
+	// Summary: counted as Passed (not Error).
+	if summary.Passed != 1 {
+		t.Errorf("expected Passed=1, got %d", summary.Passed)
+	}
+	if summary.Errors != 0 {
+		t.Errorf("expected Errors=0, got %d", summary.Errors)
 	}
 }
 
@@ -408,7 +464,7 @@ func TestGuardrailDefaultValues(t *testing.T) {
 func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "no-limits", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 25 { t.Errorf("expected maxTurns 25, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected maxSessionActions 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected maxFiles 50, got %d", lim.maxFiles) }
@@ -418,7 +474,7 @@ func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
 func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "zero", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 25 { t.Errorf("expected 25, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
@@ -428,7 +484,7 @@ func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
 func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "custom", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxFiles: 20, MaxOutputSize: 524288, MaxSessionActions: 30}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 30 { t.Errorf("expected 30, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 20 { t.Errorf("expected 20, got %d", lim.maxFiles) }
@@ -438,11 +494,48 @@ func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
 func TestResolveLimitsPartialOverride(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "partial", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
 	if lim.maxOutputSize != 1048576 { t.Errorf("expected 1048576, got %d", lim.maxOutputSize) }
+}
+
+func TestResolveLimitsPromptOverridesConfig(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxSessionActions: 30}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 100, MaxTurns: 40}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxTurns != 40 { t.Errorf("expected prompt maxTurns 40, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 100 { t.Errorf("expected prompt maxSessionActions 100, got %d", lim.maxSessionActions) }
+	if lim.maxFiles != 50 { t.Errorf("expected default maxFiles 50, got %d", lim.maxFiles) }
+}
+
+func TestResolveLimitsPromptOverridesDefaults(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "no-limits", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 75}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxSessionActions != 75 { t.Errorf("expected prompt maxSessionActions 75, got %d", lim.maxSessionActions) }
+	if lim.maxTurns != 25 { t.Errorf("expected default maxTurns 25, got %d", lim.maxTurns) }
+}
+
+func TestResolveLimitsPromptPartialOverride(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxSessionActions: 30}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 100}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxTurns != 10 { t.Errorf("expected config maxTurns 10, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 100 { t.Errorf("expected prompt maxSessionActions 100, got %d", lim.maxSessionActions) }
+}
+
+func TestResolveLimitsPromptZeroDoesNotOverride(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxSessionActions: 30}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 0, MaxTurns: 0}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxSessionActions != 30 { t.Errorf("expected config maxSessionActions 30, got %d", lim.maxSessionActions) }
+	if lim.maxTurns != 25 { t.Errorf("expected default maxTurns 25, got %d", lim.maxTurns) }
 }
 
 func TestConfigLimitsRespectedByGuardrail(t *testing.T) {
@@ -723,6 +816,63 @@ func TestLargeRunConfirmAbort(t *testing.T) {
 	}
 }
 
+func TestStubEvaluatorWriteErrorLogsWarning(t *testing.T) {
+	// When workDir is an invalid path, the stub evaluator should still
+	// succeed (logging a warning) rather than returning an error.
+	stub := &StubEvaluator{}
+	p := &prompt.Prompt{ID: "test-prompt", Properties: map[string]string{"language": "go"}}
+	cfg := &config.ToolConfig{Name: "test-config", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
+
+	result, err := stub.Evaluate(context.Background(), p, cfg, filepath.Join(t.TempDir(), "nonexistent", "subdir"))
+	if err != nil {
+		t.Fatalf("stub evaluator should not return an error even when write fails: %v", err)
+	}
+	if !result.Success {
+		t.Error("expected stub to report success even when file write fails")
+	}
+	if !result.IsStub {
+		t.Error("expected IsStub to be true")
+	}
+}
+
+func TestLargeRunConfirmNoTTY(t *testing.T) {
+	// With ConfirmLargeRuns=true and stdin closed (simulating piped/no-TTY input),
+	// the run should abort with an "no interactive input" error.
+	outputDir := t.TempDir()
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+		Workers:          1,
+		OutputDir:        outputDir,
+		SkipReview:       true,
+		ConfirmLargeRuns: true,
+		AutoConfirm:      false,
+	}))
+
+	var prompts []*prompt.Prompt
+	for i := 0; i < 12; i++ {
+		prompts = append(prompts, &prompt.Prompt{
+			ID:         fmt.Sprintf("no-tty-%d", i),
+			Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"},
+		})
+	}
+
+	// Redirect stdin to a closed pipe (EOF immediately).
+	oldStdin := os.Stdin
+	r, w, _ := os.Pipe()
+	w.Close()
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	_, err := engine.Run(context.Background(), prompts, []config.ToolConfig{
+		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	})
+	if err == nil {
+		t.Fatal("expected error when stdin is closed (no TTY)")
+	}
+	if !strings.Contains(err.Error(), "no interactive input available") {
+		t.Errorf("expected 'no interactive input available' error, got: %v", err)
+	}
+}
+
 // capturingReviewer records the evaluation criteria passed to Review.
 type capturingReviewer struct {
 	capturedCriteria string
@@ -750,7 +900,10 @@ graders:
 `), 0644)
 
 	reviewer := &capturingReviewer{}
-	engine := NewEngineWithReviewer(&StubEvaluator{}, reviewer, quietOpts(EngineOptions{
+	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+		return reviewer, nil, nil
+	}
+	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, reviewerFactory, quietOpts(EngineOptions{
 		Workers:     1,
 		OutputDir:   t.TempDir(),
 		CriteriaDir: criteriaDir,
@@ -801,7 +954,10 @@ func TestCriteriaDirNotExist(t *testing.T) {
 func TestCriteriaDirEmpty(t *testing.T) {
 	// Empty criteria dir should work fine — no criteria matched
 	reviewer := &capturingReviewer{}
-	engine := NewEngineWithReviewer(&StubEvaluator{}, reviewer, quietOpts(EngineOptions{
+	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+		return reviewer, nil, nil
+	}
+	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, reviewerFactory, quietOpts(EngineOptions{
 		Workers:     1,
 		OutputDir:   t.TempDir(),
 		CriteriaDir: t.TempDir(), // empty dir

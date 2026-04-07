@@ -177,82 +177,29 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func TestApplyToGenerator(t *testing.T) {
-	reg := NewRegistry()
-	reg.plugins["sdk-tools"] = &Plugin{
+func TestPluginToToolEntries(t *testing.T) {
+	p := &Plugin{
 		Name: "sdk-tools",
 		Skills: []PluginSkill{
 			{Type: "local", Path: "./skills/sdk"},
-			{Type: "remote", Repo: "github.com/example/repo"},
+			{Type: "remote", Repo: "github.com/example/repo", Name: "sdk"},
 		},
 		MCPServers: map[string]*MCPServer{
-			"azure-cli": {Type: "stdio", Command: "az", Args: []string{"mcp"}},
-		},
-	}
-	reg.plugins["review-helpers"] = &Plugin{
-		Name: "review-helpers",
-		Skills: []PluginSkill{
-			{Type: "local", Path: "./skills/review"},
+			"azure-cli": {Type: "stdio", Command: "az", Args: []string{"mcp"}, Tools: []string{"*"}},
 		},
 	}
 
-	var skills []PluginSkill
-	mcpServers := map[string]*MCPServer{}
-
-	err := reg.ApplyToGenerator([]string{"sdk-tools", "review-helpers"}, &skills, &mcpServers)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	entries := p.ToToolEntries()
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 tool entries, got %d", len(entries))
 	}
-	if len(skills) != 3 {
-		t.Errorf("expected 3 skills, got %d", len(skills))
+	if entries[0].Type != "skill" || entries[0].Name != "./skills/sdk" {
+		t.Errorf("expected first entry to use path as name, got %+v", entries[0])
 	}
-	if len(mcpServers) != 1 {
-		t.Errorf("expected 1 MCP server, got %d", len(mcpServers))
+	if entries[1].Type != "skill" || entries[1].Repo != "github.com/example/repo" {
+		t.Errorf("expected second entry to be remote skill, got %+v", entries[1])
 	}
-	if _, ok := mcpServers["azure-cli"]; !ok {
-		t.Error("expected azure-cli MCP server")
-	}
-}
-
-func TestApplyToGeneratorDedup(t *testing.T) {
-	reg := NewRegistry()
-	reg.plugins["a"] = &Plugin{
-		Name:   "a",
-		Skills: []PluginSkill{{Type: "local", Path: "./same"}},
-		MCPServers: map[string]*MCPServer{
-			"srv": {Type: "stdio", Command: "cmd"},
-		},
-	}
-	reg.plugins["b"] = &Plugin{
-		Name:   "b",
-		Skills: []PluginSkill{{Type: "local", Path: "./same"}}, // duplicate
-		MCPServers: map[string]*MCPServer{
-			"srv": {Type: "stdio", Command: "other"}, // duplicate key
-		},
-	}
-
-	var skills []PluginSkill
-	mcpServers := map[string]*MCPServer{}
-
-	err := reg.ApplyToGenerator([]string{"a", "b"}, &skills, &mcpServers)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(skills) != 1 {
-		t.Errorf("expected 1 deduplicated skill, got %d", len(skills))
-	}
-	if len(mcpServers) != 1 {
-		t.Errorf("expected 1 deduplicated MCP server, got %d", len(mcpServers))
-	}
-}
-
-func TestApplyToGeneratorNotFound(t *testing.T) {
-	reg := NewRegistry()
-	var skills []PluginSkill
-	mcpServers := map[string]*MCPServer{}
-
-	err := reg.ApplyToGenerator([]string{"nonexistent"}, &skills, &mcpServers)
-	if err == nil {
-		t.Fatal("expected error for missing plugin")
+	if entries[2].Type != "mcp" || entries[2].Name != "azure-cli" || entries[2].Command != "az" {
+		t.Errorf("expected MCP entry for azure-cli, got %+v", entries[2])
 	}
 }

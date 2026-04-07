@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"gopkg.in/yaml.v3"
 )
@@ -25,7 +26,7 @@ type Plugin struct {
 	Source      string                `yaml:"-" json:"source,omitempty"` // file path
 }
 
-// PluginSkill is the same as config.Skill but defined here to avoid import cycles.
+// PluginSkill mirrors the skill fields supported in plugin definitions.
 type PluginSkill struct {
 	Type string `yaml:"type" json:"type"`
 	Name string `yaml:"name,omitempty" json:"name,omitempty"`
@@ -45,6 +46,18 @@ type MCPServer struct {
 type HookConfig struct {
 	PreToolUse  []string `yaml:"pre_tool_use,omitempty" json:"pre_tool_use,omitempty"`
 	PostToolUse []string `yaml:"post_tool_use,omitempty" json:"post_tool_use,omitempty"`
+}
+
+// ToolEntry describes a unified tool entry produced from a plugin.
+type ToolEntry struct {
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Source   string   `json:"source,omitempty"`
+	Path     string   `json:"path,omitempty"`
+	Repo     string   `json:"repo,omitempty"`
+	Command  string   `json:"command,omitempty"`
+	Args     []string `json:"args,omitempty"`
+	MCPTools []string `json:"mcp_tools,omitempty"`
 }
 
 // Registry holds loaded plugins indexed by name.
@@ -142,40 +155,46 @@ func (r *Registry) Count() int {
 	return len(r.plugins)
 }
 
-// ApplyToGenerator resolves plugin names and merges their skills and MCP
-// servers into the generator's existing configuration. Duplicate skills and
-// MCP servers are skipped.
-func (r *Registry) ApplyToGenerator(pluginNames []string, skills *[]PluginSkill, mcpServers *map[string]*MCPServer) error {
-	for _, name := range pluginNames {
-		p, err := r.Get(name)
-		if err != nil {
-			return err
+// ToToolEntries converts the plugin's skills and MCP servers into unified tool entries.
+func (p *Plugin) ToToolEntries() []ToolEntry {
+	var entries []ToolEntry
+	for _, s := range p.Skills {
+		entries = append(entries, toolEntryFromPluginSkill(s))
+	}
+	if len(p.MCPServers) > 0 {
+		names := make([]string, 0, len(p.MCPServers))
+		for name := range p.MCPServers {
+			names = append(names, name)
 		}
-		for _, s := range p.Skills {
-			if !containsSkill(*skills, s) {
-				*skills = append(*skills, s)
-			}
-		}
-		if len(p.MCPServers) > 0 {
-			if *mcpServers == nil {
-				*mcpServers = make(map[string]*MCPServer)
-			}
-			for k, v := range p.MCPServers {
-				if _, exists := (*mcpServers)[k]; !exists {
-					(*mcpServers)[k] = v
-				}
-			}
+		sort.Strings(names)
+		for _, name := range names {
+			server := p.MCPServers[name]
+			entries = append(entries, ToolEntry{
+				Name:     name,
+				Type:     "mcp",
+				Command:  server.Command,
+				Args:     server.Args,
+				MCPTools: server.Tools,
+			})
 		}
 	}
-	return nil
+	return entries
 }
 
-func containsSkill(skills []PluginSkill, s PluginSkill) bool {
-	for _, existing := range skills {
-		if existing.Type == s.Type && existing.Name == s.Name &&
-			existing.Repo == s.Repo && existing.Path == s.Path {
-			return true
+func toolEntryFromPluginSkill(s PluginSkill) ToolEntry {
+	name := s.Name
+	if name == "" {
+		if s.Path != "" {
+			name = s.Path
+		} else {
+			name = s.Repo
 		}
 	}
-	return false
+	return ToolEntry{
+		Name:   name,
+		Type:   "skill",
+		Source: s.Type,
+		Path:   s.Path,
+		Repo:   s.Repo,
+	}
 }

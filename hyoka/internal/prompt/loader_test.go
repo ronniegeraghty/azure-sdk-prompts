@@ -558,3 +558,78 @@ t.Errorf("expected 0 near misses for .prompt.yaml file, got %d", len(misses))
 }
 }
 
+func TestParsePromptWithSessionLimits(t *testing.T) {
+content := []byte(`---
+id: test-limits
+max_session_actions: 100
+max_turns: 40
+properties:
+  service: storage
+  language: python
+---
+
+# Test Limits
+
+## Prompt
+
+Test prompt with session limits.
+`)
+p, err := ParsePromptFile(content, "test-limits.prompt.md")
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if p.MaxSessionActions != 100 {
+t.Errorf("expected MaxSessionActions 100, got %d", p.MaxSessionActions)
+}
+if p.MaxTurns != 40 {
+t.Errorf("expected MaxTurns 40, got %d", p.MaxTurns)
+}
+}
+
+func TestParsePromptWithoutSessionLimitsDefaultsToZero(t *testing.T) {
+content := []byte(`---
+id: test-no-limits
+properties:
+  service: storage
+  language: python
+---
+
+# No Limits
+
+## Prompt
+
+Test prompt without session limits.
+`)
+p, err := ParsePromptFile(content, "test-no-limits.prompt.md")
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if p.MaxSessionActions != 0 {
+t.Errorf("expected MaxSessionActions 0 (unset), got %d", p.MaxSessionActions)
+}
+if p.MaxTurns != 0 {
+t.Errorf("expected MaxTurns 0 (unset), got %d", p.MaxTurns)
+}
+}
+
+func TestParseYAMLPromptWithSessionLimits(t *testing.T) {
+content := []byte(`id: yaml-limits
+max_session_actions: 75
+max_turns: 30
+properties:
+  service: identity
+  language: dotnet
+prompt_text: "Test YAML prompt with limits."
+`)
+p, err := ParsePromptYAML(content, "yaml-limits.prompt.yaml")
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if p.MaxSessionActions != 75 {
+t.Errorf("expected MaxSessionActions 75, got %d", p.MaxSessionActions)
+}
+if p.MaxTurns != 30 {
+t.Errorf("expected MaxTurns 30, got %d", p.MaxTurns)
+}
+}
+
