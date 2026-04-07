@@ -12,6 +12,8 @@ doc_url: # Library reference docs (e.g., learn.microsoft.com API overview, pkg.g
 tags: []
 created: # YYYY-MM-DD
 author: # GitHub username
+# max_session_actions: # Optional: override session action limit for this prompt (e.g., 100 for complex prompts)
+# max_turns:           # Optional: override max conversation turns for this prompt (e.g., 40 for complex prompts)
 # expected_tools: []  # Optional: tool names the generation session should use (e.g., create_file, run_terminal_command, azure_mcp)
 # starter_project: "" # Optional: path to starter project directory (relative to prompt file). Used with project_context: existing.
 # project_context:    # Optional: "blank" (default) starts from empty workspace; "existing" copies starter_project first.
