@@ -955,3 +955,27 @@ Tests in `hyoka/internal/eval/resourcemonitor_test.go` were flaky because they u
 
 All future tests with background goroutines should follow the event-driven pattern. If a test needs to verify periodic behavior, expose the underlying method (make it public or use a test hook) so tests can call it directly.
 
+---
+
+## Decision: Site Embedding Architecture
+
+**Date:** 2026-04-07  
+**Author:** Morpheus 🕶️  
+**Status:** Proposed  
+**Category:** Build System, Distribution, Developer Experience
+
+### Summary
+
+Embed the built React SPA into the Go binary using `go:embed`. Pre-build the site in CI, commit the built `site/dist/` directory to the repo, and serve from the embedded filesystem at runtime. Follow the microsoft/waza pattern. Do not attempt auto-building at runtime.
+
+### Impact
+
+- Binary size: +1.3 MB (3 files: index.html + 1 CSS + 1 JS)
+- User experience: Zero-config `hyoka serve` works for all users (repo cloners, `go install` users, binary releases)
+- Repo churn: +1.3 MB in git history, minimal ongoing churn (dist rebuilds only when site changes)
+- Build complexity: Add pre-build step to CI, update `.gitignore` to allow `site/dist/`
+
+### Reference
+
+Full proposal: `.squad/decisions/inbox/morpheus-site-embed-architecture.md`
+
