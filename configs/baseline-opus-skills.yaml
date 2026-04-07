@@ -15,5 +15,8 @@ configs:
         - "claude-opus-4.6"
         - "gemini-3-pro-preview"
         - "gpt-4.1"
-    reviewer_skill_directories:
-      - "./skills/reviewer"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          path: "./skills/reviewer"
