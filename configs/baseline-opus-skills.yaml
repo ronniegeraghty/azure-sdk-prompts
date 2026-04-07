@@ -5,8 +5,10 @@ configs:
     description: "Baseline + Skills — Claude Opus 4.6 with generator skills"
     generator:
       model: "claude-opus-4.6"
-      skills:
-        - type: local
+      tools:
+        - name: generator-skills
+          type: skill
+          source: local
           path: "./skills/generator"
     reviewer:
       models:

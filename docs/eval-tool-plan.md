@@ -216,46 +216,43 @@ Define configurations in a YAML file (`configs/default.yaml`):
 configs:
   - name: baseline
     description: "No MCP servers, no skills — just base Copilot"
-    model: "claude-sonnet-4.5"
-    mcp_servers: {}
-    skill_directories: []
-    available_tools: []    # empty = all built-in tools
-    excluded_tools: []
+    generator:
+      model: "claude-sonnet-4.5"
+      excluded_tools: []
 
   - name: azure-mcp
     description: "Azure MCP server attached"
-    model: "claude-sonnet-4.5"
-    mcp_servers:
-      azure:
-        type: local
-        command: npx
-        args: ["-y", "@azure/mcp@latest"]
-        tools: ["*"]
-    skill_directories: []
-    available_tools: []
-    excluded_tools: []
+    generator:
+      model: "claude-sonnet-4.5"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest"]
+          mcp_tools: ["*"]
+      excluded_tools: []
 
   - name: azure-mcp-plus-skills
     description: "Azure MCP + Azure SDK best-practices skills"
-    model: "claude-sonnet-4.5"
-    mcp_servers:
-      azure:
-        type: local
-        command: npx
-        args: ["-y", "@azure/mcp@latest"]
-        tools: ["*"]
-    skill_directories:
-      - ./skills/azure-sdk
-    available_tools: []
-    excluded_tools: []
+    generator:
+      model: "claude-sonnet-4.5"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest"]
+          mcp_tools: ["*"]
+        - name: azure-sdk-skill
+          type: skill
+          source: local
+          path: ./skills/azure-sdk
+      excluded_tools: []
 
   - name: no-web-search
     description: "All tools except web search"
-    model: "claude-sonnet-4.5"
-    mcp_servers: {}
-    skill_directories: []
-    available_tools: []
-    excluded_tools: ["web_search"]
+    generator:
+      model: "claude-sonnet-4.5"
+      excluded_tools: ["web_search"]
 ```
 
 ### 3.2 Mapping to SDK SessionConfig
@@ -264,11 +261,11 @@ Each config maps directly to `copilot.SessionConfig` fields:
 
 | Config YAML field | SessionConfig field | Type |
 |---|---|---|
-| `model` | `Model` | `string` |
-| `mcp_servers` | `MCPServers` | `map[string]MCPServerConfig` |
-| `skill_directories` | `SkillDirectories` | `[]string` |
-| `available_tools` | `AvailableTools` | `[]string` |
-| `excluded_tools` | `ExcludedTools` | `[]string` |
+| `generator.model` | `Model` | `string` |
+| `generator.tools` (`type: tool`) | `AvailableTools` | `[]string` |
+| `generator.tools` (`type: mcp`) | `MCPServers` | `map[string]MCPServerConfig` |
+| `generator.tools` (`type: skill`) | `SkillDirectories` | `[]string` |
+| `generator.excluded_tools` | `ExcludedTools` | `[]string` |
 
 ### 3.3 Cross-Product Execution
 

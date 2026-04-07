@@ -16,8 +16,7 @@ import (
 //   - Variant 1..N: each disables one togglable tool, named "{base}/without-{tool}"
 //
 // Tools with AlwaysOn: true in Generator.Tools are never toggled.
-// Both Generator.Tools ([]ToolEntry) and Generator.AvailableTools ([]string)
-// are considered; duplicates across the two lists are unified.
+// Only ToolEntry values with type "tool" are considered.
 func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
 	togglable := collectTogglable(base)
 
@@ -40,7 +39,6 @@ func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
 }
 
 // collectTogglable returns deduplicated tool names eligible for toggling.
-// Order: ToolEntry names first (preserving order), then AvailableTools.
 func collectTogglable(cfg config.ToolConfig) []string {
 	if cfg.Generator == nil {
 		return nil
@@ -50,26 +48,17 @@ func collectTogglable(cfg config.ToolConfig) []string {
 	var tools []string
 
 	for _, te := range cfg.Generator.Tools {
-		if te.AlwaysOn || seen[te.Name] {
+		if te.ResolvedType() != "tool" || te.AlwaysOn || seen[te.Name] {
 			continue
 		}
 		seen[te.Name] = true
 		tools = append(tools, te.Name)
 	}
 
-	for _, name := range cfg.Generator.AvailableTools {
-		if seen[name] {
-			continue
-		}
-		seen[name] = true
-		tools = append(tools, name)
-	}
-
 	return tools
 }
 
-// removeTool removes a named tool from both Generator.Tools and
-// Generator.AvailableTools in the given config.
+// removeTool removes a named tool from Generator.Tools in the given config.
 func removeTool(cfg *config.ToolConfig, name string) {
 	if cfg.Generator == nil {
 		return
@@ -77,19 +66,11 @@ func removeTool(cfg *config.ToolConfig, name string) {
 
 	var tools []config.ToolEntry
 	for _, te := range cfg.Generator.Tools {
-		if te.Name != name {
+		if te.ResolvedType() != "tool" || te.Name != name {
 			tools = append(tools, te)
 		}
 	}
 	cfg.Generator.Tools = tools
-
-	var avail []string
-	for _, t := range cfg.Generator.AvailableTools {
-		if t != name {
-			avail = append(avail, t)
-		}
-	}
-	cfg.Generator.AvailableTools = avail
 }
 
 // cloneToolConfig returns a deep copy of a ToolConfig so mutations to the
@@ -99,11 +80,6 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 
 	if src.Generator != nil {
 		gen := *src.Generator
-
-		if len(src.Generator.Skills) > 0 {
-			gen.Skills = make([]config.Skill, len(src.Generator.Skills))
-			copy(gen.Skills, src.Generator.Skills)
-		}
 
 		if len(src.Generator.Tools) > 0 {
 			gen.Tools = make([]config.ToolEntry, len(src.Generator.Tools))
@@ -116,12 +92,17 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 					}
 					gen.Tools[i].When = m
 				}
+				if te.Args != nil {
+					args := make([]string, len(te.Args))
+					copy(args, te.Args)
+					gen.Tools[i].Args = args
+				}
+				if te.MCPTools != nil {
+					tools := make([]string, len(te.MCPTools))
+					copy(tools, te.MCPTools)
+					gen.Tools[i].MCPTools = tools
+				}
 			}
-		}
-
-		if len(src.Generator.AvailableTools) > 0 {
-			gen.AvailableTools = make([]string, len(src.Generator.AvailableTools))
-			copy(gen.AvailableTools, src.Generator.AvailableTools)
 		}
 
 		if len(src.Generator.ExcludedTools) > 0 {
@@ -129,30 +110,33 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 			copy(gen.ExcludedTools, src.Generator.ExcludedTools)
 		}
 
-		if len(src.Generator.MCPServers) > 0 {
-			gen.MCPServers = make(map[string]*config.MCPServer, len(src.Generator.MCPServers))
-			for k, v := range src.Generator.MCPServers {
-				srv := *v
-				if len(v.Args) > 0 {
-					srv.Args = make([]string, len(v.Args))
-					copy(srv.Args, v.Args)
-				}
-				if len(v.Tools) > 0 {
-					srv.Tools = make([]string, len(v.Tools))
-					copy(srv.Tools, v.Tools)
-				}
-				gen.MCPServers[k] = &srv
-			}
-		}
-
 		dst.Generator = &gen
 	}
 
 	if src.Reviewer != nil {
 		rev := *src.Reviewer
-		if len(src.Reviewer.Skills) > 0 {
-			rev.Skills = make([]config.Skill, len(src.Reviewer.Skills))
-			copy(rev.Skills, src.Reviewer.Skills)
+		if len(src.Reviewer.Tools) > 0 {
+			rev.Tools = make([]config.ToolEntry, len(src.Reviewer.Tools))
+			copy(rev.Tools, src.Reviewer.Tools)
+			for i, te := range rev.Tools {
+				if te.When != nil {
+					m := make(map[string]string, len(te.When))
+					for k, v := range te.When {
+						m[k] = v
+					}
+					rev.Tools[i].When = m
+				}
+				if te.Args != nil {
+					args := make([]string, len(te.Args))
+					copy(args, te.Args)
+					rev.Tools[i].Args = args
+				}
+				if te.MCPTools != nil {
+					tools := make([]string, len(te.MCPTools))
+					copy(tools, te.MCPTools)
+					rev.Tools[i].MCPTools = tools
+				}
+			}
 		}
 		if len(src.Reviewer.Models) > 0 {
 			rev.Models = make([]string, len(src.Reviewer.Models))
@@ -171,135 +155,135 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 
 // VariantResult holds the evaluation outcome for a single pairwise variant.
 type VariantResult struct {
-ConfigName  string `json:"config_name"`
-RemovedTool string `json:"removed_tool,omitempty"`
-Score       int    `json:"score"`
-MaxScore    int    `json:"max_score"`
-Success     bool   `json:"success"`
+	ConfigName  string `json:"config_name"`
+	RemovedTool string `json:"removed_tool,omitempty"`
+	Score       int    `json:"score"`
+	MaxScore    int    `json:"max_score"`
+	Success     bool   `json:"success"`
 }
 
 // ToolImpact holds the computed impact of a single tool.
 type ToolImpact struct {
-ToolName      string  `json:"tool_name"`
-Impact        float64 `json:"impact"`
-BaselineScore float64 `json:"baseline_score"`
-WithoutScore  float64 `json:"without_score"`
-BaselinePass  bool    `json:"baseline_pass"`
-WithoutPass   bool    `json:"without_pass"`
+	ToolName      string  `json:"tool_name"`
+	Impact        float64 `json:"impact"`
+	BaselineScore float64 `json:"baseline_score"`
+	WithoutScore  float64 `json:"without_score"`
+	BaselinePass  bool    `json:"baseline_pass"`
+	WithoutPass   bool    `json:"without_pass"`
 }
 
 // PairwiseReport holds the complete pairwise comparison results for a prompt.
 type PairwiseReport struct {
-PromptID string          `json:"prompt_id"`
-Baseline VariantResult   `json:"baseline"`
-Variants []VariantResult `json:"variants"`
-Impacts  []ToolImpact    `json:"impacts"`
+	PromptID string          `json:"prompt_id"`
+	Baseline VariantResult   `json:"baseline"`
+	Variants []VariantResult `json:"variants"`
+	Impacts  []ToolImpact    `json:"impacts"`
 }
 
 // normalizeScore converts a raw score/maxScore pair to a 0-100 scale.
 func normalizeScore(score, maxScore int) float64 {
-if maxScore <= 0 {
-return 0
-}
-return math.Round(float64(score)/float64(maxScore)*1000) / 10
+	if maxScore <= 0 {
+		return 0
+	}
+	return math.Round(float64(score)/float64(maxScore)*1000) / 10
 }
 
 // ComputeImpacts calculates per-tool impact from a baseline and a set of variants.
 func ComputeImpacts(promptID string, results []VariantResult) (*PairwiseReport, error) {
-var baseline *VariantResult
-var variants []VariantResult
+	var baseline *VariantResult
+	var variants []VariantResult
 
-for i := range results {
-if results[i].RemovedTool == "" {
-baseline = &results[i]
-} else {
-variants = append(variants, results[i])
-}
-}
+	for i := range results {
+		if results[i].RemovedTool == "" {
+			baseline = &results[i]
+		} else {
+			variants = append(variants, results[i])
+		}
+	}
 
-if baseline == nil {
-return nil, fmt.Errorf("pairwise: no baseline found for prompt %s", promptID)
-}
+	if baseline == nil {
+		return nil, fmt.Errorf("pairwise: no baseline found for prompt %s", promptID)
+	}
 
-baselineNorm := normalizeScore(baseline.Score, baseline.MaxScore)
+	baselineNorm := normalizeScore(baseline.Score, baseline.MaxScore)
 
-impacts := make([]ToolImpact, 0, len(variants))
-for _, v := range variants {
-withoutNorm := normalizeScore(v.Score, v.MaxScore)
-impacts = append(impacts, ToolImpact{
-ToolName:      v.RemovedTool,
-Impact:        math.Round((baselineNorm-withoutNorm)*10) / 10,
-BaselineScore: baselineNorm,
-WithoutScore:  withoutNorm,
-BaselinePass:  baseline.Success,
-WithoutPass:   v.Success,
-})
-}
+	impacts := make([]ToolImpact, 0, len(variants))
+	for _, v := range variants {
+		withoutNorm := normalizeScore(v.Score, v.MaxScore)
+		impacts = append(impacts, ToolImpact{
+			ToolName:      v.RemovedTool,
+			Impact:        math.Round((baselineNorm-withoutNorm)*10) / 10,
+			BaselineScore: baselineNorm,
+			WithoutScore:  withoutNorm,
+			BaselinePass:  baseline.Success,
+			WithoutPass:   v.Success,
+		})
+	}
 
-SortByImpact(impacts)
+	SortByImpact(impacts)
 
-return &PairwiseReport{
-PromptID: promptID,
-Baseline: *baseline,
-Variants: variants,
-Impacts:  impacts,
-}, nil
+	return &PairwiseReport{
+		PromptID: promptID,
+		Baseline: *baseline,
+		Variants: variants,
+		Impacts:  impacts,
+	}, nil
 }
 
 // SortByImpact sorts impacts by impact score descending.
 func SortByImpact(impacts []ToolImpact) {
-sort.Slice(impacts, func(i, j int) bool {
-if impacts[i].Impact != impacts[j].Impact {
-return impacts[i].Impact > impacts[j].Impact
-}
-return impacts[i].ToolName < impacts[j].ToolName
-})
+	sort.Slice(impacts, func(i, j int) bool {
+		if impacts[i].Impact != impacts[j].Impact {
+			return impacts[i].Impact > impacts[j].Impact
+		}
+		return impacts[i].ToolName < impacts[j].ToolName
+	})
 }
 
 // AggregateImpacts merges impacts from multiple prompts into a single per-tool summary.
 func AggregateImpacts(reports []*PairwiseReport) []ToolImpact {
-type accum struct {
-totalImpact   float64
-totalBaseline float64
-totalWithout  float64
-count         int
-baselinePass  int
-withoutPass   int
-}
+	type accum struct {
+		totalImpact   float64
+		totalBaseline float64
+		totalWithout  float64
+		count         int
+		baselinePass  int
+		withoutPass   int
+	}
 
-byTool := make(map[string]*accum)
-for _, r := range reports {
-for _, imp := range r.Impacts {
-a, ok := byTool[imp.ToolName]
-if !ok {
-a = &accum{}
-byTool[imp.ToolName] = a
-}
-a.totalImpact += imp.Impact
-a.totalBaseline += imp.BaselineScore
-a.totalWithout += imp.WithoutScore
-a.count++
-if imp.BaselinePass {
-a.baselinePass++
-}
-if imp.WithoutPass {
-a.withoutPass++
-}
-}
-}
+	byTool := make(map[string]*accum)
+	for _, r := range reports {
+		for _, imp := range r.Impacts {
+			a, ok := byTool[imp.ToolName]
+			if !ok {
+				a = &accum{}
+				byTool[imp.ToolName] = a
+			}
+			a.totalImpact += imp.Impact
+			a.totalBaseline += imp.BaselineScore
+			a.totalWithout += imp.WithoutScore
+			a.count++
+			if imp.BaselinePass {
+				a.baselinePass++
+			}
+			if imp.WithoutPass {
+				a.withoutPass++
+			}
+		}
+	}
 
-result := make([]ToolImpact, 0, len(byTool))
-for tool, a := range byTool {
-result = append(result, ToolImpact{
-ToolName:      tool,
-Impact:        math.Round(a.totalImpact/float64(a.count)*10) / 10,
-BaselineScore: math.Round(a.totalBaseline/float64(a.count)*10) / 10,
-WithoutScore:  math.Round(a.totalWithout/float64(a.count)*10) / 10,
-BaselinePass:  a.baselinePass == a.count,
-WithoutPass:   a.withoutPass == a.count,
-})
-}
+	result := make([]ToolImpact, 0, len(byTool))
+	for tool, a := range byTool {
+		result = append(result, ToolImpact{
+			ToolName:      tool,
+			Impact:        math.Round(a.totalImpact/float64(a.count)*10) / 10,
+			BaselineScore: math.Round(a.totalBaseline/float64(a.count)*10) / 10,
+			WithoutScore:  math.Round(a.totalWithout/float64(a.count)*10) / 10,
+			BaselinePass:  a.baselinePass == a.count,
+			WithoutPass:   a.withoutPass == a.count,
+		})
+	}
 
-SortByImpact(result)
-return result
+	SortByImpact(result)
+	return result
 }

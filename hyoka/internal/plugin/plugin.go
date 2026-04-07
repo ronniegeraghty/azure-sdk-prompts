@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ronniegeraghty/hyoka/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,7 +26,7 @@ type Plugin struct {
 	Source      string                `yaml:"-" json:"source,omitempty"` // file path
 }
 
-// PluginSkill is the same as config.Skill but defined here to avoid import cycles.
+// PluginSkill mirrors the skill fields supported in plugin definitions.
 type PluginSkill struct {
 	Type string `yaml:"type" json:"type"`
 	Name string `yaml:"name,omitempty" json:"name,omitempty"`
@@ -143,37 +144,57 @@ func (r *Registry) Count() int {
 }
 
 // ApplyToGenerator resolves plugin names and merges their skills and MCP
-// servers into the generator's existing configuration. Duplicate skills and
-// MCP servers are skipped.
-func (r *Registry) ApplyToGenerator(pluginNames []string, skills *[]PluginSkill, mcpServers *map[string]*MCPServer) error {
+// servers into the generator's existing configuration. Duplicate entries
+// are skipped.
+func (r *Registry) ApplyToGenerator(pluginNames []string, tools *[]config.ToolEntry) error {
 	for _, name := range pluginNames {
 		p, err := r.Get(name)
 		if err != nil {
 			return err
 		}
 		for _, s := range p.Skills {
-			if !containsSkill(*skills, s) {
-				*skills = append(*skills, s)
+			entry := toolEntryFromPluginSkill(s)
+			if !containsToolEntry(*tools, entry) {
+				*tools = append(*tools, entry)
 			}
 		}
-		if len(p.MCPServers) > 0 {
-			if *mcpServers == nil {
-				*mcpServers = make(map[string]*MCPServer)
+		for k, v := range p.MCPServers {
+			entry := config.ToolEntry{
+				Name:     k,
+				Type:     "mcp",
+				Command:  v.Command,
+				Args:     v.Args,
+				MCPTools: v.Tools,
 			}
-			for k, v := range p.MCPServers {
-				if _, exists := (*mcpServers)[k]; !exists {
-					(*mcpServers)[k] = v
-				}
+			if !containsToolEntry(*tools, entry) {
+				*tools = append(*tools, entry)
 			}
 		}
 	}
 	return nil
 }
 
-func containsSkill(skills []PluginSkill, s PluginSkill) bool {
-	for _, existing := range skills {
-		if existing.Type == s.Type && existing.Name == s.Name &&
-			existing.Repo == s.Repo && existing.Path == s.Path {
+func toolEntryFromPluginSkill(s PluginSkill) config.ToolEntry {
+	name := s.Name
+	if name == "" {
+		if s.Path != "" {
+			name = s.Path
+		} else {
+			name = s.Repo
+		}
+	}
+	return config.ToolEntry{
+		Name:   name,
+		Type:   "skill",
+		Source: s.Type,
+		Path:   s.Path,
+		Repo:   s.Repo,
+	}
+}
+
+func containsToolEntry(tools []config.ToolEntry, entry config.ToolEntry) bool {
+	for _, existing := range tools {
+		if existing.ResolvedType() == entry.ResolvedType() && existing.Name == entry.Name {
 			return true
 		}
 	}

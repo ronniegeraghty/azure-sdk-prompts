@@ -642,12 +642,12 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 }
 
 func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
-	// Build skill directories from the new Generator.Skills list
+	// Build skill directories from generator tool entries.
 	var skillDirs []string
 	if cfg.Generator != nil {
-		for _, s := range cfg.Generator.Skills {
-			if s.Type == "local" && s.Path != "" {
-				skillDirs = append(skillDirs, s.Path)
+		for _, entry := range cfg.Generator.Tools {
+			if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
+				skillDirs = append(skillDirs, entry.Path)
 			}
 		}
 	}
@@ -656,7 +656,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// system prompt — all behavioral instructions belong in the config YAML.
 
 	sc := &copilot.SessionConfig{
-		Model: cfg.Generator.Model,
+		Model:               cfg.Generator.Model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
@@ -706,20 +706,22 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		SkillDirectories: skillDirs,
 	}
 
-	// Resolve tools: new conditional format (generator.tools) takes precedence
-	// over legacy flat lists (generator.available_tools / excluded_tools).
+	// Resolve tools: conditional tool entries are filtered by prompt properties.
 	// An empty slice serializes as JSON [] which tells the CLI "zero tools" —
 	// nil serializes as null which means "all default tools available."
-	var availableTools []string
-	if len(cfg.Generator.Tools) > 0 {
-		availableTools = config.ResolveTools(cfg.Generator.Tools, promptProps)
+	var toolEntries []config.ToolEntry
+	for _, entry := range cfg.Generator.Tools {
+		if entry.ResolvedType() == "tool" {
+			toolEntries = append(toolEntries, entry)
+		}
+	}
+	availableTools := config.ResolveTools(toolEntries, promptProps)
+	if len(toolEntries) > 0 {
 		slog.Debug("Resolved conditional tools",
-			"entries", len(cfg.Generator.Tools),
+			"entries", len(toolEntries),
 			"matched", len(availableTools),
 			"tools", availableTools,
 			"properties", promptProps)
-	} else {
-		availableTools = cfg.Generator.AvailableTools
 	}
 	excludedTools := cfg.Generator.ExcludedTools
 	if len(availableTools) > 0 {
@@ -730,25 +732,30 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	}
 
 	// Map MCP servers
-	mcpServers := cfg.Generator.MCPServers
-	if len(mcpServers) > 0 {
-		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpServers))
-		for name, srv := range mcpServers {
+	var mcpEntries []config.ToolEntry
+	for _, entry := range cfg.Generator.Tools {
+		if entry.ResolvedType() == "mcp" {
+			mcpEntries = append(mcpEntries, entry)
+		}
+	}
+	if len(mcpEntries) > 0 {
+		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpEntries))
+		for _, entry := range mcpEntries {
 			mcpCfg := copilot.MCPServerConfig{
-				"type":    srv.Type,
-				"command": srv.Command,
-				"args":    srv.Args,
+				"type":    "local",
+				"command": entry.Command,
+				"args":    entry.Args,
 			}
-			if len(srv.Tools) > 0 {
-				mcpCfg["tools"] = srv.Tools
+			if len(entry.MCPTools) > 0 {
+				mcpCfg["tools"] = entry.MCPTools
 			}
-			sc.MCPServers[name] = mcpCfg
+			sc.MCPServers[entry.Name] = mcpCfg
 			slog.Info("MCP server configured",
-				"name", name,
-				"type", srv.Type,
-				"command", srv.Command,
-				"args", srv.Args,
-				"tools", srv.Tools,
+				"name", entry.Name,
+				"type", "local",
+				"command", entry.Command,
+				"args", entry.Args,
+				"tools", entry.MCPTools,
 			)
 		}
 	} else {

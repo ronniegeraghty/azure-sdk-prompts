@@ -18,12 +18,12 @@ configs:
     description: "Second test"
     generator:
       model: "claude-sonnet-4.5"
-      mcp_servers:
-        azure:
-          type: local
+      tools:
+        - name: azure
+          type: mcp
           command: npx
           args: ["-y", "@azure/mcp@latest"]
-          tools: ["*"]
+          mcp_tools: ["*"]
 `)
 	cfg, err := Parse(data)
 	if err != nil {
@@ -39,11 +39,19 @@ configs:
 		t.Errorf("expected model 'gpt-4', got %q", cfg.Configs[0].Generator.Model)
 	}
 	// Check MCP server on second config
-	if cfg.Configs[1].Generator.MCPServers == nil {
-		t.Fatal("expected MCP servers on second config")
+	if cfg.Configs[1].Generator == nil {
+		t.Fatal("expected generator on second config")
 	}
-	azure, ok := cfg.Configs[1].Generator.MCPServers["azure"]
-	if !ok {
+	var azure ToolEntry
+	found := false
+	for _, entry := range cfg.Configs[1].Generator.Tools {
+		if entry.ResolvedType() == "mcp" && entry.Name == "azure" {
+			azure = entry
+			found = true
+			break
+		}
+	}
+	if !found {
 		t.Fatal("expected 'azure' MCP server")
 	}
 	if azure.Command != "npx" {
@@ -286,11 +294,14 @@ configs:
     description: "Config with skills and plugins"
     generator:
       model: "gpt-4"
-      skills:
-        - type: local
+      tools:
+        - name: local-skill
+          type: skill
+          source: local
           path: "./skills/tool-use"
-        - type: remote
-          name: org-skill
+        - name: org-skill
+          type: skill
+          source: remote
           repo: "github:org/repo"
     plugins:
       - "@azure/functions"
@@ -300,14 +311,14 @@ configs:
 		t.Fatalf("unexpected error: %v", err)
 	}
 	c := cfg.Configs[0]
-	if len(c.Generator.Skills) != 2 {
-		t.Errorf("expected 2 skills, got %d", len(c.Generator.Skills))
+	if len(c.Generator.Tools) != 2 {
+		t.Errorf("expected 2 tools, got %d", len(c.Generator.Tools))
 	}
-	if c.Generator.Skills[0].Type != "local" || c.Generator.Skills[0].Path != "./skills/tool-use" {
-		t.Errorf("expected local skill './skills/tool-use', got %+v", c.Generator.Skills[0])
+	if c.Generator.Tools[0].ResolvedType() != "skill" || c.Generator.Tools[0].Path != "./skills/tool-use" {
+		t.Errorf("expected local skill './skills/tool-use', got %+v", c.Generator.Tools[0])
 	}
-	if c.Generator.Skills[1].Type != "remote" || c.Generator.Skills[1].Repo != "github:org/repo" {
-		t.Errorf("expected remote skill 'github:org/repo', got %+v", c.Generator.Skills[1])
+	if c.Generator.Tools[1].ResolvedType() != "skill" || c.Generator.Tools[1].Repo != "github:org/repo" {
+		t.Errorf("expected remote skill 'github:org/repo', got %+v", c.Generator.Tools[1])
 	}
 	if len(c.Plugins) != 1 {
 		t.Errorf("expected 1 plugin, got %d", len(c.Plugins))
@@ -330,8 +341,8 @@ configs:
 		t.Fatalf("unexpected error: %v", err)
 	}
 	c := cfg.Configs[0]
-	if len(c.Generator.Skills) != 0 {
-		t.Errorf("expected 0 skills, got %d", len(c.Generator.Skills))
+	if len(c.Generator.Tools) != 0 {
+		t.Errorf("expected 0 tools, got %d", len(c.Generator.Tools))
 	}
 	if len(c.Plugins) != 0 {
 		t.Errorf("expected 0 plugins, got %d", len(c.Plugins))
@@ -354,23 +365,27 @@ configs:
     description: "New format with generator/reviewer"
     generator:
       model: "claude-sonnet-4.5"
-      skills:
-        - type: local
+      tools:
+        - name: generator-skills
+          type: skill
+          source: local
           path: "./skills/generator"
-      mcp_servers:
-        azure:
-          type: local
+        - name: azure
+          type: mcp
           command: npx
           args: ["-y", "@azure/mcp@latest"]
-          tools: ["*"]
-      available_tools: ["create", "edit"]
+          mcp_tools: ["*"]
+        - name: create
+        - name: edit
       excluded_tools: ["web_fetch"]
     reviewer:
       models:
         - "claude-opus-4.6"
         - "gemini-3-pro-preview"
-      skills:
-        - type: local
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
           path: "./skills/reviewer"
 `)
 	cfg, err := Parse(data)
@@ -386,20 +401,26 @@ configs:
 	if len(models) != 2 || models[0] != "claude-opus-4.6" {
 		t.Errorf("expected reviewer models [claude-opus-4.6 gemini-3-pro-preview], got %v", models)
 	}
-	genSkills := c.Generator.Skills
-	if len(genSkills) != 1 || genSkills[0].Type != "local" {
-		t.Errorf("expected 1 generator skill (local), got %v", genSkills)
+	if len(c.Generator.Tools) != 4 {
+		t.Errorf("expected 4 generator tools, got %d", len(c.Generator.Tools))
 	}
-	revSkills := c.Reviewer.Skills
-	if len(revSkills) != 1 || revSkills[0].Path != "./skills/reviewer" {
-		t.Errorf("expected 1 reviewer skill, got %v", revSkills)
+	var hasSkill, hasMCP bool
+	for _, entry := range c.Generator.Tools {
+		if entry.ResolvedType() == "skill" && entry.Path == "./skills/generator" {
+			hasSkill = true
+		}
+		if entry.ResolvedType() == "mcp" && entry.Name == "azure" {
+			hasMCP = true
+		}
 	}
-	mcpServers := c.Generator.MCPServers
-	if len(mcpServers) != 1 {
-		t.Errorf("expected 1 MCP server, got %d", len(mcpServers))
+	if !hasSkill {
+		t.Error("expected generator skill entry with ./skills/generator")
 	}
-	if len(c.Generator.AvailableTools) != 2 {
-		t.Errorf("expected 2 available tools, got %d", len(c.Generator.AvailableTools))
+	if !hasMCP {
+		t.Error("expected generator MCP entry named azure")
+	}
+	if len(c.Reviewer.Tools) != 1 {
+		t.Errorf("expected 1 reviewer tool, got %d", len(c.Reviewer.Tools))
 	}
 	if len(c.Generator.ExcludedTools) != 1 {
 		t.Errorf("expected 1 excluded tool, got %d", len(c.Generator.ExcludedTools))
@@ -413,21 +434,24 @@ configs:
     description: "Full config with generator and reviewer"
     generator:
       model: "claude-opus-4.6"
-      mcp_servers:
-        azure:
-          type: local
+      tools:
+        - name: azure
+          type: mcp
           command: npx
           args: ["-y", "@azure/mcp@latest"]
-      skills:
-        - type: local
+        - name: generator-skills
+          type: skill
+          source: local
           path: "./skills/generator"
-      available_tools: ["create"]
+        - name: create
       excluded_tools: ["bash"]
     reviewer:
       models:
         - "gpt-4.1"
-      skills:
-        - type: local
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
           path: "./skills/reviewer"
 `)
 	cfg, err := Parse(data)
@@ -448,17 +472,11 @@ configs:
 	if len(c.Reviewer.Models) != 1 || c.Reviewer.Models[0] != "gpt-4.1" {
 		t.Errorf("expected Reviewer.Models [gpt-4.1], got %v", c.Reviewer.Models)
 	}
-	if len(c.Generator.Skills) != 1 || c.Generator.Skills[0].Path != "./skills/generator" {
-		t.Errorf("expected 1 generator skill, got %v", c.Generator.Skills)
+	if len(c.Generator.Tools) != 3 {
+		t.Errorf("expected 3 generator tools, got %d", len(c.Generator.Tools))
 	}
-	if len(c.Reviewer.Skills) != 1 || c.Reviewer.Skills[0].Path != "./skills/reviewer" {
-		t.Errorf("expected 1 reviewer skill, got %v", c.Reviewer.Skills)
-	}
-	if len(c.Generator.MCPServers) != 1 {
-		t.Errorf("expected 1 MCP server, got %d", len(c.Generator.MCPServers))
-	}
-	if len(c.Generator.AvailableTools) != 1 {
-		t.Errorf("expected 1 available tool, got %d", len(c.Generator.AvailableTools))
+	if len(c.Reviewer.Tools) != 1 {
+		t.Errorf("expected 1 reviewer tool, got %d", len(c.Reviewer.Tools))
 	}
 }
 
@@ -469,11 +487,14 @@ configs:
     description: "Config with remote skill"
     generator:
       model: "gpt-4"
-      skills:
-        - type: remote
-          name: azure-keyvault-py
+      tools:
+        - name: azure-keyvault-py
+          type: skill
+          source: remote
           repo: microsoft/skills
-        - type: local
+        - name: local-skill
+          type: skill
+          source: local
           path: "./skills/local"
 `)
 	cfg, err := Parse(data)
@@ -481,32 +502,32 @@ configs:
 		t.Fatalf("unexpected error: %v", err)
 	}
 	c := cfg.Configs[0]
-	skills := c.Generator.Skills
-	if len(skills) != 2 {
-		t.Fatalf("expected 2 skills, got %d", len(skills))
+	tools := c.Generator.Tools
+	if len(tools) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(tools))
 	}
-	if skills[0].Type != "remote" || skills[0].Name != "azure-keyvault-py" || skills[0].Repo != "microsoft/skills" {
-		t.Errorf("unexpected remote skill: %+v", skills[0])
+	if tools[0].ResolvedType() != "skill" || tools[0].Name != "azure-keyvault-py" || tools[0].Repo != "microsoft/skills" {
+		t.Errorf("unexpected remote skill: %+v", tools[0])
 	}
-	if skills[1].Type != "local" || skills[1].Path != "./skills/local" {
-		t.Errorf("unexpected local skill: %+v", skills[1])
+	if tools[1].ResolvedType() != "skill" || tools[1].Path != "./skills/local" {
+		t.Errorf("unexpected local skill: %+v", tools[1])
 	}
 }
 
-func TestValidateRejectsInvalidSkillType(t *testing.T) {
+func TestValidateRejectsInvalidToolType(t *testing.T) {
 	data := []byte(`
 configs:
   - name: bad-skill
     description: "Bad skill type"
     generator:
       model: "gpt-4"
-      skills:
-        - type: invalid
-          path: "./foo"
+      tools:
+        - name: bad-tool
+          type: invalid
 `)
 	_, err := Parse(data)
 	if err == nil {
-		t.Fatal("expected error for invalid skill type")
+		t.Fatal("expected error for invalid tool type")
 	}
 }
 
@@ -517,8 +538,10 @@ configs:
     description: "Local skill missing path"
     generator:
       model: "gpt-4"
-      skills:
-        - type: local
+      tools:
+        - name: missing-path
+          type: skill
+          source: local
 `)
 	_, err := Parse(data)
 	if err == nil {
@@ -533,9 +556,10 @@ configs:
     description: "Remote skill missing repo"
     generator:
       model: "gpt-4"
-      skills:
-        - type: remote
-          name: some-skill
+      tools:
+        - name: some-skill
+          type: skill
+          source: remote
 `)
 	_, err := Parse(data)
 	if err == nil {

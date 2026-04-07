@@ -25,16 +25,16 @@ import (
 
 // EvalResult holds the raw output from a Copilot evaluation.
 type EvalResult struct {
-	GeneratedFiles  []string
-	EventCount      int
-	ToolCalls       []string
-	SessionEvents   []report.SessionEventRecord
-	ActionTimeline  *ActionTimeline
-	Success         bool
-	Error           string
-	ErrorDetails    string
-	IsStub          bool
-	StarterFiles    []string
+	GeneratedFiles []string
+	EventCount     int
+	ToolCalls      []string
+	SessionEvents  []report.SessionEventRecord
+	ActionTimeline *ActionTimeline
+	Success        bool
+	Error          string
+	ErrorDetails   string
+	IsStub         bool
+	StarterFiles   []string
 }
 
 // CopilotEvaluator defines the interface for running evaluations.
@@ -589,7 +589,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		SchemaVersion: report.CurrentSchemaVersion,
 		PromptID:      task.Prompt.ID,
 		ConfigName:    task.Config.Name,
-		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		Timestamp:     time.Now().UTC().Format(time.RFC3339),
 		PromptMeta: map[string]any{
 			"service":     task.Prompt.Service(),
 			"plane":       task.Prompt.Plane(),
@@ -804,19 +804,20 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Populate environment info from config and captured events
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		for _, s := range task.Config.Generator.Skills {
-			if s.Type == "local" && s.Path != "" {
-				skillDirectories = append(skillDirectories, s.Path)
+		for _, entry := range task.Config.Generator.Tools {
+			if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
+				skillDirectories = append(skillDirectories, entry.Path)
 			}
 		}
 	}
 	// Resolve tools for reporting — mirrors the resolution in buildSessionConfig.
-	var reportAvailableTools []string
-	if len(task.Config.Generator.Tools) > 0 {
-		reportAvailableTools = config.ResolveTools(task.Config.Generator.Tools, mergePromptProperties(task.Prompt))
-	} else {
-		reportAvailableTools = task.Config.Generator.AvailableTools
+	var toolEntries []config.ToolEntry
+	for _, entry := range task.Config.Generator.Tools {
+		if entry.ResolvedType() == "tool" {
+			toolEntries = append(toolEntries, entry)
+		}
 	}
+	reportAvailableTools := config.ResolveTools(toolEntries, mergePromptProperties(task.Prompt))
 	env := &report.EnvironmentInfo{
 		Model:            task.Config.Generator.Model,
 		SkillDirectories: skillDirectories,
@@ -827,8 +828,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		WorkingDirectory: ws.Dir,
 	}
 	// Extract MCP server names
-	for name := range task.Config.Generator.MCPServers {
-		env.MCPServers = append(env.MCPServers, name)
+	for _, entry := range task.Config.Generator.Tools {
+		if entry.ResolvedType() == "mcp" {
+			env.MCPServers = append(env.MCPServers, entry.Name)
+		}
 	}
 	// Derive token usage, turn count, truncation, skills from events
 	for _, ev := range evalReport.SessionEvents {
@@ -858,30 +861,38 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		StarterFiles: evalReport.StarterFiles,
 	}
 	// Record configured MCP servers with details.
-	for name, srv := range task.Config.Generator.MCPServers {
-		details := srv.Command
-		if len(srv.Args) > 0 {
-			details += " " + strings.Join(srv.Args, " ")
+	for _, entry := range task.Config.Generator.Tools {
+		if entry.ResolvedType() != "mcp" {
+			continue
+		}
+		details := entry.Command
+		if len(entry.Args) > 0 {
+			details += " " + strings.Join(entry.Args, " ")
 		}
 		setup.MCPServers = append(setup.MCPServers, report.ToolLoadResult{
-			Name:    name,
+			Name:    entry.Name,
 			Status:  "configured",
 			Details: details,
 		})
 	}
 	// Record configured skills with details.
-	for _, s := range task.Config.Generator.Skills {
-		name := s.Name
-		if name == "" {
-			name = s.Path
+	for _, entry := range task.Config.Generator.Tools {
+		if entry.ResolvedType() != "skill" {
+			continue
 		}
+		name := entry.Name
 		if name == "" {
-			name = s.Repo
+			if entry.Path != "" {
+				name = entry.Path
+			} else {
+				name = entry.Repo
+			}
 		}
+		details := entry.SkillSource()
 		setup.Skills = append(setup.Skills, report.ToolLoadResult{
 			Name:    name,
 			Status:  "configured",
-			Details: s.Type,
+			Details: details,
 		})
 	}
 	// Determine system prompt status.
@@ -1017,22 +1028,22 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 							rr.PromptDetails = &report.PromptGraderDetail{
 								Model: r.PromptDetails.Model, Rubric: r.PromptDetails.Rubric,
 								Reasoning: r.PromptDetails.Reasoning,
-								RawScore: r.PromptDetails.RawScore, MaxScore: r.PromptDetails.MaxScore,
+								RawScore:  r.PromptDetails.RawScore, MaxScore: r.PromptDetails.MaxScore,
 							}
 						}
 						if r.BehaviorDetails != nil {
 							rr.BehaviorDetails = &report.BehaviorGraderDetail{
 								ToolsUsed: r.BehaviorDetails.ToolsUsed, MissingTools: r.BehaviorDetails.MissingTools,
 								ForbiddenUsed: r.BehaviorDetails.ForbiddenUsed,
-								TurnCount: r.BehaviorDetails.TurnCount, MaxTurns: r.BehaviorDetails.MaxTurns,
+								TurnCount:     r.BehaviorDetails.TurnCount, MaxTurns: r.BehaviorDetails.MaxTurns,
 								ActualTurns: r.BehaviorDetails.ActualTurns, TotalActions: r.BehaviorDetails.TotalActions,
 								TurnLimitHit: r.BehaviorDetails.TurnLimitHit, Violations: r.BehaviorDetails.Violations,
-								SequenceMatch: r.BehaviorDetails.SequenceMatch,
+								SequenceMatch:    r.BehaviorDetails.SequenceMatch,
 								ExpectedSequence: r.BehaviorDetails.ExpectedSequence,
-								ActualSequence: r.BehaviorDetails.ActualSequence,
-								MatchedActions: r.BehaviorDetails.MatchedActions,
-								ConstraintsMet: r.BehaviorDetails.ConstraintsMet,
-								ToolCounts: r.BehaviorDetails.ToolCounts,
+								ActualSequence:   r.BehaviorDetails.ActualSequence,
+								MatchedActions:   r.BehaviorDetails.MatchedActions,
+								ConstraintsMet:   r.BehaviorDetails.ConstraintsMet,
+								ToolCounts:       r.BehaviorDetails.ToolCounts,
 							}
 						}
 						reportResults[i] = rr

@@ -12,40 +12,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// MCPServer represents an MCP server configuration.
-type MCPServer struct {
-	Type    string   `yaml:"type" json:"type"`
-	Command string   `yaml:"command" json:"command"`
-	Args    []string `yaml:"args" json:"args"`
-	Tools   []string `yaml:"tools" json:"tools"`
-}
-
-// Skill represents a unified skill entry supporting both local and remote sources.
-//   - type: local  → Path contains a local directory path (supports globs)
-//   - type: remote → Name + Repo identify a skill to fetch from a GitHub repo
-type Skill struct {
-	Type string `yaml:"type" json:"type"`
-	Name string `yaml:"name,omitempty" json:"name,omitempty"`
-	Repo string `yaml:"repo,omitempty" json:"repo,omitempty"`
-	Path string `yaml:"path,omitempty" json:"path,omitempty"`
-}
-
 // GeneratorConfig holds all configuration for the code generation agent.
 type GeneratorConfig struct {
-	Model          string                `yaml:"model" json:"model"`
-	SystemPrompt   string                `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
-	Skills         []Skill               `yaml:"skills,omitempty" json:"skills,omitempty"`
-	MCPServers     map[string]*MCPServer `yaml:"mcp_servers,omitempty" json:"mcp_servers,omitempty"`
-	Tools          []ToolEntry           `yaml:"tools,omitempty" json:"tools,omitempty"`
-	AvailableTools []string              `yaml:"available_tools,omitempty" json:"available_tools,omitempty"`
-	ExcludedTools  []string              `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`
+	Model         string      `yaml:"model" json:"model"`
+	SystemPrompt  string      `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	Tools         []ToolEntry `yaml:"tools,omitempty" json:"tools,omitempty"`
+	ExcludedTools []string    `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`
 }
 
 // ReviewerConfig holds all configuration for the review/grading plane.
 type ReviewerConfig struct {
-	Models       []string `yaml:"models,omitempty" json:"models,omitempty"`
-	SystemPrompt string   `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
-	Skills       []Skill  `yaml:"skills,omitempty" json:"skills,omitempty"`
+	Models       []string    `yaml:"models,omitempty" json:"models,omitempty"`
+	SystemPrompt string      `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	Tools        []ToolEntry `yaml:"tools,omitempty" json:"tools,omitempty"`
 }
 
 // SessionLimits configures per-config guardrail limits for evaluation sessions.
@@ -151,13 +130,7 @@ func (cf *ConfigFile) Validate() error {
 			return fmt.Errorf("duplicate config name %q at index %d and %d", c.Name, prev, i)
 		}
 		namesSeen[c.Name] = i
-		// Validate generator/reviewer skills have correct type
 		if c.Generator != nil {
-			for _, s := range c.Generator.Skills {
-				if err := validateSkill(s); err != nil {
-					return fmt.Errorf("config %q generator skill: %w", c.Name, err)
-				}
-			}
 			for j, te := range c.Generator.Tools {
 				if err := validateToolEntry(te, c.Name, j); err != nil {
 					return err
@@ -165,9 +138,9 @@ func (cf *ConfigFile) Validate() error {
 			}
 		}
 		if c.Reviewer != nil {
-			for _, s := range c.Reviewer.Skills {
-				if err := validateSkill(s); err != nil {
-					return fmt.Errorf("config %q reviewer skill: %w", c.Name, err)
+			for j, te := range c.Reviewer.Tools {
+				if err := validateToolEntry(te, c.Name, j); err != nil {
+					return err
 				}
 			}
 			// Check for duplicate reviewer models
@@ -194,23 +167,6 @@ func (cf *ConfigFile) Validate() error {
 				return fmt.Errorf("config %q: limits.max_session_actions must not be negative", c.Name)
 			}
 		}
-	}
-	return nil
-}
-
-// validateSkill checks that a Skill has valid type and required fields.
-func validateSkill(s Skill) error {
-	switch s.Type {
-	case "local":
-		if s.Path == "" {
-			return fmt.Errorf("local skill missing path")
-		}
-	case "remote":
-		if s.Repo == "" {
-			return fmt.Errorf("remote skill missing repo")
-		}
-	default:
-		return fmt.Errorf("unknown skill type %q (expected \"local\" or \"remote\")", s.Type)
 	}
 	return nil
 }
