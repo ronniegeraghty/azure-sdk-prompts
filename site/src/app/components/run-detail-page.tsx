@@ -12,7 +12,8 @@ function ScoreBadge({ score, max = 100 }: { score: number; max?: number }) {
   return <span className={color} style={{ ...mono, fontSize: 13 }}>{score}/{max}</span>;
 }
 
-function formatDuration(s: number): string {
+function formatDuration(s: number | undefined | null): string {
+  if (s == null || isNaN(s)) return "N/A";
   if (s < 60) return `${s.toFixed(1)}s`;
   const m = Math.floor(s / 60);
   const sec = (s % 60).toFixed(0);
@@ -55,7 +56,9 @@ export function RunDetailPage() {
     );
   }
 
-  const rate = run.total_evaluations > 0 ? ((run.passed / run.total_evaluations) * 100).toFixed(1) : "0.0";
+  const passed = run.passed ?? 0;
+  const total = run.total_evaluations ?? 0;
+  const rate = total > 0 ? ((passed / total) * 100).toFixed(1) : "0.0";
   const results = run.results || [];
 
   const services = [...new Set(results.map(r => r.prompt_metadata?.service).filter(Boolean))];
@@ -83,7 +86,7 @@ export function RunDetailPage() {
               Run {run.run_id}
             </h1>
             <p className="text-white/40" style={{ fontSize: 13 }}>
-              {new Date(run.timestamp).toLocaleString()} · {run.total_evaluations} evaluations · {formatDuration(run.duration_seconds)}
+              {run.timestamp && !isNaN(new Date(run.timestamp).getTime()) ? new Date(run.timestamp).toLocaleString() : "N/A"} · {run.total_evaluations ?? 0} evaluations · {formatDuration(run.duration_seconds)}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2">
@@ -148,7 +151,7 @@ export function RunDetailPage() {
           <table className="w-full" style={{ fontSize: 13 }}>
             <thead>
               <tr className="border-b border-white/8">
-                {["Status", "Prompt", "Config", "Service", "Lang", "Difficulty", "Score", "Duration", ""].map(h => (
+                {["Status", "Prompt", "Config", "Service", "Lang", "Difficulty", "Score", "Duration", "Error", ""].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/30" style={{ fontWeight: 500, fontSize: 11 }}>{h}</th>
                 ))}
               </tr>
@@ -181,7 +184,16 @@ export function RunDetailPage() {
                   <td className="px-4 py-3">
                     <ScoreBadge score={r.review?.overall_score ?? 0} max={r.review?.max_score ?? 100} />
                   </td>
-                  <td className="px-4 py-3 text-white/40" style={{ ...mono, fontSize: 12 }}>{r.duration_seconds.toFixed(1)}s</td>
+                  <td className="px-4 py-3 text-white/40" style={{ ...mono, fontSize: 12 }}>
+                    {r.duration_seconds != null && !isNaN(r.duration_seconds) ? `${r.duration_seconds.toFixed(1)}s` : "N/A"}
+                  </td>
+                  <td className="max-w-[200px] px-4 py-3">
+                    {!r.success && r.error ? (
+                      <span className="text-red-400/80" style={{ fontSize: 11 }} title={r.error}>
+                        {r.error.length > 100 ? r.error.slice(0, 100) + "…" : r.error}
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">
                     <Link
                       to={`/runs/${run.run_id}/eval/${encodeURIComponent(r.prompt_id)}/${encodeURIComponent(r.config_name)}`}

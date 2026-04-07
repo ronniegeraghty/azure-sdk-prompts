@@ -77,4 +77,61 @@ describe("RunsPage", () => {
       expect(screen.getByText(/Network failure/)).toBeInTheDocument();
     });
   });
+
+  it("renders N/A for missing or invalid timestamp", async () => {
+    const runsWithBadDate = [
+      {
+        run_id: "run-baddate",
+        timestamp: "not-a-date",
+        total_evaluations: 3,
+        passed: 1,
+        failed: 2,
+        errors: 0,
+        duration_seconds: 30,
+        results: [],
+      },
+    ];
+    vi.mocked(fetchRuns).mockResolvedValue(runsWithBadDate as any);
+
+    render(
+      <MemoryRouter>
+        <RunsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/run-baddate/)).toBeInTheDocument();
+    });
+    // Invalid timestamp renders "N/A" instead of "Invalid Date"
+    expect(screen.getByText("N/A")).toBeInTheDocument();
+  });
+
+  it("handles missing duration and pass counts gracefully", async () => {
+    const runsWithMissing = [
+      {
+        run_id: "run-missing",
+        timestamp: "",
+        total_evaluations: 0,
+        errors: 0,
+        duration_seconds: undefined,
+        results: [],
+      },
+    ];
+    vi.mocked(fetchRuns).mockResolvedValue(runsWithMissing as any);
+
+    render(
+      <MemoryRouter>
+        <RunsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/run-missing/)).toBeInTheDocument();
+    });
+    // Missing duration and timestamp both render "N/A"
+    const naElements = screen.getAllByText("N/A");
+    expect(naElements.length).toBeGreaterThanOrEqual(2);
+    // Pass rate should show 0.0% (not NaN%)
+    expect(screen.getByText("0.0%")).toBeInTheDocument();
+  });
 });
