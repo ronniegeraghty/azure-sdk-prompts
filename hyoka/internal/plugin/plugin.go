@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 
-	"github.com/ronniegeraghty/hyoka/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,6 +46,18 @@ type MCPServer struct {
 type HookConfig struct {
 	PreToolUse  []string `yaml:"pre_tool_use,omitempty" json:"pre_tool_use,omitempty"`
 	PostToolUse []string `yaml:"post_tool_use,omitempty" json:"post_tool_use,omitempty"`
+}
+
+// ToolEntry describes a unified tool entry produced from a plugin.
+type ToolEntry struct {
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Source   string   `json:"source,omitempty"`
+	Path     string   `json:"path,omitempty"`
+	Repo     string   `json:"repo,omitempty"`
+	Command  string   `json:"command,omitempty"`
+	Args     []string `json:"args,omitempty"`
+	MCPTools []string `json:"mcp_tools,omitempty"`
 }
 
 // Registry holds loaded plugins indexed by name.
@@ -143,38 +155,33 @@ func (r *Registry) Count() int {
 	return len(r.plugins)
 }
 
-// ApplyToGenerator resolves plugin names and merges their skills and MCP
-// servers into the generator's existing configuration. Duplicate entries
-// are skipped.
-func (r *Registry) ApplyToGenerator(pluginNames []string, tools *[]config.ToolEntry) error {
-	for _, name := range pluginNames {
-		p, err := r.Get(name)
-		if err != nil {
-			return err
+// ToToolEntries converts the plugin's skills and MCP servers into unified tool entries.
+func (p *Plugin) ToToolEntries() []ToolEntry {
+	var entries []ToolEntry
+	for _, s := range p.Skills {
+		entries = append(entries, toolEntryFromPluginSkill(s))
+	}
+	if len(p.MCPServers) > 0 {
+		names := make([]string, 0, len(p.MCPServers))
+		for name := range p.MCPServers {
+			names = append(names, name)
 		}
-		for _, s := range p.Skills {
-			entry := toolEntryFromPluginSkill(s)
-			if !containsToolEntry(*tools, entry) {
-				*tools = append(*tools, entry)
-			}
-		}
-		for k, v := range p.MCPServers {
-			entry := config.ToolEntry{
-				Name:     k,
+		sort.Strings(names)
+		for _, name := range names {
+			server := p.MCPServers[name]
+			entries = append(entries, ToolEntry{
+				Name:     name,
 				Type:     "mcp",
-				Command:  v.Command,
-				Args:     v.Args,
-				MCPTools: v.Tools,
-			}
-			if !containsToolEntry(*tools, entry) {
-				*tools = append(*tools, entry)
-			}
+				Command:  server.Command,
+				Args:     server.Args,
+				MCPTools: server.Tools,
+			})
 		}
 	}
-	return nil
+	return entries
 }
 
-func toolEntryFromPluginSkill(s PluginSkill) config.ToolEntry {
+func toolEntryFromPluginSkill(s PluginSkill) ToolEntry {
 	name := s.Name
 	if name == "" {
 		if s.Path != "" {
@@ -183,20 +190,11 @@ func toolEntryFromPluginSkill(s PluginSkill) config.ToolEntry {
 			name = s.Repo
 		}
 	}
-	return config.ToolEntry{
+	return ToolEntry{
 		Name:   name,
 		Type:   "skill",
 		Source: s.Type,
 		Path:   s.Path,
 		Repo:   s.Repo,
 	}
-}
-
-func containsToolEntry(tools []config.ToolEntry, entry config.ToolEntry) bool {
-	for _, existing := range tools {
-		if existing.ResolvedType() == entry.ResolvedType() && existing.Name == entry.Name {
-			return true
-		}
-	}
-	return false
 }

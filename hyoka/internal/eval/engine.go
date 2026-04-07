@@ -257,6 +257,82 @@ type resolvedLimits struct {
 	maxSessionActions int
 }
 
+func expandGeneratorModels(configs []config.ToolConfig) ([]config.ToolConfig, error) {
+	var expanded []config.ToolConfig
+	for _, cfg := range configs {
+		if cfg.Generator == nil {
+			return nil, fmt.Errorf("config %q: generator.model or generator.models is required", cfg.Name)
+		}
+		models := cfg.Generator.ResolveModels()
+		if len(models) == 0 {
+			return nil, fmt.Errorf("config %q: generator.model or generator.models is required", cfg.Name)
+		}
+		for _, model := range models {
+			clone := cloneToolConfigForModel(cfg, model)
+			if len(models) > 1 {
+				clone.Name = fmt.Sprintf("%s/%s", cfg.Name, model)
+			}
+			expanded = append(expanded, clone)
+		}
+	}
+	return expanded, nil
+}
+
+func cloneToolConfigForModel(src config.ToolConfig, model string) config.ToolConfig {
+	dst := src
+	if src.Generator != nil {
+		gen := *src.Generator
+		gen.Model = model
+		gen.Models = nil
+		if len(src.Generator.Tools) > 0 {
+			gen.Tools = cloneToolEntries(src.Generator.Tools)
+		}
+		if len(src.Generator.ExcludedTools) > 0 {
+			gen.ExcludedTools = append([]string(nil), src.Generator.ExcludedTools...)
+		}
+		dst.Generator = &gen
+	}
+	if src.Reviewer != nil {
+		rev := *src.Reviewer
+		if len(src.Reviewer.Tools) > 0 {
+			rev.Tools = cloneToolEntries(src.Reviewer.Tools)
+		}
+		if len(src.Reviewer.Models) > 0 {
+			rev.Models = append([]string(nil), src.Reviewer.Models...)
+		}
+		dst.Reviewer = &rev
+	}
+	if len(src.Plugins) > 0 {
+		dst.Plugins = append([]string(nil), src.Plugins...)
+	}
+	return dst
+}
+
+func cloneToolEntries(entries []config.ToolEntry) []config.ToolEntry {
+	clone := make([]config.ToolEntry, len(entries))
+	for i, te := range entries {
+		clone[i] = te
+		if te.When != nil {
+			m := make(map[string]string, len(te.When))
+			for k, v := range te.When {
+				m[k] = v
+			}
+			clone[i].When = m
+		}
+		if te.Args != nil {
+			args := make([]string, len(te.Args))
+			copy(args, te.Args)
+			clone[i].Args = args
+		}
+		if te.MCPTools != nil {
+			tools := make([]string, len(te.MCPTools))
+			copy(tools, te.MCPTools)
+			clone[i].MCPTools = tools
+		}
+	}
+	return clone
+}
+
 // resolveLimits merges per-config session limits with engine defaults.
 // Config values > 0 take precedence; zero values fall back to engine defaults.
 func (e *Engine) resolveLimits(cfg config.ToolConfig) resolvedLimits {
@@ -291,6 +367,12 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	// Load pluggable grader configs (#136) if configured.
 	e.loadGraders()
+
+	expandedConfigs, err := expandGeneratorModels(configs)
+	if err != nil {
+		return nil, err
+	}
+	configs = expandedConfigs
 
 	// Build task list (cross product: prompts × configs)
 	var tasks []EvalTask

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -349,6 +350,47 @@ configs:
 	}
 }
 
+func TestExpandPluginsAppendsTools(t *testing.T) {
+	dir := t.TempDir()
+	pluginPath := filepath.Join(dir, "test-plugin.yaml")
+	pluginData := []byte(`
+name: test-plugin
+skills:
+  - type: local
+    path: ./skills/generator
+mcp_servers:
+  azure:
+    type: stdio
+    command: npx
+    args: ["-y", "@azure/mcp@latest"]
+`)
+	if err := os.WriteFile(pluginPath, pluginData, 0644); err != nil {
+		t.Fatalf("failed to write plugin: %v", err)
+	}
+
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{
+				Name:        "with-plugin",
+				Description: "plugin config",
+				Generator:   &GeneratorConfig{Model: "gpt-4"},
+				Reviewer:    &ReviewerConfig{Models: []string{"gpt-4"}},
+				Plugins:     []string{"test-plugin"},
+			},
+		},
+	}
+	if err := cf.ExpandPlugins(dir); err != nil {
+		t.Fatalf("expand plugins failed: %v", err)
+	}
+	c := cf.Configs[0]
+	if len(c.Generator.Tools) != 2 {
+		t.Fatalf("expected 2 generator tools, got %d", len(c.Generator.Tools))
+	}
+	if len(c.Reviewer.Tools) != 2 {
+		t.Fatalf("expected 2 reviewer tools, got %d", len(c.Reviewer.Tools))
+	}
+}
+
 func TestInstallSkillsAndPluginsEmpty(t *testing.T) {
 	configs := []ToolConfig{
 		{Name: "empty", Description: "No skills", Generator: &GeneratorConfig{Model: "gpt-4"}},
@@ -632,6 +674,42 @@ func TestGeneratorModelDirectAccess(t *testing.T) {
 	}
 }
 
+func TestResolveModelsSingle(t *testing.T) {
+	g := &GeneratorConfig{Model: "gpt-4"}
+	if got := g.ResolveModels(); !reflect.DeepEqual(got, []string{"gpt-4"}) {
+		t.Errorf("expected [gpt-4], got %v", got)
+	}
+}
+
+func TestResolveModelsMultiple(t *testing.T) {
+	g := &GeneratorConfig{Models: []string{"claude-opus-4.6", "claude-sonnet-4.5"}}
+	want := []string{"claude-opus-4.6", "claude-sonnet-4.5"}
+	if got := g.ResolveModels(); !reflect.DeepEqual(got, want) {
+		t.Errorf("expected %v, got %v", want, got)
+	}
+}
+
+func TestResolveModelsBoth(t *testing.T) {
+	g := &GeneratorConfig{Model: "ignored", Models: []string{"m1", "m2"}}
+	want := []string{"m1", "m2"}
+	if got := g.ResolveModels(); !reflect.DeepEqual(got, want) {
+		t.Errorf("expected %v, got %v", want, got)
+	}
+}
+
+func TestResolveModelsNone(t *testing.T) {
+	g := &GeneratorConfig{}
+	if got := g.ResolveModels(); len(got) != 0 {
+		t.Errorf("expected empty models, got %v", got)
+	}
+	cf := &ConfigFile{
+		Configs: []ToolConfig{{Name: "missing", Generator: g}},
+	}
+	if err := cf.Validate(); err == nil {
+		t.Fatal("expected error for missing generator model")
+	}
+}
+
 func TestValidateRejectsNilGenerator(t *testing.T) {
 	cf := &ConfigFile{
 		Configs: []ToolConfig{
@@ -642,7 +720,7 @@ func TestValidateRejectsNilGenerator(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil generator")
 	}
-	want := `config "no-gen": generator.model is required`
+	want := `config "no-gen": generator.model or generator.models is required`
 	if err.Error() != want {
 		t.Errorf("got %q, want %q", err.Error(), want)
 	}
@@ -708,7 +786,7 @@ func TestValidateRejectsEmptyGeneratorModel(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty generator model")
 	}
-	want := `config "empty-model": generator.model is required`
+	want := `config "empty-model": generator.model or generator.models is required`
 	if err.Error() != want {
 		t.Errorf("got %q, want %q", err.Error(), want)
 	}
@@ -879,7 +957,7 @@ configs:
 	if err == nil {
 		t.Fatal("expected error for nil generator")
 	}
-	want := `config "nil-gen": generator.model is required`
+	want := `config "nil-gen": generator.model or generator.models is required`
 	if err.Error() != want {
 		t.Errorf("got %q, want %q", err.Error(), want)
 	}

@@ -206,6 +206,7 @@ func runCmd() *cobra.Command {
 						configs[i].Generator = &config.GeneratorConfig{}
 					}
 					configs[i].Generator.Model = f.model
+					configs[i].Generator.Models = nil
 				}
 			}
 
@@ -246,8 +247,23 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("no prompts matched the given filters")
 			}
 
+			effectiveConfigs := 0
+			for _, c := range configs {
+				if c.Generator == nil {
+					continue
+				}
+				models := c.Generator.ResolveModels()
+				if len(models) == 0 {
+					continue
+				}
+				effectiveConfigs += len(models)
+			}
+			if effectiveConfigs == 0 {
+				effectiveConfigs = len(configs)
+			}
+
 			fmt.Printf("Found %d prompt(s), %d config(s) \u2192 %d evaluation(s)\n",
-				len(filtered), len(configs), len(filtered)*len(configs))
+				len(filtered), effectiveConfigs, len(filtered)*effectiveConfigs)
 
 			// Select evaluator and reviewer
 			var evaluator eval.CopilotEvaluator

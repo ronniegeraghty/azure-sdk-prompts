@@ -8,16 +8,34 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"github.com/ronniegeraghty/hyoka/internal/plugin"
 	"gopkg.in/yaml.v3"
 )
 
 // GeneratorConfig holds all configuration for the code generation agent.
 type GeneratorConfig struct {
-	Model         string      `yaml:"model" json:"model"`
+	Model         string      `yaml:"model,omitempty" json:"model,omitempty"`
+	Models        []string    `yaml:"models,omitempty" json:"models,omitempty"`
 	SystemPrompt  string      `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
 	Tools         []ToolEntry `yaml:"tools,omitempty" json:"tools,omitempty"`
 	ExcludedTools []string    `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`
+}
+
+// ResolveModels returns the generator models to use. Models takes precedence
+// over Model when both are set.
+func (g *GeneratorConfig) ResolveModels() []string {
+	if g == nil {
+		return nil
+	}
+	if len(g.Models) > 0 {
+		return g.Models
+	}
+	if g.Model != "" {
+		return []string{g.Model}
+	}
+	return nil
 }
 
 // ReviewerConfig holds all configuration for the review/grading plane.
@@ -58,7 +76,17 @@ func Load(path string) (*ConfigFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
-	return Parse(data)
+	cfg, err := Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := cfg.ExpandPlugins(resolvePluginsDir()); err != nil {
+		return nil, fmt.Errorf("expanding plugins: %w", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 // LoadDir reads all .yaml files in a directory and merges their configs.
@@ -107,7 +135,8 @@ func Parse(data []byte) (*ConfigFile, error) {
 		return nil, err
 	}
 	for _, c := range cfg.Configs {
-		slog.Info("Config loaded", "name", c.Name, "model", c.Generator.Model)
+		models := c.Generator.ResolveModels()
+		slog.Info("Config loaded", "name", c.Name, "models", strings.Join(models, ","))
 	}
 	return &cfg, nil
 }
@@ -123,8 +152,22 @@ func (cf *ConfigFile) Validate() error {
 			return fmt.Errorf("config at index %d has no name", i)
 		}
 		// Generator with a model is required for every config.
-		if c.Generator == nil || c.Generator.Model == "" {
-			return fmt.Errorf("config %q: generator.model is required", c.Name)
+		if c.Generator == nil {
+			return fmt.Errorf("config %q: generator.model or generator.models is required", c.Name)
+		}
+		models := c.Generator.ResolveModels()
+		if len(models) == 0 {
+			return fmt.Errorf("config %q: generator.model or generator.models is required", c.Name)
+		}
+		seenModels := make(map[string]bool, len(models))
+		for _, model := range models {
+			if model == "" {
+				return fmt.Errorf("config %q: generator model must not be empty", c.Name)
+			}
+			if seenModels[model] {
+				return fmt.Errorf("config %q: duplicate generator model %q", c.Name, model)
+			}
+			seenModels[model] = true
 		}
 		if prev, ok := namesSeen[c.Name]; ok {
 			return fmt.Errorf("duplicate config name %q at index %d and %d", c.Name, prev, i)
@@ -218,8 +261,17 @@ func InstallSkillsAndPlugins(configs []ToolConfig) error {
 	}
 	var entries []entry
 
+	reg := plugin.NewRegistry()
+	pluginsDir := resolvePluginsDir()
+	if err := reg.LoadDir(pluginsDir); err != nil {
+		return err
+	}
+
 	for _, c := range configs {
 		for _, p := range c.Plugins {
+			if _, err := reg.Get(p); err == nil {
+				continue
+			}
 			if !seen["plugin:"+p] {
 				seen["plugin:"+p] = true
 				entries = append(entries, entry{"plugin", p})
