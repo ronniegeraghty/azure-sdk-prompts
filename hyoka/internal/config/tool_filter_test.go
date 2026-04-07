@@ -131,7 +131,8 @@ func TestMatchesWhen_MissingProperty(t *testing.T) {
 func TestValidateToolEntry_Valid(t *testing.T) {
 	cases := []ToolEntry{
 		{Name: "bash"},
-		{Name: "azure", Type: "mcp", Command: "npx"},
+		{Name: "create", Pairwise: "off"},
+		{Name: "azure", Type: "mcp", Command: "npx", Pairwise: "deep", MCPTools: []string{"storage"}},
 		{Name: "gen-skill", Type: "skill", Source: "local", Path: "./skills/generator"},
 	}
 	for i, tc := range cases {
@@ -267,6 +268,13 @@ func TestValidateToolEntry_InvalidType(t *testing.T) {
 	}
 }
 
+func TestValidateToolEntry_InvalidPairwise(t *testing.T) {
+	entry := ToolEntry{Name: "bad", Pairwise: "loud"}
+	if err := validateToolEntry(entry, "test", 0); err == nil {
+		t.Fatal("expected error for invalid pairwise value")
+	}
+}
+
 func TestValidateToolEntry_MCPMissingCommand(t *testing.T) {
 	entry := ToolEntry{Name: "azure", Type: "mcp"}
 	if err := validateToolEntry(entry, "test", 0); err == nil {
@@ -285,5 +293,22 @@ func TestValidateToolEntry_SkillInvalidSource(t *testing.T) {
 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "bad", Path: "./skills"}
 	if err := validateToolEntry(entry, "test", 0); err == nil {
 		t.Fatal("expected error for invalid skill source")
+	}
+}
+
+func TestToolEntryResolvedPairwise(t *testing.T) {
+	cases := []struct {
+		entry ToolEntry
+		want  string
+	}{
+		{entry: ToolEntry{Name: "bash"}, want: "shallow"},
+		{entry: ToolEntry{Name: "bash", Pairwise: "deep"}, want: "deep"},
+		{entry: ToolEntry{Name: "bash", Pairwise: "off"}, want: "off"},
+		{entry: ToolEntry{Name: "bash", Pairwise: "deep", AlwaysOn: true}, want: "off"},
+	}
+	for _, tc := range cases {
+		if got := tc.entry.ResolvedPairwise(); got != tc.want {
+			t.Errorf("ResolvedPairwise(%+v) = %q, want %q", tc.entry, got, tc.want)
+		}
 	}
 }

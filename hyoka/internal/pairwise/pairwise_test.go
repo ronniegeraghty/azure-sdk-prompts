@@ -3,6 +3,8 @@ package pairwise
 import (
 	"math"
 	"testing"
+
+	"github.com/ronniegeraghty/hyoka/internal/config"
 )
 
 func TestComputeImpacts(t *testing.T) {
@@ -53,6 +55,80 @@ func TestComputeImpacts(t *testing.T) {
 	if report.Impacts[2].Impact != -10.0 {
 		t.Errorf("expected impact -10.0, got %.1f", report.Impacts[2].Impact)
 	}
+}
+
+func TestExpandPairwise_ShallowMCP(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "baseline",
+		Generator: &config.GeneratorConfig{
+			Model: "gpt-4",
+			Tools: []config.ToolEntry{
+				{Name: "azure", Type: "mcp", Command: "npx"},
+			},
+		},
+	}
+
+	variants := ExpandPairwise(cfg)
+	if len(variants) != 2 {
+		t.Fatalf("expected 2 variants, got %d", len(variants))
+	}
+	if variants[0].Name != "baseline/baseline" {
+		t.Errorf("expected baseline variant name, got %q", variants[0].Name)
+	}
+	if variants[1].Name != "baseline/without-azure" {
+		t.Errorf("expected without-azure variant, got %q", variants[1].Name)
+	}
+	if len(variants[1].Generator.Tools) != 0 {
+		t.Errorf("expected MCP entry removed, got %d tools", len(variants[1].Generator.Tools))
+	}
+}
+
+func TestExpandPairwise_DeepMCPTools(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "baseline",
+		Generator: &config.GeneratorConfig{
+			Model: "gpt-4",
+			Tools: []config.ToolEntry{
+				{
+					Name:     "azure",
+					Type:     "mcp",
+					Command:  "npx",
+					Pairwise: "deep",
+					MCPTools: []string{"storage", "key-vault"},
+				},
+			},
+		},
+	}
+
+	variants := ExpandPairwise(cfg)
+	if len(variants) != 3 {
+		t.Fatalf("expected 3 variants, got %d", len(variants))
+	}
+
+	checkVariant := func(name string, expected []string) {
+		t.Helper()
+		for _, v := range variants {
+			if v.Name == name {
+				if len(v.Generator.Tools) != 1 {
+					t.Fatalf("expected 1 tool entry for %s, got %d", name, len(v.Generator.Tools))
+				}
+				got := v.Generator.Tools[0].MCPTools
+				if len(got) != len(expected) {
+					t.Fatalf("expected %d mcp tools for %s, got %d", len(expected), name, len(got))
+				}
+				for i, tool := range expected {
+					if got[i] != tool {
+						t.Fatalf("expected tool %q at %d for %s, got %q", tool, i, name, got[i])
+					}
+				}
+				return
+			}
+		}
+		t.Fatalf("variant %q not found", name)
+	}
+
+	checkVariant("baseline/without-azure/storage", []string{"key-vault"})
+	checkVariant("baseline/without-azure/key-vault", []string{"storage"})
 }
 
 func TestComputeImpactsNoBaseline(t *testing.T) {
