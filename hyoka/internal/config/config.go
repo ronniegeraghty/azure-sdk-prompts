@@ -43,7 +43,6 @@ type GeneratorConfig struct {
 
 // ReviewerConfig holds all configuration for the review/grading plane.
 type ReviewerConfig struct {
-	Model        string   `yaml:"model,omitempty" json:"model,omitempty"`
 	Models       []string `yaml:"models,omitempty" json:"models,omitempty"`
 	SystemPrompt string   `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
 	Skills       []Skill  `yaml:"skills,omitempty" json:"skills,omitempty"`

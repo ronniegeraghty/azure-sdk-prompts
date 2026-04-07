@@ -18,7 +18,10 @@ import (
 // summary.json are written to disk.
 func TestIntegrationStubEvalReviewPipeline(t *testing.T) {
 outputDir := t.TempDir()
-engine := NewEngineWithReviewer(&StubEvaluator{}, &review.StubReviewer{}, quietOpts(EngineOptions{
+stubFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+	return &review.StubReviewer{}, nil, nil
+}
+engine := NewEngineWithReviewerFactory(&StubEvaluator{}, stubFactory, quietOpts(EngineOptions{
 Workers:   1,
 OutputDir: outputDir,
 }))
@@ -40,7 +43,7 @@ configs := []config.ToolConfig{
 {
 Name:      "test-config",
 Generator: &config.GeneratorConfig{Model: "gpt-4"},
-Reviewer:  &config.ReviewerConfig{Model: "gpt-4"},
+Reviewer:  &config.ReviewerConfig{Models: []string{"gpt-4"}},
 },
 }
 
@@ -137,7 +140,10 @@ t.Errorf("summary RunID mismatch: disk=%q, memory=%q", diskSummary.RunID, summar
 // produces a valid report on disk.
 func TestIntegrationMultiPromptMultiConfigWithReview(t *testing.T) {
 outputDir := t.TempDir()
-engine := NewEngineWithReviewer(&StubEvaluator{}, &review.StubReviewer{}, quietOpts(EngineOptions{
+stubFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+	return &review.StubReviewer{}, nil, nil
+}
+engine := NewEngineWithReviewerFactory(&StubEvaluator{}, stubFactory, quietOpts(EngineOptions{
 Workers:   2,
 OutputDir: outputDir,
 }))
@@ -155,8 +161,8 @@ Properties: map[string]string{"service": "storage", "plane": "data-plane", "lang
 },
 }
 configs := []config.ToolConfig{
-{Name: "cfg-alpha", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Reviewer: &config.ReviewerConfig{Model: "gpt-4"}},
-{Name: "cfg-beta", Generator: &config.GeneratorConfig{Model: "claude-sonnet-4.5"}, Reviewer: &config.ReviewerConfig{Model: "claude-sonnet-4.5"}},
+{Name: "cfg-alpha", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Reviewer: &config.ReviewerConfig{Models: []string{"gpt-4"}}},
+{Name: "cfg-beta", Generator: &config.GeneratorConfig{Model: "claude-sonnet-4.5"}, Reviewer: &config.ReviewerConfig{Models: []string{"claude-sonnet-4.5"}}},
 }
 
 summary, err := engine.Run(context.Background(), prompts, configs)
@@ -234,8 +240,8 @@ Properties: map[string]string{"service": "identity", "plane": "data-plane", "lan
 },
 }
 configs := []config.ToolConfig{
-{Name: "cfg-1", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Reviewer: &config.ReviewerConfig{Model: "gpt-4"}},
-{Name: "cfg-2", Generator: &config.GeneratorConfig{Model: "claude-sonnet-4.5"}, Reviewer: &config.ReviewerConfig{Model: "claude-sonnet-4.5"}},
+{Name: "cfg-1", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Reviewer: &config.ReviewerConfig{Models: []string{"gpt-4"}}},
+{Name: "cfg-2", Generator: &config.GeneratorConfig{Model: "claude-sonnet-4.5"}, Reviewer: &config.ReviewerConfig{Models: []string{"claude-sonnet-4.5"}}},
 }
 
 summary, err := engine.Run(context.Background(), prompts, configs)
