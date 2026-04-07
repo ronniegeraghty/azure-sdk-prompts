@@ -109,6 +109,10 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 			gen.ExcludedTools = make([]string, len(src.Generator.ExcludedTools))
 			copy(gen.ExcludedTools, src.Generator.ExcludedTools)
 		}
+		if len(src.Generator.Models) > 0 {
+			gen.Models = make([]string, len(src.Generator.Models))
+			copy(gen.Models, src.Generator.Models)
+		}
 
 		dst.Generator = &gen
 	}

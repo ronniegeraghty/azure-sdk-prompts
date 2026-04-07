@@ -100,10 +100,12 @@ func collectRequiredModels(configs []config.ToolConfig) []string {
 	seen := make(map[string]bool)
 	var models []string
 	for _, cfg := range configs {
-		if cfg.Generator != nil && cfg.Generator.Model != "" {
-			if !seen[cfg.Generator.Model] {
-				seen[cfg.Generator.Model] = true
-				models = append(models, cfg.Generator.Model)
+		if cfg.Generator != nil {
+			for _, gm := range cfg.Generator.ResolveModels() {
+				if !seen[gm] {
+					seen[gm] = true
+					models = append(models, gm)
+				}
 			}
 		}
 		if cfg.Reviewer != nil {

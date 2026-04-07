@@ -1,0 +1,11 @@
+name: azure-python
+description: "Azure SDK for Python — MCP server + best practices skill"
+skills:
+  - type: local
+    name: azure-python-best-practices
+    path: ./skills/generator
+mcp_servers:
+  azure:
+    type: stdio
+    command: npx
+    args: ["-y", "@azure/mcp@latest", "server", "start"]
