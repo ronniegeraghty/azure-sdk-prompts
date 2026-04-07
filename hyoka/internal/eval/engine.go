@@ -308,7 +308,11 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	if evalCount > 10 && e.opts.ConfirmLargeRuns && !e.opts.AutoConfirm {
 		e.printf("⚠️  Large run detected (%d evaluations). Continue? [y/N] ", evalCount)
 		var answer string
-		_, _ = fmt.Scanln(&answer)
+		if _, err := fmt.Scanln(&answer); err != nil {
+			// On piped input or EOF, default to "no" for safety.
+			slog.Info("No TTY input detected, defaulting to abort")
+			return nil, fmt.Errorf("no interactive input available for confirmation")
+		}
 		answer = strings.TrimSpace(strings.ToLower(answer))
 		if answer != "y" && answer != "yes" {
 			return nil, fmt.Errorf("run aborted by user (use -y to skip confirmation)")
