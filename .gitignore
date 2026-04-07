@@ -34,9 +34,11 @@ logs/
 *-debug.log
 
 # Agent workspace
-.agents/
 .claude/
 skills-lock.json
+
+# Node modules
+site/node_modules/
 
 # Built binary
 /hyoka/azsdk-prompt-eval
@@ -47,3 +49,6 @@ skills-lock.json
 .squad/sessions/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+
+# Playwright MCP snapshots
+.playwright-mcp/
