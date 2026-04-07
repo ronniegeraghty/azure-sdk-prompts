@@ -929,7 +929,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			lg.Warn("Guardrail triggered", "reason", reason, "turns", turnCount, "max_turns", lim.maxTurns)
 		}
 
-		// Check action count (count reasoning, message, and tool_execution_start events as actions)
+		// Check action count — soft cap: note but don't error, let review decide pass/fail
 		actionCount := 0
 		for _, ev := range evalReport.SessionEvents {
 			if ev.Type == "assistant.reasoning" || ev.Type == "assistant.message" || ev.Type == "tool.execution_start" {
@@ -937,11 +937,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			}
 		}
 		if actionCount > lim.maxSessionActions {
-			reason := fmt.Sprintf("guardrail: action count %d exceeded limit of %d", actionCount, lim.maxSessionActions)
-			evalReport.GuardrailAbortReason = reason
-			evalReport.Error = reason
-			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "actions", actionCount, "max_session_actions", lim.maxSessionActions)
+			evalReport.ActionLimitReached = true
+			evalReport.ActionCount = actionCount
+			lg.Warn("Action limit reached (soft cap — review will proceed with partial results)",
+				"actions", actionCount, "max_session_actions", lim.maxSessionActions)
 		}
 
 		// Check file count

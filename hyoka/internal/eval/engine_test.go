@@ -324,11 +324,11 @@ func TestGuardrailMaxFiles(t *testing.T) {
 
 func TestGuardrailMaxTurns(t *testing.T) {
 	outputDir := t.TempDir()
+	// 30 assistant.message events exceeds the default MaxTurns=25.
 	engine := NewEngine(&manyTurnsEvaluator{turnCount: 30}, quietOpts(EngineOptions{
-		Workers:   1,
-		OutputDir: outputDir,
+		Workers:    1,
+		OutputDir:  outputDir,
 		SkipReview: true,
-		MaxSessionActions:  5,
 	}))
 
 	prompts := []*prompt.Prompt{
@@ -349,8 +349,64 @@ func TestGuardrailMaxTurns(t *testing.T) {
 	if r.Success {
 		t.Error("expected guardrail to fail the eval")
 	}
-	if !strings.Contains(r.GuardrailAbortReason, "action count") {
-		t.Errorf("expected guardrail abort reason about action count, got %q", r.GuardrailAbortReason)
+	if !strings.Contains(r.GuardrailAbortReason, "turn count") {
+		t.Errorf("expected guardrail abort reason about turn count, got %q", r.GuardrailAbortReason)
+	}
+}
+
+// TestActionLimitSoftCap verifies that exceeding the session action limit is
+// treated as a soft cap: the eval is NOT counted as an error, and the review
+// phase determines pass/fail. The report records action_limit_reached and
+// action_count for transparency.
+func TestActionLimitSoftCap(t *testing.T) {
+	outputDir := t.TempDir()
+	// 10 events with MaxSessionActions=5 triggers the soft cap.
+	// MaxTurns=999 prevents the turn-count hard guardrail from firing.
+	engine := NewEngine(&manyTurnsEvaluator{turnCount: 10}, quietOpts(EngineOptions{
+		Workers:           1,
+		OutputDir:         outputDir,
+		SkipReview:        true,
+		MaxTurns:          999,
+		MaxSessionActions: 5,
+	}))
+
+	prompts := []*prompt.Prompt{
+		{ID: "soft-cap-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
+	}
+	configs := []config.ToolConfig{
+		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	}
+
+	summary, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(summary.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(summary.Results))
+	}
+	r := summary.Results[0]
+
+	// Soft cap: no error set, so the eval is NOT counted as "Errors".
+	if r.Error != "" {
+		t.Errorf("expected no error for action limit soft cap, got %q", r.Error)
+	}
+	// With SkipReview, Success stays as returned by evaluator (true).
+	if !r.Success {
+		t.Error("expected success=true when action limit is soft cap with no review")
+	}
+	// The report records that the action limit was reached.
+	if !r.ActionLimitReached {
+		t.Error("expected ActionLimitReached=true")
+	}
+	if r.ActionCount != 10 {
+		t.Errorf("expected ActionCount=10, got %d", r.ActionCount)
+	}
+	// Summary: counted as Passed (not Error).
+	if summary.Passed != 1 {
+		t.Errorf("expected Passed=1, got %d", summary.Passed)
+	}
+	if summary.Errors != 0 {
+		t.Errorf("expected Errors=0, got %d", summary.Errors)
 	}
 }
 
