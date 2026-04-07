@@ -88,15 +88,16 @@ func DiscoverFromCWD() *ProjectDir {
 // ResolveCandidates returns an ordered list of candidate paths for a given
 // subdirectory name (e.g. "configs", "prompts"). The .hyoka/ path is checked
 // first, followed by the legacy ./subdir and ../subdir fallbacks.
-// Only paths that actually exist on disk are returned.
+// Only paths that actually exist on disk are returned. Symlinks are resolved
+// so that callers using filepath.Walk (which uses os.Lstat) see real directories.
 func ResolveCandidates(proj *ProjectDir, subdir string, extraCandidates ...string) []string {
 	var candidates []string
 
 	// .hyoka/<subdir> takes priority
 	if proj.Found() {
 		hyokaPath := proj.SubDir(subdir)
-		if info, err := os.Stat(hyokaPath); err == nil && info.IsDir() {
-			candidates = append(candidates, hyokaPath)
+		if resolved, ok := resolveIfDir(hyokaPath); ok {
+			candidates = append(candidates, resolved)
 		}
 	}
 
@@ -104,12 +105,37 @@ func ResolveCandidates(proj *ProjectDir, subdir string, extraCandidates ...strin
 	defaults := []string{"./" + subdir, "../" + subdir}
 	defaults = append(defaults, extraCandidates...)
 	for _, c := range defaults {
-		if _, err := os.Stat(c); err == nil {
-			candidates = append(candidates, c)
+		if resolved, ok := resolveIfDir(c); ok {
+			candidates = append(candidates, resolved)
 		}
 	}
 
 	return candidates
+}
+
+// resolveIfDir checks that path exists and is a directory (following symlinks),
+// returning a path suitable for filepath.Walk. Symlinks are resolved via
+// EvalSymlinks; regular directories are returned as-is.
+func resolveIfDir(path string) (string, bool) {
+	linfo, err := os.Lstat(path)
+	if err != nil {
+		return "", false
+	}
+	if linfo.Mode()&os.ModeSymlink != 0 {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return "", false
+		}
+		info, err := os.Stat(resolved)
+		if err != nil || !info.IsDir() {
+			return "", false
+		}
+		return resolved, true
+	}
+	if !linfo.IsDir() {
+		return "", false
+	}
+	return path, true
 }
 
 // InitProject creates the .hyoka directory structure at the given parent
