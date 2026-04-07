@@ -755,6 +755,15 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		slog.Debug("No MCP servers configured")
 	}
 
+	// Wire generator system prompt to Copilot SDK session.
+	if cfg.Generator.SystemPrompt != "" {
+		sc.SystemMessage = &copilot.SystemMessageConfig{
+			Mode:    "append",
+			Content: cfg.Generator.SystemPrompt,
+		}
+		slog.Info("Generator system prompt configured", "length", len(cfg.Generator.SystemPrompt))
+	}
+
 	return sc
 }
 
