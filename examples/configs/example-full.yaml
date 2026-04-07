@@ -13,15 +13,18 @@ configs:
     generator:
       model: "claude-sonnet-4.5"
 
-      # Unified skills list replaces skill_directories + generator_skill_directories
-      skills:
+      # Unified tools list replaces skill_directories + generator_skill_directories
+      tools:
         # Remote skill — fetched from a GitHub repository
-        - type: remote
-          name: azure-keyvault-py
+        - name: azure-keyvault-py
+          type: skill
+          source: remote
           repo: microsoft/skills
 
         # Local skill — directory path (supports glob patterns)
-        - type: local
+        - name: generator-skills
+          type: skill
+          source: local
           path: "./skills/generator"
 
       # MCP servers attached to the generator session
@@ -43,9 +46,11 @@ configs:
         - "gemini-3-pro-preview"
         - "gpt-4.1"
 
-      # Reviewer-specific skills (e.g., rubric knowledge, build verification)
-      skills:
-        - type: local
+      # Reviewer-specific tools (e.g., rubric knowledge, build verification)
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
           path: "./skills/reviewer"
 
   # Minimal config — only required fields

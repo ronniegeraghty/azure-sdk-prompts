@@ -206,7 +206,7 @@ go run ./hyoka run --service identity --language python \
 
 ```bash
 # Tighter limits for faster iteration
-go run ./hyoka run --max-turns 10 --max-files 20 --max-output-size 512KB
+go run ./hyoka run --max-session-actions 10 --max-files 20 --max-output-size 512KB
 
 # Allow real Azure resource provisioning
 go run ./hyoka run --allow-cloud
@@ -254,9 +254,7 @@ Every code-generation session is automatically aborted if it exceeds:
 
 | Limit | Default | Flag |
 |-------|---------|------|
-| Conversation turns | 25 | `--max-turns` |
-| Generated files | 50 | `--max-files` |
-| Total output size | 1 MB | `--max-output-size` |
+| Session actions | 50 | `--max-session-actions` |
 
 When a limit is hit, the evaluation stops and the report shows the specific guardrail that triggered (e.g., `guardrail: file count 51 exceeded limit of 50`).
 

@@ -8,7 +8,7 @@ These limits apply per-evaluation and abort the run if exceeded:
 
 | Guardrail | Default | Flag | Description |
 |-----------|---------|------|-------------|
-| Max Turns | 25 | `--max-turns` | Maximum assistant message turns. Prevents agents from looping indefinitely. |
+| Max Session Actions | 50 | `--max-session-actions` | Maximum actions (reasoning, response, or tool call) per Copilot session. |
 | Max Files | 50 | `--max-files` | Maximum files generated. Prevents agents from creating excessive output. |
 | Max Output Size | 1 MB | `--max-output-size` | Total size of all generated files. Accepts `KB`, `MB`, `GB` suffixes. |
 | Max Session Actions | 50 | `--max-session-actions` | Maximum actions (reasoning, response, or tool call) per Copilot session. |
@@ -25,7 +25,6 @@ By default, hyoka enforces safety boundaries preventing generated code from prov
 | Flag | Description |
 |------|-------------|
 | `--allow-cloud` | Disables safety boundaries, allowing real Azure resource provisioning |
-| `--sandbox` | (Default) Enforces safety boundaries |
 
 ## Fan-Out Confirmation
 
@@ -78,9 +77,7 @@ Each phase has an independent timeout:
 
 | Phase | Default | Flag |
 |-------|---------|------|
-| Generation | 600s (10 min) | `--generate-timeout` |
-| Build | 300s (5 min) | `--build-timeout` |
-| Review | 300s (5 min) | `--review-timeout` |
+| Session timeout | `--session-timeout` |
 
 If a phase times out, the report includes `error_category: "timeout"` with details.
 

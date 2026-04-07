@@ -43,7 +43,6 @@ hyoka run --config baseline --dry-run
 | `--category` | Filter by use-case category |
 | `--tags` | Filter by tags (comma-separated) |
 | `--prompt-id` | Run a single prompt by ID |
-| `--filter` | Generic key=value filter (e.g., `--filter sdk_package=azure-storage-blob`) |
 
 #### Config Flags
 
@@ -61,9 +60,7 @@ hyoka run --config baseline --dry-run
 |------|---------|-------------|
 | `--workers` | CPU count (max 8) | Parallel evaluation workers |
 | `--max-sessions` | workers × 3 | Maximum concurrent Copilot sessions |
-| `--generate-timeout` | 600s | Generation phase timeout |
-| `--build-timeout` | 300s | Build verification timeout |
-| `--review-timeout` | 300s | Review phase timeout |
+| `--session-timeout` | 600s | Maximum time in seconds for any single session phase to complete |
 | `--output` | `./reports` | Report output directory |
 | `--progress` | `auto` | Progress display: `auto`, `live`, `log`, `off` |
 | `--stub` | false | Use stub evaluator (no Copilot SDK) |
@@ -77,7 +74,6 @@ hyoka run --config baseline --dry-run
 | `--skip-tests` | false | Skip test generation |
 | `--skip-review` | false | Skip code review phase |
 | `--skip-trends` | false | Skip trend analysis after run |
-| `--verify-build` | false | Run build verification on generated code |
 | `--dry-run` | false | List matches without running |
 | `--monitor-resources` | false | Track CPU/memory of Copilot sessions |
 | `--strict-cleanup` | false | Fail if orphaned processes remain after cleanup |
