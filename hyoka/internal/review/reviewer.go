@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
@@ -90,95 +89,11 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 	}
 	defer os.RemoveAll(configDir)
 
-	// Capture the assistant's response and all session events
-	var assistantContent strings.Builder
-	var reviewEvents []ReviewEvent
-	var mu sync.Mutex
-
-	var actionCounter int
-	var actionLimitHit bool
 	reviewCtx, reviewCancel := context.WithCancel(ctx)
 	defer reviewCancel()
 
-	eventHandler := func(event copilot.SessionEvent) {
-		mu.Lock()
-		defer mu.Unlock()
-
-		// Count actions and enforce limit
-		switch event.Type {
-		case copilot.SessionEventTypeAssistantReasoning,
-			copilot.SessionEventTypeAssistantMessage,
-			copilot.SessionEventTypeToolExecutionStart:
-			actionCounter++
-			if r.maxSessionActions > 0 && actionCounter > r.maxSessionActions && !actionLimitHit {
-				actionLimitHit = true
-				slog.Warn("Review action limit reached, cancelling session",
-					"model", r.model, "actions", actionCounter, "max_session_actions", r.maxSessionActions)
-				reviewCancel()
-			}
-		}
-
-		// Log review events at debug level for visibility during runs.
-		switch event.Type {
-		case copilot.SessionEventTypeAssistantTurnStart:
-			slog.Debug("Review turn started", "model", r.model)
-		case copilot.SessionEventTypeAssistantTurnEnd:
-			slog.Debug("Review turn ended", "model", r.model)
-		case copilot.SessionEventTypeAssistantMessage:
-			if event.Data.Content != nil {
-				slog.Debug("Review assistant message", "model", r.model,
-					"content_len", len(*event.Data.Content))
-			}
-		case copilot.SessionEventTypeToolExecutionStart:
-			toolName := ""
-			if event.Data.ToolName != nil {
-				toolName = *event.Data.ToolName
-			}
-			slog.Debug("Review tool start", "model", r.model, "tool", toolName)
-		case copilot.SessionEventTypeToolExecutionComplete:
-			toolName := ""
-			if event.Data.ToolName != nil {
-				toolName = *event.Data.ToolName
-			}
-			slog.Debug("Review tool complete", "model", r.model, "tool", toolName)
-		case copilot.SessionEventTypeAssistantUsage:
-			slog.Debug("Review token usage", "model", r.model)
-		}
-
-		if event.Type == copilot.SessionEventTypeAssistantMessage && event.Data.Content != nil {
-			assistantContent.WriteString(*event.Data.Content)
-		}
-
-		// Capture all events for the report timeline
-		evt := ReviewEvent{Type: string(event.Type)}
-		if event.Data.ToolName != nil {
-			evt.ToolName = *event.Data.ToolName
-		}
-		if event.Data.Content != nil {
-			evt.Content = *event.Data.Content
-		}
-		if event.Data.Arguments != nil {
-			if argsBytes, err := json.Marshal(event.Data.Arguments); err == nil {
-				evt.ToolArgs = string(argsBytes)
-			}
-		}
-		if event.Data.Result != nil {
-			if event.Data.Result.Content != nil {
-				evt.Result = *event.Data.Result.Content
-			}
-		}
-		if event.Data.Error != nil {
-			if event.Data.Error.ErrorClass != nil {
-				evt.Error = event.Data.Error.ErrorClass.Message
-			} else if event.Data.Error.String != nil {
-				evt.Error = *event.Data.Error.String
-			}
-		}
-		if event.Data.Duration != nil {
-			evt.Duration = *event.Data.Duration
-		}
-		reviewEvents = append(reviewEvents, evt)
-	}
+	// Capture the assistant's response and all session events
+	collector := newEventCollector(r.model, r.maxSessionActions, reviewCancel)
 
 	slog.Info("Starting review session", "model", r.model, "skills", len(r.skillDirectories), "work_dir", workDir)
 	slog.Debug("Creating review session", "model", r.model)
@@ -188,7 +103,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 		SkillDirectories:    r.skillDirectories,
-		OnEvent:             eventHandler,
+		OnEvent:             collector.handleEvent,
 	}
 	if r.systemPrompt != "" {
 		sessionCfg.SystemMessage = &copilot.SystemMessageConfig{
@@ -236,11 +151,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		return nil, fmt.Errorf("review session send: %w", err)
 	}
 
-	mu.Lock()
-	responseText := assistantContent.String()
-	capturedEvents := make([]ReviewEvent, len(reviewEvents))
-	copy(capturedEvents, reviewEvents)
-	mu.Unlock()
+	responseText, capturedEvents := collector.response()
 
 	result, err := parseReviewResponse(responseText)
 	if err != nil {
@@ -455,93 +366,10 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 	}
 	defer os.RemoveAll(configDir)
 
-	var assistantContent strings.Builder
-	var reviewEvents []ReviewEvent
-	var mu sync.Mutex
-
-	var actionCounter int
-	var actionLimitHit bool
 	reviewCtx, reviewCancel := context.WithCancel(ctx)
 	defer reviewCancel()
 
-	eventHandler := func(event copilot.SessionEvent) {
-		mu.Lock()
-		defer mu.Unlock()
-
-		// Count actions and enforce limit
-		switch event.Type {
-		case copilot.SessionEventTypeAssistantReasoning,
-			copilot.SessionEventTypeAssistantMessage,
-			copilot.SessionEventTypeToolExecutionStart:
-			actionCounter++
-			if p.maxSessionActions > 0 && actionCounter > p.maxSessionActions && !actionLimitHit {
-				actionLimitHit = true
-				slog.Warn("Review action limit reached, cancelling session",
-					"model", model, "actions", actionCounter, "max_session_actions", p.maxSessionActions)
-				reviewCancel()
-			}
-		}
-
-		// Log review events at debug level for visibility during runs.
-		switch event.Type {
-		case copilot.SessionEventTypeAssistantTurnStart:
-			slog.Debug("Review turn started", "model", model)
-		case copilot.SessionEventTypeAssistantTurnEnd:
-			slog.Debug("Review turn ended", "model", model)
-		case copilot.SessionEventTypeAssistantMessage:
-			if event.Data.Content != nil {
-				slog.Debug("Review assistant message", "model", model,
-					"content_len", len(*event.Data.Content))
-			}
-		case copilot.SessionEventTypeToolExecutionStart:
-			toolName := ""
-			if event.Data.ToolName != nil {
-				toolName = *event.Data.ToolName
-			}
-			slog.Debug("Review tool start", "model", model, "tool", toolName)
-		case copilot.SessionEventTypeToolExecutionComplete:
-			toolName := ""
-			if event.Data.ToolName != nil {
-				toolName = *event.Data.ToolName
-			}
-			slog.Debug("Review tool complete", "model", model, "tool", toolName)
-		case copilot.SessionEventTypeAssistantUsage:
-			slog.Debug("Review token usage", "model", model)
-		}
-
-		if event.Type == copilot.SessionEventTypeAssistantMessage && event.Data.Content != nil {
-			assistantContent.WriteString(*event.Data.Content)
-		}
-		// Capture all events for the report timeline
-		evt := ReviewEvent{Type: string(event.Type)}
-		if event.Data.ToolName != nil {
-			evt.ToolName = *event.Data.ToolName
-		}
-		if event.Data.Content != nil {
-			evt.Content = *event.Data.Content
-		}
-		if event.Data.Arguments != nil {
-			if argsBytes, err := json.Marshal(event.Data.Arguments); err == nil {
-				evt.ToolArgs = string(argsBytes)
-			}
-		}
-		if event.Data.Result != nil {
-			if event.Data.Result.Content != nil {
-				evt.Result = *event.Data.Result.Content
-			}
-		}
-		if event.Data.Error != nil {
-			if event.Data.Error.ErrorClass != nil {
-				evt.Error = event.Data.Error.ErrorClass.Message
-			} else if event.Data.Error.String != nil {
-				evt.Error = *event.Data.Error.String
-			}
-		}
-		if event.Data.Duration != nil {
-			evt.Duration = *event.Data.Duration
-		}
-		reviewEvents = append(reviewEvents, evt)
-	}
+	collector := newEventCollector(model, p.maxSessionActions, reviewCancel)
 
 	slog.Info("Starting review session", "model", model, "skills", len(p.skillDirectories), "work_dir", workDir)
 	slog.Debug("Creating review session", "model", model)
@@ -551,7 +379,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 		SkillDirectories:    p.skillDirectories,
-		OnEvent:             eventHandler,
+		OnEvent:             collector.handleEvent,
 	}
 	if p.systemPrompt != "" {
 		sessionCfg.SystemMessage = &copilot.SystemMessageConfig{
@@ -582,11 +410,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		return nil, fmt.Errorf("review session send for %s: %w", model, err)
 	}
 
-	mu.Lock()
-	responseText := assistantContent.String()
-	capturedEvents := make([]ReviewEvent, len(reviewEvents))
-	copy(capturedEvents, reviewEvents)
-	mu.Unlock()
+	responseText, capturedEvents := collector.response()
 
 	result, err := parseReviewResponse(responseText)
 	if err != nil {
@@ -600,30 +424,11 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 func (p *PanelReviewer) consolidate(ctx context.Context, originalPrompt string, generatedFiles map[string]string, panel []ReviewResult) (*ReviewResult, error) {
 	consolidatorModel := p.models[0]
 	slog.Debug("Starting consolidation", "consolidator_model", consolidatorModel, "panel_size", len(panel))
-	var b strings.Builder
-	b.WriteString("You are a senior review consolidator. Multiple independent reviewers have scored the same generated code.\n")
-	b.WriteString("Synthesize their feedback into a single consensus review.\n\n")
 
-	b.WriteString("## Original Prompt\n\n")
-	b.WriteString(originalPrompt)
-	b.WriteString("\n\n")
-
-	b.WriteString("## Individual Reviews\n\n")
-	for i, r := range panel {
-		reviewJSON, _ := json.MarshalIndent(r, "", "  ")
-		fmt.Fprintf(&b, "### Reviewer %d (%s)\n```json\n%s\n```\n\n", i+1, r.Model, string(reviewJSON))
-	}
-
-	b.WriteString("## Instructions\n\n")
-	b.WriteString("Produce a consensus review using the criteria-based pass/fail system. ")
-	b.WriteString("For each criterion, it PASSES if the majority of reviewers marked it as passed. ")
-	b.WriteString("Use the union of all criteria across reviewers. ")
-	b.WriteString("Combine the best issues and strengths from all reviewers. ")
-	b.WriteString("Write a summary that captures the consensus view.\n\n")
-	b.WriteString("Respond with ONLY a JSON object in the same format as the individual reviews.\n")
+	prompt := buildConsolidationPrompt(originalPrompt, panel)
 
 	slog.Debug("Sending consolidation prompt", "consolidator_model", consolidatorModel)
-	result, err := p.runSingleReview(ctx, consolidatorModel, b.String(), "")
+	result, err := p.runSingleReview(ctx, consolidatorModel, prompt, "")
 	if err != nil {
 		return nil, fmt.Errorf("consolidation failed: %w", err)
 	}
