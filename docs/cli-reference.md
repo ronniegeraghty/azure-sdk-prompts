@@ -43,6 +43,7 @@ hyoka run --config baseline --dry-run
 | `--category` | Filter by use-case category |
 | `--tags` | Filter by tags (comma-separated) |
 | `--prompt-id` | Run a single prompt by ID |
+| `--filter` | Generic key=value filter (e.g., `--filter sdk_package=azure-storage-blob`) |
 
 #### Config Flags
 
@@ -72,6 +73,7 @@ hyoka run --config baseline --dry-run
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--pairwise` / `-P` | false | Expand each config into N+1 pairwise tool-ablation variants for regression testing |
 | `--skip-tests` | false | Skip test generation |
 | `--skip-review` | false | Skip code review phase |
 | `--skip-trends` | false | Skip trend analysis after run |
@@ -109,6 +111,60 @@ List available prompts from the prompt library.
 hyoka list
 hyoka list --service storage
 hyoka list --language python --plane data-plane
+```
+
+### `hyoka init`
+
+Initialize a `.hyoka` project directory with standard subdirectories.
+
+```bash
+# Create a .hyoka directory in the current working directory
+hyoka init
+```
+
+This scaffolds:
+- `configs/` — evaluation config YAML files
+- `prompts/` — prompt library (.prompt.md files)
+- `criteria/` — attribute-matched grader criteria
+- `skills/` — Copilot skills (generator and reviewer)
+- `reports/` — evaluation output directory (added to .gitignore)
+
+Running `init` again on an existing `.hyoka` directory is safe (idempotent).
+
+### `hyoka compare`
+
+Compare evaluation results to identify regressions and improvements.
+
+```bash
+# Config comparison — compare two configs across all shared prompts
+hyoka compare --config-a baseline/claude-sonnet-4.5 --config-b azure-mcp/claude-sonnet-4.5
+
+# Run comparison — compare results from two specific evaluation runs
+hyoka compare --run-a <run-id-1> --run-b <run-id-2>
+
+# Temporal comparison — compare a config before and after a date
+hyoka compare --config baseline/claude-opus-4.6 --since 2025-01-15
+```
+
+| Flag | Description |
+|------|-------------|
+| `--config-a` | First config name for config comparison |
+| `--config-b` | Second config name for config comparison |
+| `--run-a` | First run ID for run comparison |
+| `--run-b` | Second run ID for run comparison |
+| `--config` | Config name for temporal comparison |
+| `--since` | Date cutoff for temporal comparison (YYYY-MM-DD) |
+
+### `hyoka tools`
+
+Manage and list tools available to the generator agent.
+
+```bash
+# List all available tools
+hyoka tools list
+
+# Add a new tool configuration
+hyoka tools add --name my-tool --description "Tool description"
 ```
 
 ### `hyoka configs`

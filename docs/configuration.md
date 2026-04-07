@@ -58,6 +58,7 @@ configs:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `model` | string | required | Model to use for code generation |
+| `system_prompt` | string | "" | Custom system instruction for the generator agent |
 | `skills` | list | [] | Skill references for the generator session |
 | `mcp_servers` | map | {} | MCP server configurations |
 | `available_tools` | list | [] | Allowlist of tools the agent can use |
@@ -69,6 +70,7 @@ configs:
 |-------|------|---------|-------------|
 | `model` | string | — | Single reviewer model |
 | `models` | list | — | Multiple reviewer models (panel review) |
+| `system_prompt` | string | "" | Custom system instruction for reviewer agents |
 | `skills` | list | [] | Skill references for review sessions |
 
 When `models` lists multiple models, hyoka uses a **panel review** where all models review independently and the first model acts as consolidator to produce a consensus result.
@@ -239,6 +241,29 @@ configs:
 ```
 
 Legacy fields (`model`, `reviewer_model`, `reviewer_models`, `skill_directories`, `generator_skill_directories`, `reviewer_skill_directories`, `mcp_servers`, `available_tools`, `excluded_tools`) are automatically normalized to the structured `generator`/`reviewer` format at load time. See the [Skills > Legacy Skill Format](#legacy-skill-format) section for details on how skill directories are migrated.
+
+## Limits
+
+Guardrail limits can be set globally via CLI flags or per-config in the YAML file. CLI flags take precedence over config values.
+
+| Field | Type | Default | CLI Flag | Description |
+|-------|------|---------|----------|-------------|
+| `max_turns` | int | 25 | `--max-turns` | Maximum assistant turns per generation |
+| `max_files` | int | 50 | `--max-files` | Maximum generated files per evaluation |
+| `max_output_size` | string | "1MB" | `--max-output-size` | Maximum total output size (supports KB, MB suffixes) |
+| `max_session_actions` | int | 50 | `--max-session-actions` | Maximum actions per Copilot session |
+
+```yaml
+configs:
+  - name: strict-config
+    generator:
+      model: claude-opus-4.6
+    limits:
+      max_turns: 15
+      max_files: 30
+      max_output_size: "512KB"
+      max_session_actions: 25
+```
 
 ## Multiple Config Files
 

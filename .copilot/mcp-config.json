@@ -9,6 +9,12 @@
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@anthropic-ai/mcp-server-playwright"
+      ]
     }
   }
 }

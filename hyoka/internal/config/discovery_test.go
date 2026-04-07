@@ -163,3 +163,31 @@ func TestResolveCandidates_NoProjectDir(t *testing.T) {
 		t.Errorf("expected ./prompts, got %q", candidates[0])
 	}
 }
+
+func TestResolveCandidates_Symlink(t *testing.T) {
+	root := t.TempDir()
+
+	// Real directory with content
+	realPrompts := filepath.Join(root, "prompts")
+	os.MkdirAll(realPrompts, 0755)
+
+	// .hyoka/prompts → ../prompts (symlink)
+	hyokaDir := filepath.Join(root, ".hyoka")
+	os.MkdirAll(hyokaDir, 0755)
+	os.Symlink(filepath.Join("..", "prompts"), filepath.Join(hyokaDir, "prompts"))
+
+	proj := &ProjectDir{Root: hyokaDir}
+
+	orig, _ := os.Getwd()
+	defer os.Chdir(orig)
+	os.Chdir(root)
+
+	candidates := ResolveCandidates(proj, "prompts")
+	if len(candidates) < 1 {
+		t.Fatal("expected at least one candidate when .hyoka/prompts is a symlink")
+	}
+	// The resolved path should point to the real prompts directory
+	if candidates[0] != realPrompts {
+		t.Errorf("expected resolved path %q, got %q", realPrompts, candidates[0])
+	}
+}
