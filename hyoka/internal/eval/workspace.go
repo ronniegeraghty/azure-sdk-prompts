@@ -72,7 +72,8 @@ type Workspace struct {
 // The workspace is ephemeral — generated files should be copied out
 // before calling Cleanup.
 func NewWorkspace(promptID, configName string) (*Workspace, error) {
-	prefix := fmt.Sprintf("hyoka-%s-%s-", promptID, configName)
+	safeConfig := strings.ReplaceAll(configName, "/", "-")
+	prefix := fmt.Sprintf("hyoka-%s-%s-", promptID, safeConfig)
 	dir, err := os.MkdirTemp("", prefix)
 	if err != nil {
 		return nil, fmt.Errorf("creating temp workspace: %w", err)
