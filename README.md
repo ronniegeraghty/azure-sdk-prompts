@@ -82,7 +82,7 @@ Every code-generation session is automatically aborted if it exceeds any of thes
 
 | Limit | Default | Flag | Purpose |
 |-------|---------|------|---------|
-| Turn count | 25 | `--max-turns` | Prevents runaway conversations |
+| Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
 | File count | 50 | `--max-files` | Prevents excessive file creation |
 | Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (supports KB, MB suffixes) |
 | Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
@@ -183,7 +183,6 @@ hyoka list --json
 | `--progress` | `auto` | Progress display mode: `auto`, `live`, `log`, `off` |
 | `--skip-tests` | `false` | Skip test generation |
 | `--skip-review` | `false` | Skip code review |
-| `--verify-build` | `false` | Run build verification on generated code |
 | `--stub` | `false` | Use stub evaluator (no Copilot SDK) |
 | `--dry-run` | `false` | List matching prompts without running |
 | `--workers` | CPU cores (max 8) | Parallel evaluation workers |
@@ -192,18 +191,15 @@ hyoka list --json
 | `-y` / `--yes` | `false` | Skip confirmation prompt for large runs (>10 evaluations) |
 | `--all-configs` | `false` | Required when running all configs without a `--config` filter |
 | `--config` | | Config name(s) to run — use quotes for multiple: `"name1,name2"` |
-| `--max-turns` | `25` | Maximum conversation turns per generation before aborting |
+| `--max-session-actions` | `50` | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
 | `--max-files` | `50` | Maximum generated files per evaluation before aborting |
 | `--max-output-size` | `1MB` | Maximum total output size per evaluation (supports KB, MB suffixes) |
 | `--max-session-actions` | `50` | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
 | `--allow-cloud` | `false` | Allow generated code to provision real Azure resources |
-| `--sandbox` | `true` | Alias confirming safe/local-only mode (default behavior) |
 | `--criteria-dir` | (none) | Directory with attribute-matched criteria YAML files (e.g., `criteria/`) |
 | `--strict-cleanup` | `false` | Fail run if orphaned Copilot processes remain after cleanup |
 | `--monitor-resources` | `false` | Monitor CPU and memory usage of Copilot sessions during evaluation |
-| `--generate-timeout` | `600` | Generation phase timeout in seconds |
-| `--build-timeout` | `300` | Build verification timeout in seconds |
-| `--review-timeout` | `300` | Review phase timeout in seconds |
+| `--session-timeout` | `600` | Maximum time in seconds for any single session phase to complete |
 | `--exclude-dirs` | | Comma-separated directories to exclude from generated_files output |
 
 ### Run Command Examples
@@ -216,7 +212,7 @@ go run ./hyoka run --prompt-id my-prompt --config "baseline/claude-sonnet-4.5" -
 go run ./hyoka run --all-configs -y
 
 # Tighten guardrails for faster iteration
-go run ./hyoka run --max-turns 10 --max-files 20
+go run ./hyoka run --max-session-actions 10 --max-files 20
 
 # Allow real Azure resource provisioning (use with caution)
 go run ./hyoka run --allow-cloud

@@ -73,7 +73,7 @@ A single evaluation flows through these stages:
         ▼
  ┌─────────────┐     Optional: runs real build commands
  │  build/       │──→ go build, dotnet build, npm install, etc.
- └──────┬──────┘     (enabled with --verify-build)
+ └──────┬──────┘     (configurable via tool settings)
         ▼
  ┌─────────────┐     Multiple LLMs score code against rubric
  │  review/      │──→ each model reviews independently,
@@ -137,11 +137,9 @@ Key flags for `hyoka run`:
 - `--pairwise` / `-P` — Expand configs into pairwise tool-ablation variants
 - `--log-level debug` — Structured debug logging
 - `--log-file path` — Redirect logs to file
-- `--verify-build` — Run real build verification
 - `--skip-review` — Skip the review phase
 - `--criteria-dir` — Directory with tiered criteria YAML files
 - `--strict-cleanup` — Fail run if orphaned processes detected after cleanup
-- `--filter` — Generic key=value filter for prompt metadata
 
 ### Reports and Action Timeline
 
