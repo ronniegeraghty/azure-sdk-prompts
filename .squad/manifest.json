@@ -1,0 +1,29 @@
+{
+  "name": "hyoka",
+  "version": "1.0.0",
+  "description": "Go evaluation tool for AI-generated Azure SDK code — multi-model review panels, pluggable graders, criteria-based scoring, and comprehensive reporting.",
+  "universe": "The Matrix",
+  "capabilities": [
+    "eval-engine",
+    "review-panel",
+    "grading-system",
+    "criteria-framework",
+    "cli-tooling",
+    "report-generation",
+    "prompt-library",
+    "plugin-system",
+    "mcp-integration"
+  ],
+  "contact": {
+    "repo": "ronniegeraghty/hyoka",
+    "labels": ["squad"]
+  },
+  "accepts": ["issues", "prs"],
+  "members": ["morpheus", "neo", "tank", "trinity", "switch", "oracle"],
+  "stack": ["go", "copilot-sdk", "mcp", "cobra-cli"],
+  "pm": {
+    "name": "Treebeard",
+    "squad": "ronnies-agent-team",
+    "repo": "ronniegeraghty/ronnies-agent-team"
+  }
+}

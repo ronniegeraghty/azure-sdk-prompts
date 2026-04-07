@@ -38,19 +38,11 @@ func (g *GeneratorConfig) ResolveModels() []string {
 	return nil
 }
 
-// SkillRef describes a skill reference used by the reviewer.
-type SkillRef struct {
-	Type string `yaml:"type,omitempty" json:"type,omitempty"` // "local" or "remote"
-	Path string `yaml:"path,omitempty" json:"path,omitempty"`
-	Repo string `yaml:"repo,omitempty" json:"repo,omitempty"`
-}
-
 // ReviewerConfig holds all configuration for the review/grading plane.
 type ReviewerConfig struct {
 	Models       []string    `yaml:"models,omitempty" json:"models,omitempty"`
 	SystemPrompt string      `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
 	Tools        []ToolEntry `yaml:"tools,omitempty" json:"tools,omitempty"`
-	Skills       []SkillRef  `yaml:"skills,omitempty" json:"skills,omitempty"`
 }
 
 // SessionLimits configures per-config guardrail limits for evaluation sessions.
@@ -64,13 +56,12 @@ type SessionLimits struct {
 
 // ToolConfig represents a single evaluation configuration.
 type ToolConfig struct {
-	Name                     string           `yaml:"name" json:"name"`
-	Description              string           `yaml:"description" json:"description"`
-	Generator                *GeneratorConfig `yaml:"generator,omitempty" json:"generator,omitempty"`
-	Reviewer                 *ReviewerConfig  `yaml:"reviewer,omitempty" json:"reviewer,omitempty"`
-	Plugins                  []string         `yaml:"plugins,omitempty" json:"plugins,omitempty"`
-	Limits                   *SessionLimits   `yaml:"limits,omitempty" json:"limits,omitempty"`
-	ReviewerSkillDirectories []string         `yaml:"reviewer_skill_directories,omitempty" json:"reviewer_skill_directories,omitempty"`
+	Name        string           `yaml:"name" json:"name"`
+	Description string           `yaml:"description" json:"description"`
+	Generator   *GeneratorConfig `yaml:"generator,omitempty" json:"generator,omitempty"`
+	Reviewer    *ReviewerConfig  `yaml:"reviewer,omitempty" json:"reviewer,omitempty"`
+	Plugins     []string         `yaml:"plugins,omitempty" json:"plugins,omitempty"`
+	Limits      *SessionLimits   `yaml:"limits,omitempty" json:"limits,omitempty"`
 }
 
 // ConfigFile represents the top-level config file structure.
@@ -192,11 +183,6 @@ func (cf *ConfigFile) Validate() error {
 		if c.Reviewer != nil {
 			for j, te := range c.Reviewer.Tools {
 				if err := validateToolEntry(te, c.Name, j); err != nil {
-					return err
-				}
-			}
-			for j, sr := range c.Reviewer.Skills {
-				if err := validateSkillRef(sr, c.Name, j); err != nil {
 					return err
 				}
 			}
