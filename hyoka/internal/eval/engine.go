@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/internal/report"
@@ -675,6 +678,14 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			SessionCount:   rs.SessionCount,
 		}
 		e.printf("\n🔍 Resource usage: %s\n", resMonitor.SummaryLine())
+	}
+
+	pairwiseReports, pairwiseImpacts := collectPairwiseReports(summary.Results)
+	if len(pairwiseReports) > 0 {
+		summary.PairwiseResults = pairwiseReports
+		if _, err := report.WritePairwiseReport(runID, pairwiseReports, pairwiseImpacts, e.opts.OutputDir); err != nil {
+			slog.Warn("Failed to write pairwise report", "error", err)
+		}
 	}
 
 	// Write JSON summary
@@ -1385,6 +1396,97 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 	summary.TotalConfigs = len(configNames)
 
 	return summary, nil
+}
+
+func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseReport, []pairwise.ToolImpact) {
+	type key struct {
+		promptID string
+		baseName string
+	}
+
+	byKey := make(map[key][]pairwise.VariantResult)
+
+	for _, r := range results {
+		model := ""
+		if r.ConfigUsed != nil {
+			if m, ok := r.ConfigUsed["model"].(string); ok {
+				model = m
+			}
+		}
+		baseName, removedTool, ok := parsePairwiseConfigName(r.ConfigName, model)
+		if !ok {
+			continue
+		}
+		score, maxScore := pairwiseScore(r)
+		k := key{promptID: r.PromptID, baseName: baseName}
+		byKey[k] = append(byKey[k], pairwise.VariantResult{
+			ConfigName:  r.ConfigName,
+			RemovedTool: removedTool,
+			Score:       score,
+			MaxScore:    maxScore,
+			Success:     r.Success,
+		})
+	}
+
+	if len(byKey) == 0 {
+		return nil, nil
+	}
+
+	var reports []*pairwise.PairwiseReport
+	for k, variants := range byKey {
+		report, err := pairwise.ComputeImpacts(k.promptID, variants)
+		if err != nil {
+			slog.Warn("Pairwise impact computation failed", "prompt", k.promptID, "config", k.baseName, "error", err)
+			continue
+		}
+		reports = append(reports, report)
+	}
+
+	if len(reports) == 0 {
+		return nil, nil
+	}
+
+	sort.Slice(reports, func(i, j int) bool {
+		if reports[i].PromptID != reports[j].PromptID {
+			return reports[i].PromptID < reports[j].PromptID
+		}
+		return reports[i].Baseline.ConfigName < reports[j].Baseline.ConfigName
+	})
+
+	impacts := pairwise.AggregateImpacts(reports)
+	return reports, impacts
+}
+
+func parsePairwiseConfigName(configName, model string) (string, string, bool) {
+	suffix := ""
+	if model != "" && strings.HasSuffix(configName, "/"+model) {
+		suffix = "/" + model
+		configName = strings.TrimSuffix(configName, suffix)
+	}
+
+	if strings.HasSuffix(configName, "/baseline") {
+		base := strings.TrimSuffix(configName, "/baseline")
+		return base + suffix, "", true
+	}
+
+	if idx := strings.LastIndex(configName, "/without-"); idx != -1 {
+		base := configName[:idx]
+		removed := configName[idx+len("/without-"):]
+		return base + suffix, removed, true
+	}
+
+	return "", "", false
+}
+
+func pairwiseScore(r *report.EvalReport) (int, int) {
+	if r.Review != nil {
+		return r.Review.OverallScore, r.Review.MaxScore
+	}
+	if r.ScoreBreakdown != nil {
+		score := int(math.Round(r.ScoreBreakdown.FinalScorePct))
+		return score, 100
+	}
+	return 0, 0
 }
 
 // evaluateToolUsage compares expected tools from prompt frontmatter with actual tool calls.

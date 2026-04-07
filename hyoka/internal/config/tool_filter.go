@@ -11,6 +11,7 @@ type ToolEntry struct {
 	Type     string            `yaml:"type,omitempty" json:"type,omitempty"` // "tool" (default), "mcp", "skill"
 	When     map[string]string `yaml:"when,omitempty" json:"when,omitempty"`
 	AlwaysOn bool              `yaml:"always_on,omitempty" json:"always_on,omitempty"`
+	Pairwise string            `yaml:"pairwise,omitempty" json:"pairwise,omitempty"` // "off", "shallow" (default), "deep"
 	// MCP-specific fields
 	Command  string   `yaml:"command,omitempty" json:"command,omitempty"`
 	Args     []string `yaml:"args,omitempty" json:"args,omitempty"`
@@ -31,6 +32,18 @@ func resolvedToolType(entry ToolEntry) string {
 // ResolvedType returns the normalized entry type ("tool" by default).
 func (e ToolEntry) ResolvedType() string {
 	return resolvedToolType(e)
+}
+
+// ResolvedPairwise returns the effective pairwise setting ("shallow" default).
+// AlwaysOn overrides any explicit setting to "off".
+func (e ToolEntry) ResolvedPairwise() string {
+	if e.AlwaysOn {
+		return "off"
+	}
+	if e.Pairwise == "" {
+		return "shallow"
+	}
+	return e.Pairwise
 }
 
 // SkillSource returns the normalized skill source ("local" or "remote").
@@ -85,6 +98,9 @@ func matchesWhen(when map[string]string, props map[string]string) bool {
 func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 	if entry.Name == "" {
 		return fmt.Errorf("config %q: tools[%d] missing name", configName, idx)
+	}
+	if entry.Pairwise != "" && entry.Pairwise != "off" && entry.Pairwise != "shallow" && entry.Pairwise != "deep" {
+		return fmt.Errorf("config %q: tools[%d] has invalid pairwise %q", configName, idx, entry.Pairwise)
 	}
 	switch resolvedToolType(entry) {
 	case "tool":

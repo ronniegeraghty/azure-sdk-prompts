@@ -35,7 +35,8 @@ generator:
 ```
 
 Only entries with `type: tool` (or empty type) participate in tool filtering. `type: mcp`
-entries configure MCP servers, and `type: skill` entries configure skills.
+entries configure MCP servers, and `type: skill` entries configure skills. Pairwise
+ablation can be configured for any entry type via the `pairwise` field.
 
 ### `ToolEntry` (tool filtering fields)
 
@@ -45,6 +46,7 @@ entries configure MCP servers, and `type: skill` entries configure skills.
 | `type`    | `string`            | no       | Defaults to `tool`; only `tool` entries are filtered |
 | `when`    | `map[string]string` | no       | Include this tool only when **all** key-value pairs match |
 | `always_on` | `bool`            | no       | Never toggled during pairwise tool ablation |
+| `pairwise`  | `string`          | no       | Pairwise toggle mode: `off`, `shallow` (default), `deep` |
 
 A `ToolEntry` with no `when` clause is unconditional (always included).
 

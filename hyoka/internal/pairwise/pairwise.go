@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/ronniegeraghty/hyoka/internal/config"
 )
@@ -16,7 +17,8 @@ import (
 //   - Variant 1..N: each disables one togglable tool, named "{base}/without-{tool}"
 //
 // Tools with AlwaysOn: true in Generator.Tools are never toggled.
-// Only ToolEntry values with type "tool" are considered.
+// Entries marked pairwise: off are excluded. MCP entries can opt into deep
+// toggling, which expands their mcp_tools list into individual variants.
 func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
 	togglable := collectTogglable(base)
 
@@ -48,11 +50,31 @@ func collectTogglable(cfg config.ToolConfig) []string {
 	var tools []string
 
 	for _, te := range cfg.Generator.Tools {
-		if te.ResolvedType() != "tool" || te.AlwaysOn || seen[te.Name] {
+		if te.ResolvedPairwise() == "off" {
 			continue
 		}
-		seen[te.Name] = true
-		tools = append(tools, te.Name)
+		if te.ResolvedPairwise() == "deep" && te.ResolvedType() == "mcp" {
+			if len(te.MCPTools) == 0 || containsWildcard(te.MCPTools) {
+				if !seen[te.Name] {
+					seen[te.Name] = true
+					tools = append(tools, te.Name)
+				}
+				continue
+			}
+			for _, tool := range te.MCPTools {
+				name := fmt.Sprintf("%s/%s", te.Name, tool)
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				tools = append(tools, name)
+			}
+			continue
+		}
+		if !seen[te.Name] {
+			seen[te.Name] = true
+			tools = append(tools, te.Name)
+		}
 	}
 
 	return tools
@@ -64,9 +86,23 @@ func removeTool(cfg *config.ToolConfig, name string) {
 		return
 	}
 
+	if strings.Contains(name, "/") {
+		mcpName, toolName, ok := strings.Cut(name, "/")
+		if ok {
+			for i, te := range cfg.Generator.Tools {
+				if te.ResolvedType() != "mcp" || te.Name != mcpName {
+					continue
+				}
+				te.MCPTools = removeMCPTool(te.MCPTools, toolName)
+				cfg.Generator.Tools[i] = te
+				return
+			}
+		}
+	}
+
 	var tools []config.ToolEntry
 	for _, te := range cfg.Generator.Tools {
-		if te.ResolvedType() != "tool" || te.Name != name {
+		if te.Name != name {
 			tools = append(tools, te)
 		}
 	}
@@ -155,6 +191,36 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 	}
 
 	return dst
+}
+
+func containsWildcard(values []string) bool {
+	for _, v := range values {
+		if v == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func removeMCPTool(tools []string, remove string) []string {
+	if len(tools) == 0 {
+		return tools
+	}
+	if containsWildcard(tools) {
+		// Wildcard lists require enumerating all tools to remove one entry.
+		// Until the SDK exposes tool discovery, leave the wildcard in place.
+		return tools
+	}
+	kept := tools[:0]
+	for _, tool := range tools {
+		if tool != remove {
+			kept = append(kept, tool)
+		}
+	}
+	if len(kept) == 0 {
+		return []string{}
+	}
+	return append([]string(nil), kept...)
 }
 
 // VariantResult holds the evaluation outcome for a single pairwise variant.
