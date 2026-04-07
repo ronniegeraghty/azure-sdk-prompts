@@ -52,11 +52,11 @@ configs:
 }
 
 func TestParseEmptyConfig(t *testing.T) {
-data := []byte(`configs: []`)
-_, err := Parse(data)
-if err == nil {
-t.Fatal("expected error for empty configs")
-}
+	data := []byte(`configs: []`)
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected error for empty configs")
+	}
 }
 
 func TestParseConfigMissingName(t *testing.T) {
@@ -73,11 +73,11 @@ configs:
 }
 
 func TestParseInvalidYAML(t *testing.T) {
-data := []byte(`not: valid: yaml: [`)
-_, err := Parse(data)
-if err == nil {
-t.Fatal("expected error for invalid YAML")
-}
+	data := []byte(`not: valid: yaml: [`)
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected error for invalid YAML")
+	}
 }
 
 func TestValidateSameModelAccepted(t *testing.T) {
@@ -348,7 +348,7 @@ func TestInstallSkillsAndPluginsEmpty(t *testing.T) {
 }
 
 func TestParseNewFormatGeneratorReviewer(t *testing.T) {
-data := []byte(`
+	data := []byte(`
 configs:
   - name: new-format
     description: "New format with generator/reviewer"
@@ -373,37 +373,37 @@ configs:
         - type: local
           path: "./skills/reviewer"
 `)
-cfg, err := Parse(data)
-if err != nil {
-t.Fatalf("unexpected error: %v", err)
-}
-c := cfg.Configs[0]
+	cfg, err := Parse(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	c := cfg.Configs[0]
 
-if c.Generator.Model != "claude-sonnet-4.5" {
-t.Errorf("expected model 'claude-sonnet-4.5', got %q", c.Generator.Model)
-}
-models := c.Reviewer.Models
-if len(models) != 2 || models[0] != "claude-opus-4.6" {
-t.Errorf("expected reviewer models [claude-opus-4.6 gemini-3-pro-preview], got %v", models)
-}
-genSkills := c.Generator.Skills
-if len(genSkills) != 1 || genSkills[0].Type != "local" {
-t.Errorf("expected 1 generator skill (local), got %v", genSkills)
-}
-revSkills := c.Reviewer.Skills
-if len(revSkills) != 1 || revSkills[0].Path != "./skills/reviewer" {
-t.Errorf("expected 1 reviewer skill, got %v", revSkills)
-}
-mcpServers := c.Generator.MCPServers
-if len(mcpServers) != 1 {
-t.Errorf("expected 1 MCP server, got %d", len(mcpServers))
-}
-if len(c.Generator.AvailableTools) != 2 {
-t.Errorf("expected 2 available tools, got %d", len(c.Generator.AvailableTools))
-}
-if len(c.Generator.ExcludedTools) != 1 {
-t.Errorf("expected 1 excluded tool, got %d", len(c.Generator.ExcludedTools))
-}
+	if c.Generator.Model != "claude-sonnet-4.5" {
+		t.Errorf("expected model 'claude-sonnet-4.5', got %q", c.Generator.Model)
+	}
+	models := c.Reviewer.Models
+	if len(models) != 2 || models[0] != "claude-opus-4.6" {
+		t.Errorf("expected reviewer models [claude-opus-4.6 gemini-3-pro-preview], got %v", models)
+	}
+	genSkills := c.Generator.Skills
+	if len(genSkills) != 1 || genSkills[0].Type != "local" {
+		t.Errorf("expected 1 generator skill (local), got %v", genSkills)
+	}
+	revSkills := c.Reviewer.Skills
+	if len(revSkills) != 1 || revSkills[0].Path != "./skills/reviewer" {
+		t.Errorf("expected 1 reviewer skill, got %v", revSkills)
+	}
+	mcpServers := c.Generator.MCPServers
+	if len(mcpServers) != 1 {
+		t.Errorf("expected 1 MCP server, got %d", len(mcpServers))
+	}
+	if len(c.Generator.AvailableTools) != 2 {
+		t.Errorf("expected 2 available tools, got %d", len(c.Generator.AvailableTools))
+	}
+	if len(c.Generator.ExcludedTools) != 1 {
+		t.Errorf("expected 1 excluded tool, got %d", len(c.Generator.ExcludedTools))
+	}
 }
 
 func TestGeneratorReviewerFieldsPopulated(t *testing.T) {
@@ -463,7 +463,7 @@ configs:
 }
 
 func TestParseRemoteSkill(t *testing.T) {
-data := []byte(`
+	data := []byte(`
 configs:
   - name: with-remote
     description: "Config with remote skill"
@@ -476,25 +476,25 @@ configs:
         - type: local
           path: "./skills/local"
 `)
-cfg, err := Parse(data)
-if err != nil {
-t.Fatalf("unexpected error: %v", err)
-}
-c := cfg.Configs[0]
-skills := c.Generator.Skills
-if len(skills) != 2 {
-t.Fatalf("expected 2 skills, got %d", len(skills))
-}
-if skills[0].Type != "remote" || skills[0].Name != "azure-keyvault-py" || skills[0].Repo != "microsoft/skills" {
-t.Errorf("unexpected remote skill: %+v", skills[0])
-}
-if skills[1].Type != "local" || skills[1].Path != "./skills/local" {
-t.Errorf("unexpected local skill: %+v", skills[1])
-}
+	cfg, err := Parse(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	c := cfg.Configs[0]
+	skills := c.Generator.Skills
+	if len(skills) != 2 {
+		t.Fatalf("expected 2 skills, got %d", len(skills))
+	}
+	if skills[0].Type != "remote" || skills[0].Name != "azure-keyvault-py" || skills[0].Repo != "microsoft/skills" {
+		t.Errorf("unexpected remote skill: %+v", skills[0])
+	}
+	if skills[1].Type != "local" || skills[1].Path != "./skills/local" {
+		t.Errorf("unexpected local skill: %+v", skills[1])
+	}
 }
 
 func TestValidateRejectsInvalidSkillType(t *testing.T) {
-data := []byte(`
+	data := []byte(`
 configs:
   - name: bad-skill
     description: "Bad skill type"
@@ -504,14 +504,14 @@ configs:
         - type: invalid
           path: "./foo"
 `)
-_, err := Parse(data)
-if err == nil {
-t.Fatal("expected error for invalid skill type")
-}
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected error for invalid skill type")
+	}
 }
 
 func TestValidateRejectsLocalSkillMissingPath(t *testing.T) {
-data := []byte(`
+	data := []byte(`
 configs:
   - name: no-path
     description: "Local skill missing path"
@@ -520,14 +520,14 @@ configs:
       skills:
         - type: local
 `)
-_, err := Parse(data)
-if err == nil {
-t.Fatal("expected error for local skill without path")
-}
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected error for local skill without path")
+	}
 }
 
 func TestValidateRejectsRemoteSkillMissingRepo(t *testing.T) {
-data := []byte(`
+	data := []byte(`
 configs:
   - name: no-repo
     description: "Remote skill missing repo"
@@ -537,10 +537,10 @@ configs:
         - type: remote
           name: some-skill
 `)
-_, err := Parse(data)
-if err == nil {
-t.Fatal("expected error for remote skill without repo")
-}
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected error for remote skill without repo")
+	}
 }
 
 func TestParseDuplicateConfigNamesRejected(t *testing.T) {
@@ -703,13 +703,25 @@ configs:
       max_session_actions: 30
 `)
 	cfg, err := Parse(data)
-	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	lim := cfg.Configs[0].Limits
-	if lim == nil { t.Fatal("expected Limits to be set") }
-	if lim.MaxTurns != 10 { t.Errorf("MaxTurns: expected 10, got %d", lim.MaxTurns) }
-	if lim.MaxFiles != 20 { t.Errorf("MaxFiles: expected 20, got %d", lim.MaxFiles) }
-	if lim.MaxOutputSize != 524288 { t.Errorf("MaxOutputSize: expected 524288, got %d", lim.MaxOutputSize) }
-	if lim.MaxSessionActions != 30 { t.Errorf("MaxSessionActions: expected 30, got %d", lim.MaxSessionActions) }
+	if lim == nil {
+		t.Fatal("expected Limits to be set")
+	}
+	if lim.MaxTurns != 10 {
+		t.Errorf("MaxTurns: expected 10, got %d", lim.MaxTurns)
+	}
+	if lim.MaxFiles != 20 {
+		t.Errorf("MaxFiles: expected 20, got %d", lim.MaxFiles)
+	}
+	if lim.MaxOutputSize != 524288 {
+		t.Errorf("MaxOutputSize: expected 524288, got %d", lim.MaxOutputSize)
+	}
+	if lim.MaxSessionActions != 30 {
+		t.Errorf("MaxSessionActions: expected 30, got %d", lim.MaxSessionActions)
+	}
 }
 
 func TestParseSessionLimitsOmitted(t *testing.T) {
@@ -720,8 +732,12 @@ configs:
       model: "gpt-4"
 `)
 	cfg, err := Parse(data)
-	if err != nil { t.Fatalf("unexpected error: %v", err) }
-	if cfg.Configs[0].Limits != nil { t.Error("expected Limits to be nil when omitted") }
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Configs[0].Limits != nil {
+		t.Error("expected Limits to be nil when omitted")
+	}
 }
 
 func TestParseSessionLimitsPartial(t *testing.T) {
@@ -734,11 +750,113 @@ configs:
       max_turns: 15
 `)
 	cfg, err := Parse(data)
-	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	lim := cfg.Configs[0].Limits
-	if lim == nil { t.Fatal("expected Limits to be set") }
-	if lim.MaxTurns != 15 { t.Errorf("MaxTurns: expected 15, got %d", lim.MaxTurns) }
-	if lim.MaxFiles != 0 { t.Errorf("MaxFiles: expected 0, got %d", lim.MaxFiles) }
-	if lim.MaxOutputSize != 0 { t.Errorf("MaxOutputSize: expected 0, got %d", lim.MaxOutputSize) }
-	if lim.MaxSessionActions != 0 { t.Errorf("MaxSessionActions: expected 0, got %d", lim.MaxSessionActions) }
+	if lim == nil {
+		t.Fatal("expected Limits to be set")
+	}
+	if lim.MaxTurns != 15 {
+		t.Errorf("MaxTurns: expected 15, got %d", lim.MaxTurns)
+	}
+	if lim.MaxFiles != 0 {
+		t.Errorf("MaxFiles: expected 0, got %d", lim.MaxFiles)
+	}
+	if lim.MaxOutputSize != 0 {
+		t.Errorf("MaxOutputSize: expected 0, got %d", lim.MaxOutputSize)
+	}
+	if lim.MaxSessionActions != 0 {
+		t.Errorf("MaxSessionActions: expected 0, got %d", lim.MaxSessionActions)
+	}
+}
+
+func TestValidateRejectsNegativeMaxTurns(t *testing.T) {
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{Name: "neg", Generator: &GeneratorConfig{Model: "gpt-4"}, Limits: &SessionLimits{MaxTurns: -1}},
+		},
+	}
+	err := cf.Validate()
+	if err == nil {
+		t.Fatal("expected error for negative max_turns")
+	}
+	want := `config "neg": limits.max_turns must not be negative`
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
+	}
+}
+
+func TestValidateRejectsNegativeMaxFiles(t *testing.T) {
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{Name: "neg", Generator: &GeneratorConfig{Model: "gpt-4"}, Limits: &SessionLimits{MaxFiles: -5}},
+		},
+	}
+	err := cf.Validate()
+	if err == nil {
+		t.Fatal("expected error for negative max_files")
+	}
+	want := `config "neg": limits.max_files must not be negative`
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
+	}
+}
+
+func TestValidateRejectsNegativeMaxOutputSize(t *testing.T) {
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{Name: "neg", Generator: &GeneratorConfig{Model: "gpt-4"}, Limits: &SessionLimits{MaxOutputSize: -1024}},
+		},
+	}
+	err := cf.Validate()
+	if err == nil {
+		t.Fatal("expected error for negative max_output_size")
+	}
+	want := `config "neg": limits.max_output_size must not be negative`
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
+	}
+}
+
+func TestValidateRejectsNegativeMaxSessionActions(t *testing.T) {
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{Name: "neg", Generator: &GeneratorConfig{Model: "gpt-4"}, Limits: &SessionLimits{MaxSessionActions: -10}},
+		},
+	}
+	err := cf.Validate()
+	if err == nil {
+		t.Fatal("expected error for negative max_session_actions")
+	}
+	want := `config "neg": limits.max_session_actions must not be negative`
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
+	}
+}
+
+func TestValidateAcceptsZeroLimits(t *testing.T) {
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{Name: "zero", Generator: &GeneratorConfig{Model: "gpt-4"}, Limits: &SessionLimits{MaxTurns: 0, MaxFiles: 0}},
+		},
+	}
+	if err := cf.Validate(); err != nil {
+		t.Fatalf("zero limits should be accepted, got: %v", err)
+	}
+}
+
+func TestParseNilGeneratorDoesNotPanic(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: nil-gen
+`)
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected error for nil generator")
+	}
+	want := `config "nil-gen": generator.model is required`
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
+	}
 }
