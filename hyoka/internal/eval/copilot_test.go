@@ -436,3 +436,36 @@ func TestIntegration_DuplicateToolEntries(t *testing.T) {
 		t.Errorf("expected [create edit], got %v", sc.AvailableTools)
 	}
 }
+
+func TestBuildSessionConfig_SystemPromptSet(t *testing.T) {
+	e := &CopilotSDKEvaluator{}
+	cfg := &config.ToolConfig{
+		Name: "test",
+		Generator: &config.GeneratorConfig{
+			Model:        "gpt-4",
+			SystemPrompt: "You are a helpful Azure SDK assistant.",
+		},
+	}
+	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	if sc.SystemMessage == nil {
+		t.Fatal("expected SystemMessage to be set when generator.system_prompt is configured")
+	}
+	if sc.SystemMessage.Mode != "append" {
+		t.Errorf("expected SystemMessage.Mode 'append', got %q", sc.SystemMessage.Mode)
+	}
+	if sc.SystemMessage.Content != "You are a helpful Azure SDK assistant." {
+		t.Errorf("expected SystemMessage.Content to match system_prompt, got %q", sc.SystemMessage.Content)
+	}
+}
+
+func TestBuildSessionConfig_SystemPromptEmpty(t *testing.T) {
+	e := &CopilotSDKEvaluator{}
+	cfg := &config.ToolConfig{
+		Name:      "test",
+		Generator: &config.GeneratorConfig{Model: "gpt-4"},
+	}
+	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	if sc.SystemMessage != nil {
+		t.Errorf("expected SystemMessage nil when no system_prompt set, got %+v", sc.SystemMessage)
+	}
+}

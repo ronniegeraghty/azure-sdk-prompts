@@ -317,6 +317,9 @@ panelReviewer.SetSessionTimeout(sessionTimeout)
 if len(reviewerSkillsDirs) > 0 {
 panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
 }
+if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
+panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+}
 slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
 return nil, panelReviewer, nil
 }
@@ -330,6 +333,9 @@ copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.
 copilotReviewer.SetSessionTimeout(sessionTimeout)
 if len(reviewerSkillsDirs) > 0 {
 copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+}
+if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
+copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
 }
 slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
 return copilotReviewer, nil, nil
