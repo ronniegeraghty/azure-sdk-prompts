@@ -402,7 +402,8 @@ If you've installed skill plugins via the Copilot CLI `/plugin` commands, you ca
 configs:
   - name: baseline-skills/claude-sonnet-4.5
     description: "Baseline + Skills"
-    model: "claude-sonnet-4.5"
+    generator:
+      model: "claude-sonnet-4.5"
     plugins:
       - "azure-sdk-java@skills"
 ```
