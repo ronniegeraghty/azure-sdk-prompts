@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"github.com/ronniegeraghty/hyoka/internal/config"
 )
 
 func TestMain(m *testing.M) {
@@ -196,20 +198,23 @@ func TestApplyToGenerator(t *testing.T) {
 		},
 	}
 
-	var skills []PluginSkill
-	mcpServers := map[string]*MCPServer{}
+	var tools []config.ToolEntry
 
-	err := reg.ApplyToGenerator([]string{"sdk-tools", "review-helpers"}, &skills, &mcpServers)
+	err := reg.ApplyToGenerator([]string{"sdk-tools", "review-helpers"}, &tools)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(skills) != 3 {
-		t.Errorf("expected 3 skills, got %d", len(skills))
+	if len(tools) != 4 {
+		t.Errorf("expected 4 tools, got %d", len(tools))
 	}
-	if len(mcpServers) != 1 {
-		t.Errorf("expected 1 MCP server, got %d", len(mcpServers))
+	foundMCP := false
+	for _, entry := range tools {
+		if entry.ResolvedType() == "mcp" && entry.Name == "azure-cli" {
+			foundMCP = true
+			break
+		}
 	}
-	if _, ok := mcpServers["azure-cli"]; !ok {
+	if !foundMCP {
 		t.Error("expected azure-cli MCP server")
 	}
 }
@@ -231,27 +236,22 @@ func TestApplyToGeneratorDedup(t *testing.T) {
 		},
 	}
 
-	var skills []PluginSkill
-	mcpServers := map[string]*MCPServer{}
+	var tools []config.ToolEntry
 
-	err := reg.ApplyToGenerator([]string{"a", "b"}, &skills, &mcpServers)
+	err := reg.ApplyToGenerator([]string{"a", "b"}, &tools)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(skills) != 1 {
-		t.Errorf("expected 1 deduplicated skill, got %d", len(skills))
-	}
-	if len(mcpServers) != 1 {
-		t.Errorf("expected 1 deduplicated MCP server, got %d", len(mcpServers))
+	if len(tools) != 2 {
+		t.Errorf("expected 2 deduplicated tools, got %d", len(tools))
 	}
 }
 
 func TestApplyToGeneratorNotFound(t *testing.T) {
 	reg := NewRegistry()
-	var skills []PluginSkill
-	mcpServers := map[string]*MCPServer{}
+	var tools []config.ToolEntry
 
-	err := reg.ApplyToGenerator([]string{"nonexistent"}, &skills, &mcpServers)
+	err := reg.ApplyToGenerator([]string{"nonexistent"}, &tools)
 	if err == nil {
 		t.Fatal("expected error for missing plugin")
 	}

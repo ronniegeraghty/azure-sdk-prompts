@@ -264,7 +264,7 @@ Each prompt author lists what the generated code should include. These are evalu
 
 ### Review Panel
 
-Each config file defines a `reviewer_models` list (e.g., `[claude-opus-4.6, gemini-3-pro-preview, gpt-4.1]`). All reviewers run in parallel, then:
+Each config file defines a `reviewer.models` list (e.g., `[claude-opus-4.6, gemini-3-pro-preview, gpt-4.1]`). All reviewers run in parallel, then:
 
 1. The **first model** in the list acts as the **consolidator**, synthesizing all reviews into a consensus result
 2. For each criterion, it passes if the **majority** of reviewers marked it passed
@@ -327,7 +327,7 @@ Markdown reports contain the same information as HTML reports (criteria pass/fai
 
 ## Configuration Matrix
 
-Configurations live in the `configs/` directory at the repo root. Each file defines **one generator model** and a shared `reviewer_models` list. All configs are auto-discovered via `LoadDir()`:
+Configurations live in the `configs/` directory at the repo root. Each file defines **one generator model** and a shared `reviewer.models` list. All configs are auto-discovered via `LoadDir()`:
 
 | File | Generator Model | Description |
 |------|----------------|-------------|
@@ -339,7 +339,7 @@ Configurations live in the `configs/` directory at the repo root. Each file defi
 | `configs/azure-mcp-opus.yaml` | Claude Opus 4.6 | Azure MCP server attached |
 | `configs/azure-mcp-codex.yaml` | GPT Codex | Azure MCP server attached |
 
-All configs use the same review panel: `reviewer_models: [claude-opus-4.6, gemini-3-pro-preview, gpt-4.1]` (claude-opus-4.6 is the consolidator).
+All configs use the same review panel: `reviewer.models: [claude-opus-4.6, gemini-3-pro-preview, gpt-4.1]` (claude-opus-4.6 is the consolidator).
 
 **Sample config file:**
 
@@ -347,15 +347,18 @@ All configs use the same review panel: `reviewer_models: [claude-opus-4.6, gemin
 configs:
   - name: baseline/claude-sonnet-4.5
     description: "Baseline — raw Copilot with Claude Sonnet 4.5"
-    model: "claude-sonnet-4.5"
-    reviewer_models:
-      - "claude-opus-4.6"
-      - "gemini-3-pro-preview"
-      - "gpt-4.1"
-    mcp_servers: {}
-    skill_directories: []
-    available_tools: []
-    excluded_tools: []
+    generator:
+      model: "claude-sonnet-4.5"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest"]
+    reviewer:
+      models:
+        - "claude-opus-4.6"
+        - "gemini-3-pro-preview"
+        - "gpt-4.1"
 ```
 
 ### Config Fields
@@ -364,23 +367,19 @@ configs:
 |-------|------|-------------|-------------|
 | `name` | string | — | Unique config identifier |
 | `description` | string | — | Human-readable description |
-| `model` | string | `SessionConfig.Model` | Generator AI model |
-| `reviewer_models` | list | — | Review panel models (first is consolidator) |
-| `mcp_servers` | map | `SessionConfig.MCPServers` | MCP server definitions |
-| `generator_skill_directories` | list | `SessionConfig.SkillDirectories` | Skill directories for the generator agent (takes priority over `skill_directories`) |
-| `reviewer_skill_directories` | list | `SessionConfig.SkillDirectories` | Skill directories for the review panel agents |
-| `skill_directories` | list | `SessionConfig.SkillDirectories` | Shared fallback skill directories (used when role-specific fields are not set) |
-| `available_tools` | list | `SessionConfig.AvailableTools` | Allowed tool names |
-| `excluded_tools` | list | `SessionConfig.ExcludedTools` | Blocked tool names |
+| `generator.model` | string | `SessionConfig.Model` | Generator AI model |
+| `generator.tools` | list | `SessionConfig.AvailableTools` / `SessionConfig.MCPServers` / `SessionConfig.SkillDirectories` | Tool entries (type: tool, mcp, skill) |
+| `generator.excluded_tools` | list | `SessionConfig.ExcludedTools` | Blocked tool names |
+| `reviewer.models` | list | — | Review panel models (first is consolidator) |
+| `reviewer.tools` | list | `SessionConfig.SkillDirectories` | Reviewer skill entries (type: skill) |
 
-#### Skill Directory Resolution
+#### Tools entries
 
-The tool resolves skill directories per role:
+Tool entries live in `generator.tools` or `reviewer.tools` and require a `type`:
 
-- **Generator:** Uses `generator_skill_directories` if set, otherwise falls back to `skill_directories`
-- **Reviewers:** Uses `reviewer_skill_directories` if set, otherwise falls back to `skill_directories`
-
-This allows configs to load different skills for generation vs. review. For example, the generator might get SDK-specific coding skills while reviewers get build-verification and version-checking skills.
+- `tool` (default): named tool exposed to the agent, optionally conditional via `when`.
+- `mcp`: MCP server definition (`command`, `args`, optional `mcp_tools`).
+- `skill`: skill entry (`source: local|remote`, `path` or `repo`).
 
 **Adding skills:** Use `npx skills add microsoft/skills --directory skills/generator` to install skills from the [microsoft/skills](https://github.com/microsoft/skills) registry. See the main [README.md](../README.md#adding-skills-to-configs) for details.
 
@@ -390,15 +389,23 @@ This allows configs to load different skills for generation vs. review. For exam
 configs:
   - name: full-skills/claude-opus-4.6
     description: "Generator and reviewer skills"
-    model: "claude-opus-4.6"
-    reviewer_models:
-      - "claude-opus-4.6"
-      - "gemini-3-pro-preview"
-      - "gpt-4.1"
-    generator_skill_directories:
-      - "./skills/generator"
-    reviewer_skill_directories:
-      - "./skills/reviewer"
+    generator:
+      model: "claude-opus-4.6"
+      tools:
+        - name: generator-skills
+          type: skill
+          source: local
+          path: "./skills/generator"
+    reviewer:
+      models:
+        - "claude-opus-4.6"
+        - "gemini-3-pro-preview"
+        - "gpt-4.1"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          path: "./skills/reviewer"
 ```
 
 ## Smart Path Detection

@@ -90,3 +90,18 @@ Implemented P0 config hardening from codebase audit (#252, items 1-2):
 
 **Files:** hyoka/internal/config/config.go, hyoka/internal/config/config_test.go
 
+
+### Session 2026-04-08 (Config Unification #252)
+
+**Status:** COMPLETE
+
+Unified generator/reviewer tooling into a single `tools` array with typed entries (`tool`, `mcp`, `skill`). Updated config validation, tool resolution, MCP wiring, pairwise ablation logic, plugin merging, and skill path resolution to operate on typed ToolEntry records.
+
+**Implementation:**
+- Extended `ToolEntry` with MCP and skill metadata plus type normalization
+- Reworked eval/session setup to derive MCP servers, skills, and available tools from `generator.tools`
+- Updated configs and docs to the unified `tools` schema and migrated tests
+
+**Testing:** `go build ./hyoka/...`, `go vet ./hyoka/...`, `go test ./hyoka/... -count=1`
+
+**Key Learning:** Centralizing tool configuration simplifies downstream consumers — filter by type once and reuse the same entries for MCP, skills, and tool allowlists without duplicating schema fields.

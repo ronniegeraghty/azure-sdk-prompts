@@ -15,8 +15,8 @@ func TestResolveLocal_DirectPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirs, err := ResolveSkillDirs([]config.Skill{
-		{Type: "local", Path: skillDir},
+	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+		{Type: "skill", Source: "local", Path: skillDir, Name: "local-skill"},
 	}, dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -36,8 +36,8 @@ func TestResolveLocal_RelativePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirs, err := ResolveSkillDirs([]config.Skill{
-		{Type: "local", Path: "skills/generator"},
+	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+		{Type: "skill", Source: "local", Path: "skills/generator", Name: "local-skill"},
 	}, dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -61,8 +61,8 @@ func TestResolveLocal_GlobPattern(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "skills", "readme.txt"), []byte("hi"), 0644)
 	_ = f
 
-	dirs, err := ResolveSkillDirs([]config.Skill{
-		{Type: "local", Path: filepath.Join(dir, "skills", "*")},
+	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+		{Type: "skill", Source: "local", Path: filepath.Join(dir, "skills", "*"), Name: "local-skill"},
 	}, dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -84,8 +84,8 @@ func TestResolveLocal_EmptySkills(t *testing.T) {
 }
 
 func TestResolveLocal_InvalidType(t *testing.T) {
-	_, err := ResolveSkillDirs([]config.Skill{
-		{Type: "unknown", Path: "/some/path"},
+	_, err := ResolveSkillDirs([]config.ToolEntry{
+		{Type: "skill", Source: "unknown", Path: "/some/path", Name: "bad-skill"},
 	}, ".")
 	if err == nil {
 		t.Fatal("expected error for unknown type")

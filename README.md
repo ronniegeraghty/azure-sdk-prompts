@@ -317,35 +317,36 @@ configs:
     description: "My custom evaluation config"
     generator:
       model: "claude-sonnet-4.5"
-      skills:
-        - type: remote
-          name: azure-keyvault-py
+      tools:
+        - name: azure-keyvault-py
+          type: skill
+          source: remote
           repo: microsoft/skills
-        - type: local
+        - name: generator-skills
+          type: skill
+          source: local
           path: "./skills/generator"
-      mcp_servers:
-        azure:
-          type: local
+        - name: azure
+          type: mcp
           command: npx
           args: ["-y", "@azure/mcp@latest"]
-          tools: ["*"]
     reviewer:
       models:
         - "claude-opus-4.6"
         - "gemini-3-pro-preview"
         - "gpt-4.1"
-      skills:
-        - type: local
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
           path: "./skills/reviewer"
 ```
 
 Then run with: `hyoka run --config-file configs/my-custom-config.yaml`
 
-> **Backward compatibility:** Legacy top-level fields (`model`, `reviewer_models`, `skill_directories`, `generator_skill_directories`, etc.) still work. They are automatically migrated to the `generator`/`reviewer` sub-structs at parse time.
+#### Skills in `tools`
 
-#### Unified Skills
-
-Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. The unified `skills:` list replaces the old `skill_directories`, `generator_skill_directories`, and `reviewer_skill_directories` fields.
+Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. They are configured as `tools` entries with `type: skill` in the generator or reviewer section.
 
 Each skill has a `type`:
 
@@ -359,11 +360,14 @@ Each skill has a `type`:
 ```yaml
 generator:
   model: "claude-sonnet-4.5"
-  skills:
-    - type: remote
-      name: azure-keyvault-py
+  tools:
+    - name: azure-keyvault-py
+      type: skill
+      source: remote
       repo: microsoft/skills
-    - type: local
+    - name: generator-skills
+      type: skill
+      source: local
       path: "./skills/generator"
 ```
 
@@ -374,8 +378,10 @@ reviewer:
   models:
     - "claude-opus-4.6"
     - "gpt-4.1"
-  skills:
-    - type: local
+  tools:
+    - name: reviewer-skills
+      type: skill
+      source: local
       path: "./skills/reviewer"
 ```
 
