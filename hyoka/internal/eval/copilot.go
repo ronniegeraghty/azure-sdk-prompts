@@ -827,7 +827,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	}
 
 	// Set the system message: start with config-driven system prompt,
-	// then append any accumulated hints (skills, MCP, etc.)
+	// then append any accumulated hints (skills, etc.)
 	if systemMsg != "" {
 		sc.SystemMessage = &copilot.SystemMessageConfig{
 			Mode:    "append",
