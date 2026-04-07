@@ -4,7 +4,7 @@ Prompts are Markdown files with YAML frontmatter that define evaluation scenario
 
 ## File Naming
 
-Prompts must use the `.prompt.md` extension:
+Prompts use the `.prompt.md` or `.prompt.yaml` extension:
 
 ```
 prompts/
@@ -13,9 +13,35 @@ prompts/
       python/
         crud/
           blob-upload.prompt.md
+          blob-download.prompt.yaml
 ```
 
-## Frontmatter Schema
+## YAML Format (`.prompt.yaml`)
+
+Prompts can also be authored as pure YAML files with a `.prompt.yaml` extension. This is useful for programmatic generation or when frontmatter-in-markdown feels awkward:
+
+```yaml
+# storage-dp-python-crud.prompt.yaml
+id: storage-dp-python-crud
+service: storage
+plane: data-plane
+language: python
+category: crud
+difficulty: basic
+description: "Upload a blob to Azure Storage"
+sdk_package: azure-storage-blob
+prompt: |
+  Write a Python script that uploads a file to Azure Blob Storage
+  using the azure-storage-blob SDK with DefaultAzureCredential.
+criteria:
+  - Uses BlobServiceClient with DefaultAzureCredential
+  - Creates container if it doesn't exist
+  - Uploads file with proper content type detection
+```
+
+The YAML format supports the same fields as the Markdown frontmatter. The `prompt` field replaces the `## Prompt` section and `criteria` replaces `## Evaluation Criteria`.
+
+## Frontmatter Schema (Markdown Format)
 
 ```yaml
 ---

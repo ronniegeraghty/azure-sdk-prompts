@@ -48,6 +48,30 @@ hyoka run --prompts ~/projects/hyoka/prompts
 
 > **Smart path detection:** `hyoka` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `hyoka/` directory both work without extra flags.
 
+### Creating a `.hyoka` Project Directory
+
+To organize prompts, configs, and skills for your own evaluations, initialize a `.hyoka` project directory:
+
+```bash
+# Create a .hyoka directory with standard subdirectories
+hyoka init
+
+# Organize your own prompts and configs
+cd .hyoka
+# Add prompts/ configs/ criteria/ skills/
+
+# Run evaluations against your local project
+hyoka run --service my-service --config my-config
+```
+
+The `init` command creates:
+- `configs/` — evaluation configuration YAML files
+- `prompts/` — custom prompt library
+- `criteria/` — attribute-matched grader criteria
+- `skills/` — Copilot skills (generator and reviewer)
+- `reports/` — evaluation output (auto-added to .gitignore)
+- `.gitignore` — excludes `reports/` from version control
+
 ## Safety & Guardrails
 
 hyoka includes built-in protections that keep evaluation runs safe, bounded, and predictable by default. No extra flags are needed — everything below is on unless you opt out.
@@ -71,6 +95,8 @@ By default, generators receive a system instruction that **prevents real Azure r
 - Use mock data, environment variables, and local emulators (Azurite, CosmosDB emulator)
 - Generate Bicep/ARM/Terraform templates instead of running live `az` CLI commands
 - Use placeholder values like `os.Getenv("AZURE_STORAGE_CONNECTION_STRING")`
+
+The system prompt can be customized per generator/reviewer in the config file. If not specified, defaults to zero (no additional system instruction beyond Copilot's defaults).
 
 Use `--allow-cloud` to opt out and permit real resource provisioning.
 
@@ -104,13 +130,15 @@ Did you mean one of these?
 |---------|-------|-------------|
 | `hyoka run` | | Run evaluations against prompts |
 | `hyoka list` | `ls` | List prompts matching filters |
+| `hyoka init` | | Scaffold a `.hyoka` project directory |
+| `hyoka compare` | | Compare evaluation results between configs, runs, or time periods |
 | `hyoka configs` | | Show available tool configurations |
 | `hyoka validate` | | Validate prompt frontmatter against schema |
 | `hyoka check-env` | `env` | Check for required language toolchains and tools |
 | `hyoka trends` | | Generate historical trend reports with AI analysis |
 | `hyoka report` | | Re-render HTML/MD reports from existing JSON data |
 | `hyoka new-prompt` | | Scaffold a new prompt file interactively |
-| `hyoka serve` | | Launch local web UI for browsing reports |
+| `hyoka serve` | | Launch local web UI for browsing reports (React dashboard) |
 | `hyoka plugins` | | List registered plugins |
 | `hyoka clean` | | Remove stale session state and orphaned SDK processes |
 | `hyoka version` | | Print version |
@@ -149,6 +177,7 @@ hyoka list --json
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--pairwise` / `-P` | `false` | Expand each config into N+1 pairwise tool-ablation variants for regression testing |
 | `--analyze` | `true` | AI-powered trend analysis after run |
 | `--skip-trends` | `false` | Skip automatic trend analysis after run |
 | `--progress` | `auto` | Progress display mode: `auto`, `live`, `log`, `off` |
@@ -194,6 +223,57 @@ go run ./hyoka run --allow-cloud
 
 # Limit concurrent Copilot sessions on a shared machine
 go run ./hyoka run --max-sessions 4 --workers 2
+```
+
+### Init Command
+
+Initialize a `.hyoka` project directory with standard subdirectories:
+
+```bash
+# Create a .hyoka project directory in the current working directory
+hyoka init
+```
+
+This scaffolds:
+- `configs/` — evaluation config YAML files
+- `prompts/` — prompt library (.prompt.md files)
+- `criteria/` — attribute-matched grader criteria
+- `skills/` — Copilot skills (generator and reviewer)
+- `reports/` — evaluation output directory (added to .gitignore)
+
+Running `init` again on an existing `.hyoka` directory is safe (idempotent).
+
+### Compare Command
+
+Compare evaluation results to identify regressions and improvements across three modes:
+
+```bash
+# Config comparison — compare two configs across all shared prompts
+hyoka compare --config-a baseline/claude-sonnet-4.5 --config-b azure-mcp/claude-sonnet-4.5
+
+# Run comparison — compare results from two specific evaluation runs
+hyoka compare --run-a <run-id-1> --run-b <run-id-2>
+
+# Temporal comparison — compare a config before and after a date
+hyoka compare --config baseline/claude-opus-4.6 --since 2025-01-15
+```
+
+The compare command analyzes pass/fail deltas, score changes, and highlights regressions per prompt. Output includes:
+- Summary statistics (pass/fail counts, avg scores)
+- Per-prompt delta analysis
+- Top improvements and regressions
+- Details on failed/broken evaluations
+
+### Tools Command
+
+Manage and list tools available to the generator agent:
+
+```bash
+# List all available tools
+hyoka tools list
+
+# Add a new tool configuration
+hyoka tools add --name my-tool --description "Tool description"
 ```
 
 ### Validating Prompts

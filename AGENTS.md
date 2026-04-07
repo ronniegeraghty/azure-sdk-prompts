@@ -8,17 +8,21 @@ hyoka is a Go CLI tool that evaluates AI agents generating Azure SDK code. It us
 
 ```
 hyoka/              # Go source (module: github.com/ronniegeraghty/hyoka)
-  main.go           # CLI entry point (cobra)
+  main.go           # CLI entry point (13 lines, delegates to cmd.Execute())
+  cmd/              # Cobra commands (root, run, list, compare, init, validate, etc.)
   internal/         # All packages
     build/          # Language-specific build verification
     checkenv/       # Environment prerequisite validation
     clean/          # Session state & orphan process cleanup (#62, #70)
+    comparison/     # Config/run/temporal comparison logic
     config/         # Config loading & parsing
     criteria/       # Tiered evaluation criteria system (#30)
     eval/           # Evaluation engine (generation + review orchestration)
+    graders/        # Grader registry (6 types: builder, complexity, etc.)
     history/        # Run history tracking
     logging/        # Structured slog logging utilities
     manifest/       # Dependency manifest
+    pairwise/       # Tool-ablation pairwise expansion
     plugin/         # Composable plugin system (#50)
     progress/       # Progress display (live, log, off)
     prompt/         # Prompt loading, filtering, validation
@@ -27,12 +31,20 @@ hyoka/              # Go source (module: github.com/ronniegeraghty/hyoka)
     review/         # Multi-model review panel + rubric
     serve/          # Local web server for report browsing (#20)
     skills/         # Skill fetching (local + remote)
+    tools/          # Tool-related utilities and registry
     trends/         # Cross-run trend analysis
     utils/          # Shared utility functions
     validate/       # Prompt schema validation
+.hyoka/             # Project directory (created by hyoka init)
+  configs/          # Evaluation configs
+  prompts/          # Prompt library
+  criteria/         # Grader criteria files
+  skills/           # Copilot skills
+  reports/          # Evaluation output (git-ignored)
 configs/            # Evaluation config YAML files
 prompts/            # Prompt library (organized by language/service)
 skills/             # Copilot skills (generator/ and reviewer/)
+criteria/           # Attribute-matched criteria (language/ and service/ subdirs)
 reports/            # Generated evaluation output (gitignored)
 docs/               # Design docs and getting started guide
 ```
