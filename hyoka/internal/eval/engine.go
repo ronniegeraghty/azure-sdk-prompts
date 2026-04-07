@@ -336,29 +336,38 @@ func cloneToolEntries(entries []config.ToolEntry) []config.ToolEntry {
 	return clone
 }
 
-// resolveLimits merges per-config session limits with engine defaults.
-// Config values > 0 take precedence; zero values fall back to engine defaults.
-func (e *Engine) resolveLimits(cfg config.ToolConfig) resolvedLimits {
+// resolveLimits merges per-prompt and per-config session limits with engine defaults.
+// Resolution order: prompt frontmatter > config YAML > CLI flag/engine default.
+// Values > 0 take precedence; zero values fall back to the next layer.
+func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolvedLimits {
 	rl := resolvedLimits{
 		maxTurns:          e.opts.MaxTurns,
 		maxFiles:          e.opts.MaxFiles,
 		maxOutputSize:     e.opts.MaxOutputSize,
 		maxSessionActions: e.opts.MaxSessionActions,
 	}
-	if cfg.Limits == nil {
-		return rl
+	if cfg.Limits != nil {
+		if cfg.Limits.MaxTurns > 0 {
+			rl.maxTurns = cfg.Limits.MaxTurns
+		}
+		if cfg.Limits.MaxFiles > 0 {
+			rl.maxFiles = cfg.Limits.MaxFiles
+		}
+		if cfg.Limits.MaxOutputSize > 0 {
+			rl.maxOutputSize = cfg.Limits.MaxOutputSize
+		}
+		if cfg.Limits.MaxSessionActions > 0 {
+			rl.maxSessionActions = cfg.Limits.MaxSessionActions
+		}
 	}
-	if cfg.Limits.MaxTurns > 0 {
-		rl.maxTurns = cfg.Limits.MaxTurns
-	}
-	if cfg.Limits.MaxFiles > 0 {
-		rl.maxFiles = cfg.Limits.MaxFiles
-	}
-	if cfg.Limits.MaxOutputSize > 0 {
-		rl.maxOutputSize = cfg.Limits.MaxOutputSize
-	}
-	if cfg.Limits.MaxSessionActions > 0 {
-		rl.maxSessionActions = cfg.Limits.MaxSessionActions
+	// Prompt-level overrides take highest priority (#284)
+	if p != nil {
+		if p.MaxTurns > 0 {
+			rl.maxTurns = p.MaxTurns
+		}
+		if p.MaxSessionActions > 0 {
+			rl.maxSessionActions = p.MaxSessionActions
+		}
 	}
 	return rl
 }
@@ -737,8 +746,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		},
 	}
 
-	// Resolve effective limits: per-config overrides → engine defaults (#125)
-	lim := e.resolveLimits(task.Config)
+	// Resolve effective limits: prompt > per-config > engine defaults (#125, #284)
+	lim := e.resolveLimits(task.Config, task.Prompt)
 	evalReport.GuardrailMaxTurns = lim.maxTurns
 	evalReport.GuardrailMaxFiles = lim.maxFiles
 	evalReport.GuardrailMaxOutputSize = lim.maxOutputSize

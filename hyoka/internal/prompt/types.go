@@ -13,9 +13,11 @@ Tags            []string          `yaml:"tags" json:"tags"`
 ProjectContext  map[string]string `yaml:"project_context" json:"project_context,omitempty"`
 StarterProject  string            `yaml:"starter_project" json:"starter_project,omitempty"`
 ReferenceAnswer string            `yaml:"reference_answer" json:"reference_answer,omitempty"`
-Timeout         int               `yaml:"timeout" json:"timeout,omitempty"`
-ExpectedPkgs    []string          `yaml:"expected_packages" json:"expected_packages,omitempty"`
-ExpectedTools   []string          `yaml:"expected_tools" json:"expected_tools,omitempty"`
+Timeout           int               `yaml:"timeout" json:"timeout,omitempty"`
+MaxSessionActions int               `yaml:"max_session_actions" json:"max_session_actions,omitempty"`
+MaxTurns          int               `yaml:"max_turns" json:"max_turns,omitempty"`
+ExpectedPkgs      []string          `yaml:"expected_packages" json:"expected_packages,omitempty"`
+ExpectedTools     []string          `yaml:"expected_tools" json:"expected_tools,omitempty"`
 
 // Properties holds all metadata string fields (service, language, plane, etc.).
 // Keys must be snake_case.

@@ -20,9 +20,11 @@ Tags            []string          `yaml:"tags"`
 ProjectContext  map[string]string `yaml:"project_context"`
 StarterProject  string            `yaml:"starter_project"`
 ReferenceAnswer string            `yaml:"reference_answer"`
-Timeout         int               `yaml:"timeout"`
-ExpectedPkgs    []string          `yaml:"expected_packages"`
-ExpectedTools   []string          `yaml:"expected_tools"`
+Timeout           int               `yaml:"timeout"`
+MaxSessionActions int               `yaml:"max_session_actions"`
+MaxTurns          int               `yaml:"max_turns"`
+ExpectedPkgs      []string          `yaml:"expected_packages"`
+ExpectedTools     []string          `yaml:"expected_tools"`
 
 // New nested format
 Properties map[string]string `yaml:"properties"`
@@ -48,14 +50,16 @@ EvaluationCriteriaField string `yaml:"evaluation_criteria"`
 // populating Properties from flat fields when the nested format is absent.
 func rawToPrompt(raw *rawFrontmatter) *Prompt {
 p := &Prompt{
-ID:              raw.ID,
-Tags:            raw.Tags,
-ProjectContext:  raw.ProjectContext,
-StarterProject:  raw.StarterProject,
-ReferenceAnswer: raw.ReferenceAnswer,
-Timeout:         raw.Timeout,
-ExpectedPkgs:    raw.ExpectedPkgs,
-ExpectedTools:   raw.ExpectedTools,
+ID:                raw.ID,
+Tags:              raw.Tags,
+ProjectContext:    raw.ProjectContext,
+StarterProject:    raw.StarterProject,
+ReferenceAnswer:   raw.ReferenceAnswer,
+Timeout:           raw.Timeout,
+MaxSessionActions: raw.MaxSessionActions,
+MaxTurns:          raw.MaxTurns,
+ExpectedPkgs:      raw.ExpectedPkgs,
+ExpectedTools:     raw.ExpectedTools,
 }
 
 if raw.Properties != nil {

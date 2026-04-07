@@ -464,7 +464,7 @@ func TestGuardrailDefaultValues(t *testing.T) {
 func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "no-limits", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 25 { t.Errorf("expected maxTurns 25, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected maxSessionActions 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected maxFiles 50, got %d", lim.maxFiles) }
@@ -474,7 +474,7 @@ func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
 func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "zero", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 25 { t.Errorf("expected 25, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
@@ -484,7 +484,7 @@ func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
 func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "custom", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxFiles: 20, MaxOutputSize: 524288, MaxSessionActions: 30}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 30 { t.Errorf("expected 30, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 20 { t.Errorf("expected 20, got %d", lim.maxFiles) }
@@ -494,11 +494,48 @@ func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
 func TestResolveLimitsPartialOverride(t *testing.T) {
 	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "partial", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10}}
-	lim := engine.resolveLimits(cfg)
+	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
 	if lim.maxOutputSize != 1048576 { t.Errorf("expected 1048576, got %d", lim.maxOutputSize) }
+}
+
+func TestResolveLimitsPromptOverridesConfig(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxSessionActions: 30}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 100, MaxTurns: 40}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxTurns != 40 { t.Errorf("expected prompt maxTurns 40, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 100 { t.Errorf("expected prompt maxSessionActions 100, got %d", lim.maxSessionActions) }
+	if lim.maxFiles != 50 { t.Errorf("expected default maxFiles 50, got %d", lim.maxFiles) }
+}
+
+func TestResolveLimitsPromptOverridesDefaults(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "no-limits", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 75}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxSessionActions != 75 { t.Errorf("expected prompt maxSessionActions 75, got %d", lim.maxSessionActions) }
+	if lim.maxTurns != 25 { t.Errorf("expected default maxTurns 25, got %d", lim.maxTurns) }
+}
+
+func TestResolveLimitsPromptPartialOverride(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxSessionActions: 30}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 100}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxTurns != 10 { t.Errorf("expected config maxTurns 10, got %d", lim.maxTurns) }
+	if lim.maxSessionActions != 100 { t.Errorf("expected prompt maxSessionActions 100, got %d", lim.maxSessionActions) }
+}
+
+func TestResolveLimitsPromptZeroDoesNotOverride(t *testing.T) {
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxSessionActions: 30}}
+	p := &prompt.Prompt{ID: "test", MaxSessionActions: 0, MaxTurns: 0}
+	lim := engine.resolveLimits(cfg, p)
+	if lim.maxSessionActions != 30 { t.Errorf("expected config maxSessionActions 30, got %d", lim.maxSessionActions) }
+	if lim.maxTurns != 25 { t.Errorf("expected default maxTurns 25, got %d", lim.maxTurns) }
 }
 
 func TestConfigLimitsRespectedByGuardrail(t *testing.T) {
