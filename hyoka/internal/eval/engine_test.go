@@ -779,6 +779,63 @@ func TestLargeRunConfirmAbort(t *testing.T) {
 	}
 }
 
+func TestStubEvaluatorWriteErrorLogsWarning(t *testing.T) {
+	// When workDir is an invalid path, the stub evaluator should still
+	// succeed (logging a warning) rather than returning an error.
+	stub := &StubEvaluator{}
+	p := &prompt.Prompt{ID: "test-prompt", Properties: map[string]string{"language": "go"}}
+	cfg := &config.ToolConfig{Name: "test-config", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
+
+	result, err := stub.Evaluate(context.Background(), p, cfg, filepath.Join(t.TempDir(), "nonexistent", "subdir"))
+	if err != nil {
+		t.Fatalf("stub evaluator should not return an error even when write fails: %v", err)
+	}
+	if !result.Success {
+		t.Error("expected stub to report success even when file write fails")
+	}
+	if !result.IsStub {
+		t.Error("expected IsStub to be true")
+	}
+}
+
+func TestLargeRunConfirmNoTTY(t *testing.T) {
+	// With ConfirmLargeRuns=true and stdin closed (simulating piped/no-TTY input),
+	// the run should abort with an "no interactive input" error.
+	outputDir := t.TempDir()
+	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+		Workers:          1,
+		OutputDir:        outputDir,
+		SkipReview:       true,
+		ConfirmLargeRuns: true,
+		AutoConfirm:      false,
+	}))
+
+	var prompts []*prompt.Prompt
+	for i := 0; i < 12; i++ {
+		prompts = append(prompts, &prompt.Prompt{
+			ID:         fmt.Sprintf("no-tty-%d", i),
+			Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "crud"},
+		})
+	}
+
+	// Redirect stdin to a closed pipe (EOF immediately).
+	oldStdin := os.Stdin
+	r, w, _ := os.Pipe()
+	w.Close()
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	_, err := engine.Run(context.Background(), prompts, []config.ToolConfig{
+		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	})
+	if err == nil {
+		t.Fatal("expected error when stdin is closed (no TTY)")
+	}
+	if !strings.Contains(err.Error(), "no interactive input available") {
+		t.Errorf("expected 'no interactive input available' error, got: %v", err)
+	}
+}
+
 // capturingReviewer records the evaluation criteria passed to Review.
 type capturingReviewer struct {
 	capturedCriteria string

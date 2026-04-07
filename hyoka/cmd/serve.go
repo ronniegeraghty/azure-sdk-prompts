@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/ronniegeraghty/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/internal/serve"
 	"github.com/spf13/cobra"
@@ -29,6 +31,7 @@ func serveCmd() *cobra.Command {
 			promptsDir = resolvePathFlag(cmd, "prompts",
 				config.ResolveCandidates(proj, "prompts", "./prompts", "../prompts"))
 
+			fmt.Printf("Listening on http://localhost:%d\n", port)
 			return serve.Start(serve.Options{
 				ReportsDir: reportsDir,
 				SiteDir:    siteDir,

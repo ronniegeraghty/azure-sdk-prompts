@@ -53,7 +53,9 @@ type StubEvaluator struct{}
 func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	// Write a stub file so file graders can find it on disk.
 	if workDir != "" {
-		_ = os.WriteFile(filepath.Join(workDir, "stub_output.txt"), []byte("stub"), 0644)
+		if err := os.WriteFile(filepath.Join(workDir, "stub_output.txt"), []byte("stub"), 0644); err != nil {
+			slog.Warn("stub file write failed", "error", err)
+		}
 	}
 	return &EvalResult{
 		GeneratedFiles: []string{"stub_output.txt"},
@@ -291,7 +293,13 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	// Pre-run summary (#34: fan-out visibility)
 	evalCount := len(tasks)
-	estimatedSessions := evalCount * 2 // generate + review per eval
+	sessionsPerEval := 2 // generate + review
+	sessionLabel := fmt.Sprintf("%d × 2 for generate/review", evalCount)
+	if e.opts.SkipReview {
+		sessionsPerEval = 1
+		sessionLabel = fmt.Sprintf("%d × 1 for generate only", evalCount)
+	}
+	estimatedSessions := evalCount * sessionsPerEval
 	maxSessions := e.opts.Workers * 3
 	slog.Info("Evaluation plan",
 		"evaluations", evalCount,
@@ -300,15 +308,23 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		"estimated_sessions", estimatedSessions,
 		"workers", e.opts.Workers,
 		"max_sessions", maxSessions)
+
+	if e.opts.DryRun {
+		e.printf("\n🔍 DRY RUN MODE — No evaluations will be executed\n")
+	}
 	e.printf("\n📊 Evaluation plan: %d evaluations (%d prompts × %d configs)\n", evalCount, len(prompts), len(configs))
-	e.printf("   Estimated Copilot sessions: %d (%d × 2 for generate/review)\n", estimatedSessions, evalCount)
+	e.printf("   Estimated Copilot sessions: %d (%s)\n", estimatedSessions, sessionLabel)
 	e.printf("   Workers: %d | Max sessions: %d\n\n", e.opts.Workers, maxSessions)
 
 	// Confirmation prompt for large runs (#34)
 	if evalCount > 10 && e.opts.ConfirmLargeRuns && !e.opts.AutoConfirm {
 		e.printf("⚠️  Large run detected (%d evaluations). Continue? [y/N] ", evalCount)
 		var answer string
-		_, _ = fmt.Scanln(&answer)
+		if _, err := fmt.Scanln(&answer); err != nil {
+			// On piped input or EOF, default to "no" for safety.
+			slog.Info("No TTY input detected, defaulting to abort")
+			return nil, fmt.Errorf("no interactive input available for confirmation")
+		}
 		answer = strings.TrimSpace(strings.ToLower(answer))
 		if answer != "y" && answer != "yes" {
 			return nil, fmt.Errorf("run aborted by user (use -y to skip confirmation)")
