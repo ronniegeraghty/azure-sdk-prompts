@@ -130,5 +130,6 @@ func fetchRemote(s config.Skill, baseDir string) (string, error) {
 	if absErr != nil {
 		slog.Warn("Failed to resolve absolute install path", "path", installDir, "error", absErr)
 	}
+	slog.Info("Remote skill installed", "skill", s.Name, "repo", s.Repo, "path", abs)
 	return abs, nil
 }

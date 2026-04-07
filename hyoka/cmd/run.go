@@ -188,6 +188,21 @@ if err != nil {
 return err
 }
 
+// Log loaded config details for diagnostics
+{
+var configSource string
+if cmd.Flags().Changed("config-file") {
+configSource = f.configFile
+} else {
+configSource = resolveConfigDir(cmd)
+}
+names := make([]string, len(configs))
+for i, c := range configs {
+names[i] = c.Name
+}
+slog.Info("Configs loaded", "source", configSource, "count", len(configs), "names", names)
+}
+
 // Require --all-configs when multiple configs exist and no --config filter is specified (#34)
 if f.configName == "" && len(configs) > 1 && !f.allConfigs {
 fmt.Printf("\u26a0\ufe0f  Found %d configs but no --config filter specified.\n", len(configs))
@@ -317,6 +332,9 @@ panelReviewer.SetSessionTimeout(sessionTimeout)
 if len(reviewerSkillsDirs) > 0 {
 panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
 }
+if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
+panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+}
 slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
 return nil, panelReviewer, nil
 }
@@ -330,6 +348,9 @@ copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.
 copilotReviewer.SetSessionTimeout(sessionTimeout)
 if len(reviewerSkillsDirs) > 0 {
 copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+}
+if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
+copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
 }
 slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
 return copilotReviewer, nil, nil
