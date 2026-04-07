@@ -26,7 +26,7 @@ var ValidLanguages = []string{"dotnet", "java", "js-ts", "python", "go", "rust",
 
 // ValidCategories is the canonical list of valid category values.
 var ValidCategories = []string{
-"authentication", "pagination", "polling", "retries",
+"authentication", "best-practices", "pagination", "polling", "retries",
 "error-handling", "crud", "batch", "streaming", "auth", "provisioning",
 }
 

@@ -11,8 +11,9 @@ func pluginsCmd() *cobra.Command {
 var pluginsDir string
 
 cmd := &cobra.Command{
-Use:   "plugins",
-Short: "List available plugins",
+Use:     "plugins",
+Aliases: []string{"tools"},
+Short:   "List available plugins",
 Long:  "Scans the plugins directory and lists all available plugin definitions with their skills and MCP servers.",
 RunE: func(cmd *cobra.Command, args []string) error {
 reg := plugin.NewRegistry()
