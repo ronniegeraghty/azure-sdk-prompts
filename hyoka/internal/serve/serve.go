@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -79,7 +80,9 @@ func Start(opts Options) error {
 	fmt.Printf("🌐 Serving evaluation reports at %s\n", url)
 	fmt.Printf("   Reports directory: %s\n", opts.ReportsDir)
 	if opts.SiteDir != "" {
-		fmt.Printf("   Site directory:    %s\n", opts.SiteDir)
+		fmt.Printf("   Site directory:    %s (overriding embedded site)\n", opts.SiteDir)
+	} else {
+		fmt.Printf("   Site:             embedded (use --site-dir to override)\n")
 	}
 	if opts.DocsDir != "" {
 		fmt.Printf("   Docs directory:    %s\n", opts.DocsDir)
@@ -333,29 +336,46 @@ func handleAPIPromptDetail(w http.ResponseWriter, r *http.Request, promptsDir, r
 // --- SPA handler ---
 
 func spaHandler(siteDir string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// If no site directory configured, return a minimal fallback
-		if siteDir == "" {
-			w.Header().Set("Content-Type", "text/plain")
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprint(w, "Site directory not configured. Use --site-dir to point to the built React site.")
-			return
+	var siteFS fs.FS
+	if siteDir != "" {
+		siteFS = os.DirFS(siteDir)
+	} else {
+		sub, err := fs.Sub(embeddedSite, "site")
+		if err != nil {
+			slog.Error("failed to access embedded site", "error", err)
+			return func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "embedded site unavailable", http.StatusInternalServerError)
+			}
 		}
+		siteFS = sub
+	}
 
-		// Try to serve static file from site dir
-		filePath := filepath.Join(siteDir, filepath.Clean(r.URL.Path))
-		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
-			http.ServeFile(w, r, filePath)
-			return
+	fileServer := http.FileServerFS(siteFS)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Strip leading slash for fs.FS operations
+		fsPath := strings.TrimPrefix(r.URL.Path, "/")
+
+		// Try to serve the static file directly
+		if fsPath != "" {
+			if f, err := siteFS.Open(fsPath); err == nil {
+				stat, statErr := f.Stat()
+				f.Close()
+				if statErr == nil && !stat.IsDir() {
+					fileServer.ServeHTTP(w, r)
+					return
+				}
+			}
 		}
 
 		// SPA fallback: serve index.html for client-side routing
-		indexPath := filepath.Join(siteDir, "index.html")
-		if _, err := os.Stat(indexPath); err != nil {
+		indexData, err := fs.ReadFile(siteFS, "index.html")
+		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		http.ServeFile(w, r, indexPath)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(indexData)
 	}
 }
 
