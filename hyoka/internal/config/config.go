@@ -2,14 +2,14 @@
 package config
 
 import (
-"bytes"
-"fmt"
-"log/slog"
-"os"
-"os/exec"
-"path/filepath"
+	"bytes"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
 
-"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 )
 
 // MCPServer represents an MCP server configuration.
@@ -70,51 +70,51 @@ type ToolConfig struct {
 
 // ConfigFile represents the top-level config file structure.
 type ConfigFile struct {
-Configs []ToolConfig `yaml:"configs"`
+	Configs []ToolConfig `yaml:"configs"`
 }
 
 // Load reads and parses a configuration file from the given path.
 func Load(path string) (*ConfigFile, error) {
-slog.Debug("Loading config file", "path", path)
-data, err := os.ReadFile(path)
-if err != nil {
-return nil, fmt.Errorf("reading config file: %w", err)
-}
-return Parse(data)
+	slog.Debug("Loading config file", "path", path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading config file: %w", err)
+	}
+	return Parse(data)
 }
 
 // LoadDir reads all .yaml files in a directory and merges their configs.
 // This allows splitting configs across multiple files (e.g., baseline.yaml, azure-mcp.yaml).
 func LoadDir(dir string) (*ConfigFile, error) {
-slog.Debug("Loading config directory", "dir", dir)
-entries, err := os.ReadDir(dir)
-if err != nil {
-return nil, fmt.Errorf("reading config directory %s: %w", dir, err)
-}
+	slog.Debug("Loading config directory", "dir", dir)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("reading config directory %s: %w", dir, err)
+	}
 
-merged := &ConfigFile{}
-nameSource := make(map[string]string) // config name → source filename
-for _, e := range entries {
-if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
-continue
-}
-cf, err := Load(filepath.Join(dir, e.Name()))
-if err != nil {
-return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
-}
-for _, c := range cf.Configs {
-if prev, ok := nameSource[c.Name]; ok {
-return nil, fmt.Errorf("duplicate config name %q found in files %s and %s", c.Name, prev, e.Name())
-}
-nameSource[c.Name] = e.Name()
-}
-merged.Configs = append(merged.Configs, cf.Configs...)
-}
+	merged := &ConfigFile{}
+	nameSource := make(map[string]string) // config name → source filename
+	for _, e := range entries {
+		if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
+			continue
+		}
+		cf, err := Load(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
+		}
+		for _, c := range cf.Configs {
+			if prev, ok := nameSource[c.Name]; ok {
+				return nil, fmt.Errorf("duplicate config name %q found in files %s and %s", c.Name, prev, e.Name())
+			}
+			nameSource[c.Name] = e.Name()
+		}
+		merged.Configs = append(merged.Configs, cf.Configs...)
+	}
 
-if len(merged.Configs) == 0 {
-return nil, fmt.Errorf("no configs found in %s", dir)
-}
-return merged, nil
+	if len(merged.Configs) == 0 {
+		return nil, fmt.Errorf("no configs found in %s", dir)
+	}
+	return merged, nil
 }
 
 // Parse parses configuration from YAML bytes.
@@ -125,11 +125,11 @@ func Parse(data []byte) (*ConfigFile, error) {
 	if err := dec.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing config YAML: %w", err)
 	}
-	for _, c := range cfg.Configs {
-		slog.Info("Config loaded", "name", c.Name, "model", c.Generator.Model)
-	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
+	}
+	for _, c := range cfg.Configs {
+		slog.Info("Config loaded", "name", c.Name, "model", c.Generator.Model)
 	}
 	return &cfg, nil
 }
@@ -180,6 +180,21 @@ func (cf *ConfigFile) Validate() error {
 				seen[rm] = true
 			}
 		}
+		// Reject negative session limits — they bypass guardrails.
+		if c.Limits != nil {
+			if c.Limits.MaxTurns < 0 {
+				return fmt.Errorf("config %q: limits.max_turns must not be negative", c.Name)
+			}
+			if c.Limits.MaxFiles < 0 {
+				return fmt.Errorf("config %q: limits.max_files must not be negative", c.Name)
+			}
+			if c.Limits.MaxOutputSize < 0 {
+				return fmt.Errorf("config %q: limits.max_output_size must not be negative", c.Name)
+			}
+			if c.Limits.MaxSessionActions < 0 {
+				return fmt.Errorf("config %q: limits.max_session_actions must not be negative", c.Name)
+			}
+		}
 	}
 	return nil
 }
@@ -203,73 +218,73 @@ func validateSkill(s Skill) error {
 
 // GetConfig returns a config by name, or an error if not found.
 func (cf *ConfigFile) GetConfig(name string) (*ToolConfig, error) {
-for i := range cf.Configs {
-if cf.Configs[i].Name == name {
-return &cf.Configs[i], nil
-}
-}
-return nil, fmt.Errorf("config %q not found", name)
+	for i := range cf.Configs {
+		if cf.Configs[i].Name == name {
+			return &cf.Configs[i], nil
+		}
+	}
+	return nil, fmt.Errorf("config %q not found", name)
 }
 
 // GetConfigs returns configs matching the given names. If names is empty, returns all.
 func (cf *ConfigFile) GetConfigs(names []string) ([]ToolConfig, error) {
-if len(names) == 0 {
-return cf.Configs, nil
-}
-nameSet := make(map[string]bool, len(names))
-for _, n := range names {
-nameSet[n] = true
-}
-var result []ToolConfig
-for _, c := range cf.Configs {
-if nameSet[c.Name] {
-result = append(result, c)
-delete(nameSet, c.Name)
-}
-}
-if len(nameSet) > 0 {
-var missing []string
-for n := range nameSet {
-missing = append(missing, n)
-}
-return nil, fmt.Errorf("configs not found: %v", missing)
-}
-return result, nil
+	if len(names) == 0 {
+		return cf.Configs, nil
+	}
+	nameSet := make(map[string]bool, len(names))
+	for _, n := range names {
+		nameSet[n] = true
+	}
+	var result []ToolConfig
+	for _, c := range cf.Configs {
+		if nameSet[c.Name] {
+			result = append(result, c)
+			delete(nameSet, c.Name)
+		}
+	}
+	if len(nameSet) > 0 {
+		var missing []string
+		for n := range nameSet {
+			missing = append(missing, n)
+		}
+		return nil, fmt.Errorf("configs not found: %v", missing)
+	}
+	return result, nil
 }
 
 // InstallSkillsAndPlugins runs "npx skills add <entry>" for each declared
 // plugin across the given configs. It deduplicates entries so each
 // package is only installed once.
 func InstallSkillsAndPlugins(configs []ToolConfig) error {
-seen := make(map[string]bool)
-type entry struct {
-kind  string
-value string
-}
-var entries []entry
+	seen := make(map[string]bool)
+	type entry struct {
+		kind  string
+		value string
+	}
+	var entries []entry
 
-for _, c := range configs {
-for _, p := range c.Plugins {
-if !seen["plugin:"+p] {
-seen["plugin:"+p] = true
-entries = append(entries, entry{"plugin", p})
-}
-}
-}
+	for _, c := range configs {
+		for _, p := range c.Plugins {
+			if !seen["plugin:"+p] {
+				seen["plugin:"+p] = true
+				entries = append(entries, entry{"plugin", p})
+			}
+		}
+	}
 
-if len(entries) == 0 {
-return nil
-}
+	if len(entries) == 0 {
+		return nil
+	}
 
-for _, e := range entries {
-fmt.Printf("Installing %s: %s\n", e.kind, e.value)
-cmd := exec.Command("npx", "skills", "add", e.value)
-cmd.Stdout = os.Stdout
-cmd.Stderr = os.Stderr
-if err := cmd.Run(); err != nil {
-return fmt.Errorf("installing %s %q: %w", e.kind, e.value, err)
-}
-}
+	for _, e := range entries {
+		fmt.Printf("Installing %s: %s\n", e.kind, e.value)
+		cmd := exec.Command("npx", "skills", "add", e.value)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("installing %s %q: %w", e.kind, e.value, err)
+		}
+	}
 
-return nil
+	return nil
 }
