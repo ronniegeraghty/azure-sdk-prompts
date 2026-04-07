@@ -41,3 +41,14 @@ Fixed flaky resourcemonitor tests by replacing time.Sleep assertions with event-
 
 **Files:** resourcemonitor_test.go
 
+### Session 2026-07-22 (Issue #240 — Site SPA Tests)
+
+**Status:** COMPLETE  
+**Issue:** #240  
+**PR:** #250
+
+Added first-ever test coverage for the `site/` React SPA dashboard. Set up Vitest + React Testing Library with jsdom. Wrote 8 test files (41 tests) covering: API module (11), DashboardPage (7), HomePage (5), ComparisonPage (4), RunsPage (3), Navbar (4), Layout (3), Footer (4). All passing.
+
+**Key outcome:** Site now has a test foundation. Future component work can be TDD'd. Setup file stubs ResizeObserver + IntersectionObserver for jsdom compatibility with recharts and motion libraries.
+
+**Files:** site/vite.config.ts, site/package.json, site/src/__tests__/*.test.{ts,tsx}, site/src/__tests__/setup.ts
