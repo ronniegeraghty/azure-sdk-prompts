@@ -427,7 +427,9 @@ func recoverMisplacedFiles(dir string, preSnapshot map[string]bool, destDir stri
 		if e.IsDir() {
 			// Junk directories → just delete
 			if junkDirs[e.Name()] {
-				if err := os.RemoveAll(src); err == nil {
+				if err := os.RemoveAll(src); err != nil {
+					slog.Warn("Workspace recovery: failed to delete junk directory", "error", err, "path", src)
+				} else {
 					recovered++
 					slog.Debug("Deleted junk directory", "path", src)
 				}
@@ -437,9 +439,12 @@ func recoverMisplacedFiles(dir string, preSnapshot map[string]bool, destDir stri
 			dst := filepath.Join(destDir, e.Name())
 			if err := os.Rename(src, dst); err != nil {
 				// Rename may fail across filesystems; fall back to copy+delete
-				if err := copyDir(src, dst); err == nil {
-					os.RemoveAll(src)
+				if cpErr := copyDir(src, dst); cpErr == nil {
+					if rmErr := os.RemoveAll(src); rmErr != nil {
+						slog.Warn("Workspace recovery: failed to remove copied directory", "error", rmErr, "path", src)
+					}
 				} else {
+					slog.Warn("Workspace recovery: failed to copy directory", "error", cpErr, "path", src)
 					continue
 				}
 			}
@@ -463,7 +468,9 @@ func recoverMisplacedFiles(dir string, preSnapshot map[string]bool, destDir stri
 		if err := os.WriteFile(dst, data, 0644); err != nil {
 			continue
 		}
-		os.Remove(src) // clean up the misplaced file
+		if err := os.Remove(src); err != nil {
+			slog.Warn("Workspace recovery: failed to remove recovered file", "error", err, "path", src)
+		}
 		recovered++
 		slog.Debug("Recovered misplaced file", "src", src, "dst", dst)
 	}

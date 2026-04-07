@@ -545,6 +545,15 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	summary.Duration = time.Since(start).Seconds()
 
+	slog.Info("Evaluation run complete",
+		"run_id", summary.RunID,
+		"evaluations", len(summary.Results),
+		"passed", summary.Passed,
+		"failed", summary.Failed,
+		"errors", summary.Errors,
+		"duration", summary.Duration,
+	)
+
 	// Calculate per-phase average durations across all reports (#44)
 	var genSum, reviewSum float64
 	var genCount, reviewCount int
@@ -577,18 +586,24 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	// Write JSON summary
-	if _, err := report.WriteSummary(summary, e.opts.OutputDir); err != nil {
-		slog.Error("Failed to write run summary", "error", err)
+	if path, err := report.WriteSummary(summary, e.opts.OutputDir); err != nil {
+		slog.Error("Failed to write run summary", "error", err, "path", e.opts.OutputDir)
+	} else {
+		slog.Debug("Wrote JSON summary", "path", path)
 	}
 
 	// Write HTML summary
-	if _, err := report.WriteSummaryHTML(summary, e.opts.OutputDir); err != nil {
-		slog.Error("Failed to write HTML summary", "error", err)
+	if path, err := report.WriteSummaryHTML(summary, e.opts.OutputDir); err != nil {
+		slog.Error("Failed to write HTML summary", "error", err, "path", e.opts.OutputDir)
+	} else {
+		slog.Debug("Wrote HTML summary", "path", path)
 	}
 
 	// Write Markdown summary
-	if _, err := report.WriteSummaryMarkdown(summary, e.opts.OutputDir); err != nil {
-		slog.Error("Failed to write Markdown summary", "error", err)
+	if path, err := report.WriteSummaryMarkdown(summary, e.opts.OutputDir); err != nil {
+		slog.Error("Failed to write Markdown summary", "error", err, "path", e.opts.OutputDir)
+	} else {
+		slog.Debug("Wrote Markdown summary", "path", path)
 	}
 
 	return summary, nil
