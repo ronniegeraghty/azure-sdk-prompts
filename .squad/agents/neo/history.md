@@ -66,3 +66,27 @@ Implemented ReviewerFactory pattern to fix multi-config reviewer panel bug. Each
 
 **Files:** engine.go, main.go, reviewer_factory_test.go
 
+### Session 2026-04-07T03:47 (P0 Config Hardening)
+
+**Status:** COMPLETE  
+**PR:** [#256](https://github.com/ronniegeraghty/hyoka/pull/256)  
+**Branch:** `ronniegeraghty/p0-config-hardening`
+
+Implemented P0 config hardening from codebase audit (#252, items 1-2):
+
+1. **Validation Before Logging:** Moved `cfg.Validate()` before the config-loaded logging loop in `Parse()` to prevent nil-pointer panic when accessing `c.Generator.Model` on invalid configs.
+
+2. **Negative Limit Rejection:** Added validation to reject negative values for all SessionLimits fields (max_turns, max_files, max_output_size, max_session_actions). Zero is explicitly allowed (means "use default").
+
+**Implementation:**
+- Fixed validation order in `config.go:125-133` (Parse function)
+- Added negative-value checks in `config.go:183-197` (Validate function)
+- Created 6 new tests: negative limits (4 tests), zero limits acceptance, nil generator panic prevention
+- Fixed UTF-8 encoding (em-dash in comment) and Go formatting
+
+**Testing:** All 69 config package tests pass. Full build succeeds.
+
+**Key Learning:** Validation order matters for early error detection. Always validate config structure BEFORE accessing fields that may not exist. This prevents cryptic panics and provides clear error messages to users.
+
+**Files:** hyoka/internal/config/config.go, hyoka/internal/config/config_test.go
+
