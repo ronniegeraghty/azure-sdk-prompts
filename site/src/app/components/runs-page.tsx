@@ -5,15 +5,18 @@ import type { RunSummary } from "../data/types";
 import { CheckCircle2, XCircle, AlertTriangle, Clock, ChevronRight, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 
-function formatDuration(s: number): string {
+function formatDuration(s: number | undefined | null): string {
+  if (s == null || isNaN(s)) return "N/A";
   if (s < 60) return `${s.toFixed(1)}s`;
   const m = Math.floor(s / 60);
   const sec = (s % 60).toFixed(0);
   return `${m}m ${sec}s`;
 }
 
-function formatDate(ts: string): string {
+function formatDate(ts: string | undefined | null): string {
+  if (!ts) return "N/A";
   const d = new Date(ts);
+  if (isNaN(d.getTime())) return "N/A";
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -67,7 +70,9 @@ export function RunsPage() {
         ) : (
           <div className="space-y-4">
             {runs.map((run, i) => {
-              const rate = run.total_evaluations > 0 ? ((run.passed / run.total_evaluations) * 100).toFixed(1) : "0.0";
+              const passed = run.passed ?? 0;
+              const total = run.total_evaluations ?? 0;
+              const rate = total > 0 ? ((passed / total) * 100).toFixed(1) : "0.0";
               return (
                 <motion.div
                   key={run.run_id}
