@@ -85,7 +85,8 @@ Every code-generation session is automatically aborted if it exceeds any of thes
 | Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
 | File count | 50 | `--max-files` | Prevents excessive file creation |
 | Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (supports KB, MB suffixes) |
-| Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
+
+Prompts can override these defaults via frontmatter fields (`max_session_actions`, `max_turns`). The resolution order is: prompt frontmatter > config YAML > CLI flag > engine default.
 
 When a guardrail trips, the evaluation is marked as failed with a clear reason (e.g., `guardrail: turn count 26 exceeded limit of 25`).
 

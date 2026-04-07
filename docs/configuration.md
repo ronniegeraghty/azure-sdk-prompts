@@ -226,7 +226,11 @@ generator:
 
 ## Limits
 
-Guardrail limits can be set globally via CLI flags or per-config in the YAML file. CLI flags take precedence over config values.
+Guardrail limits can be set at multiple levels with the following resolution order:
+
+**prompt frontmatter > config YAML > CLI flag > engine default**
+
+This allows fine-grained control at the prompt level while maintaining sensible defaults.
 
 | Field | Type | Default | CLI Flag | Description |
 |-------|------|---------|----------|-------------|
@@ -234,6 +238,10 @@ Guardrail limits can be set globally via CLI flags or per-config in the YAML fil
 | `max_files` | int | 50 | `--max-files` | Maximum generated files per evaluation |
 | `max_output_size` | string | "1MB" | `--max-output-size` | Maximum total output size (supports KB, MB suffixes) |
 | `max_session_actions` | int | 50 | `--max-session-actions` | Maximum actions per Copilot session |
+
+### Config-Level Limits
+
+Set limits in the config YAML file (overridden by CLI flags):
 
 ```yaml
 configs:
@@ -246,6 +254,25 @@ configs:
       max_output_size: "512KB"
       max_session_actions: 25
 ```
+
+### Prompt-Level Limits
+
+Override limits for a specific prompt via frontmatter (highest priority). This is useful for complex prompts that require more actions or turns:
+
+```yaml
+---
+id: storage-dp-python-batch
+service: storage
+language: python
+plane: data-plane
+category: crud
+difficulty: advanced
+max_session_actions: 100  # This prompt needs more reasoning steps
+max_turns: 40             # Allow more back-and-forth turns
+---
+```
+
+Prompts with unset limit fields fall through to config > CLI > default, ensuring backward compatibility.
 
 ## Multiple Config Files
 

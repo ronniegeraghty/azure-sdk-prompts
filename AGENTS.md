@@ -139,6 +139,7 @@ go run ./hyoka run --service key-vault --language python \
 - Without `--config` or `--all-configs`, the run will fail
 - `--log-level debug` enables verbose logging; pair with `--log-file` to capture to file
 - `--max-session-actions` (default: 50) limits actions per Copilot session
+- Prompt-level overrides: Prompts can override `--max-session-actions` and `--max-turns` via frontmatter (see [configuration.md](docs/configuration.md#prompt-level-limits) for examples). Resolution order: prompt frontmatter > config YAML > CLI flag > default.
 
 ### Available Filter Flags
 
