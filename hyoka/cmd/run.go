@@ -61,6 +61,8 @@ type runFlags struct {
 	sessionTimeout string
 	// Pairwise tool-ablation (#121)
 	pairwiseMode bool
+	// Pre-flight model check (#264)
+	checkModels bool
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -107,6 +109,8 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.sessionTimeout, "session-timeout", "10m", "Maximum duration for a single generation or review session (e.g., 10m, 30m, 1h)")
 	// Pairwise tool-ablation (#121)
 	cmd.Flags().BoolVarP(&f.pairwiseMode, "pairwise", "P", false, "Expand each config into N+1 pairwise tool-ablation variants")
+
+	cmd.Flags().BoolVar(&f.checkModels, "check-models", false, "Pre-flight check that all configured models (generator + reviewer) are available before starting evaluations")
 }
 
 func buildFilter(f *runFlags) prompt.Filter {
@@ -384,6 +388,7 @@ func runCmd() *cobra.Command {
 				CriteriaDir:       f.criteriaDir,
 				ExcludeDirs:       excludeDirs,
 				SessionTimeout:    sessionTimeout,
+				CheckModels:       f.checkModels,
 			})
 
 			summary, err := engine.Run(context.Background(), filtered, configs)

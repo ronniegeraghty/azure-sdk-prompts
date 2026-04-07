@@ -8,6 +8,7 @@ import (
 "strings"
 "testing"
 
+"github.com/ronniegeraghty/hyoka/internal/config"
 "github.com/ronniegeraghty/hyoka/internal/prompt"
 )
 
@@ -376,5 +377,145 @@ func TestEvalWorkspace_IsIsolated(t *testing.T) {
 	}
 	if len(wsFiles) != 0 {
 		t.Errorf("workspace should be empty (isolated from CWD), got %d entries", len(wsFiles))
+	}
+}
+
+// --- Workspace lifecycle tests (#261) ---
+
+// TestWorkspaceLifecycle_FilesAvailableBeforeCleanup verifies that workspace
+// files persist through the evaluation lifecycle and can be copied to the
+// report directory before session cleanup runs.
+func TestWorkspaceLifecycle_FilesAvailableBeforeCleanup(t *testing.T) {
+	genWs, err := NewWorkspace("test-prompt", "test-config")
+	if err != nil {
+		t.Fatalf("NewWorkspace() error: %v", err)
+	}
+	defer genWs.Cleanup()
+
+	// Simulate the Copilot agent writing files to the workspace
+	os.WriteFile(filepath.Join(genWs.Dir, "main.py"), []byte("print('hello')"), 0644)
+	os.MkdirAll(filepath.Join(genWs.Dir, "pkg"), 0755)
+	os.WriteFile(filepath.Join(genWs.Dir, "pkg", "utils.py"), []byte("# utils"), 0644)
+
+	// Create persistent report directory (mirrors engine.go ws setup)
+	reportDir := filepath.Join(t.TempDir(), "generated-code")
+	ws, err := NewWorkspaceAt(reportDir)
+	if err != nil {
+		t.Fatalf("NewWorkspaceAt() error: %v", err)
+	}
+
+	// Copy files BEFORE cleanup — this is the critical ordering (#261)
+	if err := copyDir(genWs.Dir, ws.Dir); err != nil {
+		t.Fatalf("copyDir() error: %v", err)
+	}
+
+	// Verify files are in the report directory
+	files, err := ws.ListFiles()
+	if err != nil {
+		t.Fatalf("ListFiles() error: %v", err)
+	}
+	if len(files) != 2 {
+		t.Errorf("expected 2 files in report dir, got %d: %v", len(files), files)
+	}
+
+	// Now simulate cleanup (as if CleanupFn ran)
+	genWs.Cleanup()
+
+	// Report dir files should survive cleanup of the temp workspace
+	files, err = ws.ListFiles()
+	if err != nil {
+		t.Fatalf("ListFiles() after cleanup error: %v", err)
+	}
+	if len(files) != 2 {
+		t.Errorf("report dir should retain files after cleanup, got %d", len(files))
+	}
+
+	// Verify file contents are correct
+	data, err := os.ReadFile(filepath.Join(ws.Dir, "main.py"))
+	if err != nil {
+		t.Fatalf("reading main.py: %v", err)
+	}
+	if string(data) != "print('hello')" {
+		t.Errorf("unexpected content: %q", data)
+	}
+}
+
+// TestCleanupFn_CalledAfterFileCopy verifies the CleanupFn pattern: session
+// state is only deleted after workspace files have been safely copied.
+func TestCleanupFn_CalledAfterFileCopy(t *testing.T) {
+	genDir := t.TempDir()
+	os.WriteFile(filepath.Join(genDir, "output.py"), []byte("result"), 0644)
+
+	var cleanupCalled bool
+	result := &EvalResult{
+		GeneratedFiles: []string{"output.py"},
+		Success:        true,
+		CleanupFn: func() {
+			// Simulate DeleteSession removing workspace files
+			os.RemoveAll(genDir)
+			cleanupCalled = true
+		},
+	}
+
+	// Simulate engine.go copying files before calling CleanupFn
+	reportDir := t.TempDir()
+	if err := copyDir(genDir, reportDir); err != nil {
+		t.Fatalf("copyDir() error: %v", err)
+	}
+
+	// Verify files exist in report dir BEFORE cleanup
+	data, err := os.ReadFile(filepath.Join(reportDir, "output.py"))
+	if err != nil {
+		t.Fatalf("file not copied to report dir: %v", err)
+	}
+	if string(data) != "result" {
+		t.Errorf("unexpected content: %q", data)
+	}
+
+	// Call CleanupFn — simulates session deletion
+	if result.CleanupFn != nil {
+		result.CleanupFn()
+	}
+
+	if !cleanupCalled {
+		t.Error("CleanupFn should have been called")
+	}
+
+	// genDir is now removed (simulating DeleteSession behavior)
+	if _, err := os.Stat(genDir); !os.IsNotExist(err) {
+		t.Error("genDir should be removed by CleanupFn")
+	}
+
+	// But report dir files should survive
+	data, err = os.ReadFile(filepath.Join(reportDir, "output.py"))
+	if err != nil {
+		t.Fatalf("report dir file should survive CleanupFn: %v", err)
+	}
+	if string(data) != "result" {
+		t.Errorf("unexpected content after cleanup: %q", data)
+	}
+}
+
+// TestCleanupFn_NilSafe verifies that nil CleanupFn doesn't panic.
+func TestCleanupFn_NilSafe(t *testing.T) {
+	result := &EvalResult{Success: true}
+	// Should not panic
+	if result.CleanupFn != nil {
+		result.CleanupFn()
+	}
+}
+
+// TestCleanupFn_StubEvaluatorHasNoCleanup verifies StubEvaluator returns nil CleanupFn.
+func TestCleanupFn_StubEvaluatorHasNoCleanup(t *testing.T) {
+	stub := &StubEvaluator{}
+	result, err := stub.Evaluate(context.Background(),
+		&prompt.Prompt{ID: "test"},
+		&config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "test"}},
+		t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.CleanupFn != nil {
+		t.Error("StubEvaluator should have nil CleanupFn")
 	}
 }
