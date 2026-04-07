@@ -106,12 +106,68 @@ func resolveConfigSkillDirs(configs []config.ToolConfig, promptsDir string) {
 		}
 	}
 
+	resolveSkillRefs := func(refs []config.SkillRef) {
+		for j := range refs {
+			typ := refs[j].Type
+			if typ == "" && refs[j].Path != "" {
+				typ = "local"
+			}
+			if typ != "local" || refs[j].Path == "" {
+				continue
+			}
+			if filepath.IsAbs(refs[j].Path) {
+				continue
+			}
+			candidates := []string{
+				refs[j].Path,
+				filepath.Join(filepath.Dir(promptsDir), refs[j].Path),
+			}
+			for _, c := range candidates {
+				if info, err := os.Stat(c); err == nil && info.IsDir() {
+					abs, absErr := filepath.Abs(c)
+					if absErr != nil {
+						slog.Warn("Failed to resolve absolute skill path", "path", c, "error", absErr)
+					}
+					refs[j].Path = abs
+					break
+				}
+			}
+		}
+	}
+
+	resolveDirs := func(dirs []string) []string {
+		for j := range dirs {
+			if filepath.IsAbs(dirs[j]) {
+				continue
+			}
+			candidates := []string{
+				dirs[j],
+				filepath.Join(filepath.Dir(promptsDir), dirs[j]),
+			}
+			for _, c := range candidates {
+				if info, err := os.Stat(c); err == nil && info.IsDir() {
+					abs, absErr := filepath.Abs(c)
+					if absErr != nil {
+						slog.Warn("Failed to resolve absolute skill path", "path", c, "error", absErr)
+					}
+					dirs[j] = abs
+					break
+				}
+			}
+		}
+		return dirs
+	}
+
 	for i := range configs {
 		if configs[i].Generator != nil {
 			resolveSkills(configs[i].Generator.Tools)
 		}
 		if configs[i].Reviewer != nil {
 			resolveSkills(configs[i].Reviewer.Tools)
+			resolveSkillRefs(configs[i].Reviewer.Skills)
+		}
+		if len(configs[i].ReviewerSkillDirectories) > 0 {
+			configs[i].ReviewerSkillDirectories = resolveDirs(configs[i].ReviewerSkillDirectories)
 		}
 	}
 }

@@ -121,3 +121,31 @@ func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 	}
 	return nil
 }
+
+// validateSkillRef checks that a SkillRef has valid fields.
+func validateSkillRef(ref SkillRef, configName string, idx int) error {
+	if ref.Type != "" && ref.Type != "local" && ref.Type != "remote" {
+		return fmt.Errorf("config %q: skills[%d] has invalid type %q (must be \"local\" or \"remote\")", configName, idx, ref.Type)
+	}
+	resolvedType := ref.Type
+	if resolvedType == "" {
+		if ref.Path != "" {
+			resolvedType = "local"
+		} else if ref.Repo != "" {
+			resolvedType = "remote"
+		}
+	}
+	switch resolvedType {
+	case "local":
+		if ref.Path == "" {
+			return fmt.Errorf("config %q: skills[%d] local skill missing path", configName, idx)
+		}
+	case "remote":
+		if ref.Repo == "" {
+			return fmt.Errorf("config %q: skills[%d] remote skill missing repo", configName, idx)
+		}
+	default:
+		return fmt.Errorf("config %q: skills[%d] missing type, path, or repo", configName, idx)
+	}
+	return nil
+}
