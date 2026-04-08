@@ -29,6 +29,9 @@ func (cf *ConfigFile) ExpandPlugins(dir string) error {
 }
 
 // ExpandPlugins appends plugin-derived tool entries to generator/reviewer tools.
+// Missing plugins are logged as warnings and skipped — this allows configs that
+// reference optional plugins (e.g., installed Copilot CLI skills) to load
+// gracefully for contributors who don't have them installed.
 func (c *ToolConfig) ExpandPlugins(reg *plugin.Registry) error {
 	if reg == nil || len(c.Plugins) == 0 {
 		return nil
@@ -37,7 +40,11 @@ func (c *ToolConfig) ExpandPlugins(reg *plugin.Registry) error {
 	for _, name := range c.Plugins {
 		p, err := reg.Get(name)
 		if err != nil {
-			return err
+			slog.Warn("Plugin not found, skipping",
+				"plugin", name,
+				"config", c.Name,
+				"hint", "Install with: /plugin install "+name)
+			continue
 		}
 		for _, entry := range p.ToToolEntries() {
 			entries = append(entries, convertPluginToolEntry(entry))
