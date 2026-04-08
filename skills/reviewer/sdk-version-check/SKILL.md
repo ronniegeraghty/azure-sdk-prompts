@@ -22,34 +22,43 @@ Scan the generated code and dependency files to find Azure SDK packages:
 - **Go**: Check `go.mod` for `github.com/Azure/azure-sdk-for-go` modules
 - **JS/TS**: Check `package.json` for `@azure/*` dependencies
 - **Java**: Check `pom.xml` for `com.azure:azure-*` dependencies or `build.gradle`
+- **Rust**: Check `Cargo.toml` for `azure_*` crates. Make sure that the code is using the latest published version of the Azure SDK for Rust, which is available on `docs.rs` and `crates.io`.
 
 ### 2. Check Latest Versions
 
 #### Python
+
 ```bash
 pip index versions <package-name>
 # Example: pip index versions azure-keyvault-secrets
 ```
+
 Or check PyPI directly:
+
 ```bash
 pip install <package-name>== 2>/dev/1  # Shows available versions in error output
 ```
 
 #### .NET
+
 ```bash
 dotnet list package --outdated
 ```
+
 Or for a specific package:
+
 ```bash
 dotnet package search <package-name> --take 1
 ```
 
 #### Go
+
 ```bash
 go list -m -u all 2>/dev/null | grep azure
 ```
 
 #### JavaScript / TypeScript
+
 ```bash
 npm outdated
 # Or for specific packages:
@@ -57,9 +66,11 @@ npm view @azure/keyvault-secrets version
 ```
 
 #### Java (Maven)
+
 ```bash
 mvn versions:display-dependency-updates
 ```
+
 Or check Maven Central directly for `com.azure:azure-*` artifacts.
 
 ### 3. Report Findings

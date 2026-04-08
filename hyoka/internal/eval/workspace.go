@@ -351,17 +351,17 @@ var codeFileExts = map[string]bool{
 // deleted when recovering misplaced files. Covers all supported languages.
 var DefaultIgnoreDirs = map[string]bool{
 	// JavaScript / TypeScript
-	"node_modules":    true,
+	"node_modules":     true,
 	"bower_components": true,
-	".next":           true,
-	".nuxt":           true,
+	".next":            true,
+	".nuxt":            true,
 	// Python
-	"__pycache__":  true,
-	"venv":         true,
-	".venv":        true,
-	"env":          true,
-	".tox":         true,
-	".eggs":        true,
+	"__pycache__":   true,
+	"venv":          true,
+	".venv":         true,
+	"env":           true,
+	".tox":          true,
+	".eggs":         true,
 	"site-packages": true,
 	// Rust
 	"target": true,

@@ -20,3 +20,5 @@ configs:
           type: skill
           source: local
           path: "./skills/reviewer"
+    limits:
+      max_turns: 75

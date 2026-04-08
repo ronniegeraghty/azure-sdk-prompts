@@ -821,11 +821,12 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	genStart := time.Now()
 	result, err := e.evaluator.Evaluate(genCtx, task.Prompt, &task.Config, genDir)
-	genCancel() // release generation context immediately
+	genCtxErr := genCtx.Err() // capture before cancel to distinguish real cancellation from cleanup
+	genCancel()               // release generation context immediately
 	evalReport.GenerationDuration = time.Since(genStart).Seconds()
 	evalFailed := err != nil
 	if evalFailed {
-		if genCtx.Err() == context.Canceled {
+		if genCtxErr == context.Canceled {
 			evalReport.Error = "generation cancelled (action limit reached)"
 			evalReport.ErrorDetails = "context cancelled — the session exceeded the --max-session-actions limit"
 			evalReport.ErrorCategory = "timeout"
