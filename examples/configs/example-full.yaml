@@ -21,11 +21,12 @@ configs:
           source: remote
           repo: microsoft/skills
 
-        # Local skill — directory path (supports glob patterns)
-        - name: generator-skills
-          type: skill
-          source: local
-          path: "./skills/generator"
+        # Local skill — directory of skills (each subdirectory should contain SKILL.md)
+        # See examples/configs/example-generator-skills.yaml for a complete example.
+        # - name: generator-skills
+        #   type: skill
+        #   source: local
+        #   path: "./skills/generator"
 
       # MCP servers attached to the generator session
       mcp_servers:

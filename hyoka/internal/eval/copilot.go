@@ -18,6 +18,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/internal/skills"
 )
 
 // CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.
@@ -486,7 +487,8 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 
 	slog.Info("Creating Copilot session",
 		"model", cfg.Generator.Model,
-		"skills", len(sessionCfg.SkillDirectories),
+		"skill_dirs", len(sessionCfg.SkillDirectories),
+		"skills", skills.CountSkills(sessionCfg.SkillDirectories),
 		"mcp_servers", len(sessionCfg.MCPServers),
 		"work_dir", workDir,
 	)
@@ -661,13 +663,16 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 }
 
 func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
-	// Collect skill directories from Generator.Tools (includes resolved plugins)
+	// Resolve skill directories from Generator.Tools using the skills package.
+	// This handles glob patterns, validates directories exist and contain skills,
+	// and warns about empty/missing directories (#291).
 	var skillDirs []string
 	if cfg.Generator != nil {
-		for _, entry := range cfg.Generator.Tools {
-			if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-				skillDirs = append(skillDirs, entry.Path)
-			}
+		resolved, err := skills.ResolveSkillDirs(cfg.Generator.Tools, configDir)
+		if err != nil {
+			slog.Warn("Failed to resolve generator skill directories", "error", err)
+		} else {
+			skillDirs = resolved
 		}
 	}
 	// Use the config-driven system prompt (#115, #116). The default is zero
@@ -680,7 +685,8 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// Instruct the agent to use available skills before generating code.
 	// Without this hint, models tend to go straight to code generation
 	// and never invoke the skill tool, even when skills are loaded.
-	if len(skillDirs) > 0 {
+	// Only add if there are actual skills, not just empty directories (#291).
+	if skills.CountSkills(skillDirs) > 0 {
 		systemMsg += "\n\nSKILLS:\n" +
 			"You have Azure SDK skills available. BEFORE writing any code, invoke the relevant skill " +
 			"using the skill tool to get SDK-specific patterns, API examples, and acceptance criteria. " +

@@ -1,0 +1,45 @@
+# Example: loading generator skills from a local directory.
+#
+# hyoka supports two patterns for local skills:
+#
+#   1. Directory of skills — point to a parent directory that contains
+#      skill subdirectories, each with a SKILL.md file.
+#      Example: path: "./skills/generator"
+#        skills/generator/
+#          azure-best-practices/SKILL.md
+#          error-handling/SKILL.md
+#
+#   2. Glob pattern — use a wildcard to select specific skill subdirectories.
+#      Example: path: "./skills/generator/*"
+#        Expands each matching subdirectory individually.
+#
+# If the directory is empty or contains no SKILL.md files, hyoka will log
+# a warning and skip it — no error, no misleading skill count.
+configs:
+  - name: example-generator-skills/claude-opus-4.6
+    description: "Example — generator skills from a local directory"
+    generator:
+      model: "claude-opus-4.6"
+      tools:
+        # Option 1: Entire directory (all skill subdirectories are loaded)
+        - name: generator-skills
+          type: skill
+          source: local
+          path: "./skills/generator"
+
+        # Option 2: Glob pattern (selective loading)
+        # - name: generator-skills-glob
+        #   type: skill
+        #   source: local
+        #   path: "./skills/generator/*"
+
+    reviewer:
+      models:
+        - "claude-opus-4.6"
+        - "gemini-3-pro-preview"
+        - "gpt-4.1"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          path: "./skills/reviewer"

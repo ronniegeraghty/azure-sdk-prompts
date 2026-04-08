@@ -24,6 +24,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/internal/skills"
 )
 
 // EvalResult holds the raw output from a Copilot evaluation.
@@ -952,13 +953,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Per-phase generation duration already captured above (evalReport.GenerationDuration).
 	// Overall Duration is set at the end of the function after all phases complete.
 
-	// Populate environment info from config and captured events
+	// Populate environment info from config and captured events.
+	// Use ResolveSkillDirs for accurate directory resolution (#291).
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		for _, entry := range task.Config.Generator.Tools {
-			if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-				skillDirectories = append(skillDirectories, entry.Path)
-			}
+		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, "")
+		if err != nil {
+			slog.Warn("Failed to resolve skill directories for report", "error", err)
+		} else {
+			skillDirectories = resolved
 		}
 	}
 	// Resolve tools for reporting — mirrors the resolution in buildSessionConfig.

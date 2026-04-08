@@ -1,15 +1,13 @@
-# Baseline with Claude Opus 4.6 + generator skills — no MCP servers
-# Uses the new generator/reviewer config structure with unified skills list.
+# Baseline with Claude Opus 4.6 + reviewer skills — no MCP servers
+# Generator skills directory was removed because it contained no skills (#291).
+# To add generator skills, create SKILL.md files in subdirectories of
+# ./skills/generator/ and add a generator tools entry — see
+# examples/configs/example-generator-skills.yaml for the pattern.
 configs:
   - name: baseline-skills/claude-opus-4.6
-    description: "Baseline + Skills — Claude Opus 4.6 with generator skills"
+    description: "Baseline + Skills — Claude Opus 4.6 with reviewer skills"
     generator:
       model: "claude-opus-4.6"
-      tools:
-        - name: generator-skills
-          type: skill
-          source: local
-          path: "./skills/generator"
     reviewer:
       models:
         - "claude-opus-4.6"

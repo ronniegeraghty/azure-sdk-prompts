@@ -46,6 +46,34 @@ func ResolveSkillDirs(entries []config.ToolEntry, baseDir string) ([]string, err
 	return dirs, nil
 }
 
+// CountSkills counts the number of actual skill subdirectories (containing
+// SKILL.md) within the given resolved skill directories. This provides an
+// accurate count of usable skills rather than counting directory paths.
+func CountSkills(dirs []string) int {
+	count := 0
+	for _, dir := range dirs {
+		// Check if the directory itself contains a SKILL.md (it IS a skill).
+		if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err == nil {
+			count++
+			continue
+		}
+		// Otherwise enumerate subdirectories that contain SKILL.md.
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			if _, err := os.Stat(filepath.Join(dir, e.Name(), "SKILL.md")); err == nil {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 // resolveLocal resolves a local skill path (supports globs) to absolute paths.
 func resolveLocal(path, baseDir string) ([]string, error) {
 	// Make relative paths absolute based on baseDir
@@ -89,16 +117,17 @@ func resolveLocal(path, baseDir string) ([]string, error) {
 			if absErr != nil {
 				slog.Warn("Failed to resolve absolute path", "path", c, "error", absErr)
 			}
+			if isEmptySkillDir(abs) {
+				slog.Warn("Skills directory exists but contains no skills", "path", abs)
+				return nil, nil
+			}
 			return []string{abs}, nil
 		}
 	}
 
-	// Path doesn't exist yet — return absolute form anyway
-	abs, absErr := filepath.Abs(path)
-	if absErr != nil {
-		slog.Warn("Failed to resolve absolute path", "path", path, "error", absErr)
-	}
-	return []string{abs}, nil
+	// Path doesn't exist — warn and return nothing
+	slog.Warn("Skills directory does not exist", "path", path)
+	return nil, nil
 }
 
 // fetchRemote fetches a remote skill from a GitHub repo using npx skills add.
@@ -134,4 +163,28 @@ func fetchRemote(entry config.ToolEntry, baseDir string) (string, error) {
 		slog.Warn("Failed to resolve absolute install path", "path", installDir, "error", absErr)
 	}
 	return abs, nil
+}
+
+// isEmptySkillDir reports whether dir contains no SKILL.md files, either
+// directly or in immediate subdirectories. A directory with only .gitkeep
+// or other non-skill files is considered empty.
+func isEmptySkillDir(dir string) bool {
+	// Check if the directory itself is a skill (has SKILL.md).
+	if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err == nil {
+		return false
+	}
+	// Check immediate subdirectories for SKILL.md.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return true
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(dir, e.Name(), "SKILL.md")); err == nil {
+			return false
+		}
+	}
+	return true
 }
