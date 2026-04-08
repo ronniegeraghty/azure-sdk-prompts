@@ -673,32 +673,8 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// Use the config-driven system prompt (#115, #116). The default is zero
 	// system prompt — all behavioral instructions belong in the config YAML.
 	systemMsg := ""
-	if cfg.Generator != nil && cfg.Generator.SystemPrompt != "" {
+	if cfg.Generator != nil {
 		systemMsg = cfg.Generator.SystemPrompt
-	}
-
-	// Append workspace and file creation rules.
-	systemMsg += fmt.Sprintf(
-		"\n\nYou are a code generation agent. Your working directory is: %s\n"+
-			"FILE CREATION RULES:\n"+
-			"1. Always write code to files using the create or edit tools — never just explain code in text.\n"+
-			"2. Every file path MUST be a FULL ABSOLUTE PATH starting with: %s/\n"+
-			"3. NEVER omit the path parameter. NEVER use relative paths.\n"+
-			"4. NEVER create files outside your working directory.\n"+
-			"BASH RULES:\n"+
-			"5. When using bash, always cd to %s first.\n"+
-			"PYTHON RULES:\n"+
-			"6. Use python3 (not python) for all Python scripts and commands.",
-		workDir, workDir, workDir,
-	)
-
-	// Safety boundaries (#36): prevent real Azure resource provisioning unless --allow-cloud is set.
-	if !e.allowCloud {
-		systemMsg += "\n\nSAFETY BOUNDARIES:\n" +
-			"7. Do NOT provision real Azure resources. Do NOT run `az` CLI commands that create, update, or delete resources.\n" +
-			"8. Use mock data, environment variables, or local emulators for connection strings.\n" +
-			"9. Generate code that can run locally without cloud dependencies.\n" +
-			"10. If the prompt asks for infrastructure provisioning, generate infra-as-code files instead of running live commands."
 	}
 
 	// Instruct the agent to use available skills before generating code.
@@ -826,9 +802,8 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		slog.Debug("No MCP servers configured")
 	}
 
-	// Set the system message: start with config-driven system prompt,
-	// then append any accumulated hints (skills, etc.)
-	if systemMsg != "" {
+	// Set the system message: config-driven prompt + any skill hints.
+	if strings.TrimSpace(systemMsg) != "" {
 		sc.SystemMessage = &copilot.SystemMessageConfig{
 			Mode:    "append",
 			Content: systemMsg,
