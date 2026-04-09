@@ -1,33 +1,46 @@
 # Example: loading generator skills from a local directory.
 #
-# hyoka supports two patterns for local skills:
+# Local skills use the `skill_dir` field to explicitly declare whether a
+# path points to a single skill or a directory containing multiple skills:
 #
-#   1. Directory of skills — point to a parent directory that contains
-#      skill subdirectories, each with a SKILL.md file.
-#      Example: path: "./skills/generator"
-#        skills/generator/
-#          azure-best-practices/SKILL.md
-#          error-handling/SKILL.md
+#   skill_dir: false (default) — path points to a single skill directory
+#   that must contain a SKILL.md file directly:
+#     path: "./skills/reviewer/code-review-comments"
+#       code-review-comments/
+#         SKILL.md          ← skill is here
+#         examples.md
 #
-#   2. Glob pattern — use a wildcard to select specific skill subdirectories.
-#      Example: path: "./skills/generator/*"
-#        Expands each matching subdirectory individually.
+#   skill_dir: true — path is a parent directory whose subdirectories
+#   each contain a SKILL.md file:
+#     path: "./skills/generator"
+#       generator/
+#         azure-best-practices/
+#           SKILL.md        ← skill
+#         error-handling/
+#           SKILL.md        ← skill
 #
-# If the directory is empty or contains no SKILL.md files, hyoka will log
-# a warning and skip it — no error, no misleading skill count.
+# If a single-skill path is missing SKILL.md, or a skill_dir contains
+# no subdirectories with SKILL.md, hyoka logs a warning and skips it.
 configs:
   - name: example-generator-skills/claude-opus-4.6
     description: "Example — generator skills from a local directory"
     generator:
       model: "claude-opus-4.6"
       tools:
-        # Option 1: Entire directory (all skill subdirectories are loaded)
+        # Directory of skills (skill_dir: true) — all subdirs with SKILL.md are loaded
         - name: generator-skills
           type: skill
           source: local
+          skill_dir: true
           path: "./skills/generator"
 
-        # Option 2: Glob pattern (selective loading)
+        # Single skill (skill_dir: false, the default) — path must contain SKILL.md
+        # - name: azure-best-practices
+        #   type: skill
+        #   source: local
+        #   path: "./skills/generator/azure-best-practices"
+
+        # Glob pattern — each matching subdirectory is treated as a single skill
         # - name: generator-skills-glob
         #   type: skill
         #   source: local
@@ -42,4 +55,5 @@ configs:
         - name: reviewer-skills
           type: skill
           source: local
+          skill_dir: true
           path: "./skills/reviewer"

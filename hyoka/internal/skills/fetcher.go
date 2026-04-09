@@ -17,8 +17,10 @@ import (
 // absolute directory paths. The baseDir is used as the root for resolving
 // relative local paths.
 //
-//   - source: local  → resolves path (supports glob patterns like "./skills/generator/*")
-//   - source: remote → fetches from GitHub repo via "npx skills add", returns the install dir
+//   - source: local, skill_dir: false → path points to a single skill (must contain SKILL.md)
+//   - source: local, skill_dir: true  → path is a directory of skills (subdirs contain SKILL.md)
+//   - source: local with glob         → each glob match is treated as a single skill directory
+//   - source: remote                  → fetches from GitHub repo via "npx skills add"
 func ResolveSkillDirs(entries []config.ToolEntry, baseDir string) ([]string, error) {
 	var dirs []string
 	for _, entry := range entries {
@@ -27,11 +29,11 @@ func ResolveSkillDirs(entries []config.ToolEntry, baseDir string) ([]string, err
 		}
 		switch entry.SkillSource() {
 		case "local":
-			resolved, err := resolveLocal(entry.Path, baseDir)
+			resolved, err := resolveLocal(entry, baseDir)
 			if err != nil {
 				return nil, fmt.Errorf("resolving local skill %q: %w", entry.Path, err)
 			}
-			slog.Debug("Resolved local skill", "path", entry.Path, "resolved_count", len(resolved))
+			slog.Debug("Resolved local skill", "path", entry.Path, "skill_dir", entry.SkillDir, "resolved_count", len(resolved))
 			dirs = append(dirs, resolved...)
 		case "remote":
 			dir, err := fetchRemote(entry, baseDir)
@@ -47,35 +49,26 @@ func ResolveSkillDirs(entries []config.ToolEntry, baseDir string) ([]string, err
 }
 
 // CountSkills counts the number of actual skill subdirectories (containing
-// SKILL.md) within the given resolved skill directories. This provides an
-// accurate count of usable skills rather than counting directory paths.
+// SKILL.md) within the given resolved skill directories. Each resolved
+// directory is expected to be a single skill (containing SKILL.md directly)
+// since skill_dir entries are expanded into individual skill dirs during
+// resolution.
 func CountSkills(dirs []string) int {
 	count := 0
 	for _, dir := range dirs {
-		// Check if the directory itself contains a SKILL.md (it IS a skill).
 		if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err == nil {
 			count++
-			continue
-		}
-		// Otherwise enumerate subdirectories that contain SKILL.md.
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
-			if _, err := os.Stat(filepath.Join(dir, e.Name(), "SKILL.md")); err == nil {
-				count++
-			}
 		}
 	}
 	return count
 }
 
-// resolveLocal resolves a local skill path (supports globs) to absolute paths.
-func resolveLocal(path, baseDir string) ([]string, error) {
+// resolveLocal resolves a local skill entry to absolute directory paths.
+// When entry.SkillDir is true, the path is a directory of skills — each
+// subdirectory containing SKILL.md is returned. When false (default), the
+// path points to a single skill directory. Glob patterns are also supported.
+func resolveLocal(entry config.ToolEntry, baseDir string) ([]string, error) {
+	path := entry.Path
 	// Make relative paths absolute based on baseDir
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(baseDir, path)
@@ -107,6 +100,26 @@ func resolveLocal(path, baseDir string) ([]string, error) {
 	}
 
 	// Non-glob: try to resolve the path, checking candidate locations
+	resolved := resolvePath(path, baseDir)
+	if resolved == "" {
+		slog.Warn("Skills directory does not exist", "path", entry.Path)
+		return nil, nil
+	}
+
+	if entry.SkillDir {
+		return resolveSkillDir(resolved)
+	}
+
+	// Single skill — validate it contains SKILL.md
+	if _, err := os.Stat(filepath.Join(resolved, "SKILL.md")); err != nil {
+		slog.Warn("Skill directory missing SKILL.md", "path", resolved)
+		return nil, nil
+	}
+	return []string{resolved}, nil
+}
+
+// resolvePath finds the first existing directory matching path or baseDir+path.
+func resolvePath(path, baseDir string) string {
 	candidates := []string{
 		path,
 		filepath.Join(baseDir, path),
@@ -116,18 +129,38 @@ func resolveLocal(path, baseDir string) ([]string, error) {
 			abs, absErr := filepath.Abs(c)
 			if absErr != nil {
 				slog.Warn("Failed to resolve absolute path", "path", c, "error", absErr)
+				return c
 			}
-			if isEmptySkillDir(abs) {
-				slog.Warn("Skills directory exists but contains no skills", "path", abs)
-				return nil, nil
-			}
-			return []string{abs}, nil
+			return abs
 		}
 	}
+	return ""
+}
 
-	// Path doesn't exist — warn and return nothing
-	slog.Warn("Skills directory does not exist", "path", path)
-	return nil, nil
+// resolveSkillDir expands a directory of skills into individual skill dirs.
+// Each subdirectory containing SKILL.md is returned. If no skills are found,
+// a warning is logged and nil is returned.
+func resolveSkillDir(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		slog.Warn("Failed to read skill directory", "path", dir, "error", err)
+		return nil, nil
+	}
+	var dirs []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		subDir := filepath.Join(dir, e.Name())
+		if _, err := os.Stat(filepath.Join(subDir, "SKILL.md")); err == nil {
+			dirs = append(dirs, subDir)
+		}
+	}
+	if len(dirs) == 0 {
+		slog.Warn("Skills directory contains no skills (no subdirectories with SKILL.md)",
+			"path", dir)
+	}
+	return dirs, nil
 }
 
 // fetchRemote fetches a remote skill from a GitHub repo using npx skills add.
@@ -163,28 +196,4 @@ func fetchRemote(entry config.ToolEntry, baseDir string) (string, error) {
 		slog.Warn("Failed to resolve absolute install path", "path", installDir, "error", absErr)
 	}
 	return abs, nil
-}
-
-// isEmptySkillDir reports whether dir contains no SKILL.md files, either
-// directly or in immediate subdirectories. A directory with only .gitkeep
-// or other non-skill files is considered empty.
-func isEmptySkillDir(dir string) bool {
-	// Check if the directory itself is a skill (has SKILL.md).
-	if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err == nil {
-		return false
-	}
-	// Check immediate subdirectories for SKILL.md.
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return true
-	}
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		if _, err := os.Stat(filepath.Join(dir, e.Name(), "SKILL.md")); err == nil {
-			return false
-		}
-	}
-	return true
 }

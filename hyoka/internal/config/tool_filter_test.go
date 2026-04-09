@@ -296,6 +296,31 @@ func TestValidateToolEntry_SkillInvalidSource(t *testing.T) {
 	}
 }
 
+func TestValidateToolEntry_SkillDirOnRemote(t *testing.T) {
+	entry := ToolEntry{Name: "skill", Type: "skill", Source: "remote", Repo: "org/repo", SkillDir: true}
+	if err := validateToolEntry(entry, "test", 0); err == nil {
+		t.Fatal("expected error for skill_dir on remote skill")
+	}
+}
+
+func TestValidateToolEntry_SkillDirOnLocal(t *testing.T) {
+	entry := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/gen", SkillDir: true}
+	if err := validateToolEntry(entry, "test", 0); err != nil {
+		t.Fatalf("unexpected error for skill_dir on local skill: %v", err)
+	}
+}
+
+func TestToolEntrySkillDirParsed(t *testing.T) {
+	entry := ToolEntry{Name: "skills", Type: "skill", Source: "local", Path: "./skills/reviewer", SkillDir: true}
+	if !entry.SkillDir {
+		t.Error("expected SkillDir to be true")
+	}
+	entry2 := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/reviewer/code-review"}
+	if entry2.SkillDir {
+		t.Error("expected SkillDir to default to false")
+	}
+}
+
 func TestToolEntryResolvedPairwise(t *testing.T) {
 	cases := []struct {
 		entry ToolEntry

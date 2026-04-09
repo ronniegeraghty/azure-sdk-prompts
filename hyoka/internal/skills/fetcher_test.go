@@ -8,13 +8,12 @@ import (
 	"github.com/ronniegeraghty/hyoka/internal/config"
 )
 
-func TestResolveLocal_DirectPath(t *testing.T) {
+func TestResolveLocal_SingleSkill(t *testing.T) {
 	dir := t.TempDir()
 	skillDir := filepath.Join(dir, "my-skill")
 	if err := os.Mkdir(skillDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	// Add SKILL.md so the directory is recognized as containing a skill
 	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Skill"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -33,29 +32,72 @@ func TestResolveLocal_DirectPath(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_RelativePath(t *testing.T) {
+func TestResolveLocal_SingleSkillMissingSKILLMD(t *testing.T) {
 	dir := t.TempDir()
-	skillDir := filepath.Join(dir, "skills", "generator")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
+	skillDir := filepath.Join(dir, "my-skill")
+	if err := os.Mkdir(skillDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	// Add a skill subdirectory with SKILL.md
-	subSkill := filepath.Join(skillDir, "my-skill")
-	if err := os.Mkdir(subSkill, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(subSkill, "SKILL.md"), []byte("# Skill"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	// No SKILL.md — should warn and return nothing
 
 	dirs, err := ResolveSkillDirs([]config.ToolEntry{
-		{Type: "skill", Source: "local", Path: "skills/generator", Name: "local-skill"},
+		{Type: "skill", Source: "local", Path: skillDir, Name: "local-skill"},
 	}, dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(dirs) != 1 {
-		t.Fatalf("expected 1 dir, got %d", len(dirs))
+	if len(dirs) != 0 {
+		t.Errorf("expected 0 dirs for single skill missing SKILL.md, got %d", len(dirs))
+	}
+}
+
+func TestResolveLocal_SkillDir(t *testing.T) {
+	dir := t.TempDir()
+	skillsDir := filepath.Join(dir, "skills", "generator")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Create two skill subdirectories and one non-skill
+	for _, name := range []string{"skill-a", "skill-b", "not-a-skill"} {
+		if err := os.Mkdir(filepath.Join(skillsDir, name), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"skill-a", "skill-b"} {
+		if err := os.WriteFile(filepath.Join(skillsDir, name, "SKILL.md"), []byte("# Skill"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+		{Type: "skill", Source: "local", Path: "skills/generator", Name: "gen-skills", SkillDir: true},
+	}, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(dirs) != 2 {
+		t.Fatalf("expected 2 skill subdirs, got %d: %v", len(dirs), dirs)
+	}
+}
+
+func TestResolveLocal_SkillDirEmpty(t *testing.T) {
+	dir := t.TempDir()
+	emptyDir := filepath.Join(dir, "skills", "generator")
+	if err := os.MkdirAll(emptyDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(emptyDir, ".gitkeep"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+		{Type: "skill", Source: "local", Path: emptyDir, Name: "empty-skills", SkillDir: true},
+	}, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(dirs) != 0 {
+		t.Errorf("expected 0 dirs for empty skill_dir, got %d: %v", len(dirs), dirs)
 	}
 }
 
@@ -85,35 +127,13 @@ func TestResolveLocal_GlobPattern(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_EmptySkills(t *testing.T) {
+func TestResolveLocal_EmptyEntries(t *testing.T) {
 	dirs, err := ResolveSkillDirs(nil, ".")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(dirs) != 0 {
 		t.Errorf("expected 0 dirs, got %d", len(dirs))
-	}
-}
-
-func TestResolveLocal_EmptyDir(t *testing.T) {
-	dir := t.TempDir()
-	emptyDir := filepath.Join(dir, "skills", "generator")
-	if err := os.MkdirAll(emptyDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	// Create .gitkeep to mimic real scenario
-	if err := os.WriteFile(filepath.Join(emptyDir, ".gitkeep"), nil, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	dirs, err := ResolveSkillDirs([]config.ToolEntry{
-		{Type: "skill", Source: "local", Path: emptyDir, Name: "empty-skills"},
-	}, dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(dirs) != 0 {
-		t.Errorf("expected 0 dirs for empty skill directory, got %d: %v", len(dirs), dirs)
 	}
 }
 
@@ -131,35 +151,24 @@ func TestResolveLocal_NonExistentDir(t *testing.T) {
 
 func TestCountSkills(t *testing.T) {
 	dir := t.TempDir()
-	// Create a directory with two skill subdirectories and one non-skill
-	skillsDir := filepath.Join(dir, "skills")
-	for _, name := range []string{"skill-a", "skill-b", "not-a-skill"} {
-		if err := os.MkdirAll(filepath.Join(skillsDir, name), 0755); err != nil {
+	// After skill_dir expansion, each dir should directly contain SKILL.md
+	skillA := filepath.Join(dir, "skill-a")
+	skillB := filepath.Join(dir, "skill-b")
+	noSkill := filepath.Join(dir, "not-a-skill")
+	for _, d := range []string{skillA, skillB, noSkill} {
+		if err := os.Mkdir(d, 0755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	// Add SKILL.md to two of them
-	for _, name := range []string{"skill-a", "skill-b"} {
-		if err := os.WriteFile(filepath.Join(skillsDir, name, "SKILL.md"), []byte("# Skill"), 0644); err != nil {
+	for _, d := range []string{skillA, skillB} {
+		if err := os.WriteFile(filepath.Join(d, "SKILL.md"), []byte("# Skill"), 0644); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	count := CountSkills([]string{skillsDir})
+	count := CountSkills([]string{skillA, skillB, noSkill})
 	if count != 2 {
 		t.Errorf("expected 2 skills, got %d", count)
-	}
-}
-
-func TestCountSkills_DirectSkill(t *testing.T) {
-	dir := t.TempDir()
-	// Directory itself is a skill
-	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# Skill"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	count := CountSkills([]string{dir})
-	if count != 1 {
-		t.Errorf("expected 1 skill, got %d", count)
 	}
 }
 
