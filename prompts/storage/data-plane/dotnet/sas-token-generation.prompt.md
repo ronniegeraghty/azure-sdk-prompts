@@ -15,8 +15,8 @@ tags:
   - shared-access-signature
   - security
   - authentication
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # SAS Token Generation: Azure Blob Storage (.NET)

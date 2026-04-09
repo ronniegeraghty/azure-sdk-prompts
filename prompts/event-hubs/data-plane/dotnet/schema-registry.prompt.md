@@ -15,8 +15,8 @@ tags:
   - avro
   - serialization
   - enterprise
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # Schema Registry with Event Hubs: Azure Event Hubs (.NET)

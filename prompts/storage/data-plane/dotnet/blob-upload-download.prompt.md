@@ -15,8 +15,8 @@ tags:
   - upload
   - download
   - getting-started
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # Blob Upload & Download: Azure Blob Storage (.NET)

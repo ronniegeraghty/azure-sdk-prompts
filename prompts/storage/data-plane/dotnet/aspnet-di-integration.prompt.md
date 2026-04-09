@@ -15,8 +15,8 @@ tags:
   - aspnet-core
   - configuration
   - best-practices
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # ASP.NET Core DI Integration: Azure Blob Storage (.NET)

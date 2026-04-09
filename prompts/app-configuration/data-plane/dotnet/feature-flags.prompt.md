@@ -14,8 +14,8 @@ tags:
   - feature-flags
   - feature-management
   - toggles
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # Feature Flags: Azure App Configuration (.NET)

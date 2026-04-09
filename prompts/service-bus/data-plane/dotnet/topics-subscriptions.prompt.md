@@ -15,8 +15,8 @@ tags:
   - subscriptions
   - pub-sub
   - messaging
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # Topics & Subscriptions: Azure Service Bus (.NET)

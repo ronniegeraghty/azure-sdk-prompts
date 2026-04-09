@@ -15,8 +15,8 @@ tags:
   - configuration-provider
   - dynamic-refresh
   - feature-flags
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # ASP.NET Core Provider: Azure App Configuration (.NET)

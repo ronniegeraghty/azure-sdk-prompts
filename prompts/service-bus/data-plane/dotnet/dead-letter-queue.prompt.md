@@ -15,8 +15,8 @@ tags:
   - error-handling
   - poison-messages
   - reliability
-created: 2026-03-28
-author: jonathangiles
+created: 2026-04-09
+author: JonathanCrd
 ---
 
 # Dead-Letter Queue Handling: Azure Service Bus (.NET)
