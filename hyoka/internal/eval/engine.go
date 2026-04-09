@@ -1417,26 +1417,43 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		}
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
+			entries := countSkillEntries(t.Config.Generator.Tools)
 			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
 			}
 			count := skills.CountSkills(resolved)
-			e.printf("   Config %q: %d generator skill dir(s), %d skill(s) found\n", t.Config.Name, len(resolved), count)
+			if entries > 0 {
+				e.printf("   Config %q: %d generator dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
+			}
 		}
 		if t.Config.Reviewer != nil {
+			entries := countSkillEntries(t.Config.Reviewer.Tools)
 			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue
 			}
 			count := skills.CountSkills(resolved)
-			e.printf("   Config %q: %d reviewer skill dir(s), %d skill(s) found\n", t.Config.Name, len(resolved), count)
+			if entries > 0 {
+				e.printf("   Config %q: %d reviewer dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
+			}
 		}
 	}
 
 	return summary, nil
+}
+
+// countSkillEntries counts how many ToolEntries in the list are skills.
+func countSkillEntries(entries []config.ToolEntry) int {
+	n := 0
+	for _, e := range entries {
+		if e.ResolvedType() == "skill" {
+			n++
+		}
+	}
+	return n
 }
 
 func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseReport, []pairwise.ToolImpact) {
