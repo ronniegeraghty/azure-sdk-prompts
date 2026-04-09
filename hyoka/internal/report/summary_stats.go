@@ -3,6 +3,8 @@ package report
 import (
 	"math"
 	"sort"
+
+	"github.com/ronniegeraghty/hyoka/internal/pairwise"
 )
 
 // DurationStats holds min/avg/max duration statistics with source labels for tooltips.
@@ -48,6 +50,18 @@ type ToolStat struct {
 	Rate      float64 `json:"success_rate"` // 0-100
 }
 
+// TimelineSummary holds aggregate action timeline statistics across all evals.
+type TimelineSummary struct {
+	TotalActions        int     `json:"total_actions"`
+	TotalToolCalls      int     `json:"total_tool_calls"`
+	TotalTurns          int     `json:"total_turns"`
+	AvgActionsPerEval   float64 `json:"avg_actions_per_eval"`
+	AvgToolCallsPerEval float64 `json:"avg_tool_calls_per_eval"`
+	AvgTurnsPerEval     float64 `json:"avg_turns_per_eval"`
+	AvgToolCallDuration float64 `json:"avg_tool_call_duration_ms"`
+	ToolSuccessRate     float64 `json:"tool_success_rate"` // 0-100
+}
+
 // SummaryStats holds computed aggregate statistics for a run summary.
 type SummaryStats struct {
 	// Duration analysis
@@ -67,6 +81,12 @@ type SummaryStats struct {
 
 	// Tool usage
 	ToolStats []ToolStat `json:"tool_stats"`
+
+	// Pairwise tool impact (#123)
+	PairwiseImpacts []pairwise.ToolImpact `json:"pairwise_impacts,omitempty"`
+
+	// Action timeline (#140)
+	Timeline *TimelineSummary `json:"timeline_summary,omitempty"`
 }
 
 // ComputeSummaryStats computes aggregate statistics from a RunSummary.
@@ -232,6 +252,49 @@ func ComputeSummaryStats(s *RunSummary) *SummaryStats {
 	sort.Slice(stats.ToolStats, func(i, j int) bool {
 		return stats.ToolStats[i].Count > stats.ToolStats[j].Count
 	})
+
+	// Pairwise aggregation (#123)
+	if len(s.PairwiseResults) > 0 {
+		stats.PairwiseImpacts = pairwise.AggregateImpacts(s.PairwiseResults)
+	}
+
+	// Action timeline aggregation (#140)
+	var tlActions, tlToolCalls, tlTurns, tlSuccesses, tlFailures int
+	var tlToolDuration float64
+	evalsWithTimeline := 0
+	for _, r := range s.Results {
+		if r.ActionTimeline != nil {
+			evalsWithTimeline++
+			tlActions += r.ActionTimeline.Summary.TotalActions
+			tlToolCalls += r.ActionTimeline.Summary.TotalToolCalls
+			tlTurns += r.ActionTimeline.Summary.TotalTurns
+			tlToolDuration += r.ActionTimeline.Summary.ToolCallDuration
+			tlSuccesses += r.ActionTimeline.Summary.ToolSuccesses
+			tlFailures += r.ActionTimeline.Summary.ToolFailures
+		}
+	}
+	if evalsWithTimeline > 0 {
+		successDenom := tlSuccesses + tlFailures
+		successRate := 0.0
+		if successDenom > 0 {
+			successRate = float64(tlSuccesses) / float64(successDenom) * 100
+		}
+		avgDuration := 0.0
+		if tlToolCalls > 0 {
+			avgDuration = tlToolDuration / float64(tlToolCalls)
+		}
+		n := float64(evalsWithTimeline)
+		stats.Timeline = &TimelineSummary{
+			TotalActions:        tlActions,
+			TotalToolCalls:      tlToolCalls,
+			TotalTurns:          tlTurns,
+			AvgActionsPerEval:   math.Round(float64(tlActions)/n*10) / 10,
+			AvgToolCallsPerEval: math.Round(float64(tlToolCalls)/n*10) / 10,
+			AvgTurnsPerEval:     math.Round(float64(tlTurns)/n*10) / 10,
+			AvgToolCallDuration: math.Round(avgDuration*10) / 10,
+			ToolSuccessRate:     math.Round(successRate*10) / 10,
+		}
+	}
 
 	return stats
 }

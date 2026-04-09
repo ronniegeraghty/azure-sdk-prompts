@@ -1,27 +1,28 @@
 ---
 id: service-bus-dp-java-order-processor
-service: service-bus
-plane: data-plane
-language: java
-category: streaming
-difficulty: intermediate
-description: >
-  Can an agent generate a Service Bus order processing system with batch sending,
-  scheduled delivery, dead-letter queue handling, session-aware processing, and
-  proper error categorization?
-sdk_package: com.azure:azure-messaging-servicebus
-doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/messaging-servicebus-readme
+properties:
+  service: service-bus
+  plane: data-plane
+  language: java
+  category: streaming
+  difficulty: intermediate
+  description: 'Can an agent generate a Service Bus order processing system with batch sending, scheduled delivery, dead-letter
+    queue handling, session-aware processing, and proper error categorization?
+
+    '
+  sdk_package: com.azure:azure-messaging-servicebus
+  doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/messaging-servicebus-readme
+  created: '2026-03-25'
+  author: JonathanGiles, samvaity
 tags:
-  - service-bus
-  - batch-sending
-  - scheduled-delivery
-  - dead-letter-queue
-  - session-aware
-  - correlation
-  - async
-  - reactor
-created: 2026-03-25
-author: JonathanGiles, samvaity
+- service-bus
+- batch-sending
+- scheduled-delivery
+- dead-letter-queue
+- session-aware
+- correlation
+- async
+- reactor
 ---
 
 # Order Processor: Azure Service Bus (Java)
@@ -44,24 +45,11 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 
 ## Evaluation Criteria
 
-### Dependencies
-- Uses `com.azure:azure-messaging-servicebus` (not `com.microsoft.azure:azure-servicebus`)
-- Uses `com.azure:azure-identity`
-- No `com.microsoft.azure` groupId anywhere
-- Specifies Java 17
+### Scenario-Specific Client Construction
+- Sender uses `.sender().queueName().buildClient()` chain (or async equivalent)
+- Processor uses `.processor().queueName().processMessage().processError()` chain
 
-### Authentication
-- Uses `DefaultAzureCredential` with fully-qualified namespace (not connection string)
-- No hardcoded connection strings or SAS tokens
-- Reads namespace from environment variable
-
-### Client Construction
-- Uses `ServiceBusClientBuilder` as the entry point
-- Sender: `.sender().queueName().buildClient()` chain (or async equivalent)
-- Processor: `.processor().queueName().processMessage().processError()` chain
-- Builder includes `.fullyQualifiedNamespace()` and `.credential()`
-
-### SDK Patterns
+### Scenario-Specific Patterns
 - Batch sending: creates `ServiceBusMessageBatch`, checks `tryAddMessage()` return value
 - Handles the case where a message doesn't fit in the current batch
 - Scheduled delivery: uses `scheduleMessage()` or `setScheduledEnqueueTime()` (~30s delay)
@@ -71,20 +59,9 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 - Session-aware processing: uses `.sessionProcessor()` or session-enabled receiver
 - Session ID keyed by customer name for ordered processing
 
-### Error Handling
-- Catches `ServiceBusException` (not just `Exception`)
+### Scenario-Specific Error Handling
 - Error handler in processor logs entity path and error source
 - Distinguishes transient vs non-transient errors via `isTransient()` or `getReason()`
-
-### Async Quality
-- Uses `ServiceBusSenderAsyncClient` / `ServiceBusProcessorClient` (processor is inherently async)
-- Uses Project Reactor types (`Mono`, `Flux`) where applicable
-- Does not call `.block()` inside the async implementation
-
-### Anti-Patterns (should NOT appear)
-- `QueueClient`, `IMessage`, `IMessageHandler` (old SDK)
-- `ConnectionStringBuilder`
-- `com.microsoft.azure.*` imports
 
 ## Context
 

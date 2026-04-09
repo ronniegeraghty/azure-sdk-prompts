@@ -3,8 +3,11 @@ package trends
 import (
 "context"
 "fmt"
+"log/slog"
+"os"
 "strings"
 "sync"
+"time"
 
 copilot "github.com/github/copilot-sdk/go"
 )
@@ -12,25 +15,50 @@ copilot "github.com/github/copilot-sdk/go"
 // AnalyzeTrends uses a Copilot SDK session to perform AI-powered trend analysis.
 // It returns the analysis text to be included in the report.
 func AnalyzeTrends(ctx context.Context, tr *TrendReport) (string, error) {
+lg := slog.With("role", "trend-analysis", "model", "gpt-4.1")
+lg.Info("Starting AI trend analysis", "total_runs", tr.TotalRuns, "prompts", len(tr.PromptTrends))
 prompt := formatTrendPrompt(tr)
 
+lg.Debug("Starting Copilot client")
 client := copilot.NewClient(nil)
 if err := client.Start(ctx); err != nil {
 return "", fmt.Errorf("starting copilot client: %w", err)
 }
-defer client.Stop()
+var trendSessionID string
+defer func() {
+// Delete session state before stopping client (#62)
+if trendSessionID != "" {
+deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer deleteCancel()
+if err := client.DeleteSession(deleteCtx, trendSessionID); err != nil {
+lg.Debug("Session delete failed", "sessionID", trendSessionID, "error", err)
+}
+}
+client.Stop()
+}()
 
+// Create isolated config directory to prevent user-level skills from
+// leaking into the analysis session (#21).
+configDir, err := os.MkdirTemp("", "hyoka-config-*")
+if err != nil {
+return "", fmt.Errorf("creating isolated config dir: %w", err)
+}
+defer os.RemoveAll(configDir)
+
+lg.Debug("Creating session")
 session, err := client.CreateSession(ctx, &copilot.SessionConfig{
 Model: "gpt-4.1",
 SystemMessage: &copilot.SystemMessageConfig{
 Mode:    "append",
 Content: "You are an expert at analyzing AI agent tool usage and its impact on code generation quality. Focus on how tool availability affects output. Be concise and actionable.",
 },
+ConfigDir:           configDir,
 OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
 })
 if err != nil {
 return "", fmt.Errorf("creating analysis session: %w", err)
 }
+trendSessionID = session.SessionID
 defer session.Disconnect()
 
 // Capture assistant messages via event subscription
@@ -45,6 +73,7 @@ mu.Unlock()
 })
 defer unsub()
 
+lg.Debug("Sending trend analysis prompt", "prompt_chars", len(prompt))
 _, err = session.SendAndWait(ctx, copilot.MessageOptions{
 Prompt: prompt,
 })
@@ -55,6 +84,8 @@ return "", fmt.Errorf("analysis request failed: %w", err)
 mu.Lock()
 result := strings.TrimSpace(assistantContent.String())
 mu.Unlock()
+
+lg.Info("AI trend analysis complete", "result_chars", len(result))
 
 if result == "" {
 return "", fmt.Errorf("empty analysis response")

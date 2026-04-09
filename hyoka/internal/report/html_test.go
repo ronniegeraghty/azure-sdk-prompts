@@ -1,12 +1,12 @@
 package report
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/build"
 	"github.com/ronniegeraghty/hyoka/internal/review"
 )
 
@@ -22,12 +22,6 @@ func TestWriteHTMLReport(t *testing.T) {
 		PromptMeta: map[string]any{"service": "storage", "language": "dotnet"},
 		ConfigUsed: map[string]any{"name": "baseline", "model": "gpt-4"},
 		GeneratedFiles: []string{"Program.cs"},
-		Build: &build.BuildResult{
-			Language: "dotnet",
-			Command:  "dotnet build",
-			ExitCode: 0,
-			Success:  true,
-		},
 		Review: &review.ReviewResult{
 			Scores: review.ReviewScores{
 				Criteria: []review.CriterionResult{
@@ -43,6 +37,10 @@ func TestWriteHTMLReport(t *testing.T) {
 			Summary:      "Good implementation",
 			Issues:       []string{"Missing retry logic"},
 			Strengths:    []string{"Clean code structure"},
+		},
+		GraderResults: []GraderResult{
+			{GraderName: "test-grader", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Grader says good"},
+			{GraderName: "consensus", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Consensus result", IsConsensus: true},
 		},
 		SessionEvents: []SessionEventRecord{
 			{Type: "user.message", Content: "Write a dotnet storage auth sample"},
@@ -75,7 +73,6 @@ func TestWriteHTMLReport(t *testing.T) {
 		"Code Builds",
 		"Good implementation",
 		"Program.cs",
-		"dotnet build",
 		"Generation Timeline",
 		"Write a dotnet storage auth sample",
 		"I need to create an auth sample",
@@ -86,6 +83,10 @@ func TestWriteHTMLReport(t *testing.T) {
 		"Back to Summary",
 		"File created",
 		"150ms",
+		"Grader Results",
+		"test-grader",
+		"Grader says good",
+		"Consensus result",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
@@ -93,7 +94,7 @@ func TestWriteHTMLReport(t *testing.T) {
 		}
 	}
 
-	expectedDir := filepath.Join(dir, "20240115-100000", "results", "storage", "data-plane", "dotnet", "authentication", "baseline")
+	expectedDir := filepath.Join(dir, "20240115-100000", "results", "storage", "data-plane", "dotnet", "authentication", "test-prompt", "baseline")
 	if _, err := os.Stat(expectedDir); err != nil {
 		t.Errorf("expected directory %s to exist", expectedDir)
 	}
@@ -151,27 +152,23 @@ func TestWriteSummaryHTML(t *testing.T) {
 				PromptID:   "prompt-a",
 				ConfigName: "baseline",
 				Success:    true,
-				Build:      &build.BuildResult{Success: true},
 				Review:     &review.ReviewResult{OverallScore: 4, MaxScore: 5},
 			},
 			{
 				PromptID:   "prompt-a",
 				ConfigName: "azure-mcp",
 				Success:    true,
-				Build:      &build.BuildResult{Success: true},
 				Review:     &review.ReviewResult{OverallScore: 5, MaxScore: 5},
 			},
 			{
 				PromptID:   "prompt-b",
 				ConfigName: "baseline",
 				Success:    false,
-				Build:      &build.BuildResult{Success: false},
 			},
 			{
 				PromptID:   "prompt-b",
 				ConfigName: "azure-mcp",
 				Success:    true,
-				Build:      &build.BuildResult{Success: true},
 				Review:     &review.ReviewResult{OverallScore: 3, MaxScore: 5},
 			},
 		},
@@ -220,7 +217,7 @@ func TestWriteSummaryHTML(t *testing.T) {
 func TestWriteSummaryHTMLNoBuild(t *testing.T) {
 	dir := t.TempDir()
 
-	// Simulate Copilot-verified results (no Build, only Verification)
+	// Simulate results (no Build)
 	s := &RunSummary{
 		RunID:      "20240201-090000",
 		Timestamp:  "2024-02-01T09:00:00Z",
@@ -229,9 +226,9 @@ func TestWriteSummaryHTMLNoBuild(t *testing.T) {
 		Failed:     1,
 		Duration:   60.0,
 		Results: []*EvalReport{
-			{PromptID: "p1", ConfigName: "baseline", Success: true, Verification: &VerifyResult{Pass: true}},
-			{PromptID: "p1", ConfigName: "mcp", Success: true, Verification: &VerifyResult{Pass: true}, Review: &review.ReviewResult{OverallScore: 3, MaxScore: 5}},
-			{PromptID: "p2", ConfigName: "baseline", Success: false, Verification: &VerifyResult{Pass: false}},
+			{PromptID: "p1", ConfigName: "baseline", Success: true},
+			{PromptID: "p1", ConfigName: "mcp", Success: true, Review: &review.ReviewResult{OverallScore: 3, MaxScore: 5}},
+			{PromptID: "p2", ConfigName: "baseline", Success: false},
 		},
 	}
 
@@ -260,8 +257,8 @@ func TestWriteSummaryHTMLNoBuild(t *testing.T) {
 func TestBuildMatrix(t *testing.T) {
 	s := &RunSummary{
 		Results: []*EvalReport{
-			{PromptID: "p1", ConfigName: "c1", Success: true, Build: &build.BuildResult{Success: true}, Review: &review.ReviewResult{OverallScore: 4, MaxScore: 5}},
-			{PromptID: "p1", ConfigName: "c2", Success: false, Build: &build.BuildResult{Success: false}},
+			{PromptID: "p1", ConfigName: "c1", Success: true, Review: &review.ReviewResult{OverallScore: 4, MaxScore: 5}},
+			{PromptID: "p1", ConfigName: "c2", Success: false},
 			{PromptID: "p2", ConfigName: "c1", Error: "timeout"},
 		},
 	}
@@ -281,9 +278,6 @@ func TestBuildMatrix(t *testing.T) {
 	}
 	if cell.Score != 4 {
 		t.Errorf("expected score 4, got %d", cell.Score)
-	}
-	if !cell.BuildPass {
-		t.Error("expected build pass")
 	}
 	if !cell.Success {
 		t.Error("expected Success=true for p1/c1")
@@ -381,5 +375,406 @@ func TestBuildReportData(t *testing.T) {
 	}
 	if len(d.TimelineSteps) >= 6 && d.TimelineSteps[5].StepType != "complete" {
 		t.Errorf("expected last step to be complete, got %q", d.TimelineSteps[5].StepType)
+	}
+}
+
+func TestWriteHTMLReportPhaseTimings(t *testing.T) {
+	dir := t.TempDir()
+
+	r := &EvalReport{
+		PromptID:           "timing-test",
+		ConfigName:         "baseline",
+		Timestamp:          "2024-01-15T10:00:00Z",
+		Duration:           45.3,
+		GenerationDuration: 20.1,
+		ReviewDuration:     15.2,
+		PromptMeta:         map[string]any{"service": "storage", "language": "go"},
+		ConfigUsed:         map[string]any{"name": "baseline", "model": "gpt-4"},
+		GeneratedFiles:     []string{"main.go"},
+		Success:            true,
+		Environment: &EnvironmentInfo{
+			Model: "gpt-4",
+		},
+	}
+
+	reportPath, err := WriteHTMLReport(r, dir, "20240115-100000", "storage", "data-plane", "go", "crud")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("failed to read report: %v", err)
+	}
+
+	content := string(data)
+	for _, want := range []string{
+		"Generation Duration",
+		"Review Duration",
+		"20.1s",
+		"15.2s",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("HTML report missing phase timing %q", want)
+		}
+	}
+}
+
+func TestWriteSummaryHTMLAvgPhaseTimings(t *testing.T) {
+	dir := t.TempDir()
+
+	summary := &RunSummary{
+		RunID:                 "20240115-100000",
+		Timestamp:             "2024-01-15T10:00:00Z",
+		TotalEvals:            2,
+		Passed:                2,
+		Duration:              90.0,
+		AvgGenerationDuration: 18.5,
+		AvgReviewDuration:     12.8,
+		Results: []*EvalReport{
+			{PromptID: "p1", ConfigName: "c1", Success: true, Duration: 45.0},
+			{PromptID: "p2", ConfigName: "c1", Success: true, Duration: 45.0},
+		},
+	}
+
+	_, err := WriteSummaryHTML(summary, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "20240115-100000", "summary.html"))
+	if err != nil {
+		t.Fatalf("failed to read summary: %v", err)
+	}
+
+	content := string(data)
+	for _, want := range []string{
+		"Avg Generation",
+		"Avg Review",
+		"18.5s",
+		"12.8s",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("Summary HTML missing avg phase timing %q", want)
+		}
+	}
+}
+
+func TestEmbeddedTemplatesProduceValidHTML(t *testing.T) {
+	// Verify the embedded report template executes and produces valid HTML structure.
+	boolTrue := true
+	data := buildReportData(&EvalReport{
+		PromptID:       "embed-test",
+		ConfigName:     "test-config",
+		Timestamp:      "2024-06-01T12:00:00Z",
+		Duration:       10.0,
+		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "test-config"},
+		GeneratedFiles: []string{"main.py"},
+		Success:        true,
+		Review:         &review.ReviewResult{OverallScore: 3, MaxScore: 5, Scores: review.ReviewScores{Criteria: []review.CriterionResult{{Name: "Builds", Passed: true, Reason: "ok"}}}},
+		SessionEvents: []SessionEventRecord{
+			{Type: "user.message", Content: "test prompt"},
+			{Type: "tool.execution_start", ToolName: "create", ToolArgs: `{"path":"main.py"}`},
+			{Type: "tool.execution_complete", ToolName: "create", ToolResult: "ok", ToolSuccess: &boolTrue, Duration: 50},
+		},
+	})
+	data.BackPath = "../summary.html"
+
+	var buf bytes.Buffer
+	if err := parsedReportTemplate.Execute(&buf, data); err != nil {
+		t.Fatalf("report template execution failed: %v", err)
+	}
+	html := buf.String()
+	if !strings.HasPrefix(html, "<!DOCTYPE html>") {
+		t.Error("report template missing DOCTYPE")
+	}
+	if !strings.Contains(html, "</html>") {
+		t.Error("report template missing closing </html>")
+	}
+
+	// Verify the embedded summary template executes and produces valid HTML structure.
+	summary := &RunSummary{
+		RunID:      "embed-test-run",
+		Timestamp:  "2024-06-01T12:00:00Z",
+		TotalEvals: 1, Passed: 1, Duration: 10.0,
+		Results: []*EvalReport{{PromptID: "p1", ConfigName: "c1", Success: true, Duration: 5.0}},
+	}
+	matrix := buildMatrix(summary)
+	stats := ComputeSummaryStats(summary)
+	summaryData := struct {
+		Summary *RunSummary
+		Matrix  *MatrixData
+		Stats   *SummaryStats
+	}{Summary: summary, Matrix: matrix, Stats: stats}
+
+	buf.Reset()
+	if err := parsedSummaryTemplate.Execute(&buf, summaryData); err != nil {
+		t.Fatalf("summary template execution failed: %v", err)
+	}
+	html = buf.String()
+	if !strings.HasPrefix(html, "<!DOCTYPE html>") {
+		t.Error("summary template missing DOCTYPE")
+	}
+	if !strings.Contains(html, "</html>") {
+		t.Error("summary template missing closing </html>")
+	}
+}
+
+func TestTemplateFS(t *testing.T) {
+	// Verify the embedded filesystem contains the expected template files.
+	entries, err := templateFS.ReadDir("templates")
+	if err != nil {
+		t.Fatalf("failed to read embedded templates dir: %v", err)
+	}
+	names := make(map[string]bool)
+	for _, e := range entries {
+		names[e.Name()] = true
+	}
+	for _, want := range []string{"report.gohtml", "summary.gohtml"} {
+		if !names[want] {
+			t.Errorf("embedded templates missing %q", want)
+		}
+	}
+}
+
+func TestWriteHTMLReportGraderDetails(t *testing.T) {
+	dir := t.TempDir()
+	boolTrue := true
+	boolFalse := false
+	patternTrue := true
+
+	r := &EvalReport{
+		PromptID:       "grader-detail-test",
+		ConfigName:     "baseline",
+		Timestamp:      "2024-01-20T10:00:00Z",
+		Duration:       30.0,
+		PromptMeta:     map[string]any{"service": "storage", "language": "python"},
+		ConfigUsed:     map[string]any{"name": "baseline"},
+		GeneratedFiles: []string{"main.py"},
+		Success:        true,
+		GraderResults: []GraderResult{
+			{
+				GraderName: "main-exists",
+				GraderType: "file",
+				Summary:    "Checking required files",
+				Score:      1.0,
+				Weight:     0.5,
+				Pass:       &boolTrue,
+				Gate:       true,
+				FileDetails: &FileGraderDetail{
+					CheckedFiles: []FileCheckDetail{
+						{Path: "main.py", Exists: true, PatternMatched: &patternTrue, Pattern: "import azure"},
+						{Path: "tests.py", Exists: false},
+					},
+				},
+			},
+			{
+				GraderName: "build-check",
+				GraderType: "program",
+				Summary:    "Build verification",
+				Score:      0.0,
+				Weight:     1.0,
+				Pass:       &boolFalse,
+				Gate:       true,
+				ProgramDetails: &ProgramGraderDetail{
+					Command:  "python -m py_compile main.py",
+					ExitCode: 1,
+					Stdout:   "Compiling...",
+					Stderr:   "SyntaxError: unexpected EOF",
+				},
+			},
+			{
+				GraderName: "quality-review",
+				GraderType: "prompt",
+				Summary:    "LLM quality assessment",
+				Score:      0.75,
+				Weight:     1.0,
+				Pass:       &boolTrue,
+				PromptDetails: &PromptGraderDetail{
+					Model:     "claude-opus-4.6",
+					Rubric:    "Evaluate code quality on a 1-5 scale",
+					Reasoning: "The code demonstrates good structure but lacks error handling",
+					RawScore:  4,
+					MaxScore:  5,
+				},
+			},
+			{
+				GraderName: "tool-usage",
+				GraderType: "behavior",
+				Summary:    "Agent behavior analysis",
+				Score:      0.5,
+				Weight:     0.5,
+				Pass:       &boolFalse,
+				BehaviorDetails: &BehaviorGraderDetail{
+					ToolsUsed:     []string{"create", "edit"},
+					MissingTools:  []string{"azure-mcp"},
+					ForbiddenUsed: []string{"rm"},
+					TotalActions:  15,
+					MaxTurns:      25,
+					ActualTurns:   12,
+					Violations:    []string{"Used forbidden tool: rm"},
+					ToolCounts:    map[string]int{"create": 3, "edit": 5, "rm": 1},
+				},
+			},
+		},
+	}
+
+	reportPath, err := WriteHTMLReport(r, dir, "20240120-100000", "storage", "data-plane", "python", "crud")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("failed to read report: %v", err)
+	}
+
+	content := string(data)
+	checks := []string{
+		// Section header
+		"Grader Results",
+		"4 graders",
+
+		// File grader
+		"main-exists",
+		"file",
+		"main.py",
+		"exists",
+		"tests.py",
+		"missing",
+		"import azure",
+		"GATE PASSED",
+
+		// Program grader
+		"build-check",
+		"program",
+		"python -m py_compile main.py",
+		"Exit code",
+		"Show stdout",
+		"Compiling...",
+		"Show stderr",
+		"SyntaxError: unexpected EOF",
+		"GATE FAILED",
+
+		// Prompt grader
+		"quality-review",
+		"claude-opus-4.6",
+		"Show rubric",
+		"Show LLM reasoning",
+		"good structure but lacks error handling",
+		"4/5",
+
+		// Behavior grader
+		"tool-usage",
+		"behavior",
+		"azure-mcp",
+		"Used forbidden tool: rm",
+		"Tool call counts",
+
+		// Score bar
+		"score-bar",
+		"score-bar-fill",
+	}
+	for _, check := range checks {
+		if !strings.Contains(content, check) {
+			t.Errorf("HTML report missing %q", check)
+		}
+	}
+}
+
+func TestActionTimelineHTMLRendering(t *testing.T) {
+	boolTrue := true
+	boolFalse := false
+
+	r := &EvalReport{
+		PromptID:       "timeline-test",
+		ConfigName:     "test-config",
+		Timestamp:      "2024-06-01T12:00:00Z",
+		Duration:       30.0,
+		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
+		ConfigUsed:     map[string]any{"name": "test-config"},
+		GeneratedFiles: []string{"main.py"},
+		Success:        true,
+		SessionEvents: []SessionEventRecord{
+			{Type: "user.message", Content: "test prompt"},
+			{Type: "assistant.reasoning", Content: "thinking"},
+			{Type: "tool.execution_start", ToolName: "create", ToolArgs: `{"path":"main.py"}`},
+			{Type: "tool.execution_complete", ToolName: "create", ToolResult: "ok", ToolSuccess: &boolTrue, Duration: 150},
+			{Type: "assistant.message", Content: "Done"},
+		},
+		ActionTimeline: BuildActionTimeline([]SessionEventRecord{
+			{Type: "assistant.turn_start"},
+			{Type: "assistant.reasoning"},
+			{Type: "tool.execution_start", ToolName: "create", MCPServerName: "fs-server", FilePath: "main.py"},
+			{Type: "tool.execution_complete", ToolName: "create", ToolSuccess: &boolTrue, Duration: 150},
+			{Type: "tool.execution_start", ToolName: "bash", FilePath: "/workspace/build.sh"},
+			{Type: "tool.execution_complete", ToolName: "bash", ToolSuccess: &boolFalse, Duration: 2500, Error: "build failed"},
+			{Type: "assistant.intent", Intent: "fixing imports"},
+			{Type: "assistant.message"},
+			{Type: "assistant.turn_end"},
+		}),
+	}
+
+	data := buildReportData(r)
+	data.BackPath = "../summary.html"
+
+	var buf bytes.Buffer
+	if err := parsedReportTemplate.Execute(&buf, data); err != nil {
+		t.Fatalf("template execution failed: %v", err)
+	}
+	html := buf.String()
+
+	checks := []string{
+		"Action Timeline",
+		"atl-summary-bar",
+		"atl-search",
+		"atl-list",
+		"atl-row",
+		"tool calls",
+		"turns",
+		"tool duration",
+		"succeeded",
+		"create",
+		"bash",
+		"fs-server",
+		"150ms",
+		"2.5s",
+		"atl-success",
+		"atl-failure",
+		"fixing imports",
+		"build failed",
+		"Filter timeline",
+	}
+	for _, check := range checks {
+		if !strings.Contains(html, check) {
+			t.Errorf("action timeline HTML missing %q", check)
+		}
+	}
+}
+
+func TestActionTimelineHTMLOmittedWhenNil(t *testing.T) {
+	r := &EvalReport{
+		PromptID:       "no-timeline",
+		ConfigName:     "test-config",
+		Timestamp:      "2024-06-01T12:00:00Z",
+		Duration:       5.0,
+		PromptMeta:     map[string]any{},
+		ConfigUsed:     map[string]any{},
+		GeneratedFiles: []string{},
+		Success:        true,
+	}
+
+	data := buildReportData(r)
+	data.BackPath = "../summary.html"
+
+	var buf bytes.Buffer
+	if err := parsedReportTemplate.Execute(&buf, data); err != nil {
+		t.Fatalf("template execution failed: %v", err)
+	}
+	html := buf.String()
+
+	if strings.Contains(html, "atl-summary-bar") {
+		t.Error("action timeline section should not render when ActionTimeline is nil")
 	}
 }

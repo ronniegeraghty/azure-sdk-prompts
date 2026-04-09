@@ -3,15 +3,25 @@ package prompt
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-// LoadPrompts walks the directory tree at root and loads all .prompt.md files.
-// Returns an error if the directory contains zero valid prompts, along with
-// near-miss suggestions for files that almost match the naming pattern.
+// isPromptFile returns true if the filename matches a supported prompt extension.
+func isPromptFile(name string) bool {
+	return strings.HasSuffix(name, ".prompt.md") ||
+		strings.HasSuffix(name, ".prompt.yaml") ||
+		strings.HasSuffix(name, ".prompt.yml")
+}
+
+// LoadPrompts walks the directory tree at root and loads all prompt files
+// (.prompt.md, .prompt.yaml, .prompt.yml). Returns an error if the directory
+// contains zero valid prompts, along with near-miss suggestions for files that
+// almost match the naming pattern.
 func LoadPrompts(root string) ([]*Prompt, error) {
+	slog.Debug("Scanning for prompts", "root", root)
 	var prompts []*Prompt
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -21,7 +31,8 @@ func LoadPrompts(root string) ([]*Prompt, error) {
 		if info.IsDir() {
 			return nil
 		}
-		if !strings.HasSuffix(info.Name(), ".prompt.md") {
+		name := info.Name()
+		if !isPromptFile(name) {
 			return nil
 		}
 
@@ -30,12 +41,18 @@ func LoadPrompts(root string) ([]*Prompt, error) {
 			return fmt.Errorf("reading %s: %w", path, err)
 		}
 
-		p, err := ParsePromptFile(data, path)
+		var p *Prompt
+		if strings.HasSuffix(name, ".prompt.yaml") || strings.HasSuffix(name, ".prompt.yml") {
+			p, err = ParsePromptYAML(data, path)
+		} else {
+			p, err = ParsePromptFile(data, path)
+		}
 		if err != nil {
 			return err
 		}
 
 		prompts = append(prompts, p)
+		slog.Debug("Loaded prompt", "id", p.ID, "path", path)
 		return nil
 	})
 	if err != nil {
@@ -71,18 +88,21 @@ func ScanNearMisses(dir string) []string {
 	var nearMisses []string
 	seen := make(map[string]bool)
 
-	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	if walkErr := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
 		name := info.Name()
 
-		// Skip files that already match the correct pattern
-		if strings.HasSuffix(name, ".prompt.md") {
+		// Skip files that already match a correct prompt pattern
+		if isPromptFile(name) {
 			return nil
 		}
 
-		rel, _ := filepath.Rel(dir, path)
+		rel, relErr := filepath.Rel(dir, path)
+		if relErr != nil {
+			slog.Warn("Failed to compute relative path", "dir", dir, "path", path, "error", relErr)
+		}
 		if rel == "" {
 			rel = name
 		}
@@ -96,8 +116,8 @@ func ScanNearMisses(dir string) []string {
 			return nil
 		}
 
-		// Pattern: *.prompt.txt or *.prompt.* (right base, wrong extension)
-		if strings.Contains(name, ".prompt.") && !strings.HasSuffix(name, ".prompt.md") {
+		// Pattern: *.prompt.txt or other unsupported extensions
+		if strings.Contains(name, ".prompt.") && !isPromptFile(name) {
 			if !seen[rel] {
 				seen[rel] = true
 				nearMisses = append(nearMisses, rel)
@@ -118,7 +138,9 @@ func ScanNearMisses(dir string) []string {
 		}
 
 		return nil
-	})
+	}); walkErr != nil {
+		slog.Warn("Failed to walk directory for near-miss prompts", "dir", dir, "error", walkErr)
+	}
 
 	return nearMisses
 }
@@ -134,7 +156,7 @@ func suggestFix(name string) string {
 		if dir == "." {
 			return fixed
 		}
-		return filepath.Join(dir, fixed)
+		return filepath.ToSlash(filepath.Join(dir, fixed))
 	}
 
 	// *.prompt.txt or *.prompt.* → *.prompt.md
@@ -143,7 +165,7 @@ func suggestFix(name string) string {
 		if dir == "." {
 			return fixed
 		}
-		return filepath.Join(dir, fixed)
+		return filepath.ToSlash(filepath.Join(dir, fixed))
 	}
 
 	return ""

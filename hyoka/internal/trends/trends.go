@@ -5,6 +5,7 @@ package trends
 import (
 "encoding/json"
 "fmt"
+"log/slog"
 "math"
 "os"
 "path/filepath"
@@ -28,18 +29,27 @@ TrendNew        TrendClassification = "new"
 
 // TrendEntry holds data from a single historical evaluation run.
 type TrendEntry struct {
-RunID      string   `json:"run_id"`
-Timestamp  string   `json:"timestamp"`
-ConfigName string   `json:"config_name"`
-PromptID   string   `json:"prompt_id"`
-Success    bool     `json:"success"`
-Duration   float64  `json:"duration_seconds"`
-Score      int      `json:"score"`
-MaxScore   int      `json:"max_score"`
-HasReview  bool     `json:"has_review"`
-ToolCalls  []string `json:"tool_calls"`
-FileCount  int      `json:"file_count"`
-Error      string   `json:"error,omitempty"`
+RunID        string            `json:"run_id"`
+Timestamp    string            `json:"timestamp"`
+ConfigName   string            `json:"config_name"`
+PromptID     string            `json:"prompt_id"`
+Success      bool              `json:"success"`
+Duration     float64           `json:"duration_seconds"`
+Score        int               `json:"score"`
+MaxScore     int               `json:"max_score"`
+HasReview    bool              `json:"has_review"`
+ToolCalls    []string          `json:"tool_calls"`
+FileCount    int               `json:"file_count"`
+Error        string            `json:"error,omitempty"`
+Properties   map[string]string `json:"properties,omitempty"`
+GraderScores []GraderScore     `json:"grader_scores,omitempty"`
+}
+
+// GraderScore holds a single grader's normalized score for trend tracking.
+type GraderScore struct {
+GraderName string  `json:"grader_name"`
+Score      float64 `json:"score"`     // 0.0–1.0 normalized
+MaxScore   int     `json:"max_score"` // integer max from the grader
 }
 
 // RunResult holds a single run's metrics for a specific prompt+config.
@@ -88,10 +98,14 @@ Analyze    bool
 
 // Generate scans historical reports and produces a trend report.
 func Generate(opts TrendOptions) (*TrendReport, error) {
+lg := slog.With("role", "trend-analysis")
+lg.Debug("Scanning reports for trends", "reports_dir", opts.ReportsDir, "prompt_id", opts.PromptID, "service", opts.Service, "language", opts.Language)
 entries, err := scanReports(opts.ReportsDir, opts.PromptID, opts.Service, opts.Language)
 if err != nil {
 return nil, fmt.Errorf("scanning reports: %w", err)
 }
+
+lg.Debug("Trend entries found", "count", len(entries))
 
 sort.Slice(entries, func(i, j int) bool {
 return entries[i].Timestamp < entries[j].Timestamp
@@ -109,6 +123,8 @@ PromptTrends: promptTrends,
 RunIDs:       runIDs,
 GeneratedAt:  time.Now().UTC().Format(time.RFC3339),
 }
+
+lg.Info("Trend report generated", "total_runs", tr.TotalRuns, "prompts", len(promptTrends), "run_ids", len(runIDs))
 
 return tr, nil
 }
@@ -268,6 +284,7 @@ writeMarkdownReport(&b, tr)
 if err := os.WriteFile(outPath, []byte(b.String()), 0644); err != nil {
 return "", fmt.Errorf("writing trend markdown: %w", err)
 }
+slog.Debug("Trend markdown written", "role", "trend-analysis", "path", outPath, "size", b.Len())
 return outPath, nil
 }
 
@@ -286,6 +303,7 @@ writeHTMLReport(&b, tr)
 if err := os.WriteFile(outPath, []byte(b.String()), 0644); err != nil {
 return "", fmt.Errorf("writing trend HTML: %w", err)
 }
+slog.Debug("Trend HTML written", "role", "trend-analysis", "path", outPath, "size", b.Len())
 return outPath, nil
 }
 
@@ -366,6 +384,26 @@ if r.Review != nil {
 entry.Score = r.Review.OverallScore
 entry.MaxScore = r.Review.MaxScore
 entry.HasReview = true
+}
+
+// Populate properties from prompt metadata for trend slicing.
+if len(r.PromptMeta) > 0 {
+props := make(map[string]string, len(r.PromptMeta))
+for k, v := range r.PromptMeta {
+if s, ok := v.(string); ok {
+props[k] = s
+}
+}
+entry.Properties = props
+}
+
+// Populate per-grader scores for regression detection.
+for _, gr := range r.GraderResults {
+entry.GraderScores = append(entry.GraderScores, GraderScore{
+GraderName: gr.GraderName,
+Score:      gr.Score,
+MaxScore:   gr.MaxScore,
+})
 }
 
 entries = append(entries, entry)

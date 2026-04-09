@@ -1,29 +1,30 @@
 ---
 id: cosmos-db-dp-java-todo-repository
-service: cosmos-db
-plane: data-plane
-language: java
-category: crud
-difficulty: intermediate
-description: >
-  Can an agent generate a Cosmos DB CRUD repository with optimistic concurrency
-  (ETags), parameterized queries, page-by-page pagination, TTL configuration,
-  custom indexing policy, and RU cost logging?
-sdk_package: com.azure:azure-cosmos
-doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/cosmos-readme
+properties:
+  service: cosmos-db
+  plane: data-plane
+  language: java
+  category: crud
+  difficulty: intermediate
+  description: 'Can an agent generate a Cosmos DB CRUD repository with optimistic concurrency (ETags), parameterized queries,
+    page-by-page pagination, TTL configuration, custom indexing policy, and RU cost logging?
+
+    '
+  sdk_package: com.azure:azure-cosmos
+  doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/cosmos-readme
+  created: '2026-03-25'
+  author: JonathanGiles, samvaity
 tags:
-  - cosmos-db
-  - etag
-  - optimistic-concurrency
-  - pagination
-  - parameterized-query
-  - ttl
-  - indexing-policy
-  - request-charge
-  - async
-  - reactor
-created: 2026-03-25
-author: JonathanGiles, samvaity
+- cosmos-db
+- etag
+- optimistic-concurrency
+- pagination
+- parameterized-query
+- ttl
+- indexing-policy
+- request-charge
+- async
+- reactor
 ---
 
 # ToDo Repository: Azure Cosmos DB (Java)
@@ -48,21 +49,7 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 
 ## Evaluation Criteria
 
-### Dependencies
-- Uses `com.azure:azure-cosmos` (not `com.microsoft.azure:azure-documentdb` or `com.microsoft.azure:azure-cosmosdb`)
-- Uses `com.azure:azure-identity`
-- No `com.microsoft.azure` groupId anywhere
-- Specifies Java 17
-
-### Authentication
-- Uses `DefaultAzureCredential` — no master keys or connection strings
-- Reads Cosmos DB endpoint from environment variable
-
-### Client Construction
-- Uses `CosmosClientBuilder` with `.endpoint()` and `.credential()`
-- Uses `CosmosClient` (sync) and `CosmosAsyncClient` (async)
-
-### SDK Patterns
+### Scenario-Specific Patterns
 - Correct partition key usage: `/category` path, `PartitionKey` in all point operations
 - ETag-based optimistic concurrency: captures ETag from read, passes `ifMatchETag` on update
 - Handles 412 Precondition Failed as a specific error case for conflicts
@@ -75,21 +62,12 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 - Indexing policy excludes `/description` path
 - RU cost extracted from response via `getRequestCharge()` and logged per operation
 
-### Error Handling
+### Scenario-Specific Error Handling
 - Catches `CosmosException` with status code checks (404, 409, 412)
 - Handles 412 separately for ETag conflicts
-- Does not use bare `Exception` catches
 
-### Async Quality
-- Uses `CosmosAsyncClient` / `CosmosAsyncDatabase` / `CosmosAsyncContainer`
-- Uses Project Reactor types (`Mono`, `Flux`)
-- Does not call `.block()` inside the async implementation
-
-### Anti-Patterns (should NOT appear)
-- `DocumentClient` or `DocumentClientException` (old v2 API)
-- Connection strings with `AccountKey=...`
-- `com.microsoft.azure.*` imports
-- Flattened query results (`.stream()` / `.forEach()` without page iteration)
+### Anti-Patterns (scenario-specific)
+- Does NOT flatten query results (`.stream()` / `.forEach()` without page iteration)
 
 ## Context
 

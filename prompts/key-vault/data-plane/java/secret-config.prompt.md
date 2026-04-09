@@ -1,30 +1,31 @@
 ---
 id: key-vault-dp-java-secret-config
-service: key-vault
-plane: data-plane
-language: java
-category: crud
-difficulty: intermediate
-description: >
-  Can an agent generate a Key Vault-backed configuration provider with secret
-  versioning, expiry inspection, in-memory caching with bulk-load, and safe
-  secret rotation using long-running delete operations (SyncPoller/PollerFlux)?
-sdk_package: com.azure:azure-security-keyvault-secrets
-doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/security-keyvault-secrets-readme
+properties:
+  service: key-vault
+  plane: data-plane
+  language: java
+  category: crud
+  difficulty: intermediate
+  description: 'Can an agent generate a Key Vault-backed configuration provider with secret versioning, expiry inspection,
+    in-memory caching with bulk-load, and safe secret rotation using long-running delete operations (SyncPoller/PollerFlux)?
+
+    '
+  sdk_package: com.azure:azure-security-keyvault-secrets
+  doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/security-keyvault-secrets-readme
+  created: '2026-03-25'
+  author: JonathanGiles, samvaity
 tags:
-  - key-vault
-  - secrets
-  - caching
-  - secret-rotation
-  - lro
-  - sync-poller
-  - poller-flux
-  - versioning
-  - expiry
-  - async
-  - reactor
-created: 2026-03-25
-author: JonathanGiles, samvaity
+- key-vault
+- secrets
+- caching
+- secret-rotation
+- lro
+- sync-poller
+- poller-flux
+- versioning
+- expiry
+- async
+- reactor
 ---
 
 # Secret Config Provider: Azure Key Vault (Java)
@@ -49,21 +50,7 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 
 ## Evaluation Criteria
 
-### Dependencies
-- Uses `com.azure:azure-security-keyvault-secrets` (not `com.microsoft.azure:azure-keyvault`)
-- Uses `com.azure:azure-identity`
-- No `com.microsoft.azure` groupId anywhere
-- Specifies Java 17
-
-### Authentication
-- Uses `DefaultAzureCredential` — no client secrets, certificates, or tenant IDs in code
-- Reads Key Vault URL from environment variable
-
-### Client Construction
-- Uses `SecretClientBuilder` (sync) / `SecretAsyncClient` builder (async)
-- Builder chain includes `.vaultUrl()` and `.credential()`
-
-### SDK Patterns
+### Scenario-Specific Patterns
 - Secret versioning: retrieves specific version via `getSecret(name, version)`
 - Secret expiry: accesses `properties().getExpiresOn()` on `SecretProperties`
 - Configurable warning window for near-expiry detection
@@ -73,22 +60,11 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 - Async uses `PollerFlux` to wait for delete completion
 - Creates new secret only after delete completes (not concurrently)
 
-### Error Handling
-- Catches `ResourceNotFoundException` or `HttpResponseException` with 404 for missing secrets
+### Scenario-Specific Error Handling
 - Returns a default value when secret is not found (does not crash)
-- Does not use bare `Exception` catches
 
-### Async Quality
-- Uses `SecretAsyncClient` (not sync on background thread)
-- Uses Project Reactor types (`Mono`, `Flux`)
-- LRO uses `PollerFlux` (not `SyncPoller`)
-- Does not call `.block()` inside the async implementation
-
-### Anti-Patterns (should NOT appear)
-- `KeyVaultClient` (old v7 API)
-- `ServiceClientCredentials` or `AuthenticationCallback`
-- `com.microsoft.azure.*` imports
-- Fire-and-forget `deleteSecret()` without waiting for completion
+### Anti-Patterns (scenario-specific)
+- NOT using fire-and-forget `deleteSecret()` without waiting for completion
 
 ## Context
 

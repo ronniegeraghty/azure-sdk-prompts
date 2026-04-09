@@ -1,28 +1,29 @@
 ---
 id: identity-dp-java-credential-chain
-service: identity
-plane: data-plane
-language: java
-category: auth
-difficulty: intermediate
-description: >
-  Can an agent build environment-specific Azure credential chains (dev, CI,
-  production) using ChainedTokenCredential, with managed identity, workload
-  identity, CAE support, and environment auto-detection?
-sdk_package: com.azure:azure-identity
-doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/identity-readme
+properties:
+  service: identity
+  plane: data-plane
+  language: java
+  category: auth
+  difficulty: intermediate
+  description: 'Can an agent build environment-specific Azure credential chains (dev, CI, production) using ChainedTokenCredential,
+    with managed identity, workload identity, CAE support, and environment auto-detection?
+
+    '
+  sdk_package: com.azure:azure-identity
+  doc_url: https://learn.microsoft.com/en-us/java/api/overview/azure/identity-readme
+  created: '2026-03-25'
+  author: JonathanGiles, samvaity
 tags:
-  - identity
-  - chained-credential
-  - managed-identity
-  - workload-identity
-  - cae
-  - environment-detection
-  - azure-pipelines
-  - async
-  - reactor
-created: 2026-03-25
-author: JonathanGiles, samvaity
+- identity
+- chained-credential
+- managed-identity
+- workload-identity
+- cae
+- environment-detection
+- azure-pipelines
+- async
+- reactor
 ---
 
 # Credential Chain Builder: Azure Identity (Java)
@@ -45,27 +46,17 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 
 ## Evaluation Criteria
 
-### Dependencies
-- Uses `com.azure:azure-identity`
-- No `com.microsoft.azure` groupId anywhere
-- Does NOT pull in service SDKs (this is identity-only)
-- Specifies Java 17
-
-### Authentication
-- No hardcoded client secrets, certificates, or tenant IDs in source code
-- User-assigned managed identity client ID comes from environment variable
-
 ### Credential Chain Construction
 - Uses `ChainedTokenCredentialBuilder` to compose multiple credentials
 - Credentials added via `.addLast()` — order matters
 
 ### Environment-Specific Chains
-- **Dev chain**: includes `AzureCliCredential` (most common); may include `IntelliJCredential`, `VisualStudioCodeCredential`, or `AzurePowerShellCredential`
+- **Dev chain**: includes `AzureCliCredential`; may include `IntelliJCredential`, `VisualStudioCodeCredential`, `AzurePowerShellCredential`
 - **CI chain**: uses `EnvironmentCredential` or `AzurePipelinesCredential` (not just `DefaultAzureCredential`)
 - **Production chain**: `ManagedIdentityCredential` first (supports user-assigned via `clientId()`), `WorkloadIdentityCredential` as fallback
 
 ### CAE Support
-- Enables Continuous Access Evaluation via `TokenRequestContext.setCaeEnabled(true)` or `enableCae()` on credential builders
+- Enables CAE via `TokenRequestContext.setCaeEnabled(true)` or `enableCae()` on credential builders
 
 ### Environment Detection
 - Detects CI (checks `CI`, `TF_BUILD`, `AZURE_PIPELINE_WORKSPACE`, or similar)
@@ -77,19 +68,11 @@ Include a complete `pom.xml` with the necessary Azure SDK dependencies.
 - Calls `getToken()` and prints token expiry from `AccessToken.getExpiresAt()`
 - Handles failure with specific exception info
 
-### Error Handling
-- Catches `CredentialUnavailableException` for missing credentials
-- Catches `AuthenticationRequiredException` where appropriate
-- Provides actionable error messages
-
-### Async Quality
+### Scenario-Specific Async
 - Async tester uses reactive `getToken()` returning `Mono<AccessToken>`
-- Does not call `.block()` inside the async implementation
 
-### Anti-Patterns (should NOT appear)
-- `DefaultAzureCredential` used as the CI credential (too broad)
-- `com.microsoft.azure.*` imports
-- Hardcoded secrets or tenant IDs
+### Anti-Patterns (scenario-specific)
+- NOT using `DefaultAzureCredential` as the CI credential (too broad)
 
 ## Context
 

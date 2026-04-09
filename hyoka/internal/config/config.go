@@ -2,243 +2,141 @@
 package config
 
 import (
-"fmt"
-"os"
-"os/exec"
-"path/filepath"
+	"bytes"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
-"gopkg.in/yaml.v3"
+	"github.com/ronniegeraghty/hyoka/internal/plugin"
+	"gopkg.in/yaml.v3"
 )
-
-// MCPServer represents an MCP server configuration.
-type MCPServer struct {
-	Type    string   `yaml:"type" json:"type"`
-	Command string   `yaml:"command" json:"command"`
-	Args    []string `yaml:"args" json:"args"`
-	Tools   []string `yaml:"tools" json:"tools"`
-}
-
-// Skill represents a unified skill entry supporting both local and remote sources.
-//   - type: local  → Path contains a local directory path (supports globs)
-//   - type: remote → Name + Repo identify a skill to fetch from a GitHub repo
-type Skill struct {
-	Type string `yaml:"type" json:"type"`
-	Name string `yaml:"name,omitempty" json:"name,omitempty"`
-	Repo string `yaml:"repo,omitempty" json:"repo,omitempty"`
-	Path string `yaml:"path,omitempty" json:"path,omitempty"`
-}
 
 // GeneratorConfig holds all configuration for the code generation agent.
 type GeneratorConfig struct {
-	Model          string                `yaml:"model" json:"model"`
-	Skills         []Skill               `yaml:"skills,omitempty" json:"skills,omitempty"`
-	MCPServers     map[string]*MCPServer `yaml:"mcp_servers,omitempty" json:"mcp_servers,omitempty"`
-	AvailableTools []string              `yaml:"available_tools,omitempty" json:"available_tools,omitempty"`
-	ExcludedTools  []string              `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`
+	Model         string      `yaml:"model,omitempty" json:"model,omitempty"`
+	Models        []string    `yaml:"models,omitempty" json:"models,omitempty"`
+	SystemPrompt  string      `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	Tools         []ToolEntry `yaml:"tools,omitempty" json:"tools,omitempty"`
+	ExcludedTools []string    `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`
+}
+
+// ResolveModels returns the generator models to use. Models takes precedence
+// over Model when both are set.
+func (g *GeneratorConfig) ResolveModels() []string {
+	if g == nil {
+		return nil
+	}
+	if len(g.Models) > 0 {
+		return g.Models
+	}
+	if g.Model != "" {
+		return []string{g.Model}
+	}
+	return nil
 }
 
 // ReviewerConfig holds all configuration for the review/grading plane.
 type ReviewerConfig struct {
-	Model  string  `yaml:"model,omitempty" json:"model,omitempty"`
-	Models []string `yaml:"models,omitempty" json:"models,omitempty"`
-	Skills []Skill  `yaml:"skills,omitempty" json:"skills,omitempty"`
+	Models       []string    `yaml:"models,omitempty" json:"models,omitempty"`
+	SystemPrompt string      `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	Tools        []ToolEntry `yaml:"tools,omitempty" json:"tools,omitempty"`
+}
+
+// SessionLimits configures per-config guardrail limits for evaluation sessions.
+// Zero values are ignored and fall back to engine-level defaults.
+type SessionLimits struct {
+	MaxTurns          int   `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
+	MaxFiles          int   `yaml:"max_files,omitempty" json:"max_files,omitempty"`
+	MaxOutputSize     int64 `yaml:"max_output_size,omitempty" json:"max_output_size,omitempty"`
+	MaxSessionActions int   `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
 }
 
 // ToolConfig represents a single evaluation configuration.
-// New-format configs use Generator and Reviewer sub-structs.
-// Legacy top-level fields are supported for backward compatibility
-// and are migrated to the sub-structs during Normalize().
 type ToolConfig struct {
 	Name        string           `yaml:"name" json:"name"`
 	Description string           `yaml:"description" json:"description"`
 	Generator   *GeneratorConfig `yaml:"generator,omitempty" json:"generator,omitempty"`
 	Reviewer    *ReviewerConfig  `yaml:"reviewer,omitempty" json:"reviewer,omitempty"`
-
-	// Legacy fields — kept for backward compatibility.
-	// Normalize() maps these into Generator/Reviewer sub-structs.
-	Model                      string                `yaml:"model,omitempty" json:"model,omitempty"`
-	ReviewerModel              string                `yaml:"reviewer_model,omitempty" json:"reviewer_model,omitempty"`
-	ReviewerModels             []string              `yaml:"reviewer_models,omitempty" json:"reviewer_models,omitempty"`
-	MCPServers                 map[string]*MCPServer `yaml:"mcp_servers,omitempty" json:"mcp_servers,omitempty"`
-	SkillDirectories           []string              `yaml:"skill_directories,omitempty" json:"skill_directories,omitempty"`
-	GeneratorSkillDirectories  []string              `yaml:"generator_skill_directories,omitempty" json:"generator_skill_directories,omitempty"`
-	ReviewerSkillDirectories   []string              `yaml:"reviewer_skill_directories,omitempty" json:"reviewer_skill_directories,omitempty"`
-	AvailableTools             []string              `yaml:"available_tools,omitempty" json:"available_tools,omitempty"`
-	ExcludedTools              []string              `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`
-	Skills                     []string              `yaml:"skills,omitempty" json:"skills,omitempty"`
-	Plugins                    []string              `yaml:"plugins,omitempty" json:"plugins,omitempty"`
-}
-
-// Normalize migrates legacy top-level fields into the Generator/Reviewer
-// sub-structs. It is idempotent — safe to call multiple times.
-func (tc *ToolConfig) Normalize() {
-	if tc.Generator == nil {
-		tc.Generator = &GeneratorConfig{}
-	}
-	if tc.Reviewer == nil {
-		tc.Reviewer = &ReviewerConfig{}
-	}
-
-	// Model
-	if tc.Generator.Model == "" && tc.Model != "" {
-		tc.Generator.Model = tc.Model
-	}
-
-	// Reviewer models
-	if len(tc.Reviewer.Models) == 0 {
-		if len(tc.ReviewerModels) > 0 {
-			tc.Reviewer.Models = tc.ReviewerModels
-		} else if tc.ReviewerModel != "" {
-			tc.Reviewer.Models = []string{tc.ReviewerModel}
-		}
-	}
-
-	// MCP servers
-	if tc.Generator.MCPServers == nil && tc.MCPServers != nil {
-		tc.Generator.MCPServers = tc.MCPServers
-	}
-
-	// Available/excluded tools
-	if len(tc.Generator.AvailableTools) == 0 && len(tc.AvailableTools) > 0 {
-		tc.Generator.AvailableTools = tc.AvailableTools
-	}
-	if len(tc.Generator.ExcludedTools) == 0 && len(tc.ExcludedTools) > 0 {
-		tc.Generator.ExcludedTools = tc.ExcludedTools
-	}
-
-	// Skill directories → Generator.Skills (type: local)
-	if len(tc.Generator.Skills) == 0 {
-		dirs := tc.GeneratorSkillDirectories
-		if len(dirs) == 0 {
-			dirs = tc.SkillDirectories
-		}
-		for _, d := range dirs {
-			tc.Generator.Skills = append(tc.Generator.Skills, Skill{Type: "local", Path: d})
-		}
-	}
-
-	// Reviewer skill directories → Reviewer.Skills (type: local)
-	if len(tc.Reviewer.Skills) == 0 {
-		for _, d := range tc.ReviewerSkillDirectories {
-			tc.Reviewer.Skills = append(tc.Reviewer.Skills, Skill{Type: "local", Path: d})
-		}
-	}
-}
-
-// EffectiveModel returns the generator model, preferring Generator.Model.
-func (tc *ToolConfig) EffectiveModel() string {
-	if tc.Generator != nil && tc.Generator.Model != "" {
-		return tc.Generator.Model
-	}
-	return tc.Model
-}
-
-// EffectiveReviewerModels returns the list of reviewer models to use.
-func (tc *ToolConfig) EffectiveReviewerModels() []string {
-	if tc.Reviewer != nil && len(tc.Reviewer.Models) > 0 {
-		return tc.Reviewer.Models
-	}
-	if len(tc.ReviewerModels) > 0 {
-		return tc.ReviewerModels
-	}
-	if tc.ReviewerModel != "" {
-		return []string{tc.ReviewerModel}
-	}
-	return nil
-}
-
-// EffectiveMCPServers returns the MCP servers config, preferring Generator.MCPServers.
-func (tc *ToolConfig) EffectiveMCPServers() map[string]*MCPServer {
-	if tc.Generator != nil && len(tc.Generator.MCPServers) > 0 {
-		return tc.Generator.MCPServers
-	}
-	return tc.MCPServers
-}
-
-// EffectiveAvailableTools returns available tools, preferring Generator.AvailableTools.
-func (tc *ToolConfig) EffectiveAvailableTools() []string {
-	if tc.Generator != nil && len(tc.Generator.AvailableTools) > 0 {
-		return tc.Generator.AvailableTools
-	}
-	return tc.AvailableTools
-}
-
-// EffectiveExcludedTools returns excluded tools, preferring Generator.ExcludedTools.
-func (tc *ToolConfig) EffectiveExcludedTools() []string {
-	if tc.Generator != nil && len(tc.Generator.ExcludedTools) > 0 {
-		return tc.Generator.ExcludedTools
-	}
-	return tc.ExcludedTools
-}
-
-// EffectiveGeneratorSkills returns the generator's skill list from the normalized config.
-func (tc *ToolConfig) EffectiveGeneratorSkills() []Skill {
-	if tc.Generator != nil {
-		return tc.Generator.Skills
-	}
-	return nil
-}
-
-// EffectiveReviewerSkills returns the reviewer's skill list from the normalized config.
-func (tc *ToolConfig) EffectiveReviewerSkills() []Skill {
-	if tc.Reviewer != nil {
-		return tc.Reviewer.Skills
-	}
-	return nil
+	Plugins     []string         `yaml:"plugins,omitempty" json:"plugins,omitempty"`
+	Limits      *SessionLimits   `yaml:"limits,omitempty" json:"limits,omitempty"`
 }
 
 // ConfigFile represents the top-level config file structure.
 type ConfigFile struct {
-Configs []ToolConfig `yaml:"configs"`
+	Configs []ToolConfig `yaml:"configs"`
 }
 
 // Load reads and parses a configuration file from the given path.
 func Load(path string) (*ConfigFile, error) {
-data, err := os.ReadFile(path)
-if err != nil {
-return nil, fmt.Errorf("reading config file: %w", err)
-}
-return Parse(data)
+	slog.Debug("Loading config file", "path", path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading config file: %w", err)
+	}
+	cfg, err := Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := cfg.ExpandPlugins(resolvePluginsDir()); err != nil {
+		return nil, fmt.Errorf("expanding plugins: %w", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 // LoadDir reads all .yaml files in a directory and merges their configs.
 // This allows splitting configs across multiple files (e.g., baseline.yaml, azure-mcp.yaml).
 func LoadDir(dir string) (*ConfigFile, error) {
-entries, err := os.ReadDir(dir)
-if err != nil {
-return nil, fmt.Errorf("reading config directory %s: %w", dir, err)
-}
+	slog.Debug("Loading config directory", "dir", dir)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("reading config directory %s: %w", dir, err)
+	}
 
-merged := &ConfigFile{}
-for _, e := range entries {
-if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
-continue
-}
-cf, err := Load(filepath.Join(dir, e.Name()))
-if err != nil {
-return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
-}
-merged.Configs = append(merged.Configs, cf.Configs...)
-}
+	merged := &ConfigFile{}
+	nameSource := make(map[string]string) // config name → source filename
+	for _, e := range entries {
+		if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
+			continue
+		}
+		cf, err := Load(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
+		}
+		for _, c := range cf.Configs {
+			if prev, ok := nameSource[c.Name]; ok {
+				return nil, fmt.Errorf("duplicate config name %q found in files %s and %s", c.Name, prev, e.Name())
+			}
+			nameSource[c.Name] = e.Name()
+		}
+		merged.Configs = append(merged.Configs, cf.Configs...)
+	}
 
-if len(merged.Configs) == 0 {
-return nil, fmt.Errorf("no configs found in %s", dir)
-}
-return merged, nil
+	if len(merged.Configs) == 0 {
+		return nil, fmt.Errorf("no configs found in %s", dir)
+	}
+	return merged, nil
 }
 
 // Parse parses configuration from YAML bytes.
 func Parse(data []byte) (*ConfigFile, error) {
 	var cfg ConfigFile
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing config YAML: %w", err)
-	}
-	// Normalize all configs (migrate legacy fields → sub-structs)
-	for i := range cfg.Configs {
-		cfg.Configs[i].Normalize()
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
+	}
+	for _, c := range cfg.Configs {
+		models := c.Generator.ResolveModels()
+		slog.Info("Config loaded", "name", c.Name, "models", strings.Join(models, ","))
 	}
 	return &cfg, nil
 }
@@ -248,126 +146,152 @@ func (cf *ConfigFile) Validate() error {
 	if len(cf.Configs) == 0 {
 		return fmt.Errorf("no configs defined")
 	}
+	namesSeen := make(map[string]int, len(cf.Configs))
 	for i, c := range cf.Configs {
 		if c.Name == "" {
 			return fmt.Errorf("config at index %d has no name", i)
 		}
-		// Validate skills have correct type
-		for _, s := range c.EffectiveGeneratorSkills() {
-			if err := validateSkill(s); err != nil {
-				return fmt.Errorf("config %q generator skill: %w", c.Name, err)
+		// Generator with a model is required for every config.
+		if c.Generator == nil {
+			return fmt.Errorf("config %q: generator.model or generator.models is required", c.Name)
+		}
+		models := c.Generator.ResolveModels()
+		if len(models) == 0 {
+			return fmt.Errorf("config %q: generator.model or generator.models is required", c.Name)
+		}
+		seenModels := make(map[string]bool, len(models))
+		for _, model := range models {
+			if model == "" {
+				return fmt.Errorf("config %q: generator model must not be empty", c.Name)
+			}
+			if seenModels[model] {
+				return fmt.Errorf("config %q: duplicate generator model %q", c.Name, model)
+			}
+			seenModels[model] = true
+		}
+		if prev, ok := namesSeen[c.Name]; ok {
+			return fmt.Errorf("duplicate config name %q at index %d and %d", c.Name, prev, i)
+		}
+		namesSeen[c.Name] = i
+		if c.Generator != nil {
+			for j, te := range c.Generator.Tools {
+				if err := validateToolEntry(te, c.Name, j); err != nil {
+					return err
+				}
 			}
 		}
-		for _, s := range c.EffectiveReviewerSkills() {
-			if err := validateSkill(s); err != nil {
-				return fmt.Errorf("config %q reviewer skill: %w", c.Name, err)
+		if c.Reviewer != nil {
+			for j, te := range c.Reviewer.Tools {
+				if err := validateToolEntry(te, c.Name, j); err != nil {
+					return err
+				}
+			}
+			// Check for duplicate reviewer models
+			seen := make(map[string]bool, len(c.Reviewer.Models))
+			for _, rm := range c.Reviewer.Models {
+				if seen[rm] {
+					return fmt.Errorf("config %q: duplicate reviewer model %q", c.Name, rm)
+				}
+				seen[rm] = true
 			}
 		}
-		// Check for duplicate reviewer models
-		reviewerModels := c.EffectiveReviewerModels()
-		seen := make(map[string]bool, len(reviewerModels))
-		for _, rm := range reviewerModels {
-			if seen[rm] {
-				return fmt.Errorf("config %q: duplicate reviewer model %q", c.Name, rm)
+		// Reject negative session limits — they bypass guardrails.
+		if c.Limits != nil {
+			if c.Limits.MaxTurns < 0 {
+				return fmt.Errorf("config %q: limits.max_turns must not be negative", c.Name)
 			}
-			seen[rm] = true
+			if c.Limits.MaxFiles < 0 {
+				return fmt.Errorf("config %q: limits.max_files must not be negative", c.Name)
+			}
+			if c.Limits.MaxOutputSize < 0 {
+				return fmt.Errorf("config %q: limits.max_output_size must not be negative", c.Name)
+			}
+			if c.Limits.MaxSessionActions < 0 {
+				return fmt.Errorf("config %q: limits.max_session_actions must not be negative", c.Name)
+			}
 		}
-	}
-	return nil
-}
-
-// validateSkill checks that a Skill has valid type and required fields.
-func validateSkill(s Skill) error {
-	switch s.Type {
-	case "local":
-		if s.Path == "" {
-			return fmt.Errorf("local skill missing path")
-		}
-	case "remote":
-		if s.Repo == "" {
-			return fmt.Errorf("remote skill missing repo")
-		}
-	default:
-		return fmt.Errorf("unknown skill type %q (expected \"local\" or \"remote\")", s.Type)
 	}
 	return nil
 }
 
 // GetConfig returns a config by name, or an error if not found.
 func (cf *ConfigFile) GetConfig(name string) (*ToolConfig, error) {
-for i := range cf.Configs {
-if cf.Configs[i].Name == name {
-return &cf.Configs[i], nil
-}
-}
-return nil, fmt.Errorf("config %q not found", name)
+	for i := range cf.Configs {
+		if cf.Configs[i].Name == name {
+			return &cf.Configs[i], nil
+		}
+	}
+	return nil, fmt.Errorf("config %q not found", name)
 }
 
 // GetConfigs returns configs matching the given names. If names is empty, returns all.
 func (cf *ConfigFile) GetConfigs(names []string) ([]ToolConfig, error) {
-if len(names) == 0 {
-return cf.Configs, nil
-}
-nameSet := make(map[string]bool, len(names))
-for _, n := range names {
-nameSet[n] = true
-}
-var result []ToolConfig
-for _, c := range cf.Configs {
-if nameSet[c.Name] {
-result = append(result, c)
-delete(nameSet, c.Name)
-}
-}
-if len(nameSet) > 0 {
-var missing []string
-for n := range nameSet {
-missing = append(missing, n)
-}
-return nil, fmt.Errorf("configs not found: %v", missing)
-}
-return result, nil
+	if len(names) == 0 {
+		return cf.Configs, nil
+	}
+	nameSet := make(map[string]bool, len(names))
+	for _, n := range names {
+		nameSet[n] = true
+	}
+	var result []ToolConfig
+	for _, c := range cf.Configs {
+		if nameSet[c.Name] {
+			result = append(result, c)
+			delete(nameSet, c.Name)
+		}
+	}
+	if len(nameSet) > 0 {
+		var missing []string
+		for n := range nameSet {
+			missing = append(missing, n)
+		}
+		return nil, fmt.Errorf("configs not found: %v", missing)
+	}
+	return result, nil
 }
 
 // InstallSkillsAndPlugins runs "npx skills add <entry>" for each declared
-// skill and plugin across the given configs. It deduplicates entries so each
+// plugin across the given configs. It deduplicates entries so each
 // package is only installed once.
 func InstallSkillsAndPlugins(configs []ToolConfig) error {
-seen := make(map[string]bool)
-type entry struct {
-kind  string
-value string
-}
-var entries []entry
+	seen := make(map[string]bool)
+	type entry struct {
+		kind  string
+		value string
+	}
+	var entries []entry
 
-for _, c := range configs {
-for _, s := range c.Skills {
-if !seen["skill:"+s] {
-seen["skill:"+s] = true
-entries = append(entries, entry{"skill", s})
-}
-}
-for _, p := range c.Plugins {
-if !seen["plugin:"+p] {
-seen["plugin:"+p] = true
-entries = append(entries, entry{"plugin", p})
-}
-}
-}
+	reg := plugin.NewRegistry()
+	pluginsDir := resolvePluginsDir()
+	if err := reg.LoadDir(pluginsDir); err != nil {
+		return err
+	}
 
-if len(entries) == 0 {
-return nil
-}
+	for _, c := range configs {
+		for _, p := range c.Plugins {
+			if _, err := reg.Get(p); err == nil {
+				continue
+			}
+			if !seen["plugin:"+p] {
+				seen["plugin:"+p] = true
+				entries = append(entries, entry{"plugin", p})
+			}
+		}
+	}
 
-for _, e := range entries {
-fmt.Printf("Installing %s: %s\n", e.kind, e.value)
-cmd := exec.Command("npx", "skills", "add", e.value)
-cmd.Stdout = os.Stdout
-cmd.Stderr = os.Stderr
-if err := cmd.Run(); err != nil {
-return fmt.Errorf("installing %s %q: %w", e.kind, e.value, err)
-}
-}
+	if len(entries) == 0 {
+		return nil
+	}
 
-return nil
+	for _, e := range entries {
+		fmt.Printf("Installing %s: %s\n", e.kind, e.value)
+		cmd := exec.Command("npx", "skills", "add", e.value)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("installing %s %q: %w", e.kind, e.value, err)
+		}
+	}
+
+	return nil
 }

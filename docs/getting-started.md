@@ -6,7 +6,7 @@ This guide walks you through cloning the repo, running your first evaluation, an
 
 | Tool | Version | Check |
 |------|---------|-------|
-| Go | 1.24.5+ | `go version` |
+| Go | 1.26.1+ | `go version` |
 | GitHub Copilot CLI | Latest | `copilot --version` |
 | Git | Any | `git --version` |
 | Node.js (for Azure MCP config) | 18+ | `node --version` |
@@ -193,19 +193,42 @@ go run ./hyoka run --config baseline
 
 # Both configs for one service
 go run ./hyoka run --service storage
+
+# Run with multiple configs (compare baseline vs azure-mcp):
+go run ./hyoka run --service identity --language python \
+  --config "baseline/claude-opus-4.6,azure-mcp/claude-opus-4.6" \
+  --log-level debug --log-file hyoka-debug.log
 ```
+
+> **Tip:** The `--config` flag takes config *names* (the `name:` field inside the YAML file), not filenames. For example, `configs/azure-mcp-opus.yaml` defines a config named `azure-mcp/claude-opus-4.6`.
 
 ### Adjust guardrails
 
 ```bash
 # Tighter limits for faster iteration
-go run ./hyoka run --max-turns 10 --max-files 20 --max-output-size 512KB
+go run ./hyoka run --max-session-actions 10 --max-files 20 --max-output-size 512KB
 
 # Allow real Azure resource provisioning
 go run ./hyoka run --allow-cloud
 
 # Limit concurrent sessions on a shared machine
 go run ./hyoka run --max-sessions 4 --workers 2
+```
+
+### Useful Flag Combos
+
+```bash
+# Debug + log file (keeps terminal clean, logs to file)
+go run ./hyoka run --config baseline --log-level debug --log-file hyoka-debug.log
+
+# Monitor resource usage during evaluation
+go run ./hyoka run --config baseline --monitor-resources
+
+# Skip review for quick generation iteration
+go run ./hyoka run --config baseline --skip-review
+
+# Dry run to preview what would be evaluated
+go run ./hyoka run --service storage --dry-run
 ```
 
 ### Re-render reports after template changes
@@ -231,9 +254,7 @@ Every code-generation session is automatically aborted if it exceeds:
 
 | Limit | Default | Flag |
 |-------|---------|------|
-| Conversation turns | 25 | `--max-turns` |
-| Generated files | 50 | `--max-files` |
-| Total output size | 1 MB | `--max-output-size` |
+| Session actions | 50 | `--max-session-actions` |
 
 When a limit is hit, the evaluation stops and the report shows the specific guardrail that triggered (e.g., `guardrail: file count 51 exceeded limit of 50`).
 
@@ -256,8 +277,21 @@ If `validate` or `run` finds zero prompts, it scans for near-miss filenames and 
 - `auth-prompt.md` → `auth.prompt.md` (hyphen instead of dot)
 - `crud.prompt.txt` → `crud.prompt.md` (wrong extension)
 
+## Browse Results with Serve
+
+Start the built-in report viewer:
+
+```bash
+go run ./hyoka serve
+```
+
+This launches a local web server at `http://localhost:8080` with an index of all evaluation runs, linking to individual HTML reports.
+
 ## Next Steps
 
-- Read the [root README](../README.md) for full command reference
-- Check out `skills/prompt-authoring/SKILL.md` for prompt writing best practices
-- See `docs/cleanup-plan.md` for the project roadmap
+- [CLI Reference](cli-reference.md) — Full command and flag documentation
+- [Configuration Guide](configuration.md) — Config YAML format and options
+- [Prompt Authoring Guide](prompt-authoring.md) — How to write evaluation prompts
+- [Guardrails and Safety](guardrails.md) — Limits, process cleanup, and safety boundaries
+- [Architecture Overview](architecture.md) — How hyoka works end-to-end
+- [Contributing Guide](contributing.md) — Building, testing, and adding features
