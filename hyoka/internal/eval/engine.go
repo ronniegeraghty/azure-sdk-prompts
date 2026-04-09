@@ -1408,6 +1408,34 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 	summary.TotalPrompts = len(promptIDs)
 	summary.TotalConfigs = len(configNames)
 
+	// Validate skill directories for each unique config (#291).
+	// This surfaces warnings about empty/missing skill dirs during dry run.
+	validatedConfigs := make(map[string]bool)
+	for _, t := range tasks {
+		if validatedConfigs[t.Config.Name] {
+			continue
+		}
+		validatedConfigs[t.Config.Name] = true
+		if t.Config.Generator != nil {
+			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, "")
+			if err != nil {
+				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
+				continue
+			}
+			count := skills.CountSkills(resolved)
+			e.printf("   Config %q: %d generator skill dir(s), %d skill(s) found\n", t.Config.Name, len(resolved), count)
+		}
+		if t.Config.Reviewer != nil {
+			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, "")
+			if err != nil {
+				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
+				continue
+			}
+			count := skills.CountSkills(resolved)
+			e.printf("   Config %q: %d reviewer skill dir(s), %d skill(s) found\n", t.Config.Name, len(resolved), count)
+		}
+	}
+
 	return summary, nil
 }
 
