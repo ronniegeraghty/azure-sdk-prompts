@@ -17,9 +17,10 @@ type ToolEntry struct {
 	Args     []string `yaml:"args,omitempty" json:"args,omitempty"`
 	MCPTools []string `yaml:"mcp_tools,omitempty" json:"mcp_tools,omitempty"`
 	// Skill-specific fields
-	Source string `yaml:"source,omitempty" json:"source,omitempty"` // "local" or "remote"
-	Path   string `yaml:"path,omitempty" json:"path,omitempty"`
-	Repo   string `yaml:"repo,omitempty" json:"repo,omitempty"`
+	Source   string `yaml:"source,omitempty" json:"source,omitempty"` // "local" or "remote"
+	Path     string `yaml:"path,omitempty" json:"path,omitempty"`
+	Repo     string `yaml:"repo,omitempty" json:"repo,omitempty"`
+	SkillDir bool   `yaml:"skill_dir,omitempty" json:"skill_dir,omitempty"` // true = path is a directory of skills, false = path is a single skill
 }
 
 func resolvedToolType(entry ToolEntry) string {
@@ -115,6 +116,9 @@ func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 		}
 		if entry.Source != "" && entry.Source != "local" && entry.Source != "remote" {
 			return fmt.Errorf("config %q: tools[%d] skill entry has invalid source %q", configName, idx, entry.Source)
+		}
+		if entry.SkillDir && entry.Repo != "" {
+			return fmt.Errorf("config %q: tools[%d] skill_dir is only valid for local skills", configName, idx)
 		}
 	default:
 		return fmt.Errorf("config %q: tools[%d] has unknown type %q", configName, idx, entry.Type)

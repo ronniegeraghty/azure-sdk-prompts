@@ -93,6 +93,160 @@ t.Errorf("expected 2 configs, got %d", summary.TotalConfigs)
 }
 }
 
+func TestDryRunSkillDir_Populated(t *testing.T) {
+	dir := t.TempDir()
+	// Create a skill_dir with 2 skill subdirectories
+	skillsDir := filepath.Join(dir, "skills")
+	for _, name := range []string{"skill-a", "skill-b"} {
+		subDir := filepath.Join(skillsDir, name)
+		if err := os.MkdirAll(subDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(subDir, "SKILL.md"), []byte("# Skill"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var buf strings.Builder
+	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
+	opts.Stdout = &buf
+	engine := NewEngine(&StubEvaluator{}, opts)
+
+	prompts := []*prompt.Prompt{
+		{ID: "p1", Properties: map[string]string{"language": "python"}},
+	}
+	configs := []config.ToolConfig{
+		{
+			Name: "populated-skills",
+			Generator: &config.GeneratorConfig{
+				Model: "gpt-4",
+				Tools: []config.ToolEntry{
+					{Name: "gen-skills", Type: "skill", Source: "local", SkillDir: true, Path: skillsDir},
+				},
+			},
+		},
+	}
+
+	_, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "1 generator dir(s) searched, 2 skill(s) found") {
+		t.Errorf("expected '1 generator dir(s) searched, 2 skill(s) found' in output, got:\n%s", output)
+	}
+}
+
+func TestDryRunSkillDir_Empty(t *testing.T) {
+	dir := t.TempDir()
+	// Create an empty skill_dir (only .gitkeep)
+	skillsDir := filepath.Join(dir, "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillsDir, ".gitkeep"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf strings.Builder
+	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
+	opts.Stdout = &buf
+	engine := NewEngine(&StubEvaluator{}, opts)
+
+	prompts := []*prompt.Prompt{
+		{ID: "p1", Properties: map[string]string{"language": "python"}},
+	}
+	configs := []config.ToolConfig{
+		{
+			Name: "empty-skills",
+			Generator: &config.GeneratorConfig{
+				Model: "gpt-4",
+				Tools: []config.ToolEntry{
+					{Name: "gen-skills", Type: "skill", Source: "local", SkillDir: true, Path: skillsDir},
+				},
+			},
+		},
+	}
+
+	_, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "1 generator dir(s) searched, 0 skill(s) found") {
+		t.Errorf("expected '1 generator dir(s) searched, 0 skill(s) found' in output, got:\n%s", output)
+	}
+}
+
+func TestDryRunSkillDir_NonExistent(t *testing.T) {
+	var buf strings.Builder
+	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
+	opts.Stdout = &buf
+	engine := NewEngine(&StubEvaluator{}, opts)
+
+	prompts := []*prompt.Prompt{
+		{ID: "p1", Properties: map[string]string{"language": "python"}},
+	}
+	configs := []config.ToolConfig{
+		{
+			Name: "missing-dir",
+			Generator: &config.GeneratorConfig{
+				Model: "gpt-4",
+				Tools: []config.ToolEntry{
+					{Name: "gen-skills", Type: "skill", Source: "local", SkillDir: true, Path: "/does/not/exist"},
+				},
+			},
+		},
+	}
+
+	_, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "1 generator dir(s) searched, 0 skill(s) found") {
+		t.Errorf("expected '1 generator dir(s) searched, 0 skill(s) found' in output, got:\n%s", output)
+	}
+}
+
+func TestDryRunSingleSkill_MissingSKILLMD(t *testing.T) {
+	dir := t.TempDir()
+	// Create a directory but no SKILL.md
+	skillDir := filepath.Join(dir, "my-skill")
+	if err := os.Mkdir(skillDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf strings.Builder
+	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
+	opts.Stdout = &buf
+	engine := NewEngine(&StubEvaluator{}, opts)
+
+	prompts := []*prompt.Prompt{
+		{ID: "p1", Properties: map[string]string{"language": "python"}},
+	}
+	configs := []config.ToolConfig{
+		{
+			Name: "bad-single-skill",
+			Generator: &config.GeneratorConfig{
+				Model: "gpt-4",
+				Tools: []config.ToolEntry{
+					{Name: "my-skill", Type: "skill", Source: "local", Path: skillDir},
+				},
+			},
+		},
+	}
+
+	_, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "1 generator dir(s) searched, 0 skill(s) found") {
+		t.Errorf("expected '1 generator dir(s) searched, 0 skill(s) found' in output, got:\n%s", output)
+	}
+}
+
 func TestEngineRun(t *testing.T) {
 outputDir := t.TempDir()
 engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{

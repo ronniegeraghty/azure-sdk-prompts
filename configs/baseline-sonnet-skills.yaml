@@ -16,6 +16,7 @@ configs:
         - name: reviewer-skills
           type: skill
           source: local
+          skill_dir: true
           path: "./skills/reviewer"
     plugins:
       - "azure-sdk-java@skills"
