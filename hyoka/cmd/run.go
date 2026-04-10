@@ -160,6 +160,7 @@ func runCmd() *cobra.Command {
 
 			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
+			f.criteriaDir = resolveCriteriaDir(cmd)
 
 			// Load config(s)
 			var cfgFile *config.ConfigFile
