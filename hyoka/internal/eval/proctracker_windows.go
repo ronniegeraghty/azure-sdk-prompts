@@ -10,7 +10,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ronniegeraghty/hyoka/internal/pidfile"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
 )
 
 // descendantPIDs returns the set of all descendant PIDs of the given root PID

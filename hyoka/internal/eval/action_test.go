@@ -3,7 +3,7 @@ package eval
 import (
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 func boolPtr(b bool) *bool { return &b }

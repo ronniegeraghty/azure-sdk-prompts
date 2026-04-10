@@ -7,8 +7,8 @@ import (
 "strings"
 "testing"
 
-"github.com/ronniegeraghty/hyoka/internal/report"
-"github.com/ronniegeraghty/hyoka/internal/review"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
 
 func TestScanReportsEmpty(t *testing.T) {

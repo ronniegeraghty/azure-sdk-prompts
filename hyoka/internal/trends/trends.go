@@ -13,7 +13,7 @@ import (
 "strings"
 "time"
 
-"github.com/ronniegeraghty/hyoka/internal/report"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 // TrendClassification indicates the overall trend direction.

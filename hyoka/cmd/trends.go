@@ -6,7 +6,7 @@ import (
 "log/slog"
 "path/filepath"
 
-"github.com/ronniegeraghty/hyoka/internal/trends"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/trends"
 "github.com/spf13/cobra"
 )
 

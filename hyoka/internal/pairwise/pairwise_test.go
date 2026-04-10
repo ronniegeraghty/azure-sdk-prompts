@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 )
 
 func TestComputeImpacts(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 )
 
 // PairwiseRunReport captures per-prompt and aggregate pairwise results for a run.

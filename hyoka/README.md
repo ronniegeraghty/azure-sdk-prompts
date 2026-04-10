@@ -24,11 +24,10 @@ go run ./hyoka <command> [flags]
 ### Install globally
 
 ```bash
-go install github.com/ronniegeraghty/hyoka/cmd/hyoka@latest
+go install github.com/ronniegeraghty/hyoka@latest
 hyoka <command> [flags]
 ```
 
-> **Pinned version:** `go install github.com/ronniegeraghty/hyoka/cmd/hyoka@hyoka/v0.3.0`
 
 ## Features
 

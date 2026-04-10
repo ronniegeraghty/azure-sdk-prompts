@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"gopkg.in/yaml.v3"
 )
 

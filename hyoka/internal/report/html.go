@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
 
 //go:embed templates/*.gohtml

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/eval"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
 )
 
 // BuildResult holds the outcome of a build verification.
