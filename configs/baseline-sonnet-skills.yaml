@@ -7,6 +7,12 @@ configs:
     description: "Baseline + Skills — Claude Sonnet 4.5 with azure-sdk-java generator skills"
     generator:
       model: "claude-sonnet-4.5"
+      tools:
+        - name: generator-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/generator"
     reviewer:
       models:
         - "claude-opus-4.6"
@@ -19,4 +25,4 @@ configs:
           skill_dir: true
           path: "./skills/reviewer"
     plugins:
-      - "azure-sdk-java@skills"
+#      - "azure-sdk-java@skills"
