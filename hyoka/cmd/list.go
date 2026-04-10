@@ -4,7 +4,7 @@ import (
 "encoding/json"
 "fmt"
 
-"github.com/ronniegeraghty/hyoka/internal/prompt"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 "github.com/spf13/cobra"
 )
 

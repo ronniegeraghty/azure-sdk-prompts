@@ -6,7 +6,7 @@ import (
 "strings"
 "time"
 
-"github.com/ronniegeraghty/hyoka/internal/comparison"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/comparison"
 "github.com/spf13/cobra"
 )
 

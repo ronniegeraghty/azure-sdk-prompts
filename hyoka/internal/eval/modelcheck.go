@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 )
 
 // ModelCheckResult holds the outcome of a pre-flight model availability check.

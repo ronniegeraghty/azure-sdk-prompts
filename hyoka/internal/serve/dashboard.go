@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/comparison"
-	"github.com/ronniegeraghty/hyoka/internal/report"
-	"github.com/ronniegeraghty/hyoka/internal/trends"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/comparison"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/trends"
 )
 
 // registerDashboardRoutes adds dashboard-specific API routes to the mux.

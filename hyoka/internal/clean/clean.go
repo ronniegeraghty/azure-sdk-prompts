@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/pidfile"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
 )
 
 // Options configures the clean operation.

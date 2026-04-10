@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 )
 
 // ResolveSkillDirs takes a list of tool entries and resolves the skill entries to

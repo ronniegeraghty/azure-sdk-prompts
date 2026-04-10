@@ -1,7 +1,7 @@
 package cmd
 
 import (
-"github.com/ronniegeraghty/hyoka/internal/logging"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 "github.com/spf13/cobra"
 )
 

@@ -5,9 +5,9 @@ import (
 "os"
 "path/filepath"
 
-"github.com/ronniegeraghty/hyoka/internal/config"
-"github.com/ronniegeraghty/hyoka/internal/prompt"
-"github.com/ronniegeraghty/hyoka/internal/validate"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/validate"
 "github.com/spf13/cobra"
 )
 

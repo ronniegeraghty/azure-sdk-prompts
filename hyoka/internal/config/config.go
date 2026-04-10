@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/plugin"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 	"gopkg.in/yaml.v3"
 )
 

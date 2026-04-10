@@ -3,7 +3,7 @@ package cmd
 import (
 "fmt"
 
-"github.com/ronniegeraghty/hyoka/internal/plugin"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 "github.com/spf13/cobra"
 )
 
