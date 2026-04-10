@@ -115,6 +115,7 @@
   - Add `plugins/` to the list of created subdirectories (alongside configs, prompts, criteria, skills, reports).
   - Add `--with-examples` flag that copies a generic starter prompt file and minimal config into the new project. These should be tool-agnostic (no specific MCP servers or skills).
   - Accept an optional path argument (e.g., `hyoka init ./my-project`) to initialize in a different directory. Default to current directory when no path is given.
+- **Remove `hyoka/internal/build/` package** — Dead code. Nobody imports it, engine doesn't call it. The build verification concept should be reimplemented as a proper build grader that can be added as an evaluation criteria in config YAML (e.g., `kind: build`), not a hardcoded pipeline phase. Investigate how the existing grader framework (`internal/graders/`) can support a build grader that runs language-specific compile/syntax checks as part of the grading step.
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
