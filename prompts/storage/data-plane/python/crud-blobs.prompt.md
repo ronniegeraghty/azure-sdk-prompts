@@ -32,18 +32,18 @@ CRUD operations on Azure Blob Storage:
 5. Download the blob and save it to "report-downloaded.csv"
 6. Delete the blob and then delete the container
 
-Show required pip packages and proper error handling with HttpResponseError.
+Include a `requirements.txt` with `azure-storage-blob` and `azure-identity`, and add proper error handling with `HttpResponseError` and `ResourceExistsError`.
 
 ## Evaluation Criteria
 
-- Installing `azure-storage-blob` and `azure-identity` packages
-- `BlobServiceClient` with `DefaultAzureCredential`
-- `BlobServiceClient.create_container()` or `ContainerClient.create_container()`
-- `BlobClient.upload_blob()` with `overwrite` parameter
-- `ContainerClient.list_blobs()` iteration
-- `BlobClient.download_blob()` and `readall()` or `readinto()`
-- `BlobClient.delete_blob()` and `ContainerClient.delete_container()`
-- `HttpResponseError` and `ResourceExistsError` handling
+- Includes required Azure Storage and Identity SDK packages (via requirements.txt or install instructions)
+- Authenticates the blob service client with DefaultAzureCredential
+- Creates a container (handling the case where it already exists)
+- Uploads a file as a blob with overwrite support
+- Lists blobs in the container with their properties
+- Downloads a blob to a local file
+- Deletes the blob and the container
+- Catches Azure-specific errors (both general HTTP errors and resource-exists errors)
 
 ## Context
 
