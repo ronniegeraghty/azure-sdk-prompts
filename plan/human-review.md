@@ -110,6 +110,11 @@
 - Reports need to show the tools available during the eval and which ended up actually being used. 
 - need an example of prompt with starting files. 
 - Harden up the review criteria being asked. We should automate the extraction and listing of the review criteria and ask the review agents to respond in a json format so we can check if they are givinng a judgement for each criteria and aren't forgeting any. If the JSON they provide back doesn't satisfy the requirements we tell them what is wrong or missing, and ask them to try giving it to us again. 
+- **Use Go build-time version instead of hardcoded** — `Version` in `root.go` is hardcoded to `0.3.0`. Should use `runtime/debug.ReadBuildInfo()` to pull the version from Go's module system (set automatically by `go install`), with the hardcoded value as a fallback for dev builds.
+- **Enhance `hyoka init`** — Several improvements:
+  - Add `plugins/` to the list of created subdirectories (alongside configs, prompts, criteria, skills, reports).
+  - Add `--with-examples` flag that copies a generic starter prompt file and minimal config into the new project. These should be tool-agnostic (no specific MCP servers or skills).
+  - Accept an optional path argument (e.g., `hyoka init ./my-project`) to initialize in a different directory. Default to current directory when no path is given.
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
