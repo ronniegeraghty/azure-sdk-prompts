@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
 
 func boolPtr(b bool) *bool { return &b }

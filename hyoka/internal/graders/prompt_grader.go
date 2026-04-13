@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/utils"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
 // DefaultMaxScore is the default maximum score a prompt grader assigns.

@@ -1,8 +1,8 @@
 package eval
 
 import (
-	"github.com/ronniegeraghty/hyoka/internal/graders"
-	"github.com/ronniegeraghty/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 // maxActionFieldLen is the maximum length for truncated input/output fields.

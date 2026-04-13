@@ -10,7 +10,7 @@
 ## Building
 
 ```bash
-# From repo root (uses go.work)
+# From repo root
 cd /path/to/hyoka
 go build ./hyoka/...
 ```

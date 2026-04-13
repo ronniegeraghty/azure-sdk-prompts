@@ -3,7 +3,7 @@ package main
 import (
 "os"
 
-"github.com/ronniegeraghty/hyoka/cmd"
+"github.com/ronniegeraghty/hyoka/hyoka/cmd"
 )
 
 func main() {

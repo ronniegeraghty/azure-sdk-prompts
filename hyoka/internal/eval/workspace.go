@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/utils"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
 // EvalWorkspacePrefix is the directory name prefix used for isolated evaluation

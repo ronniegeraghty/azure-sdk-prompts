@@ -8,8 +8,8 @@ import (
 "strings"
 "testing"
 
-"github.com/ronniegeraghty/hyoka/internal/config"
-"github.com/ronniegeraghty/hyoka/internal/prompt"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
 
 func TestSnapshotDir_CapturesFilesAndDirs(t *testing.T) {

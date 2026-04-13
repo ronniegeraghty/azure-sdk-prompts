@@ -9,7 +9,7 @@ import (
 "strings"
 "testing"
 
-"github.com/ronniegeraghty/hyoka/internal/report"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 func TestCompareCmdHelp(t *testing.T) {

@@ -12,13 +12,13 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
-	"github.com/ronniegeraghty/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/internal/logging"
-	"github.com/ronniegeraghty/hyoka/internal/pidfile"
-	"github.com/ronniegeraghty/hyoka/internal/progress"
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/report"
-	"github.com/ronniegeraghty/hyoka/internal/skills"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.

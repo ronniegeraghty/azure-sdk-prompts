@@ -9,13 +9,13 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
-	"github.com/ronniegeraghty/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/internal/eval"
-	"github.com/ronniegeraghty/hyoka/internal/pairwise"
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/report"
-	"github.com/ronniegeraghty/hyoka/internal/review"
-	"github.com/ronniegeraghty/hyoka/internal/trends"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/trends"
 	"github.com/spf13/cobra"
 )
 
@@ -160,6 +160,7 @@ func runCmd() *cobra.Command {
 
 			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
+			f.criteriaDir = resolveCriteriaDir(cmd)
 
 			// Load config(s)
 			var cfgFile *config.ConfigFile

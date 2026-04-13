@@ -52,7 +52,7 @@ docs/               # Design docs and getting started guide
 ## Build & Test
 
 ```bash
-# Build (from repo root — uses go.work)
+# Build (from repo root)
 cd /home/rgeraghty/projects/hyoka
 go build ./hyoka/...
 

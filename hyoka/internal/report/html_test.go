@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
 
 func TestWriteHTMLReport(t *testing.T) {

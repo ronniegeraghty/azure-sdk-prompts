@@ -1,7 +1,7 @@
 package cmd
 
 import (
-"github.com/ronniegeraghty/hyoka/internal/checkenv"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/checkenv"
 "github.com/spf13/cobra"
 )
 

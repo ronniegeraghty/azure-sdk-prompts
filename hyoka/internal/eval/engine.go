@@ -15,16 +15,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/internal/criteria"
-	"github.com/ronniegeraghty/hyoka/internal/graders"
-	"github.com/ronniegeraghty/hyoka/internal/logging"
-	"github.com/ronniegeraghty/hyoka/internal/pairwise"
-	"github.com/ronniegeraghty/hyoka/internal/progress"
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/report"
-	"github.com/ronniegeraghty/hyoka/internal/review"
-	"github.com/ronniegeraghty/hyoka/internal/skills"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // EvalResult holds the raw output from a Copilot evaluation.

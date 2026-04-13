@@ -3,7 +3,7 @@ package config
 import (
 	"log/slog"
 
-	"github.com/ronniegeraghty/hyoka/internal/plugin"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 )
 
 // ExpandPlugins loads plugins from dir and appends their tool entries to configs.
