@@ -229,6 +229,7 @@
     {{if .Environment.AvailableTools}}<tr><td>Available Tools</td><td>{{join .Environment.AvailableTools ", "}}</td></tr>{{end}}
     {{if .Environment.ExcludedTools}}<tr><td>Excluded Tools</td><td>{{join .Environment.ExcludedTools ", "}}</td></tr>{{end}}
     {{if .Environment.MCPServers}}<tr><td>MCP Servers</td><td>{{join .Environment.MCPServers ", "}}</td></tr>{{end}}
+    {{if .Environment.MCPToolsInvoked}}<tr><td>MCP Tools Invoked</td><td>{{join .Environment.MCPToolsInvoked ", "}}</td></tr>{{end}}
     <tr><td>Safety Boundaries</td><td>{{if .Environment.SafetyBoundaries}}✅ Active{{else}}❌ Off{{end}}</td></tr>
     <tr><td>Cloud Access</td><td>{{if .Environment.AllowCloud}}✅ Allowed{{else}}❌ Denied{{end}}</td></tr>
     {{if or .Environment.TotalInputTokens .Environment.TotalOutputTokens}}<tr><td>Token Usage</td><td>in={{.Environment.TotalInputTokens}} out={{.Environment.TotalOutputTokens}}</td></tr>{{end}}
