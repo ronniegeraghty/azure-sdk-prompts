@@ -209,6 +209,25 @@
   - **Rerender package** — used to re-render reports with updated templates without re-running evals. Also handles schema migration. Will need updating when report structure changes.
   - **`ExtractJSON()` in utils is fragile** — strips markdown code fences and finds first `{` to last `}`. Won't handle nested JSON with surrounding text. Less critical once we enforce structured JSON schemas with validation and retry, but should still be made more robust.
   - **Validation should use schema-based approach** — currently validates against hardcoded value lists. Should validate prompts, criteria, and config files against defined schemas (e.g., JSON Schema or Go struct validation) so format updates don't require changing validation code. Should also validate criteria YAML files and config files, not just prompts.
+- **Remove `history/` package** — dead code. No command registered, nobody imports it.
+- **Remove `manifest/` package** — dead code. `hyoka manifest` command isn't registered. Remove package and any references.
+- **Integrate pairwise results into normal reporting and site** — Currently pairwise results are written as a separate JSON report. Should be integrated into the standard eval reports and visible on the site alongside regular results, showing per-tool impact scores.
+- **Redesign progress display** — Research `github.com/schollz/progressbar` or similar libraries for simplification. Redesign the layout to be section-based per eval instead of single updating lines that wrap. Proposed format:
+  ```
+  Prompt: <prompt-id>
+  Config: <config-name>
+  - Prompt Agent Status: <live updates> / ✅ Complete
+  - Grader Status:
+    - <grader-name>: Running / Passed / Failed
+    - <prompt-grader>:
+      - <reviewer-model>: <live status> / Passed: 1  Failed: 2
+  
+  Prompt: <prompt-2>
+  Config: <config-2>
+  - ...
+  ```
+  This avoids line wrapping and gives clear per-eval visibility into each phase.
+- **Enforce structured JSON responses from AI agents, remove `ExtractJSON()`** — Instead of parsing free-text responses with fragile JSON extraction, enforce that AI agents (prompt graders, summary/insights agent, trends agent) respond in a validated JSON format. Validate the response schema before closing the agent session — if malformed, pass validation errors back and ask the agent to fix. Once enforced, `ExtractJSON()` becomes unnecessary and can be removed.
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
