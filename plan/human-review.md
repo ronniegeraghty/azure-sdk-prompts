@@ -195,6 +195,11 @@
   - Yet another property matching implementation (`matchesProperties` in `slice.go`) duplicating `config/tool_filter.go` and `criteria/criteria.go`.
   - Report scanning (`scanReports`) duplicates report-loading logic from `comparison/`.
 - **Move trend visualization to the site, eliminate static HTML trend reports** — The site (`hyoka serve`) should be the primary interface for viewing trends, using the existing `/api/trends` endpoint and the React SPA for interactive charts/filtering. No need to regenerate static HTML trend reports every time. Keep Markdown generation as a portable fallback (for CI, sharing). The only "generation" step is the AI trends analysis agent, which should produce structured insights (summary, key insights, top issues) — not free-form text. This aligns with the broader direction: reports are data (JSON), the site is the viewer, markdown is the portable fallback, static HTML goes away.
+- **Prompt package observations:**
+  - Remove old flat frontmatter backward compatibility — all 89 prompt files already use the `properties:` format. Remove the migration logic in `rawToPrompt()` and the old flat fields from `rawFrontmatter`.
+  - Replace regex-based section extraction with a heading-aware splitter — instead of regex for `## Prompt` and `## Evaluation Criteria`, split the document at all `## ` boundaries into a `map[string]string` of heading → content. More robust against formatting variations, won't break on similar heading names in content, and easy to extend for new sections (e.g., `## Graders` for prompt-level grader config).
+  - `EvaluationCriteria` is currently extracted as raw text — needs automated parsing of individual criteria points (text following `-`) into separate grader entries per our earlier notes.
+  - `ExpectedTools` and `ExpectedPkgs` should become standardized graders in a `graders:` frontmatter section per our earlier notes.
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
