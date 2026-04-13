@@ -200,6 +200,15 @@
   - Replace regex-based section extraction with a heading-aware splitter — instead of regex for `## Prompt` and `## Evaluation Criteria`, split the document at all `## ` boundaries into a `map[string]string` of heading → content. More robust against formatting variations, won't break on similar heading names in content, and easy to extend for new sections (e.g., `## Graders` for prompt-level grader config).
   - `EvaluationCriteria` is currently extracted as raw text — needs automated parsing of individual criteria points (text following `-`) into separate grader entries per our earlier notes.
   - `ExpectedTools` and `ExpectedPkgs` should become standardized graders in a `graders:` frontmatter section per our earlier notes.
+- **Medium package observations:**
+  - **Remove `history/` package** — dead code. No command registered, nobody imports it. Was implemented but never wired up.
+  - **Remove `manifest/` package** — dead code. `hyoka manifest` command isn't registered in `root.go`. Remove package and any references.
+  - **Logging package is solid** — follows Go slog best practices. Only change: remove `ConsolidatorLogger` when AI consolidation is dropped.
+  - **Pairwise ToolImpact** — measures score impact of removing each tool. Results go into pairwise reports showing which tools matter most. Keep as-is, just move expansion call into `Engine.Run()` as noted.
+  - **Research progress display simplification** — current implementation is complex (ANSI escape codes, region tracking). Research Go best practices for terminal progress output — a simpler line-by-line approach or a lightweight library may be cleaner. The existing "log" mode already does simple output and may be sufficient as default.
+  - **Rerender package** — used to re-render reports with updated templates without re-running evals. Also handles schema migration. Will need updating when report structure changes.
+  - **`ExtractJSON()` in utils is fragile** — strips markdown code fences and finds first `{` to last `}`. Won't handle nested JSON with surrounding text. Less critical once we enforce structured JSON schemas with validation and retry, but should still be made more robust.
+  - **Validation should use schema-based approach** — currently validates against hardcoded value lists. Should validate prompts, criteria, and config files against defined schemas (e.g., JSON Schema or Go struct validation) so format updates don't require changing validation code. Should also validate criteria YAML files and config files, not just prompts.
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
