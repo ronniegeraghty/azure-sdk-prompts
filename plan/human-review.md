@@ -179,6 +179,12 @@
   - `summary_stats.go` duplicates comparison logic from `internal/comparison/` — already noted for unification.
   - `bounds.go` truncates oversized reports by cutting session events and tool results, which could lose diagnostic data silently. Should at minimum log a warning when truncation occurs and note it in the report.
   - `types.go` at 660 lines is overloaded — consider splitting data types, report building helpers, and schema migration into separate files.
+- **Redesign review package for new grader system** — The current `internal/review/` package needs a full rewrite/reorganization to support the unified grader system. Key changes:
+  - **AI Prompt Grader** — reviewer models still form a review panel, but each returns structured JSON for the criteria they evaluated. The tool validates the JSON format before closing the reviewer session — if malformed, passes validation errors back to the reviewer agent to fix. Whether criteria are evaluated all-at-once or individually, the tool collects results deterministically.
+  - **Deterministic voting** — no AI consolidation. The tool checks each criterion across all reviewer models: if ANY reviewer says it failed, it's failed. Reports show how each reviewer voted per criterion.
+  - **Summary & Insights agent** — after ALL graders (not just prompt graders) have finished, a new summarization agent reviews the complete results (what the prompt agent did, all grader outcomes) and produces a structured summary with: basic summary, key insights, and top issues. Response format should be extensible for future additions.
+  - **Package restructuring** — break into: prompt grader implementation (reusing `Grader` interface), and a new summary/insights agent. Keep useful patterns: `eventCollector` for session event capture, `averageReview()` majority-vote logic (adapted for deterministic voting), parallel model execution pattern.
+  - **Report updates needed** — the new grader results structure (per-criterion per-reviewer voting, summary/insights) will require updates to report types, HTML/MD rendering, and the site UI.
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
