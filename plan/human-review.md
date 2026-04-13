@@ -231,3 +231,26 @@
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
+- **Design a new logo for hyoka** — The current `>_` logo is generic. Design something more indicative of the name, the evaluation process, or the pairwise testing feature. Should work at small sizes (favicon) and large (homepage hero).
+- **Revise homepage content** — Review all text on the homepage to ensure: (1) nothing references features that don't exist, (2) nothing is specific to code generation or Azure SDK — hyoka should be presented as a general AI agent evaluation tool, (3) keep it simple and focused on getting users to the part of the site they need (dashboard, docs, runs). Remove or generalize the Azure-specific service badges and "AI Code Generation Quality" messaging.
+- **Rewrite "How It Works" page** — Multiple inaccuracies (see `screenshots/how-it-works.png`):
+  - Visual bug: timeline lines are visible going through the squares on the left side graphic — they shouldn't be visible
+  - Page specifically references code generation — should be general AI agent evaluation
+  - Build verification is listed as a pipeline stage but is no longer part of the flow — remove or present as an optional grader
+  - AI consolidation described in Stage 5 — being replaced with deterministic code-based voting
+  - The full timeline needs updating to match the new flow: Prompt → Agent Session → Graders → Summary/Insights → Reports
+  - Should explain what prompt files, config files, and criteria files do for the tool (not how to write them — link to docs for that)
+  - Should describe the grader system and available grader types
+- **Runs page improvements** (see `screenshots/runs-page.png`):
+  - Convert run timestamp into human-readable format (e.g., "April 9th, 2026 - 18:07:43") as the run name — don't show the raw timestamp ID as the title with a duplicate formatted date underneath
+  - Clarify the duration shown at the right of each run — should be total run time, not average
+  - (Stretch goal) Add filtering above the run list — property-based filters: choose a property (language, service, tag, etc.), choose operation (only, has, doesn't have), apply. Should be generic — not hardcoded to code-gen-specific properties
+- **Run detail page improvements** (see `screenshots/run-detail.png`):
+  - Replace status column with score column as the first column — color it red if not all criteria passed, green if all passed
+  - Don't truncate prompt names — show full prompt IDs
+  - Replace config name column with an inline representation of the agent environment — show tags for the model used and the tools available, rather than the long config name string
+  - Make the entire row clickable to navigate to the individual eval report — not just the small "View →" link
+  - Remove "Files" summary card — not relevant for non-code-gen prompts
+  - Add a prompt × config vs eval criteria matrix table — prompts × configs as columns, eval criteria as rows, cells show pass/fail. Gives a quick overview of which criteria are passing across configs
+  - Surface run-level analysis — after all evals complete, the summary/insights AI agent should produce a run-level summary (in addition to per-eval summaries). Show this on the run detail page. If pairwise analysis was run, show it here with appropriate charts/graphs/tables for tool impact results
+  - When complex filtering is implemented (stretch goal from runs page), use the same filter system here
