@@ -185,6 +185,16 @@
   - **Summary & Insights agent** — after ALL graders (not just prompt graders) have finished, a new summarization agent reviews the complete results (what the prompt agent did, all grader outcomes) and produces a structured summary with: basic summary, key insights, and top issues. Response format should be extensible for future additions.
   - **Package restructuring** — break into: prompt grader implementation (reusing `Grader` interface), and a new summary/insights agent. Keep useful patterns: `eventCollector` for session event capture, `averageReview()` majority-vote logic (adapted for deterministic voting), parallel model execution pattern.
   - **Report updates needed** — the new grader results structure (per-criterion per-reviewer voting, summary/insights) will require updates to report types, HTML/MD rendering, and the site UI.
+- **Serve package observations:**
+  - No caching layer — each API call reads and parses JSON files from disk. Will get slow with large report collections. Consider an in-memory index or lazy-loading cache.
+  - API endpoints will need updating when report structure changes for the new grader voting and summary/insights data.
+  - No authentication — fine for local use but should be documented as a security consideration for shared machines.
+- **Trends package observations:**
+  - HTML/Markdown rendering is 400+ lines of inline string concatenation — should use templates or be eliminated in favor of the site.
+  - AI analysis creates its own SDK client — same shared factory issue. Also returns free-form text instead of structured output (should align with the new summary/insights agent pattern).
+  - Yet another property matching implementation (`matchesProperties` in `slice.go`) duplicating `config/tool_filter.go` and `criteria/criteria.go`.
+  - Report scanning (`scanReports`) duplicates report-loading logic from `comparison/`.
+- **Move trend visualization to the site, eliminate static HTML trend reports** — The site (`hyoka serve`) should be the primary interface for viewing trends, using the existing `/api/trends` endpoint and the React SPA for interactive charts/filtering. No need to regenerate static HTML trend reports every time. Keep Markdown generation as a portable fallback (for CI, sharing). The only "generation" step is the AI trends analysis agent, which should produce structured insights (summary, key insights, top issues) — not free-form text. This aligns with the broader direction: reports are data (JSON), the site is the viewer, markdown is the portable fallback, static HTML goes away.
 
 # Live Site Review:
 Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, visit each page type, and capture feedback on layout, UX, data display, and functionality.
