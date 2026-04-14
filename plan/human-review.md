@@ -275,3 +275,23 @@ Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, vi
   - **Evaluation criteria are showing old general rubric** — "Code Builds", "Latest Package Versions", etc. are from the rubric we're removing. Should show prompt-specific and attribute-matched criteria from the grader system instead
   - **AI consolidation section** — "Consolidated Review" uses the old AI consolidation approach we're replacing with deterministic code-based voting. Remove and replace with the grader results table and summary/insights agent output
 - **Update site footer** — Currently says "Evaluate AI code generation quality for Azure SDKs." Should be changed to reflect hyoka as a general AI agent evaluation tool, not specific to code gen or Azure SDKs.
+- **Prompts page improvements** (see `screenshots/prompts-page.png`):
+  - Add filter for "only show prompts with evals" — turned on by default so users see evaluated prompts first, not the full list of 89
+  - Add ordering options: Most recently evaluated (default), Alphabetically, Best performing, Worst performing. Secondary sort is always alphabetical when ranks tie
+  - Remove current service/language/difficulty/plane dropdowns (they appear non-functional) — replace with the complex filtering system once ready
+  - The small sparkline/chart image under each prompt name is unreadable at this size — either make it larger and meaningful or remove it
+  - Make eval count more prominent on each card — currently small and easy to miss
+  - Make tags more visible on cards
+  - Consider showing prompt description (first sentence) on cards for easier scanning
+  - Show pass rate percentage more prominently
+- **Prompt detail page improvements** (see `screenshots/prompt-detail.png`):
+  - Show the prompt content (`## Prompt` text and `## Evaluation Criteria`) in a collapsible section at the top — users need to see what the prompt actually asks
+  - Replace colored dot badges in header with labeled badges (service, language, plane, etc.)
+  - Total runs, pass rate, and average duration summary cards are good — keep
+  - Remove the "Pass Rate by Config" bar chart — not useful with many pairwise variants
+  - **Score trend chart:** change x-axis to days instead of individual runs. Only show average score line — pass rate line just shows 100 or 0 most of the time so it's not useful
+  - **Pass Rate by Model:** should be by the prompt-attempting model specifically, not the whole config name. Show ALL models tested, not just top 3. Show best/worst callouts (already good)
+  - **Pass Rate by Tool:** should be by tools in the env (skills, MCPs, plugins), not built-in tools (bash, view, create). Add a toggle: "only show pass rate for runs where the tool was actually used" (skill invoked, MCP tool called, plugin used) vs just available. This reveals the difference between "available but unused" and "actually used"
+  - **Config representation:** in the eval list and config breakdown, show configs as prompt-attempt model + available tools tags instead of the long config name string. Show full config name on hover
+  - **Config breakdown table** — good, keep
+  - **(Stretch) Configurable comparison graph** — let users create custom groups to compare: e.g., "tool not available" vs "available but not used" vs "available and used". Enables ad-hoc analysis of tool impact beyond the built-in charts
