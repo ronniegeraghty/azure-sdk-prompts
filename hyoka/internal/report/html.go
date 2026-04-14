@@ -183,6 +183,14 @@ type ReportTemplateData struct {
 	FileCount      int
 	FileContents   map[string]string // filename → content for expandable display
 	BackPath       string            // relative path from report.html back to summary.html
+	ToolCallCounts []ToolCallCount   // per-tool call counts, sorted by count desc
+}
+
+// ToolCallCount pairs a tool (or skill) name with its invocation count.
+type ToolCallCount struct {
+	Name      string
+	Count     int
+	MCPServer string // non-empty if all calls went through the same MCP server
 }
 
 // ToolAction represents one tool invocation extracted from session events.
@@ -410,6 +418,40 @@ func buildReportData(r *EvalReport) *ReportTemplateData {
 			Content:  summary,
 		})
 	}
+
+	// Build per-tool call counts from ToolActions.
+	toolCounts := map[string]int{}
+	toolMCP := map[string]string{}
+	for _, ta := range d.ToolActions {
+		name := ta.ToolName
+		// Resolve generic "skill" tool calls to the actual skill name.
+		if name == "skill" {
+			if skillArg := extractJSONField(ta.Args, "skill"); skillArg != "" {
+				name = "skill: " + skillArg
+			}
+		}
+		toolCounts[name]++
+		if ta.MCPServer != "" {
+			if prev, ok := toolMCP[name]; !ok {
+				toolMCP[name] = ta.MCPServer
+			} else if prev != ta.MCPServer {
+				toolMCP[name] = "" // mixed servers
+			}
+		}
+	}
+	for name, count := range toolCounts {
+		d.ToolCallCounts = append(d.ToolCallCounts, ToolCallCount{
+			Name:      name,
+			Count:     count,
+			MCPServer: toolMCP[name],
+		})
+	}
+	sort.Slice(d.ToolCallCounts, func(i, j int) bool {
+		if d.ToolCallCounts[i].Count != d.ToolCallCounts[j].Count {
+			return d.ToolCallCounts[i].Count > d.ToolCallCounts[j].Count
+		}
+		return d.ToolCallCounts[i].Name < d.ToolCallCounts[j].Name
+	})
 
 	d.Reasoning = strings.Join(reasoningParts, "\n\n")
 	d.FinalReply = strings.Join(messageParts, "\n\n")
@@ -740,5 +782,3 @@ func htmlFuncMap() template.FuncMap {
 		},
 	}
 }
-
-
