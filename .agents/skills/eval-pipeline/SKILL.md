@@ -1,6 +1,6 @@
 ---
 name: "eval-pipeline"
-description: "How the eval engine works: generate → grade → report"
+description: "How the eval engine works: generate → grade → review → report"
 domain: "architecture"
 confidence: "high"
 source: "hyoka/internal/eval/engine.go, architecture.md"
@@ -64,7 +64,6 @@ The evaluation pipeline is the core workflow of hyoka. It orchestrates AI agent 
 
 **Error Handling:**
 - Generation timeout → captured as error in report, review skipped
-- Build failure → reported but review proceeds
 - Grader timeout → grader marked as timeout, engine continues
 - Single reviewer timeout → other reviewers still score
 
