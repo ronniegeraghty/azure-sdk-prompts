@@ -311,3 +311,11 @@ Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, vi
   - Remove "Tool Registry Design" doc (dead feature) and planning docs (cleanup-plan, eval-tool-plan) from the sidebar
   - Add search functionality to the sidebar for finding docs
   - Content will improve once Oracle audits and updates all docs per our earlier notes
+  - **Fix inconsistent code block rendering** — some code blocks (like Directory Layout) render differently from others (like CLI section). Investigate the markdown rendering for inconsistent syntax highlighting
+  - **Docs should focus on using the tool, not developing it** — remove developer-facing docs (Project Architecture, Contributing Guide) from the site docs. Replace Project Architecture with an "Introduction to hyoka" page explaining what the tool is and what it should be used for. Developer docs belong in `hyoka/README.md` and `CONTRIBUTING.md`
+  - **Add groupings/sections to the docs sidebar** — currently all docs are flat-listed. Group into logical sections:
+    - **Getting Started** — walkthrough: create your first prompt file, config file, criteria file, then run an eval
+    - **CLI Reference** — break into separate pages so commands with many options (like `run`) get their own page
+    - **Configuration** — config files, criteria files, prompt files, plugins/skills
+    - **Concepts** — guardrails, graders, pairwise testing, review panel
+  - This restructuring should happen alongside the Oracle docs audit
