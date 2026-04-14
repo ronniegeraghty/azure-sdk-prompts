@@ -984,3 +984,34 @@ This is the right end-state but it's a large architectural change. Phase it:
 3. Third: unify into one grading pipeline where AI review is one grader type.
 
 Trying to do it all at once risks destabilizing the eval engine.
+
+---
+
+## Cross-Reference: Additional Work Items (added during R-number mapping)
+
+These work items were created to cover R-points not captured by the original squad discussion:
+
+#### Trinity: WI-NEW-1: CI Pipeline Updates (R20)
+Add site build and test job to `.github/workflows/ci.yml` — currently only covers Go backend.
+
+#### Trinity: WI-NEW-2: Serve Package Updates (R133)
+Address serve package observations: caching layer for API calls, API endpoint updates for new grader data, document security considerations.
+
+#### Tank: WI-NEW-1: Repo Hygiene (R21, R22)
+Clean up legacy binary names in `.gitignore`, start tracking `.vscode/` in git.
+
+#### Tank: WI-NEW-2: File Exclusion Unification (R114)
+Merge `IsBuildArtifactDir()` and `--exclude-dirs` into one configurable system with a config-file-driven default ignore list.
+
+#### Tank: WI-NEW-3: Prompt Package Updates (R136)
+Address prompt package observations: remove old flat format backward compat, replace regex section extraction with heading-aware splitter, automated criteria parsing.
+
+#### Neo: WI-NEW-1: Comparison Unification (R63)
+Unify `internal/comparison/` and `report/summary_stats.go` into one comparison system. Auto-generate comparison data during multi-config runs. Make site the primary comparison interface.
+
+#### Neo: WI-NEW-2: Report Tool Usage Tracking (R82)
+Reports should show tools available during eval and which were actually used. Requires data from SDK events and session setup.
+
+#### Neo: WI-NEW-3: Real-time Guardrail Enforcement (R118)
+Enforce all guardrails (turns, files, output size) during the agent session via `OnEvent` callback, not just post-hoc. Cancel session immediately when any limit is hit.
+
