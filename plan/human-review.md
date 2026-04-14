@@ -314,8 +314,9 @@ Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, vi
   - **Fix inconsistent code block rendering** — some code blocks (like Directory Layout) render differently from others (like CLI section). Investigate the markdown rendering for inconsistent syntax highlighting
   - **Docs should focus on using the tool, not developing it** — remove developer-facing docs (Project Architecture, Contributing Guide) from the site docs. Replace Project Architecture with an "Introduction to hyoka" page explaining what the tool is and what it should be used for. Developer docs belong in `hyoka/README.md` and `CONTRIBUTING.md`
   - **Add groupings/sections to the docs sidebar** — currently all docs are flat-listed. Group into logical sections:
-    - **Getting Started** — walkthrough: create your first prompt file, config file, criteria file, then run an eval
+    - **Getting Started** — install docs (install command + `hyoka init`), then walkthrough: create your first prompt file, config file, criteria file, then run an eval
     - **CLI Reference** — break into separate pages so commands with many options (like `run`) get their own page
     - **Configuration** — config files, criteria files, prompt files, plugins/skills
     - **Concepts** — guardrails, graders, pairwise testing, review panel
+  - **Update nav buttons** — "Get Started" button (top right) should link to the Getting Started install docs on the site, not the GitHub repo. Add a separate "GitHub" button to the right of "Get Started" that links to the repo
   - This restructuring should happen alongside the Oracle docs audit
