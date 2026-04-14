@@ -293,7 +293,7 @@ function ReviewerTimeline({ reviewer }: { reviewer: ReviewPanelEntry }) {
 }
 
 export function EvalDetailPage() {
-  const { runId, promptId, configName } = useParams();
+  const { runId, promptId, "*": configName } = useParams();
   const [run, setRun] = useState<RunSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -318,7 +318,7 @@ export function EvalDetailPage() {
   }
 
   const decodedPromptId = decodeURIComponent(promptId || "");
-  const decodedConfigName = decodeURIComponent(configName || "");
+  const decodedConfigName = configName || "";
 
   const evalResult = run?.results?.find(
     (r: EvalResult) => r.prompt_id === decodedPromptId && r.config_name === decodedConfigName
