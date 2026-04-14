@@ -254,3 +254,24 @@ Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, vi
   - Add a prompt × config vs eval criteria matrix table — prompts × configs as columns, eval criteria as rows, cells show pass/fail. Gives a quick overview of which criteria are passing across configs
   - Surface run-level analysis — after all evals complete, the summary/insights AI agent should produce a run-level summary (in addition to per-eval summaries). Show this on the run detail page. If pairwise analysis was run, show it here with appropriate charts/graphs/tables for tool impact results
   - When complex filtering is implemented (stretch goal from runs page), use the same filter system here
+- **Eval detail page improvements** (see `screenshots/eval-detail.png`):
+  - Bug: clicking an eval from the run detail page produces a 404 — the route URL format (`/runs/:runId/eval/:promptId/:configName`) doesn't match how the run detail page constructs links. Fix routing.
+  - **Split environment into Env block and Run stats cards:**
+    - Env Block: prompt attempt model, list of tools available (tagged as skill/MCP/plugin — accent color if used, muted grey if not)
+    - Run stats as small cards (like the existing summary cards): input tokens, output tokens, eval total time, prompt attempt time, grader time, files generated (linked to scroll to files section), turns/actions
+  - **Replace eval criteria badges with a grader results table:**
+    - Each row: grader name, description (all graders should have a description property), pass/fail, reasoning/output from the grader
+    - For prompt graders: show individual reviewer model votes and reasoning per criterion. When a prompt grader evaluates multiple criteria, the review agent's response must include reasoning for each individual criterion
+    - Remove old general rubric criteria ("Code Builds", "Latest Package Versions") — show only actual grader results
+  - **Show summary/insights agent output above the grader results table** — the AI summary with key insights and top issues
+  - **Session timeline improvements:**
+    - The prompt attempting agent timeline looks good — keep the expandable turn-based layout
+    - Style the "show system events" toggle as a proper UI switch instead of default HTML checkbox
+  - **Reviewer timeline redesign:**
+    - Needs to support the new grader system: single session per model, individual sessions per criterion, or grouped sessions
+    - For each reviewer session, show: their summary, a criteria table with pass/fail and reasoning per criterion
+  - **Generated files section:**
+    - Files should be expandable to show their contents inline, not just listed as names
+  - **Evaluation criteria are showing old general rubric** — "Code Builds", "Latest Package Versions", etc. are from the rubric we're removing. Should show prompt-specific and attribute-matched criteria from the grader system instead
+  - **AI consolidation section** — "Consolidated Review" uses the old AI consolidation approach we're replacing with deterministic code-based voting. Remove and replace with the grader results table and summary/insights agent output
+- **Update site footer** — Currently says "Evaluate AI code generation quality for Azure SDKs." Should be changed to reflect hyoka as a general AI agent evaluation tool, not specific to code gen or Azure SDKs.
