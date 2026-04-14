@@ -24,7 +24,7 @@
 
 | ID | Title | Owner(s) | R-Points | Squad Source |
 |----|-------|----------|----------|--------------|
-| WI-001 | Backend Dead Code Removal — `internal/tools/`, `internal/build/`, `internal/history/`, `internal/manifest/` + `docs/tool-registry.md` + `examples/configs/example-registry.yaml` | Tank (lead) | R32, R87, R138, R139 | Oracle WI-9, Tank WI-4, Trinity WI-1, Neo WI-7 |
+| WI-001 | Backend Dead Code Removal — `internal/tools/`, `internal/build/`, `internal/history/`, `internal/manifest/` + `docs/tool-registry.md` + `examples/configs/example-registry.yaml` + audit `cmd/root.go` command registration for dead/unregistered commands | Tank (lead) | R32, R39, R87, R138, R139 | Oracle WI-9, Tank WI-4, Trinity WI-1, Neo WI-7 |
 | WI-002 | Site Dead Code Purge — 43 unused shadcn/ui components + `ImageWithFallback.tsx` | Trinity | R38 | Trinity WI-1 |
 | WI-003 | Skill Cleanup — Remove 8 skills, update `eval-pipeline`, fill `project-conventions`, consolidate `prompt-authoring` + `prompt-conventions` | Oracle | R1, R3, R5, R6, R7, R8, R9, R10, R11, R12, R13 | Oracle WI-1 |
 | WI-004 | `.copilot/` Directory Removal — delete entire directory (26 duplicate skills + redundant MCP config) | Oracle | R18 | Oracle WI-2 |
@@ -51,7 +51,7 @@
 | WI-015 | SDK Client Factory — shared `newHyokaClient()` replacing 5 duplicated `ClientOptions` constructions | Tank | R61, R71 | Tank WI-15 |
 | WI-016 | Path Resolution Unification — single `resolveAllPaths()` at top of `RunE` for prompts, configs, criteria, plugins, output | Tank | R52, R56, R58, R60, R64 | Tank WI-3 |
 | WI-017 | Criteria System Fix — auto-discovery of criteria dir, warning on empty, improve `resolveCriteriaDir()` | Neo | R15, R17 | Neo WI-1a |
-| WI-018 | Tool System Foundation — extract `internal/tool/` package, unify skill/MCP/plugin resolution | Neo | R49, R88, R91 | Neo WI-2a |
+| WI-018 | Tool System Foundation — extract `internal/tool/` package, unify skill/MCP/plugin resolution, verify local plugin + generator skill support end-to-end, resolve `when` filter gap for skill/MCP types (won't-fix: unified `tools` section handles it) | Neo | R29, R36, R49, R53, R80, R88, R91 | Neo WI-2a |
 
 ### Core Evaluation System
 
@@ -69,23 +69,23 @@
 | WI-028 | Remote MCP Server Support — add `ServerType`, `URL`, `SocketPath` fields to `ToolEntry` | Neo | R90 | Neo WI-2g |
 | WI-029 | Engine Refactoring — split `engine.go`, rename `CopilotEvaluator`, extract process management, build post-session context | Neo | R95, R96, R103, R104, R106, R108, R115, R116, R120, R121, R122, R124, R127, R128, R129 | Neo WI-3 |
 | WI-030 | Workspace Containment Hardening — fix bash containment, remove home-dir snapshot, SDK containment investigation | Neo | R98, R109, R110, R111, R112, R117 | Neo WI-4 |
-| WI-031 | SDK Session & Cleanup — simplify cleanup, test `Stop()` sufficiency, surface `DeleteSession` failures | Neo | R71, R99, R107, R113 | Neo WI-8 |
+| WI-031 | SDK Session & Cleanup — simplify cleanup, test `Stop()` sufficiency, surface `DeleteSession` failures as warnings (not debug), fix `isHyokaSession()` heuristic reliability, verify PID-based orphan detection checks process name before killing, consider moving session state to `~/.hyoka/sessions/` | Neo | R65, R71, R99, R107, R113 | Neo WI-8 |
 | WI-032 | Guardrail System — generator/reviewer tiers, real-time enforcement via `OnEvent`, configurable at all levels | Neo (lead), Tank | R79, R105, R118 | Neo WI-9, Tank WI-14, Neo WI-NEW-3 |
-| WI-033 | Report Tool Usage Tracking — show tools available vs. actually used (three states: configured → loaded → used) | Neo | R82 | Neo WI-NEW-2 |
+| WI-033 | Report Tool Usage Tracking — show tools available vs. actually used (three states: configured → loaded → used), update status to "loaded"/"failed" based on SDK event verification | Neo | R82, R117 | Neo WI-NEW-2 |
 | WI-034 | Comparison Unification — merge `internal/comparison/` and `report/summary_stats.go`, auto-generate during multi-config runs | Neo | R63 | Neo WI-NEW-1 |
 
 ### CLI & Config Improvements
 
 | ID | Title | Owner(s) | R-Points | Squad Source |
 |----|-------|----------|----------|--------------|
-| WI-035 | Validate Enhancement — criteria validation, prompt format detection, `new-prompt` fixes (`askFreeText` bug, `--prompts` flag, `properties:` format) | Tank | R64, R66, R67, R74, R75, R76 | Tank WI-7 |
+| WI-035 | Validate Enhancement — run `hyoka validate` across all 89 prompts to confirm format, add criteria validation, prompt format detection (old flat vs `properties:` map), `new-prompt` fixes (`askFreeText` bug, `--prompts` flag, `properties:` format) | Tank | R35, R64, R66, R67, R74, R75, R76 | Tank WI-7 |
 | WI-036 | List Enhancement — show configs + criteria, merge `hyoka configs` into `hyoka list --configs` | Tank | R62 | Tank WI-6 |
 | WI-037 | Plugins-to-Tools Rename — make `tools` primary, `plugins` alias | Tank | R78 | Tank WI-10 |
 | WI-038 | Init Enhancement — add `plugins/`, `--with-examples`, optional path argument | Tank | R86 | Tank WI-8 |
 | WI-039 | Progress Redesign — section-based per-eval format, research `progressbar` library | Tank | R51, R137, R141 | Tank WI-11 |
 | WI-040 | Help Text Audit — verify all `--help` output, generalize "Azure SDK" references | Tank (lead), Oracle | R43 | Tank WI-13, Oracle WI-13 |
 | WI-041 | File Exclusion Unification — merge `IsBuildArtifactDir()` + `--exclude-dirs` into config-driven system | Tank | R114 | Tank WI-NEW-2 |
-| WI-042 | Prompt Package Updates — remove flat format backward compat, heading-aware section splitter | Tank | R136, R199 | Tank WI-NEW-3 |
+| WI-042 | Prompt Package Updates — remove flat format backward compat, heading-aware section splitter | Tank | R136 | Tank WI-NEW-3 |
 
 ### Reports & Site
 
@@ -123,7 +123,7 @@
 
 | ID | Title | Owner | Prerequisites | R-Points | Size | Parallel Group |
 |----|-------|-------|---------------|----------|------|----------------|
-| WI-001 | Backend Dead Code Removal | Tank | None | R32, R87, R138, R139 | S | A |
+| WI-001 | Backend Dead Code Removal | Tank | None | R32, R39, R87, R138, R139 | S | A |
 | WI-002 | Site Dead Code Purge | Trinity | None | R38 | S | A |
 | WI-003 | Skill Cleanup | Oracle | None | R1, R3, R5–R13 | M | A |
 | WI-005 | Repo Hygiene | Tank | None | R21, R22 | S | A |
@@ -157,7 +157,7 @@
 | WI-015 | SDK Client Factory | Tank | None | R61, R71 | M | C |
 | WI-016 | Path Resolution Unification | Tank | None | R52, R56, R58, R60, R64 | L | C |
 | WI-017 | Criteria System Fix | Neo | None | R15, R17 | M | B |
-| WI-018 | Tool System Foundation | Neo | WI-001 ✅ | R49, R88, R91 | L | C |
+| WI-018 | Tool System Foundation | Neo | WI-001 ✅ | R29, R36, R49, R53, R80, R88, R91 | L | C |
 
 **Parallelism:**
 - **Tank:** WI-007 + WI-008 → WI-011 → WI-015 → WI-016
@@ -181,8 +181,8 @@
 | WI-021 | Rubric Removal | Neo, Oracle | WI-017 ✅, WI-020 ✅ | R19 | M | E |
 | WI-026 | Tool Caching & Isolation | Neo | WI-018 ✅ | R50, R54, R81, R89 | L | D |
 | WI-029 | Engine Refactoring | Neo | WI-017 ✅, WI-019 ✅ | R95, R96, R103–R108, R115–R116, R120–R122, R124, R127–R129 | XL | E |
-| WI-031 | SDK Session & Cleanup | Neo | WI-015 ✅ | R71, R99, R107, R113 | M | D |
-| WI-035 | Validate Enhancement | Tank | WI-016 ✅ | R64, R66, R67, R74–R76 | M | D |
+| WI-031 | SDK Session & Cleanup | Neo | WI-015 ✅ | R65, R71, R99, R107, R113 | M | D |
+| WI-035 | Validate Enhancement | Tank | WI-016 ✅ | R35, R64, R66, R67, R74–R76 | M | D |
 | WI-036 | List Enhancement | Tank | None | R62 | M | D |
 | WI-037 | Plugins-to-Tools Rename | Tank | WI-001 ✅ | R78 | S | D |
 | WI-038 | Init Enhancement | Tank | None | R86 | S | D |
@@ -213,7 +213,7 @@
 | WI-028 | Remote MCP Server Support | Neo | WI-018 ✅ | R90 | M | F |
 | WI-030 | Workspace Containment Hardening | Neo | WI-029 ✅ | R98, R109–R112, R117 | L | F |
 | WI-032 | Guardrail System | Neo, Tank | WI-019 ✅, WI-029 ✅ | R79, R105, R118 | L | G |
-| WI-033 | Report Tool Usage Tracking | Neo | WI-018 ✅ | R82 | M | F |
+| WI-033 | Report Tool Usage Tracking | Neo | WI-018 ✅ | R82, R117 | M | F |
 | WI-039 | Progress Redesign | Tank | WI-019 ✅ | R51, R137, R141 | L | F |
 | WI-040 | Help Text Audit | Tank, Oracle | WI-007 ✅ | R43 | M | F |
 | WI-041 | File Exclusion Unification | Tank | None | R114 | M | F |
@@ -434,7 +434,7 @@ This is shorter and Tank can work through it in parallel with Neo's grading work
 
 | Position | Advocate | Argument |
 |----------|----------|----------|
-| Remove immediately | R136, R199 | All 89 prompts already use `properties:` format |
+| Remove immediately | R136 | All 89 prompts already use `properties:` format |
 | Remove after validation confirms migration | Oracle | Verify claim first; silent breakage if wrong |
 
 **Blocks:** WI-042 (Phase 3)
@@ -541,17 +541,17 @@ Every R-point (R1–R155) mapped to at least one work item:
 | R26 | WI-012 |
 | R27 | WI-052 |
 | R28 | WI-052 |
-| R29 | WI-018, WI-026 |
+| R29 | WI-018 |
 | R30 | WI-053 |
 | R31 | WI-053 |
 | R32 | WI-001 |
 | R33 | WI-053 |
 | R34 | Verified working (Tank investigation) |
 | R35 | WI-035 |
-| R36 | WI-018, WI-026 |
+| R36 | WI-018 |
 | R37 | WI-023 |
 | R38 | WI-002 |
-| R39 | WI-007 |
+| R39 | WI-001 |
 | R40 | WI-056 |
 | R41 | WI-053 |
 | R42 | WI-010 |
@@ -561,7 +561,7 @@ Every R-point (R1–R155) mapped to at least one work item:
 | R46 | WI-007 |
 | R47 | WI-007 |
 | R48 | WI-007 |
-| R49 | WI-018, WI-026 |
+| R49 | WI-018 |
 | R50 | WI-026 |
 | R51 | WI-039 |
 | R52 | WI-016, WI-019 |
@@ -685,3 +685,70 @@ Every R-point (R1–R155) mapped to at least one work item:
 | 5 — Docs & Polish | 6 | 3–5 days | All docs current and accurate |
 | 6 — Stretch | 5 | Ongoing | Advanced features |
 | **Total** | **57 + 4 stretch** | **~25–35 working days** | |
+
+---
+
+## Audit Log
+
+*Audited by Morpheus — Strategic Lead*
+*Date: Final review pass against all 155 R-points*
+
+### Summary
+
+| Metric | Count |
+|--------|-------|
+| R-points checked | 155 / 155 |
+| Coverage gaps found & fixed | 7 |
+| Work items with detail added | 5 |
+| Cross-reference mismatches fixed | 8 |
+| Bogus R-point references removed | 1 (R199) |
+
+### Coverage Gaps Found & Fixed
+
+All 155 R-points were already present in the Section 6 coverage table, but 7 R-points were mapped in the coverage table without appearing in the corresponding work item's R-Points column. These have been added:
+
+| R-Point | Issue | Fix |
+|---------|-------|-----|
+| R39 | Coverage table mapped to WI-007 (Flag Cleanup) but R39 is about auditing `cmd/root.go` command registration — a dead code concern, not flag cleanup | Moved to WI-001 (Backend Dead Code Removal). Added to inventory table, Phase 0 table, and updated coverage table. |
+| R29 | Coverage mapped to WI-018, WI-026 but not in either's R-Points column. R29 (verify local plugin support) is a foundation concern. | Added to WI-018 (Tool System Foundation). Removed WI-026 from coverage mapping. |
+| R36 | Coverage mapped to WI-018, WI-026 but not in either's R-Points column. R36 (verify local generator skill support) is a foundation concern. | Added to WI-018 (Tool System Foundation). Removed WI-026 from coverage mapping. |
+| R53 | Coverage mapped to WI-018 but not in WI-018's R-Points column. R53 (local plugin path resolution) fits tool system foundation. | Added to WI-018. |
+| R80 | Coverage mapped to WI-018 but not in WI-018's R-Points column. R80 (`when` filter won't-fix, resolved by tool unification). | Added to WI-018 as a policy resolution note. |
+| R65 | Coverage mapped to WI-031 but not in WI-031's R-Points column. R65 (session cleanup reliability) has 4 critical sub-bullets. | Added to WI-031 (SDK Session & Cleanup). Updated WI-031 description with the 4 specific improvements from R65. |
+| R35 | Coverage mapped to WI-035 but not in WI-035's R-Points column. R35 (validate all prompt file formats). | Added to WI-035 (Validate Enhancement). |
+| R117 | Coverage mapped to WI-030, WI-033 but only in WI-030's R-Points. R117 (report tools as "loaded" not "configured"). | Added to WI-033 (Report Tool Usage Tracking). |
+
+### Cross-Reference Mismatches Fixed
+
+| Location | Issue | Fix |
+|----------|-------|-----|
+| WI-042 inventory table | Listed `R136, R199` — R199 does not exist (only R1–R155). Appears to be a line-number reference confused for an R-point. | Changed to `R136` only. |
+| WI-042 Phase 3 table | Already correctly listed `R136` only — no change needed. | Confirmed consistent. |
+| Decision 8 table | Referenced `R136, R199` in the "Remove immediately" row. | Changed to `R136` only. |
+| WI-007 / R39 | Coverage table mapped R39 → WI-007 but WI-007's R-Points didn't include R39 and the work doesn't match (flag cleanup ≠ command registration audit). | Remapped R39 → WI-001 in coverage table. Added R39 to WI-001 in all tables. |
+| WI-018 R-Points | Inventory listed R49, R88, R91 but coverage table mapped 4 additional R-points (R29, R36, R53, R80) to WI-018 without them appearing in the work item table. | Added all 4 to WI-018's R-Points in inventory and Phase 1 tables. |
+| WI-031 R-Points | Inventory listed R71, R99, R107, R113 but R65 was mapped to WI-031 in coverage without appearing in the work item table. | Added R65 to WI-031 in inventory and Phase 2 tables. |
+| WI-035 R-Points | Inventory listed R64, R66, R67, R74, R75, R76 but R35 was mapped to WI-035 in coverage without appearing in the work item table. | Added R35 to WI-035 in inventory and Phase 2 tables. |
+| WI-033 R-Points | Inventory listed R82 only but R117 was dual-mapped to WI-030, WI-033 in coverage. | Added R117 to WI-033 in inventory and Phase 3 tables. |
+
+### Work Items with Detail Added
+
+| Work Item | Detail Added |
+|-----------|-------------|
+| WI-001 | Added "audit `cmd/root.go` command registration for dead/unregistered commands" to description (from R39). |
+| WI-018 | Added "verify local plugin + generator skill support end-to-end, resolve `when` filter gap for skill/MCP types" to description (from R29, R36, R53, R80). |
+| WI-031 | Expanded description with all 4 session cleanup reliability improvements from R65: surface `DeleteSession` failures as warnings, fix `isHyokaSession()` heuristic reliability, verify PID-based orphan detection checks process name, consider moving to `~/.hyoka/sessions/`. |
+| WI-033 | Added "update status to 'loaded'/'failed' based on SDK event verification" to description (from R117). |
+| WI-035 | Added "run `hyoka validate` across all 89 prompts to confirm format" to description (from R35). |
+
+### R-Points Correctly Handled Without Work Items
+
+| R-Point | Status | Reason |
+|---------|--------|--------|
+| R2 | Awareness note | "Ensure Tank knows about `cli-patterns` skill" — not actionable work, noted in WI-003 coverage as awareness. |
+| R34 | Verified working | Tank investigation confirmed prompt discovery handles deep nesting. No work needed. |
+| R77 | Phase 6 stretch | Configurable prompt directory structure (`--flat` flag for `new-prompt`). Listed as unnamed stretch goal. |
+
+### Remaining Issues
+
+None. All 155 R-points are now covered by at least one work item (or documented as verified/stretch/awareness). All work item R-Points columns are consistent with the coverage table. All bogus references (R199) have been removed.
