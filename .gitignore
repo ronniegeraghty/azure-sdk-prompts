@@ -1,12 +1,7 @@
 # Go
-/tool/sdk-eval
-/tool/sdk-eval.exe
-/tool/azsdk-prompt-eval
-/tool/azsdk-prompt-eval.exe
 bin/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -42,9 +37,6 @@ site/node_modules/
 
 # Site build output (embedded copy lives in hyoka/internal/serve/site/)
 site/dist/
-
-# Built binary
-/hyoka/azsdk-prompt-eval
 # Squad: ignore runtime state (logs, inbox, sessions)
 .squad/orchestration-log/
 .squad/log/
