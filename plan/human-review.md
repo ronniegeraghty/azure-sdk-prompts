@@ -299,3 +299,15 @@ Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, vi
   - Top Helpers/Hurters/Neutral cards, Tool Contribution chart, and Tool × Prompt Heatmap are all good — keep
   - **Clarify how tool impact scores are calculated** — add an explanation (tooltip or info section) showing the methodology: is it based on graders that pass/fail when the tool is available vs removed? Does grader weight factor in? Users need to understand what the numbers mean
   - **Add tool usage frequency chart** — show how often each tool is actually used when available across prompts. Break down into three states: not available, available but not used, available and used. Show how eval scores change across these three states. This reveals whether just having a tool available (even unused) affects outcomes vs actually invoking it
+- **Redesign Compare page as configurable comparison tool** — Replace the current simple Config A vs Config B comparison with a flexible group-based comparison system (inspired by devex-reviews site's insights page at `/home/rgeraghty/projects/coreai-microsoft/devex-reviews/site`). Key features:
+  - **Comparison groups** — users create named groups by filtering evals on any property: prompt, config, prompt-attempt model, tools available, language, service, tags, etc. Each group gets a color for chart series
+  - **Group builder UI** — builds a catalogue from actual eval data (available models, tools, properties) and lets users select filters to define each group
+  - **Configurable charts** — users choose which visualizations to add to the page: prompt comparison table, config comparison table, score distribution, trend charts, etc. depending on what they're comparing
+  - **Persist groups** — save group configurations to localStorage so they survive page refreshes
+  - Take a first pass at this and refine after prototyping. Reference: `devex-reviews/site/src/lib/comparison-groups.ts` for the group model and `devex-reviews/site/src/components/insights/GroupBuilder.tsx` for the UI pattern
+- **Dashboard page needs real data and rethinking** — Currently shows entirely mock/hardcoded data (1,247 evaluations, GPT-4o, Claude 3.5 models that don't match our configs). Must be connected to real report data. The radar chart comparing models across criteria won't work since we no longer have default criteria that are always tested. Need to rethink what visualizations make sense for the new grader system data. The AI-Generated Insights section is the right idea — matches our summary/insights agent concept. Consider whether this page should be a "global overview" aggregating across all runs, or consolidated into the runs/compare pages.
+- **Docs page observations:**
+  - Sidebar navigation and markdown rendering work well — keep the design
+  - Remove "Tool Registry Design" doc (dead feature) and planning docs (cleanup-plan, eval-tool-plan) from the sidebar
+  - Add search functionality to the sidebar for finding docs
+  - Content will improve once Oracle audits and updates all docs per our earlier notes
