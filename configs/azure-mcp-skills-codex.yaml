@@ -1,15 +1,20 @@
-# Azure MCP with Claude Sonnet 4.5 — Azure MCP server attached
+# Azure MCP with GPT 5.3 Codex — Azure MCP server attached
 configs:
-  - name: azure-mcp/claude-sonnet-4.5
-    description: "Azure MCP — Claude Sonnet 4.5"
+  - name: azure-mcp-skills/gpt-5.3-codex
+    description: "Azure MCP — GPT 5.3 Codex"
     generator:
-      model: "claude-sonnet-4.5"
+      model: "gpt-5.3-codex"
       tools:
         - name: azure
           type: mcp
           command: npx
           args: ["-y", "@azure/mcp@latest", "server", "start"]
           mcp_tools: ["*"]
+        - name: generator-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/generator"
     reviewer:
       models:
         - "claude-opus-4.6"

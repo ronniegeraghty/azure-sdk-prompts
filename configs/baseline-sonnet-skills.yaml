@@ -1,12 +1,18 @@
-# Baseline with Claude Sonnet 4.5 + generator skills — no MCP servers
-# Tests the impact of azure-sdk-java plugin skills on code generation quality.
-# Skills installed via: /plugin install azure-sdk-java@skills
-# The plugins field auto-resolves to ~/.copilot/installed-plugins/skills/azure-sdk-java/skills/
+# Baseline with Claude Sonnet 4.5 + SDK skills — no MCP servers
+# Uses installed Copilot CLI plugin skills for code generation guidance.
+# Install plugins: /plugin install azure-sdk-java@skills
+# Missing plugins are skipped gracefully with a warning.
 configs:
   - name: baseline-skills/claude-sonnet-4.5
-    description: "Baseline + Skills — Claude Sonnet 4.5 with azure-sdk-java generator skills"
+    description: "Baseline + Skills — Claude Sonnet 4.5 with SDK plugin skills"
     generator:
       model: "claude-sonnet-4.5"
+      tools:
+        - name: generator-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/generator"
     reviewer:
       models:
         - "claude-opus-4.6"
@@ -16,6 +22,11 @@ configs:
         - name: reviewer-skills
           type: skill
           source: local
+          skill_dir: true
           path: "./skills/reviewer"
     plugins:
       - "azure-sdk-java@skills"
+      - "azure-sdk-python@skills"
+      - "azure-sdk-dotnet@skills"
+      - "azure-sdk-typescript@skills"
+      - "azure-sdk-rust@skills"

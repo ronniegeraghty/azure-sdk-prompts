@@ -1,8 +1,8 @@
 package eval
 
 import (
-	"github.com/ronniegeraghty/hyoka/internal/graders"
-	"github.com/ronniegeraghty/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 // maxActionFieldLen is the maximum length for truncated input/output fields.
@@ -12,22 +12,24 @@ const maxActionFieldLen = 512
 type ActionEvent struct {
 	Sequence   int     `json:"sequence"`              // ordinal position in the timeline
 	Type       string  `json:"type"`                  // classified action type
-	Tool       string  `json:"tool,omitempty"`         // tool name (for tool_call, file_read, file_write, bash)
-	Action     string  `json:"action,omitempty"`       // sub-action (e.g., "start", "complete")
-	Path       string  `json:"path,omitempty"`         // file path when applicable
-	Input      string  `json:"input,omitempty"`        // truncated tool arguments
-	Output     string  `json:"output,omitempty"`       // truncated tool result
-	Error      string  `json:"error,omitempty"`        // error message if failed
-	Success    *bool   `json:"success,omitempty"`      // tool execution success
-	DurationMs float64 `json:"duration_ms,omitempty"`  // duration in milliseconds
-	TurnNumber int     `json:"turn_number,omitempty"`  // assistant turn number
-	MCPServer  string  `json:"mcp_server,omitempty"`   // MCP server name
+	Tool       string  `json:"tool,omitempty"`        // tool name (for tool_call, file_read, file_write, bash)
+	Action     string  `json:"action,omitempty"`      // sub-action (e.g., "start", "complete")
+	Path       string  `json:"path,omitempty"`        // file path when applicable
+	Input      string  `json:"input,omitempty"`       // truncated tool arguments
+	Output     string  `json:"output,omitempty"`      // truncated tool result
+	Error      string  `json:"error,omitempty"`       // error message if failed
+	Success    *bool   `json:"success,omitempty"`     // tool execution success
+	DurationMs float64 `json:"duration_ms,omitempty"` // duration in milliseconds
+	TurnNumber int     `json:"turn_number,omitempty"` // assistant turn number
+	MCPServer  string  `json:"mcp_server,omitempty"`  // MCP server name
 }
 
 // ActionSummary holds aggregate statistics about the action timeline.
 type ActionSummary struct {
 	TotalEvents     int            `json:"total_events"`
 	TotalTurns      int            `json:"total_turns"`
+	TotalActions    int            `json:"total_actions"`
+	TotalToolCalls  int            `json:"total_tool_calls"`
 	ToolCalls       int            `json:"tool_calls"`
 	FileReads       int            `json:"file_reads"`
 	FileWrites      int            `json:"file_writes"`
@@ -36,6 +38,8 @@ type ActionSummary struct {
 	Errors          int            `json:"errors"`
 	ToolBreakdown   map[string]int `json:"tool_breakdown"`
 	TotalDurationMs float64        `json:"total_duration_ms,omitempty"`
+	ToolSuccesses   int            `json:"tool_successes"`
+	ToolFailures    int            `json:"tool_failures"`
 }
 
 // ActionTimeline holds an ordered sequence of ActionEvents with summary stats.
@@ -233,9 +237,16 @@ func computeSummary(events []ActionEvent) ActionSummary {
 	}
 
 	turnsSeen := make(map[int]bool)
+	actionEvents := 0 // non-tool actions: reasoning, message, intent, turn start/end
 	for _, ev := range events {
 		if ev.TurnNumber > 0 {
 			turnsSeen[ev.TurnNumber] = true
+		}
+
+		// Count non-tool action events
+		switch ev.Type {
+		case "reasoning", "message", "intent", "turn_start", "turn_end":
+			actionEvents++
 		}
 
 		switch ev.Type {
@@ -280,6 +291,15 @@ func computeSummary(events []ActionEvent) ActionSummary {
 			s.Errors++
 		}
 
+		// Track tool success/failure from "complete" events
+		if ev.Action == "complete" && ev.Success != nil {
+			if *ev.Success {
+				s.ToolSuccesses++
+			} else {
+				s.ToolFailures++
+			}
+		}
+
 		// Sum durations from "complete" events only to avoid double-counting
 		if ev.DurationMs > 0 && ev.Action == "complete" {
 			s.TotalDurationMs += ev.DurationMs
@@ -287,6 +307,10 @@ func computeSummary(events []ActionEvent) ActionSummary {
 	}
 
 	s.TotalTurns = len(turnsSeen)
+	// TotalToolCalls = all tool-related "start" events
+	s.TotalToolCalls = s.ToolCalls + s.FileReads + s.FileWrites + s.BashCommands + s.MCPCalls
+	// TotalActions = tool calls + reasoning + messages + intents + turn boundaries
+	s.TotalActions = s.TotalToolCalls + actionEvents
 	return s
 }
 
@@ -333,6 +357,8 @@ func (tl *ActionTimeline) ToReport() *report.ActionTimelineReport {
 		Summary: report.ActionSummaryReport{
 			TotalEvents:     tl.Summary.TotalEvents,
 			TotalTurns:      tl.Summary.TotalTurns,
+			TotalActions:    tl.Summary.TotalActions,
+			TotalToolCalls:  tl.Summary.TotalToolCalls,
 			ToolCalls:       tl.Summary.ToolCalls,
 			FileReads:       tl.Summary.FileReads,
 			FileWrites:      tl.Summary.FileWrites,
@@ -341,6 +367,8 @@ func (tl *ActionTimeline) ToReport() *report.ActionTimelineReport {
 			Errors:          tl.Summary.Errors,
 			ToolBreakdown:   tl.Summary.ToolBreakdown,
 			TotalDurationMs: tl.Summary.TotalDurationMs,
+			ToolSuccesses:   tl.Summary.ToolSuccesses,
+			ToolFailures:    tl.Summary.ToolFailures,
 		},
 	}
 	for i, ev := range tl.Events {

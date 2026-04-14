@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/utils"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
 // EvalWorkspacePrefix is the directory name prefix used for isolated evaluation
@@ -351,17 +351,17 @@ var codeFileExts = map[string]bool{
 // deleted when recovering misplaced files. Covers all supported languages.
 var DefaultIgnoreDirs = map[string]bool{
 	// JavaScript / TypeScript
-	"node_modules":    true,
+	"node_modules":     true,
 	"bower_components": true,
-	".next":           true,
-	".nuxt":           true,
+	".next":            true,
+	".nuxt":            true,
 	// Python
-	"__pycache__":  true,
-	"venv":         true,
-	".venv":        true,
-	"env":          true,
-	".tox":         true,
-	".eggs":        true,
+	"__pycache__":   true,
+	"venv":          true,
+	".venv":         true,
+	"env":           true,
+	".tox":          true,
+	".eggs":         true,
 	"site-packages": true,
 	// Rust
 	"target": true,

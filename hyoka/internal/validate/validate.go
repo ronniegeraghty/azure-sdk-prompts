@@ -8,7 +8,7 @@ import (
 "sort"
 "strings"
 
-"github.com/ronniegeraghty/hyoka/internal/prompt"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
 
 // ValidServices is the canonical list of valid service values.

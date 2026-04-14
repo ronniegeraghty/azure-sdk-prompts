@@ -40,6 +40,9 @@ skills-lock.json
 # Node modules
 site/node_modules/
 
+# Site build output (embedded copy lives in hyoka/internal/serve/site/)
+site/dist/
+
 # Built binary
 /hyoka/azsdk-prompt-eval
 # Squad: ignore runtime state (logs, inbox, sessions)

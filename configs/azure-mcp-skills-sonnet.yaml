@@ -1,6 +1,6 @@
 # Azure MCP with Claude Sonnet 4.5 — Azure MCP server attached
 configs:
-  - name: azure-mcp/claude-sonnet-4.5
+  - name: azure-mcp-skills/claude-sonnet-4.5
     description: "Azure MCP — Claude Sonnet 4.5"
     generator:
       model: "claude-sonnet-4.5"
@@ -10,6 +10,11 @@ configs:
           command: npx
           args: ["-y", "@azure/mcp@latest", "server", "start"]
           mcp_tools: ["*"]
+        - name: generator-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/generator"
     reviewer:
       models:
         - "claude-opus-4.6"

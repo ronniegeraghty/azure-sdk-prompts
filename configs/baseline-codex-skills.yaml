@@ -1,9 +1,15 @@
 # Baseline with GPT 5.3 Codex — no MCP servers, no skills
 configs:
-  - name: baseline/gpt-5.3-codex
+  - name: baseline-skills/gpt-5.3-codex
     description: "Baseline — raw Copilot with GPT 5.3 Codex"
     generator:
       model: "gpt-5.3-codex"
+      tools:
+        - name: generator-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/generator"
     reviewer:
       models:
         - "claude-opus-4.6"

@@ -4,7 +4,7 @@ import (
 "fmt"
 "strings"
 
-"github.com/ronniegeraghty/hyoka/internal/clean"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/clean"
 "github.com/spf13/cobra"
 )
 

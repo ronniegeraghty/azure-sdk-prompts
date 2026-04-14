@@ -15,15 +15,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ronniegeraghty/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/internal/criteria"
-	"github.com/ronniegeraghty/hyoka/internal/graders"
-	"github.com/ronniegeraghty/hyoka/internal/logging"
-	"github.com/ronniegeraghty/hyoka/internal/pairwise"
-	"github.com/ronniegeraghty/hyoka/internal/progress"
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/report"
-	"github.com/ronniegeraghty/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // EvalResult holds the raw output from a Copilot evaluation.
@@ -821,11 +822,12 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	genStart := time.Now()
 	result, err := e.evaluator.Evaluate(genCtx, task.Prompt, &task.Config, genDir)
-	genCancel() // release generation context immediately
+	genCtxErr := genCtx.Err() // capture before cancel to distinguish real cancellation from cleanup
+	genCancel()               // release generation context immediately
 	evalReport.GenerationDuration = time.Since(genStart).Seconds()
 	evalFailed := err != nil
 	if evalFailed {
-		if genCtx.Err() == context.Canceled {
+		if genCtxErr == context.Canceled {
 			evalReport.Error = "generation cancelled (action limit reached)"
 			evalReport.ErrorDetails = "context cancelled — the session exceeded the --max-session-actions limit"
 			evalReport.ErrorCategory = "timeout"
@@ -951,13 +953,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Per-phase generation duration already captured above (evalReport.GenerationDuration).
 	// Overall Duration is set at the end of the function after all phases complete.
 
-	// Populate environment info from config and captured events
+	// Populate environment info from config and captured events.
+	// Use ResolveSkillDirs for accurate directory resolution (#291).
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		for _, entry := range task.Config.Generator.Tools {
-			if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-				skillDirectories = append(skillDirectories, entry.Path)
-			}
+		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, "")
+		if err != nil {
+			slog.Warn("Failed to resolve skill directories for report", "error", err)
+		} else {
+			skillDirectories = resolved
 		}
 	}
 	// Resolve tools for reporting — mirrors the resolution in buildSessionConfig.
@@ -1404,7 +1408,52 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 	summary.TotalPrompts = len(promptIDs)
 	summary.TotalConfigs = len(configNames)
 
+	// Validate skill directories for each unique config (#291).
+	// This surfaces warnings about empty/missing skill dirs during dry run.
+	validatedConfigs := make(map[string]bool)
+	for _, t := range tasks {
+		if validatedConfigs[t.Config.Name] {
+			continue
+		}
+		validatedConfigs[t.Config.Name] = true
+		if t.Config.Generator != nil {
+			entries := countSkillEntries(t.Config.Generator.Tools)
+			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, "")
+			if err != nil {
+				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
+				continue
+			}
+			count := skills.CountSkills(resolved)
+			if entries > 0 {
+				e.printf("   Config %q: %d generator dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
+			}
+		}
+		if t.Config.Reviewer != nil {
+			entries := countSkillEntries(t.Config.Reviewer.Tools)
+			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, "")
+			if err != nil {
+				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
+				continue
+			}
+			count := skills.CountSkills(resolved)
+			if entries > 0 {
+				e.printf("   Config %q: %d reviewer dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
+			}
+		}
+	}
+
 	return summary, nil
+}
+
+// countSkillEntries counts how many ToolEntries in the list are skills.
+func countSkillEntries(entries []config.ToolEntry) int {
+	n := 0
+	for _, e := range entries {
+		if e.ResolvedType() == "skill" {
+			n++
+		}
+	}
+	return n
 }
 
 func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseReport, []pairwise.ToolImpact) {

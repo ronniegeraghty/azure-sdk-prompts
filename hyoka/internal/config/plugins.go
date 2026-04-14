@@ -3,7 +3,7 @@ package config
 import (
 	"log/slog"
 
-	"github.com/ronniegeraghty/hyoka/internal/plugin"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 )
 
 // ExpandPlugins loads plugins from dir and appends their tool entries to configs.
@@ -29,19 +29,41 @@ func (cf *ConfigFile) ExpandPlugins(dir string) error {
 }
 
 // ExpandPlugins appends plugin-derived tool entries to generator/reviewer tools.
+// It first checks the plugin registry (plugins/ directory), then falls back to
+// resolving installed Copilot CLI plugins from ~/.copilot/installed-plugins/.
+// Missing plugins are logged as warnings and skipped — this allows configs that
+// reference optional plugins to load gracefully for contributors who don't have
+// them installed.
 func (c *ToolConfig) ExpandPlugins(reg *plugin.Registry) error {
-	if reg == nil || len(c.Plugins) == 0 {
+	if len(c.Plugins) == 0 {
 		return nil
 	}
 	var entries []ToolEntry
 	for _, name := range c.Plugins {
-		p, err := reg.Get(name)
-		if err != nil {
-			return err
+		// Try plugin registry first (plugins/ directory YAML definitions)
+		if reg != nil {
+			if p, err := reg.Get(name); err == nil {
+				for _, entry := range p.ToToolEntries() {
+					entries = append(entries, convertPluginToolEntry(entry))
+				}
+				continue
+			}
 		}
-		for _, entry := range p.ToToolEntries() {
-			entries = append(entries, convertPluginToolEntry(entry))
+		// Fall back to installed Copilot CLI plugins (~/.copilot/installed-plugins/)
+		if dir := resolveInstalledPlugin(name); dir != "" {
+			entries = append(entries, ToolEntry{
+				Name:   name,
+				Type:   "skill",
+				Source: "local",
+				Path:   dir,
+			})
+			slog.Info("Resolved plugin from installed Copilot CLI plugins", "plugin", name, "path", dir)
+			continue
 		}
+		slog.Warn("Plugin not found, skipping",
+			"plugin", name,
+			"config", c.Name,
+			"hint", "Install with: /plugin install "+name)
 	}
 	if len(entries) == 0 {
 		return nil

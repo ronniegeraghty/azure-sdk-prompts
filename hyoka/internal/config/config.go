@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/plugin"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 	"gopkg.in/yaml.v3"
 )
 
@@ -371,7 +371,10 @@ func InstallSkillsAndPlugins(configs []ToolConfig) error {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("installing %s %q: %w", e.kind, e.value, err)
+			slog.Warn("Failed to install plugin, skipping",
+				"plugin", e.value,
+				"error", err,
+				"hint", "Install manually with: /plugin install "+e.value)
 		}
 	}
 
