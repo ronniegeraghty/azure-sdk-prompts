@@ -1,0 +1,69 @@
+when:
+  language: java
+graders:
+  - name: Correct Dependencies (com.azure, not com.microsoft.azure)
+    weight: 1.0
+    prompt: >
+      Uses com.azure group ID for all Azure SDK packages. No com.microsoft.azure
+      (legacy SDK) dependencies. Includes azure-identity for authentication.
+  - name: Azure SDK BOM for Version Management
+    weight: 1.0
+    prompt: >
+      Uses azure-sdk-bom in dependencyManagement to manage Azure SDK versions
+      instead of hardcoding individual artifact versions. Dependencies should
+      omit <version> tags when managed by the BOM.
+  - name: Correct Imports (no legacy, no internal packages)
+    weight: 1.0
+    prompt: >
+      All imports use com.azure.* packages. No com.microsoft.azure.* (legacy)
+      or com.azure.*.implementation.* (internal API) imports.
+  - name: DefaultAzureCredential Authentication
+    weight: 1.0
+    prompt: >
+      Uses DefaultAzureCredential or another com.azure.identity credential.
+      No hardcoded connection strings, account keys, SAS tokens, or secrets.
+  - name: Client Builder Pattern
+    weight: 1.0
+    prompt: >
+      SDK clients constructed using *ClientBuilder classes with .endpoint()
+      or .vaultUrl() and .credential(). No legacy constructors
+      (CloudStorageAccount, DocumentClient, KeyVaultClient).
+  - name: No Deprecated/Legacy Classes
+    weight: 1.0
+    prompt: >
+      No deprecated classes from the old SDK (CloudStorageAccount,
+      CloudBlobClient, DocumentClient, QueueClient, ApplicationTokenCredentials,
+      MSICredentials, ConnectionStringBuilder).
+  - name: Pagination (PagedIterable/PagedFlux)
+    weight: 1.0
+    prompt: >
+      List/query operations return PagedIterable (sync) or PagedFlux (async).
+      Does not flatten all pages into a raw List or Stream in memory.
+  - name: LRO Pattern (SyncPoller/PollerFlux)
+    weight: 1.0
+    prompt: >
+      Long-running operations use SyncPoller (sync) or PollerFlux (async)
+      with begin* method prefix. No Thread.sleep() polling loops.
+  - name: Async Uses Project Reactor (Mono/Flux)
+    weight: 1.0
+    prompt: >
+      Async code uses Project Reactor types (Mono, Flux). Not CompletableFuture
+      (wrong), not RxJava (wrong), not sync wrapped in ExecutorService.
+      No .block() inside async service implementations.
+  - name: Service-Specific Exception Handling
+    weight: 1.0
+    prompt: >
+      Catches service-specific exceptions (BlobStorageException, CosmosException,
+      ServiceBusException, HttpResponseException) with status code inspection.
+      Not just generic Exception catches.
+  - name: Code Compiles (mvn compile / gradle compileJava)
+    weight: 1.0
+    prompt: >
+      The generated code compiles without errors. Attempt build verification
+      if build tools are available.
+  - name: Try-With-Resources for Clients
+    weight: 1.0
+    prompt: >
+      All Azure SDK client instances that implement AutoCloseable
+      are used within try-with-resources blocks or explicitly closed
+      in a finally block.
