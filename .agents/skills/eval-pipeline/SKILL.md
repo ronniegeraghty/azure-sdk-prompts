@@ -22,15 +22,7 @@ The evaluation pipeline is the core workflow of hyoka. It orchestrates AI agent 
   - Captures all tool calls, file reads/writes, and stdout
 - **Output:** Generated code + action timeline
 
-### 2. Build Verification Phase (optional)
-- **Input:** Generated code
-- **Process:**
-  - Runs language-specific build command (e.g., `cargo build` for Rust)
-  - Collects stderr/stdout for report
-  - Marks success/failure
-- **Output:** Build status + logs
-
-### 3. Grading Phase
+### 2. Grading Phase
 - **Input:** Generated code + action timeline + config
 - **Process:**
   - Runs 6 pluggable grader types independently
@@ -38,8 +30,8 @@ The evaluation pipeline is the core workflow of hyoka. It orchestrates AI agent 
   - Collects all grader results
 - **Output:** Grader scores (pass/fail + numeric score per grader)
 
-### 4. Review Panel Phase
-- **Input:** Generated code + build status
+### 3. Review Panel Phase
+- **Input:** Generated code
 - **Process:**
   - Launches N reviewer sessions (one per reviewer model in config)
   - Sends code + rubric to each reviewer independently
@@ -47,7 +39,7 @@ The evaluation pipeline is the core workflow of hyoka. It orchestrates AI agent 
   - Consolidator model merges individual reviews → consensus score
 - **Output:** Panel scores + individual reviewer insights
 
-### 5. Report Generation Phase
+### 4. Report Generation Phase
 - **Input:** All phase outputs + metadata
 - **Process:**
   - Renders JSON report with full timeline

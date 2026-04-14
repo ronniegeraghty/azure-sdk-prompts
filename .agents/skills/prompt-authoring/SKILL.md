@@ -1,11 +1,14 @@
 ---
 name: prompt-authoring
-description: Expert guidance for authoring evaluation prompts for hyoka, the Azure SDK Prompt Evaluation Tool. Use when creating, reviewing, or improving .prompt.md files that test AI agent code generation quality.
+description: "Expert guidance for authoring and maintaining .prompt.md evaluation files for hyoka. Covers frontmatter formats, file structure, filtering, and best practices."
+domain: "content"
+confidence: "high"
+source: "hyoka/internal/prompt/types.go, hyoka/internal/prompt/parser.go, prompts/"
 ---
 
 # Prompt Authoring Skill
 
-You are an expert at authoring evaluation prompts for the **Azure SDK Prompt Evaluation Tool** (`hyoka`). You help users create well-structured `.prompt.md` files that test AI agent code generation quality.
+Expert guidance for authoring evaluation prompts for **hyoka**, the Azure SDK Prompt Evaluation Tool. Covers `.prompt.md` file format, frontmatter conventions, and tool filtering.
 
 ## Prompt File Format
 
@@ -14,11 +17,62 @@ Each prompt is a Markdown file with YAML frontmatter. Files live at:
 prompts/{service}/{plane}/{language}/{slug}.prompt.md
 ```
 
-### Frontmatter Schema
+## Frontmatter Formats
+
+The parser accepts two frontmatter layouts. **Nested `properties:` is the current convention.**
+
+### Nested Format (preferred)
+
+Metadata lives inside a `properties:` map. The `Prompt` struct stores all values in `Properties map[string]string`.
+
+```yaml
+---
+id: identity-dp-python-default-credential
+properties:
+  service: identity
+  plane: data-plane
+  language: python
+  category: auth
+  difficulty: basic
+  description: "Can a developer set up DefaultAzureCredential?"
+  sdk_package: azure-identity
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/identity-readme
+  created: "2025-07-28"
+  author: ronniegeraghty
+tags:
+  - authentication
+  - getting-started
+---
+```
+
+### Flat Format (legacy, still supported)
+
+Older prompts may use top-level fields. The parser auto-migrates them into the `Properties` map at load time.
+
+```yaml
+---
+id: storage-dp-dotnet-auth
+service: storage
+plane: data-plane
+language: dotnet
+category: authentication
+difficulty: basic
+description: "Authenticate to Azure Blob Storage"
+sdk_package: Azure.Storage.Blobs
+created: 2025-07-27
+author: ronniegeraghty
+tags:
+  - identity
+---
+```
+
+Both formats produce identical `Prompt` structs. The `properties:` format is preferred for new prompts.
+
+### Frontmatter Fields
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `id` | ✅ | string | Unique ID: `{service}-{dp|mp}-{language}-{slug}` |
+| `id` | ✅ | string | Unique ID: `{service}-{dp\|mp}-{language}-{slug}` |
 | `service` | ✅ | string | Azure service name |
 | `plane` | ✅ | string | `data-plane` or `management-plane` |
 | `language` | ✅ | string | Target programming language |
@@ -27,15 +81,15 @@ prompts/{service}/{plane}/{language}/{slug}.prompt.md
 | `description` | ✅ | string | 1–3 sentences: what this prompt tests |
 | `created` | ✅ | string | Date in `YYYY-MM-DD` format |
 | `author` | ✅ | string | GitHub username |
-| `sdk_package` | ❌ | string | Expected SDK package (e.g., `Azure.Storage.Blobs`) |
-| `doc_url` | ❌ | string | Library reference docs URL (see doc_url convention below) |
-| `tags` | ❌ | list | Free-form tags for filtering (e.g., `[identity, getting-started]`) |
-| `expected_tools` | ❌ | list | Tool names the agent should use (e.g., `[create_file, run_terminal_command]`) |
+| `sdk_package` | ❌ | string | Expected SDK package |
+| `doc_url` | ❌ | string | Library reference docs URL |
+| `tags` | ❌ | list | Free-form tags for filtering |
+| `expected_tools` | ❌ | list | Tool names the agent should use |
 | `expected_packages` | ❌ | list | SDK packages the generated code should import |
 | `starter_project` | ❌ | string | Path to starter project dir (relative to prompt file) |
-| `project_context` | ❌ | string | `blank` (default) or `existing` (copies starter_project first) |
+| `project_context` | ❌ | string | `blank` (default) or `existing` |
 | `reference_answer` | ❌ | string | Inline reference code for LLM-as-judge scoring |
-| `timeout` | ❌ | int | Per-prompt timeout in seconds (overrides config default) |
+| `timeout` | ❌ | int | Per-prompt timeout in seconds |
 
 ### Valid Values
 
@@ -49,192 +103,100 @@ prompts/{service}/{plane}/{language}/{slug}.prompt.md
 
 **Difficulties:** `basic`, `intermediate`, `advanced`
 
-### doc_url Convention
+## ID & File Naming
 
-The `doc_url` field should point to the **library's API reference docs**, not quickstarts or tutorials:
+**ID pattern:** `{service}-{dp|mp}-{language}-{slug}`
+- `dp` = data-plane, `mp` = management-plane
+- Slug is kebab-case, max ~4 words
+- Examples: `storage-dp-dotnet-auth`, `cosmos-db-dp-python-crud-items`
 
-| Language | URL Pattern | Example |
-|----------|-------------|---------|
-| Python | `learn.microsoft.com/en-us/python/api/overview/azure/{pkg}-readme` | `azure/identity-readme` |
-| .NET | `learn.microsoft.com/en-us/dotnet/api/overview/azure/{pkg}-readme` | `azure/storage.blobs-readme` |
-| Java | `learn.microsoft.com/en-us/java/api/overview/azure/{pkg}-readme` | `azure/cosmos-readme` |
-| JS/TS | `learn.microsoft.com/en-us/javascript/api/overview/azure/{pkg}-readme` | `azure/identity-readme` |
-| Go | `pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/...` | `sdk/azidentity` |
-| Rust | `docs.rs/{crate}/latest/{crate}/` | `azure_identity` |
-| C++ | `github.com/Azure/azure-sdk-for-cpp/tree/main/sdk/...` | `sdk/identity/azure-identity` |
+**Filename:** `{slug}.prompt.md` — matches the slug portion of the ID.
 
-### ID Convention
+## Tool Filtering with `When`
 
-The `id` field follows the pattern: `{service}-{dp|mp}-{language}-{slug}`
+Config entries use a `When` map (not `properties` on `ToolEntry`) to conditionally include tools based on prompt metadata:
 
-- Use `dp` for `data-plane`, `mp` for `management-plane`
-- The slug should be a concise kebab-case descriptor of what the prompt tests
-- Example: `storage-dp-dotnet-auth`, `cosmos-db-dp-python-crud-items`
+```yaml
+tools:
+  - name: python_test_runner
+    when:
+      language: python
+  - name: key-vault-mcp
+    when:
+      service: key-vault
+```
 
-### File Naming
+At runtime, `matchesWhen(entry.When, prompt.Properties)` checks that every key-value pair in `When` matches the prompt's `Properties` map. If `When` is empty, the tool is unconditionally included.
 
-The filename should match the slug portion of the ID: `{slug}.prompt.md`
-
-Examples:
-- `authentication.prompt.md`
-- `pagination-list-blobs.prompt.md`
-- `crud-items.prompt.md`
-
-## Prompt Structure
-
-Every `.prompt.md` file should have these sections after the frontmatter:
+## Prompt Content Structure
 
 ```markdown
 # Title: Service (Language)
 
 ## Prompt
-
-The exact prompt text sent to the AI agent. Be specific and actionable.
+The exact prompt text sent to the AI agent.
 
 ## Evaluation Criteria
-
 Bullet list of what the generated code should demonstrate.
-The review agent uses this (along with the general rubric) to score generated code.
 
 ## Context
-
-Why this prompt matters and what quality aspect it evaluates.
-(Human-readable only — not used by the eval tool.)
+Why this prompt matters. (Human-readable only — not sent to the eval tool.)
 ```
 
-**How sections flow through the eval tool:**
-- **Generator agent** receives ONLY the `## Prompt` text — no frontmatter, no evaluation criteria
-- **Review agent** receives the prompt text, generated code, the general rubric (`hyoka/internal/review/rubric.md`), AND the `## Evaluation Criteria` section
-- **`## Context`** is for human readers only — the eval tool ignores it entirely
+**How sections flow:**
+- **Generator** receives ONLY the `## Prompt` text
+- **Reviewer** receives prompt text, generated code, the rubric, AND `## Evaluation Criteria`
+- **`## Context`** is for human readers only
 
 ## Writing Good Prompts
 
 ### DO ✅
-
-- **Be specific about the task**: "Create a BlobServiceClient using DefaultAzureCredential" not "Use storage"
-- **Specify the SDK package**: "Using the `Azure.Storage.Blobs` NuGet package"
-- **Ask for complete, runnable code**: "Show the complete setup including required packages"
-- **Include realistic constraints**: "The code should work in a console app targeting .NET 8"
-- **Test one concept per prompt**: Focus on authentication, or pagination, or error handling — not all three
-- **Set clear expectations in Evaluation Criteria**: List specific APIs, patterns, and imports
+- Be specific: "Create a BlobServiceClient using DefaultAzureCredential" not "Use storage"
+- Specify the SDK package by name
+- Ask for complete, runnable code
+- Test one concept per prompt
+- Set clear expectations in Evaluation Criteria
 
 ### DON'T ❌
+- Don't be vague — "Write some Azure code" is too broad to score
+- Don't test multiple concepts in one prompt
+- Don't assume context — agent starts from a blank workspace unless `project_context: existing`
+- Don't skip the description — it's used in reports and filtering
 
-- **Don't be vague**: "Write some Azure code" — too broad to evaluate meaningfully
-- **Don't test multiple concepts**: A prompt testing auth + pagination + retries is hard to score
-- **Don't assume context**: The agent starts from a blank workspace unless `project_context: existing` is set
-- **Don't skip the description**: It's used in reports and filtering
-- **Don't duplicate existing prompts**: Check `hyoka list` first
+## doc_url Convention
 
-### Difficulty Guidelines
+Point to the **library's API reference docs**, not quickstarts:
 
-| Difficulty | What It Means | Example |
-|-----------|---------------|---------|
-| `basic` | Single API call, straightforward setup | Authenticate and list blobs |
-| `intermediate` | Multiple API calls, error handling, configuration | Upload with retry policy and progress tracking |
-| `advanced` | Complex workflows, multiple services, edge cases | Event-driven pipeline with dead-letter handling |
+| Language | URL Pattern |
+|----------|-------------|
+| Python | `learn.microsoft.com/en-us/python/api/overview/azure/{pkg}-readme` |
+| .NET | `learn.microsoft.com/en-us/dotnet/api/overview/azure/{pkg}-readme` |
+| Java | `learn.microsoft.com/en-us/java/api/overview/azure/{pkg}-readme` |
+| JS/TS | `learn.microsoft.com/en-us/javascript/api/overview/azure/{pkg}-readme` |
+| Go | `pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/...` |
+| Rust | `docs.rs/{crate}/latest/{crate}/` |
 
-## Writing Good Reference Answers
-
-The `reference_answer` field is optional but valuable — it enables LLM-as-judge scoring with a reference comparison.
-
-- Write the reference as actual working code, not pseudocode
-- Include imports, package references, and error handling
-- The reference should represent a "good" answer, not a perfect one
-- Keep it focused on the prompt's specific task
-
-## Example: Good Prompt
-
-```yaml
----
-id: storage-dp-dotnet-auth
-service: storage
-plane: data-plane
-language: dotnet
-category: authentication
-difficulty: basic
-description: >
-  Can the docs help a developer authenticate to Azure Blob Storage
-  using DefaultAzureCredential in .NET?
-sdk_package: Azure.Storage.Blobs
-doc_url: https://learn.microsoft.com/en-us/dotnet/api/overview/azure/storage.blobs-readme
-tags:
-  - identity
-  - default-azure-credential
-  - getting-started
-created: 2025-07-27
-author: ronniegeraghty
----
-
-# Authentication: Azure Blob Storage (.NET)
-
-## Prompt
-
-How do I authenticate to Azure Blob Storage using DefaultAzureCredential in C#?
-I need to create a BlobServiceClient that uses managed identity in production
-but falls back to Azure CLI credentials during local development.
-Show me the complete setup including required NuGet packages.
-
-## Evaluation Criteria
-
-The generated code should demonstrate:
-- Azure.Identity and Azure.Storage.Blobs package setup
-- DefaultAzureCredential initialization
-- BlobServiceClient creation with token credential
-- Basic container/blob operation to verify auth works
-
-## Context
-
-Authentication is the first step for any Azure SDK interaction.
-This tests whether the agent produces correct, current auth patterns.
-```
-
-## Example: Bad Prompt
-
-```yaml
----
-id: storage-dp-dotnet-stuff
-service: storage
-plane: data-plane
-language: dotnet
-category: crud
-difficulty: basic
-description: "test storage"
-created: 2025-07-27
-author: someone
----
-
-# Storage
-
-## Prompt
-
-Write Azure storage code in C#.
-```
-
-**Problems:**
-- Vague prompt — "storage code" could mean anything
-- No specific SDK package mentioned
-- Description is meaningless for reports
-- Missing `sdk_package`, `doc_url`, `tags`
-- No Evaluation Criteria section
-- No Context section
-
-## CLI Scaffolding
-
-You can also use the CLI to scaffold a new prompt interactively:
+## CLI Commands
 
 ```bash
+# Scaffold a new prompt interactively
 go run ./hyoka new-prompt
-```
 
-This asks for service, language, plane, category, and difficulty, then generates the file with populated frontmatter at the correct path.
-
-## Validation
-
-After creating a prompt, always validate:
-
-```bash
+# Validate all prompts
 go run ./hyoka validate
+
+# List and filter prompts
+go run ./hyoka list --service key-vault --language python
+go run ./hyoka list --tags "auth,crud"
+
+# Dry run (show matching prompts without executing)
+go run ./hyoka run --service storage --language dotnet --dry-run
 ```
 
-This checks frontmatter schema compliance, required fields, and naming conventions.
+## Anti-Patterns
+
+- IDs with uppercase or special characters (use kebab-case)
+- Inconsistent plane values (`data_plane` vs `data-plane`)
+- Missing required frontmatter fields
+- Prompts with the same ID in different directories
+- Overly specific prompts (too narrow to be useful across models)
