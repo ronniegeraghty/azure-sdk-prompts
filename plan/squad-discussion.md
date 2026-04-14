@@ -8,13 +8,13 @@
 
 I've sorted the documentation-related review notes into logical work items, ordered by dependency and impact.
 
-#### WI-1: Skill Cleanup (Lines 2, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+#### WI-1: Skill Cleanup (R1, R3, R5, R6, R7, R8, R9, R10, R11, R12, R13)
 The single largest batch — 8 skills to remove, 1 to update, 1 to fill, 2 to consolidate. See §4 below for sequencing.
 
-#### WI-2: `.copilot/` Directory Removal (Line 19)
+#### WI-2: `.copilot/` Directory Removal (R18)
 Confirmed: `.copilot/skills/` contains 26 skills that are copies of `.agents/skills/`. The MCP config is redundant. Entire directory can be deleted. **This should happen AFTER WI-1** to avoid doing cleanup in both locations.
 
-#### WI-3: Contributing Guide Consolidation (Lines 5, 51)
+#### WI-3: Contributing Guide Consolidation (R4, R26)
 Three locations mention contributing info:
 - `.agents/skills/contributor-guide/` (212 lines, detailed)
 - `docs/contributing.md` (119 lines, build/test focused)
@@ -22,47 +22,47 @@ Three locations mention contributing info:
 
 Action: Create root `CONTRIBUTING.md` by merging content from both sources, delete the skill, update `docs/contributing.md` to redirect or become the detailed dev guide. Fix `ronniegeraghty/dev` vs `main` branch discrepancy.
 
-#### WI-4: AGENTS.md Overhaul (Lines 24–33)
+#### WI-4: AGENTS.md Overhaul (R23)
 9 specific sub-items covering every section. The core tension: AGENTS.md tries to be both a reference doc AND a teaching tool. Proposed approach: slim it to pointers (link to docs/, link to skills) with only truly stable content inline.
 
-#### WI-5: README.md Restructure (Lines 34–49)
+#### WI-5: README.md Restructure (R24)
 Structural overhaul of the 540-line README. Verified issues: `hyoka tools list`/`hyoka tools add` commands don't exist (it's `hyoka plugins`), repo structure tree is stale, `--max-session-actions` duplicated. This is a significant rewrite — not a patch job.
 
-#### WI-6: `hyoka/README.md` Refocus (Line 65)
+#### WI-6: `hyoka/README.md` Refocus (R40)
 Confirmed: 451-line file is a stale copy of root README. Needs full rewrite as a developer-oriented doc covering package architecture, how to add commands/graders, debugging tips.
 
-#### WI-7: Docs Cleanup (Lines 50, 52, 53)
+#### WI-7: Docs Cleanup (R25, R27, R28)
 - Remove `docs/cleanup-plan.md` (372 lines, planning artifact)
 - Remove `docs/eval-tool-plan.md` (980 lines, planning artifact)
 - Remove `docs/tool-registry.md` (142 lines, dead feature — see WI-9)
 - Document `plugins/` in `docs/configuration.md`
 - Full docs audit (every doc validated against current CLI behavior)
 
-#### WI-8: Examples Update (Lines 55, 56, 58, 66, 112)
+#### WI-8: Examples Update (R30, R31, R33, R41, R83)
 - Update `examples/configs/example-full.yaml` (uses outdated `mcp_servers:` key)
 - Remove `examples/configs/example-registry.yaml` (dead feature)
 - Update `examples/prompts/prompt-template.prompt.md` (uses old flat frontmatter)
 - Add `.prompt.yaml` example
 - Add prompt-with-starter-files example
 
-#### WI-9: Dead Code / Dead Feature Docs (Lines 57, 204, 205)
+#### WI-9: Dead Code / Dead Feature Docs (R32, R87, R138, R139)
 - Remove `docs/tool-registry.md` (no configs use registry)
 - Remove `hyoka/internal/tools/` package (confirmed: zero imports)
 - Remove `hyoka/internal/history/` package (confirmed: zero imports)
 - Remove `hyoka/internal/manifest/` package (confirmed: zero imports)
 - Remove `hyoka/internal/build/` package (confirmed: zero imports, line 119)
 
-#### WI-10: Rubric Removal (Line 20)
+#### WI-10: Rubric Removal (R19)
 `hyoka/internal/review/rubric.go` (50 lines) embeds `rubric.md` (35 lines) via `//go:embed`. This is actively compiled into the binary. Removal requires verifying all call sites of `embeddedRubric` and `GetDefaultRubric()` and replacing them with prompt-specific/criteria-based evaluation. **This is code work, not just docs** — needs coordination with whoever owns the review package.
 
-#### WI-11: Criteria Cleanup (Lines 15, 16, 18)
+#### WI-11: Criteria Cleanup (R14, R15, R17)
 - Remove `criteria/language/dotnet.yaml`, `go.yaml`, `java.yaml`, `rust.yaml` and `criteria/service/storage.yaml`
 - Investigate why criteria files aren't being used in evals (this is a bug, not just docs)
 
-#### WI-12: Validation Improvements (Lines 89, 95, 96, 211)
+#### WI-12: Validation Improvements (R64, R66, R67, R137)
 See §5 below for approach.
 
-#### WI-13: CLI Help & Flag Audit (Lines 68, 69, 70, 71, 72, 73)
+#### WI-13: CLI Help & Flag Audit (R43, R44, R45, R46, R47, R48)
 Audit all `--help` text, remove/add specific flags. Docs follow code here — do the flag changes first, then update docs.
 
 ---
@@ -101,17 +101,17 @@ Line 315 says remove developer docs from the site (architecture, contributing). 
 
 The review assigns me four ongoing review responsibilities. Here's my assessment of current state and audit plan.
 
-#### AGENTS.md (Line 33)
+#### AGENTS.md (R23)
 - **Current state:** 217 lines, 9 sections. Hardcoded absolute paths, stale config table, inline conventions that duplicate skills. Missing packages (`pidfile/`, `site/`). Hardcoded username `ronniegeraghty`.
 - **Scope:** Medium rewrite. ~60% of content needs changing. The structure is sound; the content is stale.
 - **Audit plan:** Rewrite after WI-1 (skill cleanup) completes so I can reference the correct skills. Validate every command/path in the file against current CLI output.
 
-#### README.md (Line 49)
+#### README.md (R24)
 - **Current state:** 540 lines. Documents nonexistent commands (`hyoka tools list/add`). Duplicate flag entries. Stale repo tree. Roadmap references things that already exist.
 - **Scope:** Large rewrite to proposed 6-section structure. Requires knowing final CLI command surface (depends on WI-13 flag cleanup).
 - **Audit plan:** Wait for flag removals/additions (lines 69–73) to settle, then rewrite. Verify every command example runs successfully.
 
-#### Full Docs Audit (Line 52)
+#### Full Docs Audit (R27)
 - **Current state:** 13 docs, 3,542 total lines. At least 3 are dead (`cleanup-plan.md`, `eval-tool-plan.md`, `tool-registry.md`). `grader-config-schema.md` is DRAFT with 2 unimplemented grader types. `configuration.md` doesn't mention plugins. `cli-reference.md` needs verification against actual `--help` output.
 - **Scope:** Large. Every doc needs line-by-line validation against current behavior.
 - **Audit plan:**
@@ -123,7 +123,7 @@ The review assigns me four ongoing review responsibilities. Here's my assessment
   6. Review `architecture.md`, `guardrails.md`, `prompt-authoring.md`, `starter-files.md`, `tool-filter-schema.md` for accuracy
   7. Add `plugins/` documentation to `configuration.md`
 
-#### `hyoka/README.md` (Line 65)
+#### `hyoka/README.md` (R40)
 - **Current state:** 451 lines, stale copy of root README. Not fit for purpose — should be a dev guide.
 - **Scope:** Full rewrite. Need to understand package architecture to write this well.
 - **Audit plan:** Write after dead code removal (WI-9) so the package list is accurate. Cover: package map, how to add a command, how to add a grader, debug tips, test patterns.
@@ -181,7 +181,7 @@ Create `CONTRIBUTING.md`, merge with `docs/contributing.md`, delete the skill.
 
 Three validation enhancements are called for:
 
-#### 5a. Schema-based validation (Line 211)
+#### 5a. Schema-based validation (R137)
 Currently `hyoka validate` checks prompts against hardcoded value lists. Moving to schema-based:
 - Define prompt schema as a Go struct with validation tags (or a JSON Schema document)
 - Define criteria YAML schema similarly
@@ -191,14 +191,14 @@ Currently `hyoka validate` checks prompts against hardcoded value lists. Moving 
 
 **Approach:** Start with Go struct validation tags (`validate:"required,oneof=..."`) using a lightweight validator. Avoid adding a JSON Schema dependency unless we need external schema files for editor integration.
 
-#### 5b. Criteria validation (Line 95)
+#### 5b. Criteria validation (R66)
 `hyoka validate` currently skips criteria files entirely. Add:
 - Parse all `criteria/**/*.yaml` files
 - Validate structure (must have `when`, `graders` list)
 - Validate each grader entry has required fields for its `kind`
 - Cross-reference: warn if criteria `when` conditions don't match any existing prompt properties
 
-#### 5c. Prompt format detection (Line 96)
+#### 5c. Prompt format detection (R67)
 Flag prompts using old flat frontmatter vs `properties:` map format:
 - Detect by checking if top-level keys include `service`, `language`, `plane` (flat) vs `properties` (new)
 - Report as a warning with migration suggestion
@@ -253,7 +253,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-1: `flag-cleanup` — Remove/fix deprecated CLI flags
+#### WI-1: `flag-cleanup` (R44, R45, R46, R47, R48, R70) — Remove/fix deprecated CLI flags
 **Review lines:** 69–73, 99
 
 - **Remove `--max-sessions`** (L69): Confirmed redundant with `--workers`. Both exist in `runFlags` (L33–34 in run.go). `MaxSessions` is passed to engine but could default to `workers × 3` internally.
@@ -267,7 +267,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-2: `check-env-fix` — Fix check-env command
+#### WI-2: `check-env-fix` (R68, R69) — Fix check-env command
 **Review lines:** 97–98
 
 - **Exit code bug (L97):** CONFIRMED. `check_env.go:14` uses `Run:` (not `RunE:`), so the command always exits 0. The `checkenv.Run()` function at `checkenv.go:18` returns nothing — it just prints. Fix: change to `RunE:`, have `checkenv.Run()` return an error (or bool), exit 1 if required tools are missing.
@@ -277,7 +277,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-3: `path-resolution-unify` — Consolidate path resolution
+#### WI-3: `path-resolution-unify` (R52, R56, R58, R60, R64) — Consolidate path resolution
 **Review lines:** 77, 81, 83, 85, 89
 
 - **Scattered resolution (L77, L81, L85):** `run.go` resolves prompts/output at L161–163 (step 2), configs at L167–181 (step 3), and criteria passed as raw string. Timeout parsing at L273–277 happens mid-flow between evaluator setup and reviewer setup.
@@ -289,7 +289,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-4: `dead-code-removal` — Remove dead packages and commands
+#### WI-4: `dead-code-removal` (R32, R87, R138, R139) — Remove dead packages and commands
 **Review lines:** 57, 119, 204–205, 212–213
 
 - **Remove `internal/tools/`** (L57): CONFIRMED dead code — `registry.go`, `remote.go` + tests. Zero imports across entire codebase. Also remove `examples/configs/example-registry.yaml` and `docs/tool-registry.md`.
@@ -301,7 +301,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-5: `run-cmd-refactor` — Refactor run.go resource loading
+#### WI-5: `run-cmd-refactor` (R52, R57, R60, R61, R95) — Refactor run.go resource loading
 **Review lines:** 77, 82, 85, 86, 127
 
 - **Load resources together (L82):** Currently prompts load at L235, configs at L166–181, criteria is just a string passed to engine. Should be: resolve all paths → load all resources → apply filters → calculate eval matrix.
@@ -312,7 +312,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-6: `list-enhance` — Enhance `hyoka list` to show configs and criteria
+#### WI-6: `list-enhance` (R62) — Enhance `hyoka list` to show configs and criteria
 **Review line:** 87
 
 - **Current state:** `list.go` only lists prompts. `configs.go` is a separate command.
@@ -322,7 +322,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-7: `validate-enhance` — Enhance validation command
+#### WI-7: `validate-enhance` (R64, R66, R67, R74, R75, R76) — Enhance validation command
 **Review lines:** 89, 95, 96, 103–105
 
 - **Fix config dir assumption (L89):** `validate.go:49` hardcodes `filepath.Dir(promptsDir) + "/configs"`. Should use `resolveConfigDir()`.
@@ -336,7 +336,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-8: `init-enhance` — Enhance `hyoka init`
+#### WI-8: `init-enhance` (R86) — Enhance `hyoka init`
 **Review lines:** 115–118
 
 - **Add `plugins/` to subdirs (L116):** `init.go` creates configs, prompts, criteria, skills, reports. Missing plugins.
@@ -347,7 +347,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-9: `version-build-time` — Use Go build-time version
+#### WI-9: `version-build-time` (R85) — Use Go build-time version
 **Review line:** 114
 
 - **Current state:** `root.go:9` hardcodes `Version = "0.3.0"`.
@@ -357,7 +357,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-10: `plugins-to-tools-rename` — Rename `hyoka plugins` to `hyoka tools`
+#### WI-10: `plugins-to-tools-rename` (R78) — Rename `hyoka plugins` to `hyoka tools`
 **Review line:** 107
 
 - **Current state:** `plugins.go` already has `Aliases: []string{"tools"}` so `hyoka tools` works. But the primary name should be `tools` with `plugins` as the alias (reversed).
@@ -367,7 +367,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-11: `progress-redesign` — Redesign progress bar output
+#### WI-11: `progress-redesign` (R51, R137, R141) — Redesign progress bar output
 **Review lines:** 76, 208, 215–229
 
 - Research simpler approaches. Current live mode uses complex ANSI escape code region tracking. The proposed section-based format (L215–229) is cleaner.
@@ -377,7 +377,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-12: `report-cmd-rename` — Rename or clarify `hyoka report`
+#### WI-12: `report-cmd-rename` (R72, R73) — Rename or clarify `hyoka report`
 **Review lines:** 101–102
 
 - `rerender.go` currently uses `Use: "report [run-id]"`. Name is misleading — it re-renders, not generates.
@@ -387,7 +387,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-13: `help-text-audit` — Audit all CLI help text
+#### WI-13: `help-text-audit` (R43) — Audit all CLI help text
 **Review line:** 68
 
 - Run `hyoka --help` and `hyoka <command> --help` for every command.
@@ -398,7 +398,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-14: `guardrail-tiers` — Split guardrail limits into three tiers
+#### WI-14: `guardrail-tiers` (R79) — Split guardrail limits into three tiers
 **Review line:** 108
 
 - Currently turns, actions, time are one flat set. Split into generator limits (larger), reviewer limits (smaller), overall per-config limits.
@@ -408,7 +408,7 @@ After reading all 323 review lines and investigating the relevant code, here's h
 
 ---
 
-#### WI-15: `sdk-client-factory` — Share Copilot SDK client creation
+#### WI-15: `sdk-client-factory` (R61, R71) — Share Copilot SDK client creation
 **Review lines:** 86, 100
 
 - SDK clients created in 5 places with duplicated `ClientOptions` setup. Create a `newHyokaClient()` shared factory.
@@ -436,7 +436,7 @@ L73 wants `--max-turns` re-added, but L69–72 want flags removed. **Not a real 
 
 ### 3. Investigation Findings
 
-#### L54: Verify Local Plugin Support
+#### L54: Verify Local Plugin Support (R29)
 **FINDING: Partially supported.** The code path exists and works:
 1. `config/plugins.go:37–78` — `ExpandPlugins()` checks the plugin registry (local `plugins/` dir YAML files) first, then falls back to `~/.copilot/installed-plugins/`.
 2. `config/plugins.go:122–129` — `resolvePluginsDir()` uses `.hyoka/plugins` → `./plugins` → `../plugins` candidate chain.
@@ -444,19 +444,19 @@ L73 wants `--max-turns` re-added, but L69–72 want flags removed. **Not a real 
 4. **Gap:** `resolveConfigSkillDirs()` in `helpers.go:82–117` resolves local skill paths but NOT local plugin paths. If a config references a local plugin with a relative path, and hyoka is invoked from a different directory, the plugin won't be found. Confirms the note at L83.
 5. **Gap:** The `run` command calls `InstallSkillsAndPlugins()` which processes `Plugins` entries needing `npx skills add`. Local plugins from the `plugins/` dir are expanded via `ConfigFile.ExpandPlugins()` — but `run.go` never calls `ExpandPlugins()`. Local plugin YAML definitions in `plugins/` are only loaded inside `InstallSkillsAndPlugins` for skip-check purposes, not for actual expansion into tool entries during the eval.
 
-#### L59: Verify Prompt Discovery Handles Deep Nesting
+#### L59: Verify Prompt Discovery Handles Deep Nesting (R34)
 **FINDING: Works correctly.** `loader.go:27` uses `filepath.Walk(root, ...)` which recursively traverses all subdirectories with no depth limit. Any `.prompt.md`, `.prompt.yaml`, or `.prompt.yml` file at any nesting depth will be discovered. The `isPromptFile()` check at L13–16 only looks at the filename suffix, not the path structure. Confirmed by test at `loader_test.go:190` which creates prompts in a subdirectory.
 
-#### L97: Fix `check-env` Exit Code
+#### L97: Fix `check-env` Exit Code (R68)
 **FINDING: Confirmed broken.** `check_env.go:14` uses `Run:` callback (not `RunE:`). Cobra's `Run` doesn't propagate errors — the command always exits 0 regardless of check results. The `checkenv.Run()` function returns nothing; it just prints emoji-decorated output. Fix requires:
 1. Change `check_env.go` from `Run:` to `RunE:`.
 2. Change `checkenv.Run()` to return `error` (or at least `bool`).
 3. Track whether any required checks failed, return error if so.
 
-#### L98: Verify `check-env` Copilot CLI Binary Matches SDK
+#### L98: Verify `check-env` Copilot CLI Binary Matches SDK (R69)
 **FINDING: Confirmed mismatch risk.** `checkenv.go:189–194` runs `exec.Command("copilot", "--version")` — this finds whatever `copilot` binary is first on `$PATH`. The SDK uses `copilot.ClientOptions.CLIPath` (if set) or its own internal discovery. These could resolve to different binaries if multiple versions are installed. The evaluator at `copilot.go:89` calls `copilot.NewClient(&opts)` where `opts.CLIPath` is empty by default. Fix: `check-env` should instantiate a `copilot.NewClient()` and attempt `.Start()` to validate the SDK's own binary discovery path.
 
-#### L67: `--allow-cloud` Flag Investigation
+#### L67: `--allow-cloud` Flag Investigation (R42)
 **FINDING: Flag is NOT wired through.** The `allowCloud` field is stored on `CopilotSDKEvaluator` (copilot.go:27) and set from options (L75). But searching `buildSessionConfig()` (L665–815), the `allowCloud` field is **never referenced**. The system prompt construction at L680–695 only adds skills hints — there's no conditional safety boundary text based on `allowCloud`. The field is stored but never used to modify the session config or system prompt. Reports saying "cloud disabled" are correct — the flag literally doesn't do anything.
 
 ---
@@ -512,12 +512,12 @@ Agree it should be removed — but verify the engine's default `workers × 3` fo
 
 I've grouped the review notes touching my domain into **six logical work items**, ordered from foundational to incremental.
 
-#### WI-1: Dead Code Purge (site + backend packages)
+#### WI-1: Dead Code Purge (R32, R38, R138, R139) — site + backend packages
 *Lines: 63, 57, 204, 205, 212, 213*
 
 **Investigation result:** I audited every component in `site/src/`. Of the 45 shadcn/ui components, **43 are completely unused** — only `select.tsx` and `table.tsx` are imported outside of `ui/`. One custom component (`ImageWithFallback.tsx` in `figma/`) is also dead. All 12 page components are routed, so no dead pages. This is a quick, high-confidence cleanup — delete the 43 unused UI files, delete `ImageWithFallback.tsx`, and remove the backend dead code (`internal/tools/`, `internal/history/`, `internal/manifest/`).
 
-#### WI-2: Eliminate Static HTML Reports + Trends HTML — Consolidate on SPA
+#### WI-2: Eliminate Static HTML Reports + Trends HTML (R131, R134, R135, R148) — Consolidate on SPA
 *Lines: 175–181, 192–197, 276–277*
 
 **Investigation result:** `report/html.go` (744 lines) + two `.gohtml` templates generate standalone HTML files. The SPA at `hyoka serve` renders the exact same data from JSON via `/api/runs/{runId}` and `/api/runs/{runId}/eval`. The static HTML reports add zero functionality the SPA doesn't have — they're a parallel rendering pipeline with a maintenance cost.
@@ -530,7 +530,7 @@ The trends package is worse: `trends.go` has ~280 lines of raw `fmt.Fprintf` / `
 - Keep JSON as the canonical data format. The SPA is the viewer.
 - This aligns with the review note on line 197: *"reports are data (JSON), the site is the viewer, markdown is the portable fallback, static HTML goes away."*
 
-#### WI-3: Eval Detail Page Fix + Redesign
+#### WI-3: Eval Detail Page Fix + Redesign (R148)
 *Lines: 257–276*
 
 This is the most impactful single page change. The eval detail page currently:
@@ -546,7 +546,7 @@ Priority order within this WI:
 5. Redesign reviewer timeline for new grader sessions
 6. Make generated files expandable with inline content
 
-#### WI-4: Run Detail + Runs Page Improvements
+#### WI-4: Run Detail + Runs Page Improvements (R146, R147)
 *Lines: 244–256*
 
 - Convert timestamps to human-readable run names
@@ -557,14 +557,14 @@ Priority order within this WI:
 - Remove "Files" summary card (not relevant for non-code-gen)
 - Add prompt × config vs eval criteria matrix table
 
-#### WI-5: Prompt Pages + Dashboard Rethink
+#### WI-5: Prompt Pages + Dashboard Rethink (R150, R151, R154)
 *Lines: 278–297, 308*
 
 - Prompts page: add "only show prompts with evals" filter (default on), ordering options, remove non-functional dropdowns
 - Prompt detail: fix score trend chart x-axis to days, show ALL models not top 3, add tool usage toggle
 - Dashboard: currently shows 100% mock data (hardcoded "1,247 evaluations", fake model names). Must be connected to real report data. Radar chart won't work without default criteria — needs rethinking.
 
-#### WI-6: Compare Page Redesign + Docs Page Improvements
+#### WI-6: Compare Page Redesign + Docs Page Improvements (R153, R155)
 *Lines: 302–307, 309–322*
 
 - Compare page: replace simple A vs B with configurable group-based comparison (referencing devex-reviews pattern)
@@ -590,10 +590,10 @@ Slight tension: line 156 says report tools as "loaded" once SDK events confirm i
 
 ### 3. Investigation Findings
 
-#### Line 63: Site dead code audit — 43 of 45 shadcn/ui components unused
+#### Line 63: Site dead code audit (R38) — 43 of 45 shadcn/ui components unused
 **Done.** Full audit results above in WI-1. The 43 unused components total ~8,500 lines of dead code. Only `select.tsx` and `table.tsx` survive. This is expected — shadcn/ui encourages installing components individually, but someone ran a bulk install. Safe to delete; re-add as needed.
 
-#### Line 176: Two `BuildActionTimeline()` implementations
+#### Line 176: Two `BuildActionTimeline()` implementations (R131)
 **Done.** These are **intentionally separate, not duplicates:**
 
 | Aspect | `eval/action.go` | `report/types.go` |
@@ -606,7 +606,7 @@ Slight tension: line 156 says report tools as "loaded" once SDK events confirm i
 
 **Verdict:** Keep both. The review note's concern is addressed — they serve different purposes. The naming overlap is confusing though; I'd suggest renaming the eval version to `ClassifyEvents()` to make the distinction obvious.
 
-#### Line 178: HTML reports vs embedded SPA — are both needed?
+#### Line 178: HTML reports vs embedded SPA (R131) — are both needed?
 **Done.** Full analysis above. Summary:
 - Static HTML: 744 lines in `html.go` + 2 Go templates. Self-contained files, no server needed.
 - SPA: Full React app with 12 pages, 6+ API endpoints for cross-run analysis, interactive timelines.
@@ -615,7 +615,7 @@ Slight tension: line 156 says report tools as "loaded" once SDK events confirm i
 
 **Verdict:** Remove static HTML. Keep JSON (data) + Markdown (portable) + SPA (interactive viewer). The offline use case is served by Markdown output.
 
-#### Lines 192–197: Trends inline HTML + duplicate matchesProperties
+#### Lines 192–197: Trends inline HTML + duplicate matchesProperties (R134, R135)
 **Done.** The trends package has ~280 lines of inline HTML string building via `fmt.Fprintf`/`WriteString`. Meanwhile `/api/trends` already exists in `serve/dashboard.go` and returns structured `TrendReport` JSON. The `matchesProperties` function in `trends/slice.go` is character-for-character identical in logic to `matchesWhen` in `config/tool_filter.go` — only parameter names differ. This should use a shared utility.
 
 ---
@@ -657,6 +657,19 @@ The review note (line 308) questions whether the dashboard should exist or be fo
 
 ---
 
+
+
+#### WI-7: Site Content & Branding Updates (R143, R144, R145, R149, R152)
+
+These are content/copy changes that don't require structural code changes:
+- **R143** — Design new logo (replace generic >_ with something representative)
+- **R144** — Revise homepage content (remove code-gen/Azure-specific messaging)
+- **R145** — Rewrite "How It Works" page (update pipeline stages, fix visual bugs, generalize language)
+- **R149** — Update site footer (remove Azure SDK reference)
+- **R152** — Pairwise page improvements (score clarity, tool usage frequency chart)
+
+These can be done in parallel with the structural site work and should be tackled after the grader system redesign since the How It Works page needs to reflect the new pipeline.
+
 ## Neo 💊 — Core Eval Framework
 
 ### 1. Work Item Grouping
@@ -665,7 +678,7 @@ From my domain (eval engine, review panel, criteria, graders, SDK integration, s
 
 ---
 
-#### WI-1: Criteria & Grader Unification
+#### WI-1: Criteria & Grader Unification (R15, R17, R19, R37, R84, R92, R93, R94, R97, R100, R101, R102, R142)
 **Notes:** 16, 18, 20, 62, 113, 124, 125, 126, 129, 132–136
 
 This is the single most impactful body of work. The criteria system is *implemented but silently unused* (details in §3 below). The general rubric masks the problem. These notes all converge on one goal: **make the grader system the single source of truth for evaluation**.
@@ -681,7 +694,7 @@ Sub-items:
 
 ---
 
-#### WI-2: Tool System Consolidation
+#### WI-2: Tool System Consolidation (R49, R50, R53, R54, R55, R78, R80, R88, R89, R90, R91)
 **Notes:** 74, 75, 78, 79, 80, 107, 109, 120, 121, 122, 123
 
 All of these converge on: **one unified tool resolution → acquisition → caching → session-injection pipeline**.
@@ -698,7 +711,7 @@ Sub-items:
 
 ---
 
-#### WI-3: Engine Refactoring
+#### WI-3: Engine Refactoring (R52, R95, R96, R103, R104, R106, R108, R115)
 **Notes:** 77, 127, 128, 137, 138, 140, 142, 154
 
 These are code quality improvements to `engine.go` and related orchestration:
@@ -714,7 +727,7 @@ These are code quality improvements to `engine.go` and related orchestration:
 
 ---
 
-#### WI-4: Workspace Containment Hardening
+#### WI-4: Workspace Containment Hardening (R98, R109, R110, R111, R112)
 **Notes:** 143–151
 
 Security-critical work around sandboxing the agent workspace:
@@ -728,7 +741,7 @@ Security-critical work around sandboxing the agent workspace:
 
 ---
 
-#### WI-5: `--allow-cloud` Fix
+#### WI-5: `--allow-cloud` Fix (R42)
 **Note:** 67
 
 Two bugs found (details in §3 below):
@@ -737,7 +750,7 @@ Two bugs found (details in §3 below):
 
 ---
 
-#### WI-6: CLI Flag Cleanup
+#### WI-6: CLI Flag Cleanup (R44, R45, R46, R47, R48)
 **Notes:** 69–73
 
 - **WI-6a:** Remove `--max-sessions` (note 69).
@@ -748,7 +761,7 @@ Two bugs found (details in §3 below):
 
 ---
 
-#### WI-7: Dead Code Removal
+#### WI-7: Dead Code Removal (R32, R87, R138, R139)
 **Notes:** 57, 119, 204, 205
 
 - Remove `internal/tools/` package (note 57) — dead ToolRegistry.
@@ -758,7 +771,7 @@ Two bugs found (details in §3 below):
 
 ---
 
-#### WI-8: SDK Session & Cleanup
+#### WI-8: SDK Session & Cleanup (R71, R99, R107, R113)
 **Notes:** 100, 131, 141, 152
 
 - **WI-8a:** Simplify Copilot session cleanup — test if plain `Stop()` suffices (note 152).
@@ -768,7 +781,7 @@ Two bugs found (details in §3 below):
 
 ---
 
-#### WI-9: Guardrail System
+#### WI-9: Guardrail System (R79, R105)
 **Notes:** 108, 139
 
 - **WI-9a:** Split guardrail limits into generator/reviewer tiers (note 108). *(I'd skip the overall tier — see §5.)*
@@ -795,7 +808,7 @@ Note 107 says rename `hyoka plugins` → `hyoka tools`. Note 120 says plugins ar
 
 ### 3. Investigation Findings
 
-#### Investigation: Criteria System (Note 16, 18)
+#### Investigation: Criteria System (R15, R17)
 
 **Status: Confirmed broken in production, working in tests.**
 
@@ -821,7 +834,7 @@ Full trace from CLI to review prompt:
 
 ---
 
-#### Investigation: `--allow-cloud` Flag (Note 67)
+#### Investigation: `--allow-cloud` Flag (R42)
 
 **Status: Two confirmed bugs.**
 
@@ -841,7 +854,7 @@ The Engine uses the `CopilotEvaluator` interface which doesn't expose `allowClou
 
 ---
 
-#### Investigation: SDK Events for Tool Verification (Note 130)
+#### Investigation: SDK Events for Tool Verification (R98)
 
 **Status: Partially implemented — events captured but not used for verification.**
 
@@ -862,7 +875,7 @@ Events are stored in `SessionEventRecord` structs in the report but **no verific
 
 ---
 
-#### Investigation: SDK Workspace Containment (Note 149)
+#### Investigation: SDK Workspace Containment (R110)
 
 **Status: Unknown — needs runtime testing.**
 
@@ -879,7 +892,7 @@ The SDK docs say `WorkingDirectory` makes "tool operations relative to this dire
 
 ---
 
-#### Investigation: Remote MCP Server Support (Note 122)
+#### Investigation: Remote MCP Server Support (R90)
 
 **Status: Not supported — three blockers identified.**
 
