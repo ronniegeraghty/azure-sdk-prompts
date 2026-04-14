@@ -57,10 +57,12 @@ graders:
     prompt: >
       List operations return and consume azure_core::Pager<T> using
       futures::TryStreamExt (try_next/try_collect). Pagination is
-      handled correctly by iterating all items from all pages.
-      Prefers iterating individual items over page-by-page iteration
-      unless there is an explicit need for page-level access via
-      into_pages().
+      handled correctly by iterating all items. In most if not all
+      cases, individual items should be iterated over directly rather
+      than page-by-page, demonstrating the SDK's ability to handle 
+      pagination internally. Page-by-page iteration via into_pages()
+      is only necessary when there is an explicit requirement for page-level
+      access.
   - name: Response Handling
     weight: 1.0
     prompt: >

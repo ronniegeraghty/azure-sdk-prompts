@@ -402,6 +402,7 @@ func runCmd() *cobra.Command {
 				MaxOutputSize:     maxOutputSize,
 				MonitorResources:  f.monitorResources,
 				StrictCleanup:     f.strictCleanup,
+				AllowCloud:        f.allowCloud,
 				CriteriaDir:       f.criteriaDir,
 				ExcludeDirs:       excludeDirs,
 				SessionTimeout:    sessionTimeout,

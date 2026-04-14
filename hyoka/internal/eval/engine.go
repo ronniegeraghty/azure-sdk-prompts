@@ -106,6 +106,8 @@ type EngineOptions struct {
 	CriteriaDir string // Directory containing attribute-matched criteria YAML files.
 	// Pluggable graders (#136)
 	GradersDir string // Directory containing grader config YAML files.
+	// Generator safety (#36)
+	AllowCloud bool // Allow generated code to provision real Azure resources.
 	// Directory exclusion (#63)
 	ExcludeDirs []string // Directories to exclude from generated_files output.
 	// Pre-flight model availability check (#264).
@@ -977,8 +979,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		SkillDirectories: skillDirectories,
 		AvailableTools:   reportAvailableTools,
 		ExcludedTools:    task.Config.Generator.ExcludedTools,
-		SafetyBoundaries: true,
-		AllowCloud:       false,
+		SafetyBoundaries: !e.opts.AllowCloud,
+		AllowCloud:       e.opts.AllowCloud,
 		WorkingDirectory: ws.Dir,
 	}
 	// Extract MCP server names
@@ -1004,6 +1006,18 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		case "session.skills_loaded":
 			if ev.Content != "" {
 				env.SkillsLoaded = strings.Split(ev.Content, ", ")
+			}
+		}
+	}
+	// Derive MCP tools invoked from action timeline events.
+	if evalReport.ActionTimeline != nil {
+		seen := map[string]bool{}
+		for _, ev := range evalReport.ActionTimeline.Events {
+			if ev.MCPServer != "" && ev.Tool != "" && ev.Action == "start" {
+				if !seen[ev.Tool] {
+					seen[ev.Tool] = true
+					env.MCPToolsInvoked = append(env.MCPToolsInvoked, ev.Tool)
+				}
 			}
 		}
 	}
