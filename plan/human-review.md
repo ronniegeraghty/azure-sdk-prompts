@@ -295,3 +295,7 @@ Walk through the site using Playwright MCP, page by page. Load `hyoka serve`, vi
   - **Config representation:** in the eval list and config breakdown, show configs as prompt-attempt model + available tools tags instead of the long config name string. Show full config name on hover
   - **Config breakdown table** — good, keep
   - **(Stretch) Configurable comparison graph** — let users create custom groups to compare: e.g., "tool not available" vs "available but not used" vs "available and used". Enables ad-hoc analysis of tool impact beyond the built-in charts
+- **Pairwise page improvements** (see `screenshots/pairwise-with-data.png`):
+  - Top Helpers/Hurters/Neutral cards, Tool Contribution chart, and Tool × Prompt Heatmap are all good — keep
+  - **Clarify how tool impact scores are calculated** — add an explanation (tooltip or info section) showing the methodology: is it based on graders that pass/fail when the tool is available vs removed? Does grader weight factor in? Users need to understand what the numbers mean
+  - **Add tool usage frequency chart** — show how often each tool is actually used when available across prompts. Break down into three states: not available, available but not used, available and used. Show how eval scores change across these three states. This reveals whether just having a tool available (even unused) affects outcomes vs actually invoking it
