@@ -231,15 +231,9 @@ func (e *Engine) loadGraders() {
 }
 
 // mergedCriteria returns the combined attribute-matched + prompt-specific
-// evaluation criteria text for the given prompt.
-func (e *Engine) mergedCriteria(p *prompt.Prompt) string {
-	props := map[string]string{
-		"language": p.Language(),
-		"service":  p.Service(),
-		"plane":    p.Plane(),
-		"category": p.Category(),
-		"sdk":      p.SDKPackage(),
-	}
+// evaluation criteria text for the given prompt. The props map provides
+// pre-computed prompt properties for criteria matching.
+func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) string {
 	matched := criteria.MatchingGraders(e.graderConfigs, props)
 	merged := criteria.MergeCriteria(matched, p.EvaluationCriteria)
 	if merged == "" {

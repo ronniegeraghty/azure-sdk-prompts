@@ -29,19 +29,36 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	lg := logging.EvalLogger(task.Prompt.ID, task.Config.Name, "generation", 0)
 	start := time.Now()
 
+	// Compute prompt properties once — used for criteria matching, grader
+	// matching, tool resolution, and report metadata.
+	promptProps := mergePromptProperties(task.Prompt)
+	props := map[string]string{
+		"language": task.Prompt.Language(),
+		"service":  task.Prompt.Service(),
+		"plane":    task.Prompt.Plane(),
+		"category": task.Prompt.Category(),
+		"sdk":      task.Prompt.SDKPackage(),
+	}
+	// Merge prompt-level properties (from frontmatter) into props.
+	for k, v := range promptProps {
+		if _, exists := props[k]; !exists {
+			props[k] = v
+		}
+	}
+
 	evalReport := &report.EvalReport{
 		SchemaVersion: report.CurrentSchemaVersion,
 		PromptID:      task.Prompt.ID,
 		ConfigName:    task.Config.Name,
 		Timestamp:     time.Now().UTC().Format(time.RFC3339),
 		PromptMeta: map[string]any{
-			"service":     task.Prompt.Service(),
-			"plane":       task.Prompt.Plane(),
-			"language":    task.Prompt.Language(),
-			"category":    task.Prompt.Category(),
+			"service":     props["service"],
+			"plane":       props["plane"],
+			"language":    props["language"],
+			"category":    props["category"],
 			"description": task.Prompt.Description(),
 			"difficulty":  task.Prompt.Difficulty(),
-			"sdk_package": task.Prompt.SDKPackage(),
+			"sdk_package": props["sdk"],
 		},
 		ConfigUsed: map[string]any{
 			"name":  task.Config.Name,
@@ -273,7 +290,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			toolEntries = append(toolEntries, entry)
 		}
 	}
-	reportAvailableTools := config.ResolveTools(toolEntries, mergePromptProperties(task.Prompt))
+	reportAvailableTools := config.ResolveTools(toolEntries, promptProps)
 	env := &report.EnvironmentInfo{
 		Model:            task.Config.Generator.Model,
 		SkillDirectories: skillDirectories,
@@ -435,14 +452,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	if len(e.pluginGraders) > 0 && len(generatedFiles) > 0 {
 		glg := logging.WithPhase(lg, "grading")
 
-		props := map[string]string{
-			"language": task.Prompt.Language(),
-			"service":  task.Prompt.Service(),
-			"plane":    task.Prompt.Plane(),
-			"category": task.Prompt.Category(),
-			"sdk":      task.Prompt.SDKPackage(),
-		}
-
 		applicable := graders.ApplicableGraders(e.pluginGraders, props)
 		glg.Debug("Applicable graders", "total", len(e.pluginGraders), "applicable", len(applicable))
 
@@ -562,7 +571,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 
 		// Merge evaluation criteria (#30)
-		evalCriteria := e.mergedCriteria(task.Prompt)
+		evalCriteria := e.mergedCriteria(task.Prompt, props)
 
 		// Create reviewer for this specific config using the factory (#92)
 		var reviewer review.Reviewer
@@ -660,7 +669,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	// Write Markdown report
 	if _, err := report.WriteMarkdownReport(evalReport, e.opts.OutputDir, runID,
-		task.Prompt.Service(), task.Prompt.Plane(), task.Prompt.Language(), task.Prompt.Category()); err != nil {
+		props["service"], props["plane"], props["language"], props["category"]); err != nil {
 		lg.Error("Failed to write Markdown report", "error", err)
 	}
 
