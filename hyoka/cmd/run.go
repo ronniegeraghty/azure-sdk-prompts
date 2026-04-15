@@ -156,21 +156,22 @@ func runCmd() *cobra.Command {
 				}
 			}
 
+			// Resolve all paths first, before any loading
 			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
 			f.criteriaDir = resolveCriteriaDir(cmd)
+			f.configFile = resolveConfigFile(cmd)
+			configDir := resolveConfigDir(cmd)
 
 			// Load config(s)
 			var cfgFile *config.ConfigFile
 			if cmd.Flags().Changed("config-file") {
-				f.configFile = resolveConfigFile(cmd)
 				var err error
 				cfgFile, err = config.Load(f.configFile)
 				if err != nil {
 					return fmt.Errorf("loading config: %w", err)
 				}
 			} else {
-				configDir := resolveConfigDir(cmd)
 				var err error
 				cfgFile, err = config.LoadDir(configDir)
 				if err != nil {
