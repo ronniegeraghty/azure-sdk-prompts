@@ -196,7 +196,7 @@ export function RunDetailPage() {
                   </td>
                   <td className="px-4 py-3">
                     <Link
-                      to={`/runs/${run.run_id}/eval/${encodeURIComponent(r.prompt_id)}/${encodeURIComponent(r.config_name)}`}
+                      to={`/runs/${run.run_id}/eval/${encodeURIComponent(r.prompt_id)}/${r.config_name}`}
                       className="text-white/30 no-underline transition hover:text-emerald-400"
                       style={{ fontSize: 12 }}
                     >
