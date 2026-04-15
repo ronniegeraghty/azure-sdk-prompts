@@ -695,12 +695,6 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	if _, err := report.WriteSummary(summary, e.opts.OutputDir); err != nil {
 		slog.Error("Failed to write run summary", "error", err)
 	}
-
-	// Write HTML summary
-	if _, err := report.WriteSummaryHTML(summary, e.opts.OutputDir); err != nil {
-		slog.Error("Failed to write HTML summary", "error", err)
-	}
-
 	// Write Markdown summary
 	if _, err := report.WriteSummaryMarkdown(summary, e.opts.OutputDir); err != nil {
 		slog.Error("Failed to write Markdown summary", "error", err)
@@ -1349,13 +1343,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	} else {
 		lg.Debug("Report written", "path", reportPath)
 	}
-
-	// Write HTML report
-	if _, err := report.WriteHTMLReport(evalReport, e.opts.OutputDir, runID,
-		task.Prompt.Service(), task.Prompt.Plane(), task.Prompt.Language(), task.Prompt.Category()); err != nil {
-		lg.Error("Failed to write HTML report", "error", err)
-	}
-
 	// Write Markdown report
 	if _, err := report.WriteMarkdownReport(evalReport, e.opts.OutputDir, runID,
 		task.Prompt.Service(), task.Prompt.Plane(), task.Prompt.Language(), task.Prompt.Category()); err != nil {
