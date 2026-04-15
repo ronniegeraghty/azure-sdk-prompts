@@ -74,7 +74,13 @@ func resolveOutputFile(cmd *cobra.Command, candidates []string) string {
 func resolveCriteriaDir(cmd *cobra.Command) string {
 	proj := discoverProject()
 	candidates := config.ResolveCandidates(proj, "criteria", "./criteria", "../criteria")
-	return resolvePathFlag(cmd, "criteria-dir", candidates)
+	resolved := resolvePathFlag(cmd, "criteria-dir", candidates)
+	if resolved != "" {
+		slog.Debug("Resolved criteria directory", "dir", resolved, "candidates", candidates)
+	} else if len(candidates) > 0 {
+		slog.Warn("Criteria candidates found but none selected", "candidates", candidates)
+	}
+	return resolved
 }
 
 // resolveConfigSkillDirs resolves relative local skill paths in loaded configs

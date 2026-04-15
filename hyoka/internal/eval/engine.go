@@ -192,6 +192,7 @@ func (e *Engine) printf(format string, args ...any) {
 // loadCriteria loads grader configs if CriteriaDir is configured.
 func (e *Engine) loadCriteria() {
 	if e.opts.CriteriaDir == "" {
+		slog.Debug("No criteria directory configured, skipping criteria loading")
 		return
 	}
 	if _, err := os.Stat(e.opts.CriteriaDir); os.IsNotExist(err) {
@@ -203,8 +204,12 @@ func (e *Engine) loadCriteria() {
 		slog.Warn("Failed to load grader configs", "dir", e.opts.CriteriaDir, "error", err)
 		return
 	}
+	if len(configs) == 0 {
+		slog.Warn("Criteria directory exists but contains no criteria configs", "dir", e.opts.CriteriaDir)
+		return
+	}
 	e.graderConfigs = configs
-	slog.Info("Loaded grader configs", "configs", len(configs), "dir", e.opts.CriteriaDir)
+	slog.Info("Loaded criteria", "dir", e.opts.CriteriaDir, "count", len(configs))
 }
 
 // loadGraders loads pluggable grader configs if GradersDir is configured (#136).
