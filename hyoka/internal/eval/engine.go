@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
@@ -24,7 +25,6 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // EvalResult holds the raw output from a Copilot evaluation.
@@ -78,10 +78,8 @@ func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *con
 
 // EngineOptions configures the evaluation engine.
 type EngineOptions struct {
-	Workers      int
-	MaxSessions  int // Maximum concurrent Copilot sessions (0 = workers × 2).
-	OutputDir    string
-	SkipTests    bool
+	Workers   int
+	OutputDir string
 	SkipReview   bool
 	DryRun       bool
 	ProgressMode string // "auto", "live", "log", "off"
@@ -146,9 +144,6 @@ func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFa
 		}
 		opts.Workers = w
 	}
-	if opts.MaxSessions <= 0 {
-		opts.MaxSessions = opts.Workers * 2
-	}
 	if opts.OutputDir == "" {
 		opts.OutputDir = "./reports"
 	}
@@ -197,6 +192,7 @@ func (e *Engine) printf(format string, args ...any) {
 // loadCriteria loads grader configs if CriteriaDir is configured.
 func (e *Engine) loadCriteria() {
 	if e.opts.CriteriaDir == "" {
+		slog.Debug("No criteria directory configured, skipping criteria loading")
 		return
 	}
 	if _, err := os.Stat(e.opts.CriteriaDir); os.IsNotExist(err) {
@@ -208,8 +204,12 @@ func (e *Engine) loadCriteria() {
 		slog.Warn("Failed to load grader configs", "dir", e.opts.CriteriaDir, "error", err)
 		return
 	}
+	if len(configs) == 0 {
+		slog.Warn("Criteria directory exists but contains no criteria configs", "dir", e.opts.CriteriaDir)
+		return
+	}
 	e.graderConfigs = configs
-	slog.Info("Loaded grader configs", "configs", len(configs), "dir", e.opts.CriteriaDir)
+	slog.Info("Loaded criteria", "dir", e.opts.CriteriaDir, "count", len(configs))
 }
 
 // loadGraders loads pluggable grader configs if GradersDir is configured (#136).
@@ -515,7 +515,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		TotalEvals:   len(tasks),
 	}
 
-	slog.Info("Starting run", "workers", e.opts.Workers, "max_sessions", e.opts.MaxSessions)
+	slog.Info("Starting run", "workers", e.opts.Workers)
 
 	start := time.Now()
 
@@ -536,7 +536,6 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	sem := make(chan struct{}, e.opts.Workers)
-	sessionSem := make(chan struct{}, e.opts.MaxSessions) // limits total concurrent Copilot sessions
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -545,16 +544,8 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		go func(t EvalTask) {
 			defer wg.Done()
 
-			// Acquire session semaphore first to limit total Copilot sessions.
-			// Use select so context cancellation unblocks waiting goroutines
-			// instead of leaking them (#129).
-			select {
-			case sessionSem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			defer func() { <-sessionSem }()
-
+			// Acquire worker semaphore. Use select so context cancellation
+			// unblocks waiting goroutines instead of leaking them (#129).
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
@@ -959,7 +950,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Use ResolveSkillDirs for accurate directory resolution (#291).
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, "")
+		resolved, err := tool.ResolveSkills(task.Config.Generator.Tools, "")
 		if err != nil {
 			slog.Warn("Failed to resolve skill directories for report", "error", err)
 		} else {
@@ -1385,9 +1376,6 @@ func buildRerunCommand(promptID, configName string, opts EngineOptions) string {
 	parts = append(parts, "--prompt-id", promptID)
 	parts = append(parts, "--config", configName)
 
-	if opts.SkipTests {
-		parts = append(parts, "--skip-tests")
-	}
 	if opts.SkipReview {
 		parts = append(parts, "--skip-review")
 	}
@@ -1432,24 +1420,24 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
 			entries := countSkillEntries(t.Config.Generator.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, "")
+			resolved, err := tool.ResolveSkills(t.Config.Generator.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
 			}
-			count := skills.CountSkills(resolved)
+			count := tool.CountSkills(resolved)
 			if entries > 0 {
 				e.printf("   Config %q: %d generator dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
 			}
 		}
 		if t.Config.Reviewer != nil {
 			entries := countSkillEntries(t.Config.Reviewer.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, "")
+			resolved, err := tool.ResolveSkills(t.Config.Reviewer.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue
 			}
-			count := skills.CountSkills(resolved)
+			count := tool.CountSkills(resolved)
 			if entries > 0 {
 				e.printf("   Config %q: %d reviewer dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
 			}

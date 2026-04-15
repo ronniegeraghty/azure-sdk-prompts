@@ -31,11 +31,11 @@ expected string
 {"config-file", ""},
 {"config-dir", "./configs"},
 {"workers", "0"},
-{"max-sessions", "0"},
 {"model", ""},
 {"output", "./reports"},
 {"progress", "auto"},
 {"max-session-actions", "50"},
+{"max-turns", "0"},
 {"max-files", "50"},
 {"max-output-size", "1MB"},
 {"criteria-dir", ""},
@@ -61,11 +61,9 @@ cmd.SetArgs([]string{"--help"})
 _ = cmd.Execute()
 
 falseFlags := []string{
-"skip-tests",
 "skip-review",
 "skip-trends",
 "dry-run",
-"stub",
 "yes",
 "all-configs",
 "allow-cloud",
@@ -379,7 +377,7 @@ for _, sub := range cmd.Commands() {
 names[sub.Name()] = true
 }
 
-expected := []string{"run", "list", "validate", "check-env", "configs", "trends", "report", "serve", "plugins", "new-prompt", "version", "clean", "compare", "init"}
+expected := []string{"run", "list", "validate", "check-env", "configs", "trends", "rerender", "serve", "plugins", "new-prompt", "version", "clean", "compare", "init"}
 for _, name := range expected {
 if !names[name] {
 t.Errorf("expected subcommand %q to be registered", name)

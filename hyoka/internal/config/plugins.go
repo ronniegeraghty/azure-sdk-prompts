@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 )
 
@@ -44,7 +45,7 @@ func (c *ToolConfig) ExpandPlugins(reg *plugin.Registry) error {
 		if reg != nil {
 			if p, err := reg.Get(name); err == nil {
 				for _, entry := range p.ToToolEntries() {
-					entries = append(entries, convertPluginToolEntry(entry))
+					entries = append(entries, tool.ConvertPluginEntry(entry))
 				}
 				continue
 			}
@@ -69,54 +70,12 @@ func (c *ToolConfig) ExpandPlugins(reg *plugin.Registry) error {
 		return nil
 	}
 	if c.Generator != nil {
-		c.Generator.Tools = appendToolEntries(c.Generator.Tools, entries)
+		c.Generator.Tools = tool.AppendEntries(c.Generator.Tools, entries)
 	}
 	if c.Reviewer != nil {
-		c.Reviewer.Tools = appendToolEntries(c.Reviewer.Tools, entries)
+		c.Reviewer.Tools = tool.AppendEntries(c.Reviewer.Tools, entries)
 	}
 	return nil
-}
-
-func convertPluginToolEntry(entry plugin.ToolEntry) ToolEntry {
-	return ToolEntry{
-		Name:     entry.Name,
-		Type:     entry.Type,
-		Source:   entry.Source,
-		Path:     entry.Path,
-		Repo:     entry.Repo,
-		Command:  entry.Command,
-		Args:     cloneStringSlice(entry.Args),
-		MCPTools: cloneStringSlice(entry.MCPTools),
-	}
-}
-
-func appendToolEntries(existing []ToolEntry, extras []ToolEntry) []ToolEntry {
-	if len(extras) == 0 {
-		return existing
-	}
-	seen := make(map[string]bool, len(existing))
-	for _, entry := range existing {
-		key := entry.ResolvedType() + ":" + entry.Name
-		seen[key] = true
-	}
-	for _, entry := range extras {
-		key := entry.ResolvedType() + ":" + entry.Name
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		existing = append(existing, entry)
-	}
-	return existing
-}
-
-func cloneStringSlice(values []string) []string {
-	if len(values) == 0 {
-		return nil
-	}
-	clone := make([]string, len(values))
-	copy(clone, values)
-	return clone
 }
 
 func resolvePluginsDir() string {

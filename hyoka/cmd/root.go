@@ -55,7 +55,7 @@ func rootCmd() *cobra.Command {
 	root.AddCommand(validateCmd())
 	root.AddCommand(checkEnvCmd())
 	root.AddCommand(trendsCmd())
-	root.AddCommand(reportCmd())
+	root.AddCommand(rerenderCmd())
 	root.AddCommand(newPromptCmd())
 	root.AddCommand(serveCmd())
 	root.AddCommand(pluginsCmd())

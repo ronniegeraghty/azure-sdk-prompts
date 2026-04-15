@@ -31,15 +31,12 @@ type runFlags struct {
 	configFile   string
 	configDir    string
 	workers      int
-	maxSessions  int
 	model        string
 	output       string
 	progressMode string
-	skipTests    bool
 	skipReview   bool
 	skipTrends   bool
 	dryRun       bool
-	useStub      bool
 	// Fan-out visibility (#34)
 	autoConfirm bool
 	allConfigs  bool
@@ -61,6 +58,8 @@ type runFlags struct {
 	sessionTimeout string
 	// Pairwise tool-ablation (#121)
 	pairwiseMode bool
+	// Max turns per generation session
+	maxTurns int
 	// Pre-flight model check (#264)
 	checkModels bool
 }
@@ -77,20 +76,19 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.configFile, "config-file", "", "Path to a specific configuration YAML file (default: load all from configs/)")
 	cmd.Flags().StringVar(&f.configDir, "config-dir", "./configs", "Directory containing configuration YAML files")
 	cmd.Flags().IntVar(&f.workers, "workers", 0, "Parallel evaluation workers (default: number of CPUs, max 8)")
-	cmd.Flags().IntVar(&f.maxSessions, "max-sessions", 0, "Maximum concurrent Copilot sessions (default: workers \u00d7 3)")
 	cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
+	cmd.Flags().MarkHidden("model")
 	cmd.Flags().StringVar(&f.output, "output", "./reports", "Report output directory")
-	cmd.Flags().BoolVar(&f.skipTests, "skip-tests", false, "Skip test generation")
 	cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
 	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, live, log, off")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
-	cmd.Flags().BoolVar(&f.useStub, "stub", false, "Use stub evaluator (no Copilot SDK)")
 	cmd.Flags().BoolVar(&f.skipTrends, "skip-trends", false, "Skip automatic trend analysis after run")
 	// Fan-out visibility (#34)
 	cmd.Flags().BoolVarP(&f.autoConfirm, "yes", "y", false, "Skip confirmation prompt for large runs (>10 evaluations)")
 	cmd.Flags().BoolVar(&f.allConfigs, "all-configs", false, "Run all configs when no --config filter is specified (required for multi-config runs)")
 	// Generator guardrails (#35)
 	cmd.Flags().IntVar(&f.maxSessionActions, "max-session-actions", 50, "Maximum actions per Copilot session (reasoning, response, or tool call each count as 1)")
+	cmd.Flags().IntVar(&f.maxTurns, "max-turns", 0, "Maximum conversation turns per generation (0 = use config/default)")
 	cmd.Flags().IntVar(&f.maxFiles, "max-files", 50, "Maximum generated files per evaluation before aborting")
 	cmd.Flags().StringVar(&f.maxOutputSize, "max-output-size", "1MB", "Maximum total output size per evaluation (e.g., 1MB, 512KB)")
 	// Generator safety (#36)
@@ -158,21 +156,22 @@ func runCmd() *cobra.Command {
 				}
 			}
 
+			// Resolve all paths first, before any loading
 			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
 			f.criteriaDir = resolveCriteriaDir(cmd)
+			f.configFile = resolveConfigFile(cmd)
+			configDir := resolveConfigDir(cmd)
 
 			// Load config(s)
 			var cfgFile *config.ConfigFile
 			if cmd.Flags().Changed("config-file") {
-				f.configFile = resolveConfigFile(cmd)
 				var err error
 				cfgFile, err = config.Load(f.configFile)
 				if err != nil {
 					return fmt.Errorf("loading config: %w", err)
 				}
 			} else {
-				configDir := resolveConfigDir(cmd)
 				var err error
 				cfgFile, err = config.LoadDir(configDir)
 				if err != nil {
@@ -270,100 +269,86 @@ func runCmd() *cobra.Command {
 			var evaluator eval.CopilotEvaluator
 			var reviewerFactory eval.ReviewerFactory
 
-			// Parse session-timeout flag early \u2014 needed for reviewer setup.
+			// Parse session-timeout flag early — needed for reviewer setup.
 			sessionTimeout, err := time.ParseDuration(f.sessionTimeout)
 			if err != nil {
 				return fmt.Errorf("invalid --session-timeout %q: %w", f.sessionTimeout, err)
 			}
 
-			if f.useStub {
-				slog.Info("Using stub evaluator", "reason", "--stub flag")
-				fmt.Println("Using stub evaluator (--stub flag)")
-				evaluator = &eval.StubEvaluator{}
-			} else {
-				// Try to create a real Copilot SDK evaluator
-				sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
-					AllowCloud:        f.allowCloud,
-					MaxSessionActions: f.maxSessionActions,
-				})
-				sdkEval.SetSessionTimeout(sessionTimeout)
-				evaluator = sdkEval
+			// Create a real Copilot SDK evaluator
+			sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
+				AllowCloud:        f.allowCloud,
+				MaxSessionActions: f.maxSessionActions,
+			})
+			sdkEval.SetSessionTimeout(sessionTimeout)
+			evaluator = sdkEval
 
+			// Skip SDK verification for dry-run — we don't need the Copilot CLI
+			if !f.dryRun {
 				// Verify Copilot CLI is available
-				client := copilot.NewClient(&copilot.ClientOptions{
-					Env: eval.HyokaBaseEnv(), // Tag verification process (#70)
-				})
+				client := copilot.NewClient(eval.BuildBaseClientOpts())
 				if err := client.Start(context.Background()); err != nil {
-					slog.Warn("Copilot SDK unavailable, falling back to stub", "error", err)
-					fmt.Printf("\u26a0\ufe0f  Copilot SDK unavailable (%v), falling back to stub evaluator\n", err)
-					evaluator = &eval.StubEvaluator{}
-				} else {
-					defer client.Stop() // #65: ensure cleanup on any exit path
-					slog.Info("Using Copilot SDK evaluator")
-					fmt.Println("Using Copilot SDK evaluator")
+					return fmt.Errorf("copilot SDK unavailable: %w", err)
+				}
+				defer client.Stop() // #65: ensure cleanup on any exit path
+				slog.Info("Using Copilot SDK evaluator")
+				fmt.Println("Using Copilot SDK evaluator")
 
-					clientOpts := &copilot.ClientOptions{
-						Env: eval.HyokaBaseEnv(), // Tag reviewer processes (#70)
-					}
-					if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-						clientOpts.LogLevel = "debug"
-					}
+				clientOpts := eval.BuildBaseClientOpts()
 
-					// Extract reviewer skill directories from configs
-					var reviewerSkillsDirs []string
-					for _, c := range configs {
-						if c.Reviewer != nil {
-							for _, entry := range c.Reviewer.Tools {
-								if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-									reviewerSkillsDirs = append(reviewerSkillsDirs, entry.Path)
-								}
+				// Extract reviewer skill directories from configs
+				var reviewerSkillsDirs []string
+				for _, c := range configs {
+					if c.Reviewer != nil {
+						for _, entry := range c.Reviewer.Tools {
+							if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
+								reviewerSkillsDirs = append(reviewerSkillsDirs, entry.Path)
 							}
 						}
 					}
+				}
 
-					// Create reviewer factory that builds a reviewer per config (#92)
-					reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
-						var reviewerModels []string
-						if cfg.Reviewer != nil && len(cfg.Reviewer.Models) > 0 {
-							reviewerModels = cfg.Reviewer.Models
-						}
-						if len(reviewerModels) == 0 {
-							return nil, nil, nil
-						}
+				// Create reviewer factory that builds a reviewer per config (#92)
+				reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+					var reviewerModels []string
+					if cfg.Reviewer != nil && len(cfg.Reviewer.Models) > 0 {
+						reviewerModels = cfg.Reviewer.Models
+					}
+					if len(reviewerModels) == 0 {
+						return nil, nil, nil
+					}
 
-						if len(reviewerModels) > 1 {
-							// Multi-model panel
-							panelReviewer := review.NewPanelReviewer(clientOpts, reviewerModels, f.maxSessionActions)
-							panelReviewer.SetSessionTimeout(sessionTimeout)
-							if len(reviewerSkillsDirs) > 0 {
-								panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
-							}
-							if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
-								panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
-							}
-							slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
-							return nil, panelReviewer, nil
-						}
-
-						// Single reviewer
-						reviewClient := copilot.NewClient(clientOpts)
-						if err := reviewClient.Start(context.Background()); err != nil {
-							return nil, nil, fmt.Errorf("could not start reviewer client: %w", err)
-						}
-						copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.maxSessionActions)
-						copilotReviewer.SetSessionTimeout(sessionTimeout)
+					if len(reviewerModels) > 1 {
+						// Multi-model panel
+						panelReviewer := review.NewPanelReviewer(clientOpts, reviewerModels, f.maxSessionActions)
+						panelReviewer.SetSessionTimeout(sessionTimeout)
 						if len(reviewerSkillsDirs) > 0 {
-							copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+							panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
 						}
 						if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
-							copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+							panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
 						}
-						slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
-						return copilotReviewer, nil, nil
+						slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
+						return nil, panelReviewer, nil
 					}
 
+					// Single reviewer
+					reviewClient := copilot.NewClient(clientOpts)
+					if err := reviewClient.Start(context.Background()); err != nil {
+						return nil, nil, fmt.Errorf("could not start reviewer client: %w", err)
+					}
+					copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.maxSessionActions)
+					copilotReviewer.SetSessionTimeout(sessionTimeout)
+					if len(reviewerSkillsDirs) > 0 {
+						copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+					}
+					if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
+						copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+					}
+					slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
+					return copilotReviewer, nil, nil
 				}
-			}
+			} // end if !f.dryRun
 
 			if f.skipReview {
 				reviewerFactory = nil
@@ -389,14 +374,13 @@ func runCmd() *cobra.Command {
 
 			engine := eval.NewEngineWithReviewerFactory(evaluator, reviewerFactory, eval.EngineOptions{
 				Workers:           f.workers,
-				MaxSessions:       f.maxSessions,
 				OutputDir:         f.output,
-				SkipTests:         f.skipTests,
 				SkipReview:        f.skipReview,
 				DryRun:            f.dryRun,
 				ProgressMode:      f.progressMode,
 				ConfirmLargeRuns:  true,
 				AutoConfirm:       f.autoConfirm,
+				MaxTurns:          f.maxTurns,
 				MaxSessionActions: f.maxSessionActions,
 				MaxFiles:          f.maxFiles,
 				MaxOutputSize:     maxOutputSize,
