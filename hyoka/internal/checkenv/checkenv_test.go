@@ -42,7 +42,7 @@ func TestCheckFunctionsDoNotPanic(t *testing.T) {
 		checkJava,
 		checkRust,
 		checkCpp,
-		checkCopilotCLI,
+		checkCopilotSDK,
 		checkCopilotAuth,
 		checkNpx,
 	}
