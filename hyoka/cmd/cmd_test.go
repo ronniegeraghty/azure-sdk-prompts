@@ -377,7 +377,7 @@ for _, sub := range cmd.Commands() {
 names[sub.Name()] = true
 }
 
-expected := []string{"run", "list", "validate", "check-env", "configs", "trends", "report", "serve", "plugins", "new-prompt", "version", "clean", "compare", "init"}
+expected := []string{"run", "list", "validate", "check-env", "configs", "trends", "rerender", "serve", "plugins", "new-prompt", "version", "clean", "compare", "init"}
 for _, name := range expected {
 if !names[name] {
 t.Errorf("expected subcommand %q to be registered", name)
