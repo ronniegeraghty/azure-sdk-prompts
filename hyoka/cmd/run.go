@@ -283,69 +283,72 @@ func runCmd() *cobra.Command {
 			sdkEval.SetSessionTimeout(sessionTimeout)
 			evaluator = sdkEval
 
-			// Verify Copilot CLI is available
-			client := copilot.NewClient(eval.BuildBaseClientOpts())
-			if err := client.Start(context.Background()); err != nil {
-				return fmt.Errorf("copilot SDK unavailable: %w", err)
-			}
-			defer client.Stop() // #65: ensure cleanup on any exit path
-			slog.Info("Using Copilot SDK evaluator")
-			fmt.Println("Using Copilot SDK evaluator")
+			// Skip SDK verification for dry-run — we don't need the Copilot CLI
+			if !f.dryRun {
+				// Verify Copilot CLI is available
+				client := copilot.NewClient(eval.BuildBaseClientOpts())
+				if err := client.Start(context.Background()); err != nil {
+					return fmt.Errorf("copilot SDK unavailable: %w", err)
+				}
+				defer client.Stop() // #65: ensure cleanup on any exit path
+				slog.Info("Using Copilot SDK evaluator")
+				fmt.Println("Using Copilot SDK evaluator")
 
-			clientOpts := eval.BuildBaseClientOpts()
+				clientOpts := eval.BuildBaseClientOpts()
 
-			// Extract reviewer skill directories from configs
-			var reviewerSkillsDirs []string
-			for _, c := range configs {
-				if c.Reviewer != nil {
-					for _, entry := range c.Reviewer.Tools {
-						if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-							reviewerSkillsDirs = append(reviewerSkillsDirs, entry.Path)
+				// Extract reviewer skill directories from configs
+				var reviewerSkillsDirs []string
+				for _, c := range configs {
+					if c.Reviewer != nil {
+						for _, entry := range c.Reviewer.Tools {
+							if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
+								reviewerSkillsDirs = append(reviewerSkillsDirs, entry.Path)
+							}
 						}
 					}
 				}
-			}
 
-			// Create reviewer factory that builds a reviewer per config (#92)
-			reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
-				var reviewerModels []string
-				if cfg.Reviewer != nil && len(cfg.Reviewer.Models) > 0 {
-					reviewerModels = cfg.Reviewer.Models
-				}
-				if len(reviewerModels) == 0 {
-					return nil, nil, nil
-				}
+				// Create reviewer factory that builds a reviewer per config (#92)
+				reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+					var reviewerModels []string
+					if cfg.Reviewer != nil && len(cfg.Reviewer.Models) > 0 {
+						reviewerModels = cfg.Reviewer.Models
+					}
+					if len(reviewerModels) == 0 {
+						return nil, nil, nil
+					}
 
-				if len(reviewerModels) > 1 {
-					// Multi-model panel
-					panelReviewer := review.NewPanelReviewer(clientOpts, reviewerModels, f.maxSessionActions)
-					panelReviewer.SetSessionTimeout(sessionTimeout)
+					if len(reviewerModels) > 1 {
+						// Multi-model panel
+						panelReviewer := review.NewPanelReviewer(clientOpts, reviewerModels, f.maxSessionActions)
+						panelReviewer.SetSessionTimeout(sessionTimeout)
+						if len(reviewerSkillsDirs) > 0 {
+							panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
+						}
+						if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
+							panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+						}
+						slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
+						return nil, panelReviewer, nil
+					}
+
+					// Single reviewer
+					reviewClient := copilot.NewClient(clientOpts)
+					if err := reviewClient.Start(context.Background()); err != nil {
+						return nil, nil, fmt.Errorf("could not start reviewer client: %w", err)
+					}
+					copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.maxSessionActions)
+					copilotReviewer.SetSessionTimeout(sessionTimeout)
 					if len(reviewerSkillsDirs) > 0 {
-						panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
+						copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
 					}
 					if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
-						panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+						copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
 					}
-					slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
-					return nil, panelReviewer, nil
+					slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
+					return copilotReviewer, nil, nil
 				}
-
-				// Single reviewer
-				reviewClient := copilot.NewClient(clientOpts)
-				if err := reviewClient.Start(context.Background()); err != nil {
-					return nil, nil, fmt.Errorf("could not start reviewer client: %w", err)
-				}
-				copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.maxSessionActions)
-				copilotReviewer.SetSessionTimeout(sessionTimeout)
-				if len(reviewerSkillsDirs) > 0 {
-					copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
-				}
-				if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
-					copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
-				}
-				slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
-				return copilotReviewer, nil, nil
-			}
+			} // end if !f.dryRun
 
 			if f.skipReview {
 				reviewerFactory = nil
