@@ -14,14 +14,14 @@ import (
 )
 
 // TestIntegrationStubEvalReviewPipeline runs the full engine pipeline with
-// StubEvaluator + StubReviewer and verifies that a valid report.json and
+// StubRunner + StubReviewer and verifies that a valid report.json and
 // summary.json are written to disk.
 func TestIntegrationStubEvalReviewPipeline(t *testing.T) {
 outputDir := t.TempDir()
 stubFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
 	return &review.StubReviewer{}, nil, nil
 }
-engine := NewEngineWithReviewerFactory(&StubEvaluator{}, stubFactory, quietOpts(EngineOptions{
+engine := NewEngineWithReviewerFactory(&StubRunner{}, stubFactory, quietOpts(EngineOptions{
 Workers:   1,
 OutputDir: outputDir,
 }))
@@ -143,7 +143,7 @@ outputDir := t.TempDir()
 stubFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
 	return &review.StubReviewer{}, nil, nil
 }
-engine := NewEngineWithReviewerFactory(&StubEvaluator{}, stubFactory, quietOpts(EngineOptions{
+engine := NewEngineWithReviewerFactory(&StubRunner{}, stubFactory, quietOpts(EngineOptions{
 Workers:   2,
 OutputDir: outputDir,
 }))
@@ -227,7 +227,7 @@ factoryCalls++
 return &review.StubReviewer{}, nil, nil
 }
 
-engine := NewEngineWithReviewerFactory(&StubEvaluator{}, factory, quietOpts(EngineOptions{
+engine := NewEngineWithReviewerFactory(&StubRunner{}, factory, quietOpts(EngineOptions{
 Workers:   1,
 OutputDir: outputDir,
 }))
@@ -261,7 +261,7 @@ t.Errorf("expected 2 evals, got %d", summary.TotalEvals)
 // the engine still writes valid report.json and summary.json.
 func TestIntegrationSkipReviewStillWritesReport(t *testing.T) {
 outputDir := t.TempDir()
-engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 Workers:    1,
 OutputDir:  outputDir,
 SkipReview: true,

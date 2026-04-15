@@ -22,8 +22,8 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
-// CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.
-type CopilotSDKEvaluator struct {
+// CopilotPromptRunner uses the Copilot SDK to run real evaluations.
+type CopilotPromptRunner struct {
 	clientOpts        *copilot.ClientOptions
 	allowCloud        bool
 	maxSessionActions int
@@ -32,19 +32,19 @@ type CopilotSDKEvaluator struct {
 }
 
 // SetProgressFunc registers a callback for live progress updates.
-func (e *CopilotSDKEvaluator) SetProgressFunc(fn progress.ProgressFunc) {
+func (e *CopilotPromptRunner) SetProgressFunc(fn progress.ProgressFunc) {
 	e.progressFn = fn
 }
 
 // SetSessionTimeout configures the maximum duration for a single generation
 // SendAndWait call. Zero means use the default (10 minutes). Per-prompt
 // Timeout frontmatter still overrides this value.
-func (e *CopilotSDKEvaluator) SetSessionTimeout(d time.Duration) {
+func (e *CopilotPromptRunner) SetSessionTimeout(d time.Duration) {
 	e.sessionTimeout = d
 }
 
-// CopilotEvalOptions configures the CopilotSDKEvaluator.
-type CopilotEvalOptions struct {
+// PromptRunnerOptions configures the CopilotPromptRunner.
+type PromptRunnerOptions struct {
 	// GitHubToken for SDK authentication (optional; falls back to logged-in user).
 	GitHubToken string
 	// CLIPath overrides the Copilot CLI executable path.
@@ -57,8 +57,8 @@ type CopilotEvalOptions struct {
 	MaxSessionActions int
 }
 
-// NewCopilotSDKEvaluator creates a new evaluator backed by the Copilot SDK.
-func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
+// NewCopilotPromptRunner creates a new evaluator backed by the Copilot SDK.
+func NewCopilotPromptRunner(opts PromptRunnerOptions) *CopilotPromptRunner {
 	clientOpts := BuildBaseClientOpts()
 	if opts.GitHubToken != "" {
 		clientOpts.GitHubToken = opts.GitHubToken
@@ -66,7 +66,7 @@ func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
 	if opts.CLIPath != "" {
 		clientOpts.CLIPath = opts.CLIPath
 	}
-	return &CopilotSDKEvaluator{
+	return &CopilotPromptRunner{
 		clientOpts:        clientOpts,
 		allowCloud:        opts.AllowCloud,
 		maxSessionActions: opts.MaxSessionActions,
@@ -74,7 +74,7 @@ func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
 }
 
 // Evaluate runs a prompt through a real Copilot session and returns generated files and events.
-func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	// Starter files are copied by the engine before Evaluate is called (#127).
 
 	// Create Copilot client
@@ -639,7 +639,7 @@ func detectFileCreation(content string) string {
 
 // Client returns a new Copilot client for the given working directory.
 // Exported for use by the review package.
-func (e *CopilotSDKEvaluator) Client(ctx context.Context, workDir string) (*copilot.Client, error) {
+func (e *CopilotPromptRunner) Client(ctx context.Context, workDir string) (*copilot.Client, error) {
 	opts := *e.clientOpts
 	opts.Cwd = workDir
 	client := copilot.NewClient(&opts)
@@ -658,7 +658,7 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 	return make(map[string]string)
 }
 
-func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
+func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
 	// Resolve skill directories from Generator.Tools using the skills package.
 	// This handles glob patterns, validates directories exist and contain skills,
 	// and warns about empty/missing directories (#291).

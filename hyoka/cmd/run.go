@@ -269,7 +269,7 @@ func runCmd() *cobra.Command {
 				len(filtered), effectiveConfigs, len(filtered)*effectiveConfigs)
 
 			// Select evaluator and reviewer
-			var evaluator eval.CopilotEvaluator
+			var evaluator eval.PromptRunner
 			var reviewerFactory eval.ReviewerFactory
 
 			// Parse session-timeout flag early — needed for reviewer setup.
@@ -279,7 +279,7 @@ func runCmd() *cobra.Command {
 			}
 
 			// Create a real Copilot SDK evaluator
-			sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
+			sdkEval := eval.NewCopilotPromptRunner(eval.PromptRunnerOptions{
 				AllowCloud:        f.allowCloud,
 				MaxSessionActions: f.maxSessionActions,
 			})

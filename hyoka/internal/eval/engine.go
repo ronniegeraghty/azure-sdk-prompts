@@ -46,20 +46,20 @@ type EvalResult struct {
 	CleanupFn func()
 }
 
-// CopilotEvaluator defines the interface for running evaluations.
-type CopilotEvaluator interface {
-	Evaluate(ctx context.Context, prompt *prompt.Prompt, config *config.ToolConfig, workDir string) (*EvalResult, error)
+// PromptRunner defines the interface for running evaluations.
+type PromptRunner interface {
+	Run(ctx context.Context, prompt *prompt.Prompt, config *config.ToolConfig, workDir string) (*EvalResult, error)
 }
 
 // ReviewerFactory creates a reviewer for a specific config.
 // Returns nil if no reviewer should be created (e.g., stub mode or review disabled).
 type ReviewerFactory func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error)
 
-// StubEvaluator returns placeholder results for testing.
-type StubEvaluator struct{}
+// StubRunner returns placeholder results for testing.
+type StubRunner struct{}
 
 // Evaluate returns a stub result and creates a stub output file in the workspace.
-func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+func (s *StubRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	// Write a stub file so file graders can find it on disk.
 	if workDir != "" {
 		if err := os.WriteFile(filepath.Join(workDir, "stub_output.txt"), []byte("stub"), 0644); err != nil {
@@ -123,7 +123,7 @@ type EngineOptions struct {
 
 // Engine orchestrates evaluation runs.
 type Engine struct {
-	evaluator       CopilotEvaluator
+	evaluator       PromptRunner
 	reviewerFactory ReviewerFactory
 	opts            EngineOptions
 	tracker         *process.ProcessTracker
@@ -132,12 +132,12 @@ type Engine struct {
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
-func NewEngine(evaluator CopilotEvaluator, opts EngineOptions) *Engine {
+func NewEngine(evaluator PromptRunner, opts EngineOptions) *Engine {
 	return NewEngineWithReviewerFactory(evaluator, nil, opts)
 }
 
 // NewEngineWithReviewerFactory creates a new Engine with an evaluator and reviewer factory.
-func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFactory, opts EngineOptions) *Engine {
+func NewEngineWithReviewerFactory(evaluator PromptRunner, factory ReviewerFactory, opts EngineOptions) *Engine {
 	if opts.Workers <= 0 {
 		w := runtime.NumCPU()
 		if w > 8 {
@@ -428,7 +428,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	// This prevents mid-eval failures from unavailable reviewer models
 	// (e.g. gemini-3-pro-preview).
 	if e.opts.CheckModels {
-		if checker, ok := e.evaluator.(*CopilotSDKEvaluator); ok {
+		if checker, ok := e.evaluator.(*CopilotPromptRunner); ok {
 			e.printf("🔍 Checking model availability...\n")
 			if err := checker.ValidateModelAvailability(ctx, configs); err != nil {
 				return nil, fmt.Errorf("pre-flight check failed: %w", err)
@@ -809,7 +809,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	sendPhase(progress.PhaseGenerating)
 
 	genStart := time.Now()
-	result, err := e.evaluator.Evaluate(genCtx, task.Prompt, &task.Config, genDir)
+	result, err := e.evaluator.Run(genCtx, task.Prompt, &task.Config, genDir)
 	genCtxErr := genCtx.Err() // capture before cancel to distinguish real cancellation from cleanup
 	genCancel()               // release generation context immediately
 	evalReport.GenerationDuration = time.Since(genStart).Seconds()

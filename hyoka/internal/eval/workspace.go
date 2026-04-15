@@ -182,7 +182,7 @@ func resolveStarterDir(p *prompt.Prompt) string {
 	return dir
 }
 
-// listFiles is a helper used by Workspace and CopilotSDKEvaluator.
+// listFiles is a helper used by Workspace and CopilotPromptRunner.
 func listFiles(dir string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {

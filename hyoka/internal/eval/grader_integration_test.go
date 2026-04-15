@@ -28,7 +28,7 @@ func TestEngineRunWithGraders(t *testing.T) {
 	}
 
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
 		GradersDir: gradersDir,
@@ -63,7 +63,7 @@ func TestEngineRunWithGraders(t *testing.T) {
 	if gr.GraderType != "file" {
 		t.Errorf("expected type 'file', got %q", gr.GraderType)
 	}
-	// StubEvaluator returns GeneratedFiles: ["stub_output.txt"]
+	// StubRunner returns GeneratedFiles: ["stub_output.txt"]
 	// The file grader checks path: "stub_output.txt" — should pass
 	if !r.Success {
 		t.Errorf("expected eval to succeed, got failure: %s", r.FailureReason)
@@ -85,7 +85,7 @@ func TestEngineRunWithGraderGateFails(t *testing.T) {
 	}
 
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
 		GradersDir: gradersDir,
@@ -141,7 +141,7 @@ func TestEngineRunWithGraderWhenFilter(t *testing.T) {
 	}
 
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
 		GradersDir: gradersDir,
@@ -175,7 +175,7 @@ func TestEngineRunWithGraderWhenFilter(t *testing.T) {
 func TestEngineRunNoGradersConfigured(t *testing.T) {
 	// No GradersDir set — should fall back to reviewer pipeline only
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:   1,
 		OutputDir: outputDir,
 	}))
