@@ -1,14 +1,12 @@
-package skills
+package tool
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 )
 
-func TestResolveLocal_SingleSkill(t *testing.T) {
+func TestResolveSkills_SingleSkill(t *testing.T) {
 	dir := t.TempDir()
 	skillDir := filepath.Join(dir, "my-skill")
 	if err := os.Mkdir(skillDir, 0755); err != nil {
@@ -18,7 +16,7 @@ func TestResolveLocal_SingleSkill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+	dirs, err := ResolveSkills([]Entry{
 		{Type: "skill", Source: "local", Path: skillDir, Name: "local-skill"},
 	}, dir)
 	if err != nil {
@@ -32,7 +30,7 @@ func TestResolveLocal_SingleSkill(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_SingleSkillMissingSKILLMD(t *testing.T) {
+func TestResolveSkills_SingleSkillMissingSKILLMD(t *testing.T) {
 	dir := t.TempDir()
 	skillDir := filepath.Join(dir, "my-skill")
 	if err := os.Mkdir(skillDir, 0755); err != nil {
@@ -40,7 +38,7 @@ func TestResolveLocal_SingleSkillMissingSKILLMD(t *testing.T) {
 	}
 	// No SKILL.md — should warn and return nothing
 
-	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+	dirs, err := ResolveSkills([]Entry{
 		{Type: "skill", Source: "local", Path: skillDir, Name: "local-skill"},
 	}, dir)
 	if err != nil {
@@ -51,7 +49,7 @@ func TestResolveLocal_SingleSkillMissingSKILLMD(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_SkillDir(t *testing.T) {
+func TestResolveSkills_SkillDir(t *testing.T) {
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, "skills", "generator")
 	if err := os.MkdirAll(skillsDir, 0755); err != nil {
@@ -69,7 +67,7 @@ func TestResolveLocal_SkillDir(t *testing.T) {
 		}
 	}
 
-	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+	dirs, err := ResolveSkills([]Entry{
 		{Type: "skill", Source: "local", Path: "skills/generator", Name: "gen-skills", SkillDir: true},
 	}, dir)
 	if err != nil {
@@ -80,7 +78,7 @@ func TestResolveLocal_SkillDir(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_SkillDirEmpty(t *testing.T) {
+func TestResolveSkills_SkillDirEmpty(t *testing.T) {
 	dir := t.TempDir()
 	emptyDir := filepath.Join(dir, "skills", "generator")
 	if err := os.MkdirAll(emptyDir, 0755); err != nil {
@@ -90,7 +88,7 @@ func TestResolveLocal_SkillDirEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+	dirs, err := ResolveSkills([]Entry{
 		{Type: "skill", Source: "local", Path: emptyDir, Name: "empty-skills", SkillDir: true},
 	}, dir)
 	if err != nil {
@@ -101,7 +99,7 @@ func TestResolveLocal_SkillDirEmpty(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_GlobPattern(t *testing.T) {
+func TestResolveSkills_GlobPattern(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"skill-a", "skill-b", "not-a-skill.txt"} {
 		p := filepath.Join(dir, "skills", name)
@@ -115,7 +113,7 @@ func TestResolveLocal_GlobPattern(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "skills", "readme.txt"), []byte("hi"), 0644)
 	_ = f
 
-	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+	dirs, err := ResolveSkills([]Entry{
 		{Type: "skill", Source: "local", Path: filepath.Join(dir, "skills", "*"), Name: "local-skill"},
 	}, dir)
 	if err != nil {
@@ -127,8 +125,8 @@ func TestResolveLocal_GlobPattern(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_EmptyEntries(t *testing.T) {
-	dirs, err := ResolveSkillDirs(nil, ".")
+func TestResolveSkills_EmptyEntries(t *testing.T) {
+	dirs, err := ResolveSkills(nil, ".")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,8 +135,8 @@ func TestResolveLocal_EmptyEntries(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_NonExistentDir(t *testing.T) {
-	dirs, err := ResolveSkillDirs([]config.ToolEntry{
+func TestResolveSkills_NonExistentDir(t *testing.T) {
+	dirs, err := ResolveSkills([]Entry{
 		{Type: "skill", Source: "local", Path: "/does/not/exist", Name: "missing"},
 	}, ".")
 	if err != nil {
@@ -187,8 +185,8 @@ func TestCountSkills_NilDirs(t *testing.T) {
 	}
 }
 
-func TestResolveLocal_InvalidType(t *testing.T) {
-	_, err := ResolveSkillDirs([]config.ToolEntry{
+func TestResolveSkills_InvalidType(t *testing.T) {
+	_, err := ResolveSkills([]Entry{
 		{Type: "skill", Source: "unknown", Path: "/some/path", Name: "bad-skill"},
 	}, ".")
 	if err == nil {

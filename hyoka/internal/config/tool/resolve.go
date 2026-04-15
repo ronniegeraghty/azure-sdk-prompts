@@ -1,6 +1,4 @@
-// Package skills resolves unified Skill entries into local directory paths
-// that can be passed to the Copilot SDK session as skill directories.
-package skills
+package tool
 
 import (
 	"fmt"
@@ -9,11 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 )
 
-// ResolveSkillDirs takes a list of tool entries and resolves the skill entries to
+// ResolveSkills takes a list of tool entries and resolves the skill entries to
 // absolute directory paths. The baseDir is used as the root for resolving
 // relative local paths.
 //
@@ -21,22 +17,22 @@ import (
 //   - source: local, skill_dir: true  → path is a directory of skills (subdirs contain SKILL.md)
 //   - source: local with glob         → each glob match is treated as a single skill directory
 //   - source: remote                  → fetches from GitHub repo via "npx skills add"
-func ResolveSkillDirs(entries []config.ToolEntry, baseDir string) ([]string, error) {
+func ResolveSkills(entries []Entry, baseDir string) ([]string, error) {
 	var dirs []string
 	for _, entry := range entries {
-		if entry.ResolvedType() != "skill" {
+		if entry.ResolvedType() != TypeSkill {
 			continue
 		}
 		switch entry.SkillSource() {
-		case "local":
+		case SourceLocal:
 			resolved, err := resolveLocal(entry, baseDir)
 			if err != nil {
 				return nil, fmt.Errorf("resolving local skill %q: %w", entry.Path, err)
 			}
 			slog.Debug("Resolved local skill", "path", entry.Path, "skill_dir", entry.SkillDir, "resolved_count", len(resolved))
 			dirs = append(dirs, resolved...)
-		case "remote":
-			dir, err := fetchRemote(entry, baseDir)
+		case SourceRemote:
+			dir, err := FetchRemote(entry, baseDir)
 			if err != nil {
 				return nil, fmt.Errorf("fetching remote skill %s/%s: %w", entry.Repo, entry.Name, err)
 			}
@@ -67,7 +63,7 @@ func CountSkills(dirs []string) int {
 // When entry.SkillDir is true, the path is a directory of skills — each
 // subdirectory containing SKILL.md is returned. When false (default), the
 // path points to a single skill directory. Glob patterns are also supported.
-func resolveLocal(entry config.ToolEntry, baseDir string) ([]string, error) {
+func resolveLocal(entry Entry, baseDir string) ([]string, error) {
 	path := entry.Path
 	// Make relative paths absolute based on baseDir
 	if !filepath.IsAbs(path) {
@@ -163,9 +159,9 @@ func resolveSkillDir(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-// fetchRemote fetches a remote skill from a GitHub repo using npx skills add.
+// FetchRemote fetches a remote skill from a GitHub repo using npx skills add.
 // Returns the directory where the skill was installed.
-func fetchRemote(entry config.ToolEntry, baseDir string) (string, error) {
+func FetchRemote(entry Entry, baseDir string) (string, error) {
 	// Determine install directory: use a skills cache dir under baseDir
 	installDir := filepath.Join(baseDir, ".skills-cache", entry.Repo)
 	if entry.Name != "" {

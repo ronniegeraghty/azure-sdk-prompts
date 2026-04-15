@@ -13,12 +13,12 @@ import (
 
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.
@@ -483,7 +483,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	slog.Info("Creating Copilot session",
 		"model", cfg.Generator.Model,
 		"skill_dirs", len(sessionCfg.SkillDirectories),
-		"skills", skills.CountSkills(sessionCfg.SkillDirectories),
+		"skills", tool.CountSkills(sessionCfg.SkillDirectories),
 		"mcp_servers", len(sessionCfg.MCPServers),
 		"work_dir", workDir,
 	)
@@ -663,7 +663,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// and warns about empty/missing directories (#291).
 	var skillDirs []string
 	if cfg.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(cfg.Generator.Tools, configDir)
+		resolved, err := tool.ResolveSkills(cfg.Generator.Tools, configDir)
 		if err != nil {
 			slog.Warn("Failed to resolve generator skill directories", "error", err)
 		} else {
@@ -695,7 +695,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// Without this hint, models tend to go straight to code generation
 	// and never invoke the skill tool, even when skills are loaded.
 	// Only add if there are actual skills, not just empty directories (#291).
-	if skills.CountSkills(skillDirs) > 0 {
+	if tool.CountSkills(skillDirs) > 0 {
 		systemMsg += "\n\nSKILLS:\n" +
 			"You have Azure SDK skills available. BEFORE writing any code, invoke the relevant skill " +
 			"using the skill tool to get SDK-specific patterns, API examples, and acceptance criteria. " +

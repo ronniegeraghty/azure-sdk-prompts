@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
@@ -24,7 +25,6 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // EvalResult holds the raw output from a Copilot evaluation.
@@ -950,7 +950,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Use ResolveSkillDirs for accurate directory resolution (#291).
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, "")
+		resolved, err := tool.ResolveSkills(task.Config.Generator.Tools, "")
 		if err != nil {
 			slog.Warn("Failed to resolve skill directories for report", "error", err)
 		} else {
@@ -1420,24 +1420,24 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
 			entries := countSkillEntries(t.Config.Generator.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, "")
+			resolved, err := tool.ResolveSkills(t.Config.Generator.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
 			}
-			count := skills.CountSkills(resolved)
+			count := tool.CountSkills(resolved)
 			if entries > 0 {
 				e.printf("   Config %q: %d generator dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
 			}
 		}
 		if t.Config.Reviewer != nil {
 			entries := countSkillEntries(t.Config.Reviewer.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, "")
+			resolved, err := tool.ResolveSkills(t.Config.Reviewer.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue
 			}
-			count := skills.CountSkills(resolved)
+			count := tool.CountSkills(resolved)
 			if entries > 0 {
 				e.printf("   Config %q: %d reviewer dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
 			}
