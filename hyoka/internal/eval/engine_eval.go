@@ -24,7 +24,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	genCtx, genCancel := context.WithCancel(ctx)
 	defer genCancel()
 
-	debugPrefix := task.Prompt.ID + "/" + task.Config.Name
 	// Structured logger with eval context fields (#42)
 	lg := logging.EvalLogger(task.Prompt.ID, task.Config.Name, "generation", 0)
 	start := time.Now()
@@ -123,19 +122,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
 		"starter_files", len(starterFiles))
 
-	// Snapshot home directory and CWD before eval so we can recover misplaced files after
-	homeDir, _ := os.UserHomeDir()
-	var preEvalHomeFiles map[string]bool
-	if homeDir != "" {
-		preEvalHomeFiles = snapshotDir(homeDir)
-	}
-	// Also snapshot CWD — agents may write files relative to the process working directory
-	cwdDir, _ := os.Getwd()
-	var preEvalCwdFiles map[string]bool
-	if cwdDir != "" && cwdDir != homeDir && cwdDir != ws.Dir {
-		preEvalCwdFiles = snapshotDir(cwdDir)
-	}
-
 	// Run evaluation (generation phase — uses its own timeout)
 	sendPhase(progress.PhaseGenerating)
 
@@ -183,28 +169,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Collect generated files — workspace listing is the primary source since
 	// ForceStop preserves files on disk.
-	// First, recover any files the agent wrote to the home directory instead of the workspace.
-	// The Copilot CLI sometimes creates files in ~ when the agent omits the path parameter.
-	if homeDir != "" && preEvalHomeFiles != nil {
-		recovered := recoverMisplacedFiles(homeDir, preEvalHomeFiles, genDir, debugPrefix)
-		if recovered > 0 {
-			lg.Info("Recovered misplaced files from home dir", "count", recovered)
-		}
-		// Post-recovery validation: flag anything recovery couldn't handle (#26)
-		if remaining := ValidateWorkspaceContainment(homeDir, preEvalHomeFiles); len(remaining) > 0 {
-			lg.Warn("Items still outside workspace after recovery (home)", "count", len(remaining), "items", remaining)
-		}
-	}
-	// Also recover from CWD
-	if cwdDir != "" && preEvalCwdFiles != nil {
-		recovered := recoverMisplacedFiles(cwdDir, preEvalCwdFiles, genDir, debugPrefix)
-		if recovered > 0 {
-			lg.Info("Recovered misplaced files from CWD", "count", recovered)
-		}
-		if remaining := ValidateWorkspaceContainment(cwdDir, preEvalCwdFiles); len(remaining) > 0 {
-			lg.Warn("Items still outside workspace after recovery (CWD)", "count", len(remaining), "items", remaining)
-		}
-	}
+	// PreToolUse hooks now enforce containment at the tool level (#346),
+	// so the snapshot-and-recovery approach is no longer needed.
 
 	// Copy generated files from isolated workspace to persistent report directory (#26)
 	if err := copyDir(genDir, ws.Dir); err != nil {
