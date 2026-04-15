@@ -884,3 +884,29 @@ func toolArgSummary(event copilot.SessionEvent) string {
 	}
 	return ""
 }
+
+// isolateSkills copies each resolved skill directory into the per-session
+// configDir so sessions don't share mutable skill state. Returns the new
+// isolated paths. If a copy fails, the original path is kept.
+func isolateSkills(resolved []string, configDir string) []string {
+	if len(resolved) == 0 {
+		return nil
+	}
+	skillsBase := filepath.Join(configDir, "skills")
+	if err := os.MkdirAll(skillsBase, 0755); err != nil {
+		slog.Warn("Failed to create per-session skills dir, using originals", "error", err)
+		return resolved
+	}
+	isolated := make([]string, 0, len(resolved))
+	for _, src := range resolved {
+		name := filepath.Base(src)
+		dst := filepath.Join(skillsBase, name)
+		if err := copyDir(src, dst); err != nil {
+			slog.Warn("Failed to isolate skill, using original", "skill", name, "error", err)
+			isolated = append(isolated, src)
+			continue
+		}
+		isolated = append(isolated, dst)
+	}
+	return isolated
+}
