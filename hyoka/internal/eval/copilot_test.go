@@ -9,7 +9,7 @@ import (
 )
 
 func TestBuildSessionConfig_EmptyToolsIsNil(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -28,7 +28,7 @@ func TestBuildSessionConfig_EmptyToolsIsNil(t *testing.T) {
 }
 
 func TestBuildSessionConfig_NilAvailableToolsIsNil(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name:      "test",
 		Generator: &config.GeneratorConfig{Model: "gpt-4"},
@@ -43,7 +43,7 @@ func TestBuildSessionConfig_NilAvailableToolsIsNil(t *testing.T) {
 }
 
 func TestBuildSessionConfig_PopulatedAvailableToolsPreserved(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -66,7 +66,7 @@ func TestBuildSessionConfig_PopulatedAvailableToolsPreserved(t *testing.T) {
 }
 
 func TestBuildSessionConfig_WorkingDirectory(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 	sc := e.buildSessionConfig(cfg, "/workspace/eval-123", "", nil)
 	if sc.WorkingDirectory != "/workspace/eval-123" {
@@ -75,7 +75,7 @@ func TestBuildSessionConfig_WorkingDirectory(t *testing.T) {
 }
 
 func TestBuildSessionConfig_ConfigDir(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 	sc := e.buildSessionConfig(cfg, "/workspace/eval-123", "/isolated/config", nil)
 	if sc.ConfigDir != "/isolated/config" {
@@ -84,7 +84,7 @@ func TestBuildSessionConfig_ConfigDir(t *testing.T) {
 }
 
 func TestBuildSessionConfig_PermissionHandler(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
 	if sc.OnPermissionRequest == nil {
@@ -93,7 +93,7 @@ func TestBuildSessionConfig_PermissionHandler(t *testing.T) {
 }
 
 func TestBuildSessionConfig_MCPServers(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -124,7 +124,7 @@ func TestBuildSessionConfig_MCPServers(t *testing.T) {
 // --- Tool filter resolution tests ---
 
 func TestBuildSessionConfig_ToolEntryResolution(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -156,7 +156,7 @@ func TestBuildSessionConfig_ToolEntryResolution(t *testing.T) {
 }
 
 func TestBuildSessionConfig_ToolEntryAllConditionalNoneMatch(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -173,7 +173,7 @@ func TestBuildSessionConfig_ToolEntryAllConditionalNoneMatch(t *testing.T) {
 }
 
 func TestBuildSessionConfig_ExcludedToolsWithToolEntries(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -240,7 +240,7 @@ func TestMergePromptProperties(t *testing.T) {
 }
 
 func TestBuildSessionConfig_CustomSystemPrompt(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 
 	cfg := &config.ToolConfig{
 		Name: "test",
@@ -257,7 +257,7 @@ func TestBuildSessionConfig_CustomSystemPrompt(t *testing.T) {
 }
 
 func TestBuildSessionConfig_EmptySystemPrompt(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 
 	cfg := &config.ToolConfig{
 		Name: "test",
@@ -335,7 +335,7 @@ configs:
 		},
 	}
 
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			props := mergePromptProperties(tt.prompt)
@@ -363,7 +363,7 @@ configs:
 }
 
 func TestIntegration_DuplicateToolEntries(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -385,7 +385,7 @@ func TestIntegration_DuplicateToolEntries(t *testing.T) {
 }
 
 func TestBuildSessionConfig_SystemPromptSet(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -410,7 +410,7 @@ func TestBuildSessionConfig_SystemPromptSet(t *testing.T) {
 }
 
 func TestBuildSessionConfig_SystemPromptEmpty(t *testing.T) {
-	e := &CopilotSDKEvaluator{}
+	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{
 		Name:      "test",
 		Generator: &config.GeneratorConfig{Model: "gpt-4"},
@@ -426,7 +426,7 @@ func TestBuildSessionConfig_SystemPromptEmpty(t *testing.T) {
 }
 
 func TestBuildSessionConfig_AllowCloudSkipsSafetyBoundaries(t *testing.T) {
-	e := &CopilotSDKEvaluator{allowCloud: true}
+	e := &CopilotPromptRunner{allowCloud: true}
 	cfg := &config.ToolConfig{
 		Name: "test",
 		Generator: &config.GeneratorConfig{
@@ -447,7 +447,7 @@ func TestBuildSessionConfig_AllowCloudSkipsSafetyBoundaries(t *testing.T) {
 }
 
 func TestBuildSessionConfig_AllowCloudNoSystemPrompt(t *testing.T) {
-	e := &CopilotSDKEvaluator{allowCloud: true}
+	e := &CopilotPromptRunner{allowCloud: true}
 	cfg := &config.ToolConfig{
 		Name:      "test",
 		Generator: &config.GeneratorConfig{Model: "gpt-4"},

@@ -18,6 +18,7 @@ var ProjectSubdirs = []string{
 	"prompts",
 	"criteria",
 	"skills",
+	"plugins",
 	"reports",
 }
 

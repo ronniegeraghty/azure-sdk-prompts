@@ -13,8 +13,9 @@ func configsCmd() *cobra.Command {
 	var configDir string
 
 	cmd := &cobra.Command{
-		Use:   "configs",
-		Short: "List available configurations",
+		Use:        "configs",
+		Short:      "List available configurations",
+		Deprecated: "use 'hyoka list' instead, which shows configs alongside prompts and criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var cfgFile *config.ConfigFile
 			if cmd.Flags().Changed("config-file") {

@@ -885,52 +885,6 @@ func TestScoreBreakdownJSONRoundTrip(t *testing.T) {
 	}
 }
 
-func TestScoreBreakdownInHTMLReport(t *testing.T) {
-	dir := t.TempDir()
-
-	graderResults := []GraderResult{
-		{GraderName: "build_check", GraderType: "program", Score: 1.0, Weight: 1.0, Pass: boolPtr(true), Gate: true},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.7, Weight: 2.0, Pass: boolPtr(true)},
-	}
-
-	r := &EvalReport{
-		SchemaVersion:  CurrentSchemaVersion,
-		PromptID:       "html-breakdown",
-		ConfigName:     "baseline",
-		Timestamp:      "2024-01-15T10:00:00Z",
-		Duration:       10.0,
-		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
-		ConfigUsed:     map[string]any{"name": "baseline"},
-		GeneratedFiles: []string{"main.py"},
-		GraderResults:  graderResults,
-		ScoreBreakdown: BuildScoreBreakdown(graderResults),
-		Success:        true,
-	}
-
-	htmlPath, err := WriteHTMLReport(r, dir, "run-html-bd", "identity", "data-plane", "python", "auth")
-	if err != nil {
-		t.Fatalf("WriteHTMLReport failed: %v", err)
-	}
-
-	data, err := os.ReadFile(htmlPath)
-	if err != nil {
-		t.Fatalf("failed to read HTML: %v", err)
-	}
-
-	html := string(data)
-	if !containsStr(html, "Score Breakdown") {
-		t.Error("HTML report should contain 'Score Breakdown' section")
-	}
-	if !containsStr(html, "build_check") {
-		t.Error("HTML report should contain grader name 'build_check'")
-	}
-	if !containsStr(html, "code_review") {
-		t.Error("HTML report should contain grader name 'code_review'")
-	}
-	if !containsStr(html, "Σ(grader_score") {
-		t.Error("HTML report should contain the formula")
-	}
-}
 
 func TestScoreBreakdownInMarkdownReport(t *testing.T) {
 	dir := t.TempDir()

@@ -505,10 +505,10 @@ func TestCleanupFn_NilSafe(t *testing.T) {
 	}
 }
 
-// TestCleanupFn_StubEvaluatorHasNoCleanup verifies StubEvaluator returns nil CleanupFn.
-func TestCleanupFn_StubEvaluatorHasNoCleanup(t *testing.T) {
-	stub := &StubEvaluator{}
-	result, err := stub.Evaluate(context.Background(),
+// TestCleanupFn_StubRunnerHasNoCleanup verifies StubRunner returns nil CleanupFn.
+func TestCleanupFn_StubRunnerHasNoCleanup(t *testing.T) {
+	stub := &StubRunner{}
+	result, err := stub.Run(context.Background(),
 		&prompt.Prompt{ID: "test"},
 		&config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "test"}},
 		t.TempDir())
@@ -516,6 +516,6 @@ func TestCleanupFn_StubEvaluatorHasNoCleanup(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result.CleanupFn != nil {
-		t.Error("StubEvaluator should have nil CleanupFn")
+		t.Error("StubRunner should have nil CleanupFn")
 	}
 }

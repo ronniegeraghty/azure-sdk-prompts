@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
@@ -28,24 +29,24 @@ func TestMain(m *testing.M) {
 // ProcessTracker so tests never scan/kill real Copilot CLI processes.
 func quietOpts(opts EngineOptions) EngineOptions {
 	opts.Stdout = io.Discard
-	opts.Tracker = &ProcessTracker{}
+	opts.Tracker = &process.ProcessTracker{}
 	return opts
 }
 
-// slowEvaluator blocks until context cancellation, simulating a timeout.
-type slowEvaluator struct{}
+// slowRunner blocks until context cancellation, simulating a timeout.
+type slowRunner struct{}
 
-func (s *slowEvaluator) Evaluate(ctx context.Context, _ *prompt.Prompt, _ *config.ToolConfig, _ string) (*EvalResult, error) {
+func (s *slowRunner) Run(ctx context.Context, _ *prompt.Prompt, _ *config.ToolConfig, _ string) (*EvalResult, error) {
 	<-ctx.Done()
 	return nil, fmt.Errorf("prompt send failed: %w", ctx.Err())
 }
 
-func TestStubEvaluator(t *testing.T) {
-stub := &StubEvaluator{}
+func TestStubRunner(t *testing.T) {
+stub := &StubRunner{}
 p := &prompt.Prompt{ID: "test-prompt", Properties: map[string]string{"language": "go"}}
 cfg := &config.ToolConfig{Name: "test-config", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 
-result, err := stub.Evaluate(context.Background(), p, cfg, t.TempDir())
+result, err := stub.Run(context.Background(), p, cfg, t.TempDir())
 if err != nil {
 t.Fatalf("unexpected error: %v", err)
 }
@@ -61,7 +62,7 @@ t.Error("expected IsStub to be true for stub evaluator")
 }
 
 func TestEngineDryRun(t *testing.T) {
-engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 Workers: 2,
 DryRun:  true,
 }))
@@ -110,7 +111,7 @@ func TestDryRunSkillDir_Populated(t *testing.T) {
 	var buf strings.Builder
 	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
 	opts.Stdout = &buf
-	engine := NewEngine(&StubEvaluator{}, opts)
+	engine := NewEngine(&StubRunner{}, opts)
 
 	prompts := []*prompt.Prompt{
 		{ID: "p1", Properties: map[string]string{"language": "python"}},
@@ -151,7 +152,7 @@ func TestDryRunSkillDir_Empty(t *testing.T) {
 	var buf strings.Builder
 	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
 	opts.Stdout = &buf
-	engine := NewEngine(&StubEvaluator{}, opts)
+	engine := NewEngine(&StubRunner{}, opts)
 
 	prompts := []*prompt.Prompt{
 		{ID: "p1", Properties: map[string]string{"language": "python"}},
@@ -182,7 +183,7 @@ func TestDryRunSkillDir_NonExistent(t *testing.T) {
 	var buf strings.Builder
 	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
 	opts.Stdout = &buf
-	engine := NewEngine(&StubEvaluator{}, opts)
+	engine := NewEngine(&StubRunner{}, opts)
 
 	prompts := []*prompt.Prompt{
 		{ID: "p1", Properties: map[string]string{"language": "python"}},
@@ -220,7 +221,7 @@ func TestDryRunSingleSkill_MissingSKILLMD(t *testing.T) {
 	var buf strings.Builder
 	opts := quietOpts(EngineOptions{Workers: 1, DryRun: true})
 	opts.Stdout = &buf
-	engine := NewEngine(&StubEvaluator{}, opts)
+	engine := NewEngine(&StubRunner{}, opts)
 
 	prompts := []*prompt.Prompt{
 		{ID: "p1", Properties: map[string]string{"language": "python"}},
@@ -249,7 +250,7 @@ func TestDryRunSingleSkill_MissingSKILLMD(t *testing.T) {
 
 func TestEngineRun(t *testing.T) {
 outputDir := t.TempDir()
-engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 Workers:   1,
 OutputDir: outputDir,
 }))
@@ -275,7 +276,7 @@ func TestEngineRunCapturesGeneratedFiles(t *testing.T) {
 	// files on disk (e.g., SDK cleanup removes them). The engine must use the
 	// evaluator's captured list rather than relying solely on ws.ListFiles().
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:   1,
 		OutputDir: outputDir,
 	}))
@@ -302,7 +303,7 @@ func TestEngineRunCapturesGeneratedFiles(t *testing.T) {
 
 func TestEngineRunTimeoutError(t *testing.T) {
 	// An evaluator that blocks until the context is cancelled.
-	slowEval := &slowEvaluator{}
+	slowEval := &slowRunner{}
 	outputDir := t.TempDir()
 	engine := NewEngine(slowEval, quietOpts(EngineOptions{
 		Workers:   1,
@@ -404,12 +405,12 @@ t.Error("expected workspace to be removed after cleanup")
 }
 }
 
-// manyFilesEvaluator generates N files to trigger the max-files guardrail.
-type manyFilesEvaluator struct {
+// manyFilesRunner generates N files to trigger the max-files guardrail.
+type manyFilesRunner struct {
 	fileCount int
 }
 
-func (m *manyFilesEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+func (m *manyFilesRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	var files []string
 	for i := 0; i < m.fileCount; i++ {
 		name := fmt.Sprintf("file_%d.txt", i)
@@ -424,12 +425,12 @@ func (m *manyFilesEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg
 	}, nil
 }
 
-// manyTurnsEvaluator produces session events to trigger the max-turns guardrail.
-type manyTurnsEvaluator struct {
+// manyTurnsRunner produces session events to trigger the max-turns guardrail.
+type manyTurnsRunner struct {
 	turnCount int
 }
 
-func (m *manyTurnsEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+func (m *manyTurnsRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	name := "output.txt"
 	os.WriteFile(filepath.Join(workDir, name), []byte("hello"), 0644)
 	var events []report.SessionEventRecord
@@ -446,7 +447,7 @@ func (m *manyTurnsEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg
 
 func TestGuardrailMaxFiles(t *testing.T) {
 	outputDir := t.TempDir()
-	engine := NewEngine(&manyFilesEvaluator{fileCount: 10}, quietOpts(EngineOptions{
+	engine := NewEngine(&manyFilesRunner{fileCount: 10}, quietOpts(EngineOptions{
 		Workers:   1,
 		OutputDir: outputDir,
 		SkipReview: true,
@@ -479,7 +480,7 @@ func TestGuardrailMaxFiles(t *testing.T) {
 func TestGuardrailMaxTurns(t *testing.T) {
 	outputDir := t.TempDir()
 	// 30 assistant.message events exceeds the default MaxTurns=25.
-	engine := NewEngine(&manyTurnsEvaluator{turnCount: 30}, quietOpts(EngineOptions{
+	engine := NewEngine(&manyTurnsRunner{turnCount: 30}, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
 		SkipReview: true,
@@ -516,7 +517,7 @@ func TestActionLimitSoftCap(t *testing.T) {
 	outputDir := t.TempDir()
 	// 10 events with MaxSessionActions=5 triggers the soft cap.
 	// MaxTurns=999 prevents the turn-count hard guardrail from firing.
-	engine := NewEngine(&manyTurnsEvaluator{turnCount: 10}, quietOpts(EngineOptions{
+	engine := NewEngine(&manyTurnsRunner{turnCount: 10}, quietOpts(EngineOptions{
 		Workers:           1,
 		OutputDir:         outputDir,
 		SkipReview:        true,
@@ -567,7 +568,7 @@ func TestActionLimitSoftCap(t *testing.T) {
 func TestGuardrailMaxOutputSize(t *testing.T) {
 	outputDir := t.TempDir()
 	// Use a custom evaluator that creates a large file
-	largeEval := &manyFilesEvaluator{fileCount: 1}
+	largeEval := &manyFilesRunner{fileCount: 1}
 	engine := NewEngine(largeEval, quietOpts(EngineOptions{
 		Workers:       1,
 		OutputDir:     outputDir,
@@ -600,7 +601,7 @@ func TestGuardrailMaxOutputSize(t *testing.T) {
 }
 
 func TestGuardrailDefaultValues(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	if engine.opts.MaxTurns != 25 {
 		t.Errorf("default MaxTurns: expected 25, got %d", engine.opts.MaxTurns)
 	}
@@ -616,7 +617,7 @@ func TestGuardrailDefaultValues(t *testing.T) {
 }
 
 func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "no-limits", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 25 { t.Errorf("expected maxTurns 25, got %d", lim.maxTurns) }
@@ -626,7 +627,7 @@ func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
 }
 
 func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "zero", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{}}
 	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 25 { t.Errorf("expected 25, got %d", lim.maxTurns) }
@@ -636,7 +637,7 @@ func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
 }
 
 func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "custom", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxFiles: 20, MaxOutputSize: 524288, MaxSessionActions: 30}}
 	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
@@ -646,7 +647,7 @@ func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
 }
 
 func TestResolveLimitsPartialOverride(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "partial", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10}}
 	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
@@ -656,7 +657,7 @@ func TestResolveLimitsPartialOverride(t *testing.T) {
 }
 
 func TestResolveLimitsPromptOverridesConfig(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxSessionActions: 30}}
 	p := &prompt.Prompt{ID: "test", MaxSessionActions: 100, MaxTurns: 40}
 	lim := engine.resolveLimits(cfg, p)
@@ -666,7 +667,7 @@ func TestResolveLimitsPromptOverridesConfig(t *testing.T) {
 }
 
 func TestResolveLimitsPromptOverridesDefaults(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "no-limits", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 	p := &prompt.Prompt{ID: "test", MaxSessionActions: 75}
 	lim := engine.resolveLimits(cfg, p)
@@ -675,7 +676,7 @@ func TestResolveLimitsPromptOverridesDefaults(t *testing.T) {
 }
 
 func TestResolveLimitsPromptPartialOverride(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxSessionActions: 30}}
 	p := &prompt.Prompt{ID: "test", MaxSessionActions: 100}
 	lim := engine.resolveLimits(cfg, p)
@@ -684,7 +685,7 @@ func TestResolveLimitsPromptPartialOverride(t *testing.T) {
 }
 
 func TestResolveLimitsPromptZeroDoesNotOverride(t *testing.T) {
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{}))
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	cfg := config.ToolConfig{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxSessionActions: 30}}
 	p := &prompt.Prompt{ID: "test", MaxSessionActions: 0, MaxTurns: 0}
 	lim := engine.resolveLimits(cfg, p)
@@ -694,7 +695,7 @@ func TestResolveLimitsPromptZeroDoesNotOverride(t *testing.T) {
 
 func TestConfigLimitsRespectedByGuardrail(t *testing.T) {
 	outputDir := t.TempDir()
-	engine := NewEngine(&manyTurnsEvaluator{turnCount: 15}, quietOpts(EngineOptions{Workers: 1, OutputDir: outputDir, SkipReview: true}))
+	engine := NewEngine(&manyTurnsRunner{turnCount: 15}, quietOpts(EngineOptions{Workers: 1, OutputDir: outputDir, SkipReview: true}))
 	prompts := []*prompt.Prompt{{ID: "config-limit-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}}}
 	configs := []config.ToolConfig{{Name: "strict", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 5, MaxSessionActions: 99}}}
 	summary, err := engine.Run(context.Background(), prompts, configs)
@@ -708,7 +709,7 @@ func TestConfigLimitsRespectedByGuardrail(t *testing.T) {
 
 func TestConfigLimitsOverrideEngineDefaults(t *testing.T) {
 	outputDir := t.TempDir()
-	engine := NewEngine(&manyFilesEvaluator{fileCount: 10}, quietOpts(EngineOptions{Workers: 1, OutputDir: outputDir, SkipReview: true, MaxFiles: 100}))
+	engine := NewEngine(&manyFilesRunner{fileCount: 10}, quietOpts(EngineOptions{Workers: 1, OutputDir: outputDir, SkipReview: true, MaxFiles: 100}))
 	prompts := []*prompt.Prompt{{ID: "override-test", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}}}
 	configs := []config.ToolConfig{{Name: "restrictive", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxFiles: 3}}}
 	summary, err := engine.Run(context.Background(), prompts, configs)
@@ -721,7 +722,7 @@ func TestConfigLimitsOverrideEngineDefaults(t *testing.T) {
 // Integration-style: full stub eval lifecycle — verifies reports are generated and result is consistent.
 func TestStubEvalLifecycle(t *testing.T) {
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
 		SkipReview: true,
@@ -795,7 +796,7 @@ func TestStubEvalLifecycle(t *testing.T) {
 // Integration-style: verify multi-prompt multi-config fan-out
 func TestMultiPromptMultiConfigFanOut(t *testing.T) {
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:    2,
 		OutputDir:  outputDir,
 		SkipReview: true,
@@ -851,7 +852,7 @@ func TestMultiPromptMultiConfigFanOut(t *testing.T) {
 // Integration-style: per-phase duration tracking
 func TestPhaseDurationTracking(t *testing.T) {
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
 		SkipReview: true,
@@ -883,7 +884,7 @@ func TestPhaseDurationTracking(t *testing.T) {
 func TestLargeRunAutoConfirmBypass(t *testing.T) {
 	// With AutoConfirm=true, a run of >10 evals should proceed without blocking on stdin.
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:          1,
 		OutputDir:        outputDir,
 		SkipReview:       true,
@@ -926,7 +927,7 @@ func TestLargeRunAutoConfirmBypass(t *testing.T) {
 func TestLargeRunConfirmAbort(t *testing.T) {
 	// With ConfirmLargeRuns=true and stdin providing "n", the run should abort.
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:          1,
 		OutputDir:        outputDir,
 		SkipReview:       true,
@@ -970,14 +971,14 @@ func TestLargeRunConfirmAbort(t *testing.T) {
 	}
 }
 
-func TestStubEvaluatorWriteErrorLogsWarning(t *testing.T) {
+func TestStubRunnerWriteErrorLogsWarning(t *testing.T) {
 	// When workDir is an invalid path, the stub evaluator should still
 	// succeed (logging a warning) rather than returning an error.
-	stub := &StubEvaluator{}
+	stub := &StubRunner{}
 	p := &prompt.Prompt{ID: "test-prompt", Properties: map[string]string{"language": "go"}}
 	cfg := &config.ToolConfig{Name: "test-config", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 
-	result, err := stub.Evaluate(context.Background(), p, cfg, filepath.Join(t.TempDir(), "nonexistent", "subdir"))
+	result, err := stub.Run(context.Background(), p, cfg, filepath.Join(t.TempDir(), "nonexistent", "subdir"))
 	if err != nil {
 		t.Fatalf("stub evaluator should not return an error even when write fails: %v", err)
 	}
@@ -993,7 +994,7 @@ func TestLargeRunConfirmNoTTY(t *testing.T) {
 	// With ConfirmLargeRuns=true and stdin closed (simulating piped/no-TTY input),
 	// the run should abort with an "no interactive input" error.
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:          1,
 		OutputDir:        outputDir,
 		SkipReview:       true,
@@ -1057,7 +1058,7 @@ graders:
 	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
 		return reviewer, nil, nil
 	}
-	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, reviewerFactory, quietOpts(EngineOptions{
+	engine := NewEngineWithReviewerFactory(&StubRunner{}, reviewerFactory, quietOpts(EngineOptions{
 		Workers:     1,
 		OutputDir:   t.TempDir(),
 		CriteriaDir: criteriaDir,
@@ -1087,7 +1088,7 @@ graders:
 
 func TestCriteriaDirNotExist(t *testing.T) {
 	// Non-existent criteria dir should not cause an error
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:     1,
 		OutputDir:   t.TempDir(),
 		CriteriaDir: "/nonexistent/path",
@@ -1111,7 +1112,7 @@ func TestCriteriaDirEmpty(t *testing.T) {
 	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
 		return reviewer, nil, nil
 	}
-	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, reviewerFactory, quietOpts(EngineOptions{
+	engine := NewEngineWithReviewerFactory(&StubRunner{}, reviewerFactory, quietOpts(EngineOptions{
 		Workers:     1,
 		OutputDir:   t.TempDir(),
 		CriteriaDir: t.TempDir(), // empty dir
@@ -1144,7 +1145,7 @@ func TestCancelledContextNoGoroutineLeak(t *testing.T) {
 	outputDir := t.TempDir()
 	// Use 1 worker but many tasks — excess goroutines would block on
 	// semaphore acquisition if context cancellation is not respected.
-	engine := NewEngine(&slowEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&slowRunner{}, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
 		SkipReview: true,
@@ -1190,7 +1191,7 @@ func TestCancelledContextNoGoroutineLeak(t *testing.T) {
 
 func TestStrictCleanupOptionWired(t *testing.T) {
 	// Verify StrictCleanup option flows through to the engine.
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:       1,
 		OutputDir:     t.TempDir(),
 		SkipReview:    true,
@@ -1202,7 +1203,7 @@ func TestStrictCleanupOptionWired(t *testing.T) {
 	}
 
 	// Verify it defaults to false
-	engine2 := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine2 := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:  1,
 		OutputDir: t.TempDir(),
 	}))

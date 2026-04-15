@@ -13,7 +13,6 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/trends"
 	"github.com/spf13/cobra"
@@ -179,6 +178,7 @@ func runCmd() *cobra.Command {
 				}
 			}
 
+			// ── Load all resources ──────────────────────────────────
 			// Get selected configs
 			var configNames []string
 			if f.configName != "" {
@@ -192,6 +192,24 @@ func runCmd() *cobra.Command {
 				return err
 			}
 
+			// Load prompts
+			prompts, err := prompt.LoadPrompts(f.prompts)
+			if err != nil {
+				return fmt.Errorf("loading prompts: %w", err)
+			}
+
+			// ── Apply filters ─────────────────────────────────────
+			filter := buildFilter(f)
+			filtered := prompt.FilterPrompts(prompts, filter)
+
+			if len(filtered) == 0 {
+				fmt.Println("\u2717 No prompts matched the given filters.")
+				if len(prompts) > 0 {
+					fmt.Printf("  (%d prompt(s) were loaded but none matched the specified filters)\n", len(prompts))
+				}
+				return fmt.Errorf("no prompts matched the given filters")
+			}
+
 			// Require --all-configs when multiple configs exist and no --config filter is specified (#34)
 			if f.configName == "" && len(configs) > 1 && !f.allConfigs {
 				fmt.Printf("\u26a0\ufe0f  Found %d configs but no --config filter specified.\n", len(configs))
@@ -199,6 +217,7 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("multiple configs found without --config or --all-configs flag")
 			}
 
+			// ── Config transformations ────────────────────────────
 			// Override model if specified via CLI flag
 			if f.model != "" {
 				for i := range configs {
@@ -230,23 +249,7 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("installing skills/plugins: %w", err)
 			}
 
-			// Load and filter prompts
-			prompts, err := prompt.LoadPrompts(f.prompts)
-			if err != nil {
-				return fmt.Errorf("loading prompts: %w", err)
-			}
-
-			filter := buildFilter(f)
-			filtered := prompt.FilterPrompts(prompts, filter)
-
-			if len(filtered) == 0 {
-				fmt.Println("\u2717 No prompts matched the given filters.")
-				if len(prompts) > 0 {
-					fmt.Printf("  (%d prompt(s) were loaded but none matched the specified filters)\n", len(prompts))
-				}
-				return fmt.Errorf("no prompts matched the given filters")
-			}
-
+			// ── Calculate eval matrix ─────────────────────────────
 			effectiveConfigs := 0
 			for _, c := range configs {
 				if c.Generator == nil {
@@ -266,7 +269,7 @@ func runCmd() *cobra.Command {
 				len(filtered), effectiveConfigs, len(filtered)*effectiveConfigs)
 
 			// Select evaluator and reviewer
-			var evaluator eval.CopilotEvaluator
+			var evaluator eval.PromptRunner
 			var reviewerFactory eval.ReviewerFactory
 
 			// Parse session-timeout flag early — needed for reviewer setup.
@@ -276,7 +279,7 @@ func runCmd() *cobra.Command {
 			}
 
 			// Create a real Copilot SDK evaluator
-			sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
+			sdkEval := eval.NewCopilotPromptRunner(eval.PromptRunnerOptions{
 				AllowCloud:        f.allowCloud,
 				MaxSessionActions: f.maxSessionActions,
 			})
@@ -432,21 +435,12 @@ func runCmd() *cobra.Command {
 						fmt.Println(analysis)
 						fmt.Println("-------------------")
 
-						// Re-write summary HTML with AI analysis included (Issue 7)
 						summary.Analysis = analysis
-						if _, err := report.WriteSummaryHTML(summary, f.output); err != nil {
-							slog.Warn("Failed to update summary with analysis", "error", err)
-							fmt.Printf("\u26a0\ufe0f  Failed to update summary with analysis: %v\n", err)
-						}
 					}
 
 					mdPath, _ := trends.WriteMarkdown(tr, trendsOutputDir)
-					htmlPath, _ := trends.WriteHTML(tr, trendsOutputDir)
 					if mdPath != "" {
 						fmt.Printf("Trend report (MD):   %s\n", mdPath)
-					}
-					if htmlPath != "" {
-						fmt.Printf("Trend report (HTML): %s\n", htmlPath)
 					}
 					fmt.Printf("Analyzed %d evaluation(s) across %d prompt(s)\n", tr.TotalRuns, len(tr.PromptTrends))
 				} else {

@@ -1,57 +1,92 @@
 package cmd
 
 import (
-"fmt"
+	"fmt"
+	"os"
+	"path/filepath"
 
-"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
-"github.com/spf13/cobra"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
+	"github.com/spf13/cobra"
 )
 
 func pluginsCmd() *cobra.Command {
-var pluginsDir string
+	var pluginsDir string
+	var skillsDir string
 
-cmd := &cobra.Command{
-Use:     "plugins",
-Aliases: []string{"tools"},
-Short:   "List available plugins",
-Long:  "Scans the plugins directory and lists all available plugin definitions with their skills and MCP servers.",
-RunE: func(cmd *cobra.Command, args []string) error {
-reg := plugin.NewRegistry()
-if err := reg.LoadDir(pluginsDir); err != nil {
-return fmt.Errorf("loading plugins: %w", err)
-}
+	cmd := &cobra.Command{
+		Use:     "tools",
+		Aliases: []string{"plugins"},
+		Short:   "List available tools and plugins",
+		Long: `Scans the plugins and skills directories and lists all available tool definitions
+with their skills, MCP servers, and source locations.
 
-plugins := reg.All()
-if len(plugins) == 0 {
-fmt.Printf("No plugins found in %s\n", pluginsDir)
-return nil
-}
+The "plugins" alias is supported for backward compatibility.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load from both plugins/ and skills/ directories
+			type sourceEntry struct {
+				plugin *plugin.Plugin
+				source string // "plugins" or "skills"
+			}
+			var entries []sourceEntry
 
-fmt.Printf("Found %d plugin(s) in %s:\n\n", len(plugins), pluginsDir)
-for _, p := range plugins {
-fmt.Printf("  %s", p.Name)
-if p.Description != "" {
-fmt.Printf(" \u2014 %s", p.Description)
-}
-fmt.Println()
-if len(p.Skills) > 0 {
-fmt.Printf("    Skills: %d\n", len(p.Skills))
-}
-if len(p.MCPServers) > 0 {
-fmt.Printf("    MCP Servers: %d\n", len(p.MCPServers))
-}
-if p.Hooks != nil {
-hooks := len(p.Hooks.PreToolUse) + len(p.Hooks.PostToolUse)
-if hooks > 0 {
-fmt.Printf("    Hooks: %d\n", hooks)
-}
-}
-}
-return nil
-},
-}
+			for _, dir := range []struct {
+				path  string
+				label string
+			}{
+				{pluginsDir, "plugins"},
+				{skillsDir, "skills"},
+			} {
+				if _, err := os.Stat(dir.path); os.IsNotExist(err) {
+					continue
+				}
+				reg := plugin.NewRegistry()
+				if err := reg.LoadDir(dir.path); err != nil {
+					return fmt.Errorf("loading %s from %s: %w", dir.label, dir.path, err)
+				}
+				for _, p := range reg.All() {
+					entries = append(entries, sourceEntry{plugin: p, source: dir.label})
+				}
+			}
 
-cmd.Flags().StringVar(&pluginsDir, "plugins-dir", "./plugins", "Directory containing plugin YAML files")
+			if len(entries) == 0 {
+				fmt.Printf("No tools found in %s or %s\n", pluginsDir, skillsDir)
+				return nil
+			}
 
-return cmd
+			fmt.Printf("Found %d tool(s):\n\n", len(entries))
+			for _, e := range entries {
+				p := e.plugin
+				// Determine display path
+				srcPath := p.Source
+				if rel, err := filepath.Rel(".", srcPath); err == nil {
+					srcPath = rel
+				}
+
+				fmt.Printf("  %s", p.Name)
+				if p.Description != "" {
+					fmt.Printf(" — %s", p.Description)
+				}
+				fmt.Println()
+				fmt.Printf("    Source: %s (%s)\n", srcPath, e.source)
+				if len(p.Skills) > 0 {
+					fmt.Printf("    Skills: %d\n", len(p.Skills))
+				}
+				if len(p.MCPServers) > 0 {
+					fmt.Printf("    MCP Servers: %d\n", len(p.MCPServers))
+				}
+				if p.Hooks != nil {
+					hooks := len(p.Hooks.PreToolUse) + len(p.Hooks.PostToolUse)
+					if hooks > 0 {
+						fmt.Printf("    Hooks: %d\n", hooks)
+					}
+				}
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&pluginsDir, "plugins-dir", "./plugins", "Directory containing plugin YAML files")
+	cmd.Flags().StringVar(&skillsDir, "skills-dir", "./skills", "Directory containing skill YAML files")
+
+	return cmd
 }

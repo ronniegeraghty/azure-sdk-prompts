@@ -15,7 +15,7 @@ func rerenderCmd() *cobra.Command {
 		Use:     "rerender [run-id]",
 		Aliases: []string{"report"},
 		Short:   "Re-render reports from saved JSON without re-running evaluations",
-		Long:    `Re-renders report.html, report.md, summary.html, and summary.md from existing report.json data using current templates. No evaluations are re-run. Useful after template improvements. The old name "report" is kept as an alias for backward compatibility.`,
+		Long:    `Re-renders report.md and summary.md from existing report.json data using current templates. No evaluations are re-run. Useful after template improvements. The old name "report" is kept as an alias for backward compatibility.`,
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			reportsDir = resolvePathFlag(cmd, "reports-dir", []string{"../reports", "./reports"})

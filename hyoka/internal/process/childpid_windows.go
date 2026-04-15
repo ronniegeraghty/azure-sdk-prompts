@@ -1,6 +1,6 @@
 //go:build windows
 
-package eval
+package process
 
 import (
 	"os"
@@ -9,11 +9,11 @@ import (
 	"unsafe"
 )
 
-// findChildCopilotPIDs returns PIDs of copilot processes that are direct
+// FindChildCopilotPIDs returns PIDs of copilot processes that are direct
 // children of the current process. It uses the documented
 // CreateToolhelp32Snapshot / Process32First / Process32Next API to enumerate
 // processes and match by parent PID and executable name.
-func findChildCopilotPIDs() []int {
+func FindChildCopilotPIDs() []int {
 	snap, err := syscall.CreateToolhelp32Snapshot(syscall.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return nil

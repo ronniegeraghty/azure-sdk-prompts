@@ -35,7 +35,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 		"Original Prompt",
 		"Generated Code",
 		"Reference Answer",
-		"Scoring Rubric",
+		"Scoring Instructions",
 		"passed",
 		"Program.cs",
 	}
@@ -71,7 +71,7 @@ func TestBuildReviewPromptWithEvaluationCriteria(t *testing.T) {
 
 	result := BuildReviewPrompt(prompt, generated, nil, criteria)
 
-	if !strings.Contains(result, "Prompt-Specific Evaluation Criteria") {
+	if !strings.Contains(result, "Evaluation Criteria") {
 		t.Error("expected evaluation criteria section")
 	}
 	if !strings.Contains(result, "DefaultAzureCredential") {
@@ -81,15 +81,9 @@ func TestBuildReviewPromptWithEvaluationCriteria(t *testing.T) {
 
 func TestBuildReviewPromptNoCriteria(t *testing.T) {
 	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, nil, "")
-	// The rubric may mention criteria, but the dynamic section header should
-	// not appear before the rubric when no criteria are passed.
-	rubricIdx := strings.Index(result, "# Review Scoring Rubric")
-	if rubricIdx < 0 {
-		rubricIdx = len(result)
-	}
-	beforeRubric := result[:rubricIdx]
-	if strings.Contains(beforeRubric, "## Prompt-Specific Evaluation Criteria") {
-		t.Error("should not contain criteria section header before rubric when criteria is empty")
+	// When no criteria are passed, the "Evaluation Criteria" section should not appear.
+	if strings.Contains(result, "## Evaluation Criteria") {
+		t.Error("should not contain criteria section header when criteria is empty")
 	}
 }
 
@@ -125,10 +119,10 @@ func TestBuildReviewPromptEmptyGeneratedFiles(t *testing.T) {
 	}
 }
 
-func TestBuildReviewPromptContainsRubric(t *testing.T) {
+func TestBuildReviewPromptContainsScoringInstructions(t *testing.T) {
 	result := BuildReviewPrompt("p", map[string]string{"f": "c"}, nil, "")
-	if !strings.Contains(result, "Scoring Rubric") {
-		t.Error("prompt should contain the embedded rubric")
+	if !strings.Contains(result, "Scoring Instructions") {
+		t.Error("prompt should contain scoring instructions")
 	}
 }
 

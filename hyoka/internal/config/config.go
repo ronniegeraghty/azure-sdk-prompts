@@ -76,7 +76,8 @@ func (tc *ToolConfig) Normalize() {
 
 	// Resolve installed Copilot CLI plugins to generator skills.
 	// Format: "plugin-name@marketplace" (e.g., "azure-sdk-java@skills")
-	// Resolves to: ~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/
+	// Resolves to: ~/.hyoka/cache/{marketplace}/{plugin}/skills/ (preferred)
+	// or ~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/ (fallback)
 	for _, p := range tc.Plugins {
 		if dir := resolveInstalledPlugin(p); dir != "" {
 			tc.Generator.Tools = append(tc.Generator.Tools, ToolEntry{
@@ -93,7 +94,8 @@ func (tc *ToolConfig) Normalize() {
 }
 
 // resolveInstalledPlugin resolves a plugin reference (e.g., "azure-sdk-java@skills")
-// to the local skills directory under ~/.copilot/installed-plugins/.
+// to the local skills directory. Checks ~/.hyoka/cache/ first (isolated cache),
+// then falls back to ~/.copilot/installed-plugins/ for backwards compatibility.
 // The format is "plugin-name@marketplace" where marketplace is the source
 // (e.g., "skills" from "/plugin marketplace add Microsoft/skills").
 // Returns the path to the plugin's skills directory, or empty string if not found.
@@ -102,7 +104,6 @@ func resolveInstalledPlugin(ref string) string {
 	if err != nil {
 		return ""
 	}
-	basePath := filepath.Join(home, ".copilot", "installed-plugins")
 
 	// Parse "plugin@marketplace" format
 	plugin, marketplace := ref, ""
@@ -116,16 +117,28 @@ func resolveInstalledPlugin(ref string) string {
 		}
 	}
 
-	// Try with marketplace subdirectory: ~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/
+	// Check ~/.hyoka/cache/ first (preferred isolated location).
+	hyokaCache := filepath.Join(home, ".hyoka", "cache")
+	if marketplace != "" {
+		dir := filepath.Join(hyokaCache, marketplace, plugin, "skills")
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return dir
+		}
+	}
+	dir := filepath.Join(hyokaCache, plugin, "skills")
+	if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		return dir
+	}
+
+	// Fallback: check ~/.copilot/installed-plugins/ for backwards compatibility.
+	basePath := filepath.Join(home, ".copilot", "installed-plugins")
 	if marketplace != "" {
 		dir := filepath.Join(basePath, marketplace, plugin, "skills")
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
 			return dir
 		}
 	}
-
-	// Fallback: try without marketplace: ~/.copilot/installed-plugins/{plugin}/skills/
-	dir := filepath.Join(basePath, plugin, "skills")
+	dir = filepath.Join(basePath, plugin, "skills")
 	if info, err := os.Stat(dir); err == nil && info.IsDir() {
 		return dir
 	}

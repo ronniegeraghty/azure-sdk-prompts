@@ -130,6 +130,7 @@ if nextLoc != nil {
 covBody = covBody[:nextLoc[0]]
 }
 p.EvaluationCriteria = strings.TrimSpace(covBody)
+p.ParsedCriteria = ParseEvaluationCriteria(p.EvaluationCriteria)
 }
 
 p.FilePath = filePath
@@ -155,6 +156,9 @@ return nil, fmt.Errorf("parsing YAML prompt %s: %w", filePath, err)
 p := rawToPrompt(&raw)
 p.PromptText = raw.PromptTextField
 p.EvaluationCriteria = raw.EvaluationCriteriaField
+if p.EvaluationCriteria != "" {
+p.ParsedCriteria = ParseEvaluationCriteria(p.EvaluationCriteria)
+}
 p.FilePath = filePath
 
 if p.ID == "" {
@@ -162,4 +166,47 @@ return nil, fmt.Errorf("prompt missing required 'id' field: %s", filePath)
 }
 
 return p, nil
+}
+
+// ParseEvaluationCriteria parses a raw evaluation criteria text into
+// structured CriterionEntry values. Top-level bullet points (lines starting
+// with "- ") become individual entries. Sub-points (lines starting with
+// "  - " under a parent) are grouped with the parent entry.
+func ParseEvaluationCriteria(text string) []CriterionEntry {
+if strings.TrimSpace(text) == "" {
+return nil
+}
+
+var entries []CriterionEntry
+var current *CriterionEntry
+
+for _, line := range strings.Split(text, "\n") {
+trimmed := strings.TrimRight(line, " \t\r")
+
+// Sub-point: starts with two+ spaces then "- "
+if (strings.HasPrefix(trimmed, "  - ") || strings.HasPrefix(trimmed, "\t- ")) && current != nil {
+sub := strings.TrimSpace(trimmed)
+sub = strings.TrimPrefix(sub, "- ")
+if sub != "" {
+current.SubPoints = append(current.SubPoints, sub)
+}
+continue
+}
+
+// Top-level bullet: starts with "- "
+if strings.HasPrefix(trimmed, "- ") {
+if current != nil {
+entries = append(entries, *current)
+}
+prompt := strings.TrimPrefix(trimmed, "- ")
+current = &CriterionEntry{Prompt: prompt}
+continue
+}
+}
+
+if current != nil {
+entries = append(entries, *current)
+}
+
+return entries
 }

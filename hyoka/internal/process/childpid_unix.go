@@ -1,6 +1,6 @@
 //go:build !windows
 
-package eval
+package process
 
 import (
 	"os"
@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-// findChildCopilotPIDs returns PIDs of copilot processes that are direct
+// FindChildCopilotPIDs returns PIDs of copilot processes that are direct
 // children of the current process. It scans /proc for processes whose PPID
 // matches our PID and whose command line contains "copilot".
-func findChildCopilotPIDs() []int {
+func FindChildCopilotPIDs() []int {
 	myPID := os.Getpid()
 	entries, err := os.ReadDir("/proc")
 	if err != nil {

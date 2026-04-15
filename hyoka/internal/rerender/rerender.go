@@ -19,7 +19,7 @@ type Options struct {
 	All        bool
 }
 
-// Run re-renders HTML/MD reports from existing report.json files.
+// Run re-renders Markdown reports from existing report.json files.
 func Run(opts Options) error {
 	if opts.All {
 		return rerenderAll(opts.ReportsDir)
@@ -77,11 +77,6 @@ func rerenderRun(reportsDir, runID string) error {
 		// Determine report directory components from the path
 		service, plane, language, category := extractMeta(evalReport)
 
-		// Write HTML
-		if _, err := report.WriteHTMLReport(evalReport, reportsDir, runID, service, plane, language, category); err != nil {
-			fmt.Printf("  ⚠️  HTML failed for %s: %v\n", evalReport.PromptID, err)
-		}
-
 		// Write Markdown
 		if _, err := report.WriteMarkdownReport(evalReport, reportsDir, runID, service, plane, language, category); err != nil {
 			fmt.Printf("  ⚠️  MD failed for %s: %v\n", evalReport.PromptID, err)
@@ -92,9 +87,6 @@ func rerenderRun(reportsDir, runID string) error {
 	if len(allReports) > 0 {
 		summary := buildSummaryFromReports(runID, allReports)
 
-		if _, err := report.WriteSummaryHTML(summary, reportsDir); err != nil {
-			fmt.Printf("  ⚠️  summary HTML failed: %v\n", err)
-		}
 		if _, err := report.WriteSummaryMarkdown(summary, reportsDir); err != nil {
 			fmt.Printf("  ⚠️  summary MD failed: %v\n", err)
 		}

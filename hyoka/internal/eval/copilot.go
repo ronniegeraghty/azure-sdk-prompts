@@ -16,13 +16,14 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
-// CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.
-type CopilotSDKEvaluator struct {
+// CopilotPromptRunner uses the Copilot SDK to run real evaluations.
+type CopilotPromptRunner struct {
 	clientOpts        *copilot.ClientOptions
 	allowCloud        bool
 	maxSessionActions int
@@ -31,19 +32,19 @@ type CopilotSDKEvaluator struct {
 }
 
 // SetProgressFunc registers a callback for live progress updates.
-func (e *CopilotSDKEvaluator) SetProgressFunc(fn progress.ProgressFunc) {
+func (e *CopilotPromptRunner) SetProgressFunc(fn progress.ProgressFunc) {
 	e.progressFn = fn
 }
 
 // SetSessionTimeout configures the maximum duration for a single generation
 // SendAndWait call. Zero means use the default (10 minutes). Per-prompt
 // Timeout frontmatter still overrides this value.
-func (e *CopilotSDKEvaluator) SetSessionTimeout(d time.Duration) {
+func (e *CopilotPromptRunner) SetSessionTimeout(d time.Duration) {
 	e.sessionTimeout = d
 }
 
-// CopilotEvalOptions configures the CopilotSDKEvaluator.
-type CopilotEvalOptions struct {
+// PromptRunnerOptions configures the CopilotPromptRunner.
+type PromptRunnerOptions struct {
 	// GitHubToken for SDK authentication (optional; falls back to logged-in user).
 	GitHubToken string
 	// CLIPath overrides the Copilot CLI executable path.
@@ -56,8 +57,8 @@ type CopilotEvalOptions struct {
 	MaxSessionActions int
 }
 
-// NewCopilotSDKEvaluator creates a new evaluator backed by the Copilot SDK.
-func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
+// NewCopilotPromptRunner creates a new evaluator backed by the Copilot SDK.
+func NewCopilotPromptRunner(opts PromptRunnerOptions) *CopilotPromptRunner {
 	clientOpts := BuildBaseClientOpts()
 	if opts.GitHubToken != "" {
 		clientOpts.GitHubToken = opts.GitHubToken
@@ -65,7 +66,7 @@ func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
 	if opts.CLIPath != "" {
 		clientOpts.CLIPath = opts.CLIPath
 	}
-	return &CopilotSDKEvaluator{
+	return &CopilotPromptRunner{
 		clientOpts:        clientOpts,
 		allowCloud:        opts.AllowCloud,
 		maxSessionActions: opts.MaxSessionActions,
@@ -73,14 +74,14 @@ func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
 }
 
 // Evaluate runs a prompt through a real Copilot session and returns generated files and events.
-func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	// Starter files are copied by the engine before Evaluate is called (#127).
 
 	// Create Copilot client
 	opts := *e.clientOpts
 	opts.Cwd = workDir
 	// Enrich env with prompt/config metadata for this specific eval (#70).
-	opts.Env = HyokaEvalEnv(p.ID, cfg.Name)
+	opts.Env = process.HyokaEvalEnv(p.ID, cfg.Name)
 	client := copilot.NewClient(&opts)
 
 	if err := client.Start(ctx); err != nil {
@@ -94,7 +95,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	// The PID is written to a file so the clean command can find orphaned
 	// processes even if hyoka crashes.
 	var trackedPIDs []int
-	for _, cpid := range findChildCopilotPIDs() {
+	for _, cpid := range process.FindChildCopilotPIDs() {
 		if err := pidfile.Write(pidfile.Info{PID: cpid, PromptID: p.ID, Config: cfg.Name}); err != nil {
 			slog.Debug("failed to write PID file", "pid", cpid, "error", err)
 		} else {
@@ -638,7 +639,7 @@ func detectFileCreation(content string) string {
 
 // Client returns a new Copilot client for the given working directory.
 // Exported for use by the review package.
-func (e *CopilotSDKEvaluator) Client(ctx context.Context, workDir string) (*copilot.Client, error) {
+func (e *CopilotPromptRunner) Client(ctx context.Context, workDir string) (*copilot.Client, error) {
 	opts := *e.clientOpts
 	opts.Cwd = workDir
 	client := copilot.NewClient(&opts)
@@ -657,7 +658,7 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 	return make(map[string]string)
 }
 
-func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
+func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
 	// Resolve skill directories from Generator.Tools using the skills package.
 	// This handles glob patterns, validates directories exist and contain skills,
 	// and warns about empty/missing directories (#291).
@@ -883,4 +884,30 @@ func toolArgSummary(event copilot.SessionEvent) string {
 		}
 	}
 	return ""
+}
+
+// isolateSkills copies each resolved skill directory into the per-session
+// configDir so sessions don't share mutable skill state. Returns the new
+// isolated paths. If a copy fails, the original path is kept.
+func isolateSkills(resolved []string, configDir string) []string {
+	if len(resolved) == 0 {
+		return nil
+	}
+	skillsBase := filepath.Join(configDir, "skills")
+	if err := os.MkdirAll(skillsBase, 0755); err != nil {
+		slog.Warn("Failed to create per-session skills dir, using originals", "error", err)
+		return resolved
+	}
+	isolated := make([]string, 0, len(resolved))
+	for _, src := range resolved {
+		name := filepath.Base(src)
+		dst := filepath.Join(skillsBase, name)
+		if err := copyDir(src, dst); err != nil {
+			slog.Warn("Failed to isolate skill, using original", "skill", name, "error", err)
+			isolated = append(isolated, src)
+			continue
+		}
+		isolated = append(isolated, dst)
+	}
+	return isolated
 }
