@@ -1212,3 +1212,57 @@ func TestStrictCleanupOptionWired(t *testing.T) {
 		t.Error("expected StrictCleanup to default to false")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tiered limits tests (#347)
+// ---------------------------------------------------------------------------
+
+func TestReviewerLimitsDefaultToHalfGenerator(t *testing.T) {
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:           1,
+		OutputDir:         t.TempDir(),
+		MaxTurns:          20,
+		MaxSessionActions: 40,
+	}))
+
+	if engine.opts.ReviewerMaxTurns != 10 {
+		t.Errorf("ReviewerMaxTurns = %d, want 10 (half of 20)", engine.opts.ReviewerMaxTurns)
+	}
+	if engine.opts.ReviewerMaxActions != 20 {
+		t.Errorf("ReviewerMaxActions = %d, want 20 (half of 40)", engine.opts.ReviewerMaxActions)
+	}
+}
+
+func TestReviewerLimitsMinimumFloor(t *testing.T) {
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:           1,
+		OutputDir:         t.TempDir(),
+		MaxTurns:          6,
+		MaxSessionActions: 10,
+	}))
+
+	if engine.opts.ReviewerMaxTurns < 5 {
+		t.Errorf("ReviewerMaxTurns = %d, want >= 5 (minimum floor)", engine.opts.ReviewerMaxTurns)
+	}
+	if engine.opts.ReviewerMaxActions < 10 {
+		t.Errorf("ReviewerMaxActions = %d, want >= 10 (minimum floor)", engine.opts.ReviewerMaxActions)
+	}
+}
+
+func TestReviewerLimitsExplicitOverride(t *testing.T) {
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:            1,
+		OutputDir:          t.TempDir(),
+		MaxTurns:           20,
+		MaxSessionActions:  40,
+		ReviewerMaxTurns:   8,
+		ReviewerMaxActions: 15,
+	}))
+
+	if engine.opts.ReviewerMaxTurns != 8 {
+		t.Errorf("ReviewerMaxTurns = %d, want 8 (explicit override)", engine.opts.ReviewerMaxTurns)
+	}
+	if engine.opts.ReviewerMaxActions != 15 {
+		t.Errorf("ReviewerMaxActions = %d, want 15 (explicit override)", engine.opts.ReviewerMaxActions)
+	}
+}
