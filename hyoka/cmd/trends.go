@@ -13,7 +13,6 @@ import (
 func trendsCmd() *cobra.Command {
 var promptID, service, language, reportsDir, output string
 var analyze bool
-var openBrowser bool
 
 cmd := &cobra.Command{
 Use:   "trends",
@@ -63,16 +62,6 @@ return fmt.Errorf("writing markdown trends: %w", err)
 }
 fmt.Printf("Markdown trend report: %s\n", mdPath)
 
-htmlPath, err := trends.WriteHTML(tr, output)
-if err != nil {
-return fmt.Errorf("writing HTML trends: %w", err)
-}
-fmt.Printf("HTML trend report:     %s\n", htmlPath)
-fmt.Printf("\nAnalyzed %d historical evaluation(s) across %d prompt(s)\n", tr.TotalRuns, len(tr.PromptTrends))
-
-if openBrowser && htmlPath != "" {
-openInBrowser(htmlPath)
-}
 
 return nil
 },
@@ -84,7 +73,6 @@ cmd.Flags().StringVar(&language, "language", "", "Filter trends by programming l
 cmd.Flags().StringVar(&reportsDir, "reports-dir", "./reports", "Directory containing past evaluation reports")
 cmd.Flags().StringVar(&output, "output", "./reports/trends", "Output directory for trend reports")
 cmd.Flags().BoolVar(&analyze, "analyze", true, "Run AI-powered analysis of trends (enabled by default)")
-cmd.Flags().BoolVar(&openBrowser, "open", false, "Auto-open the HTML trend report in the browser")
 
 // --no-analyze opt-out: cobra doesn't auto-generate negation flags,
 // so we register a separate bool and reconcile in PreRunE.

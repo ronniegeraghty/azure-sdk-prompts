@@ -1,4 +1,4 @@
-// Package report handles generation of JSON, HTML, and Markdown reports.
+// Package report handles generation of JSON and Markdown reports.
 package report
 
 import (
