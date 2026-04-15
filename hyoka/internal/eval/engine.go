@@ -78,10 +78,8 @@ func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *con
 
 // EngineOptions configures the evaluation engine.
 type EngineOptions struct {
-	Workers      int
-	MaxSessions  int // Maximum concurrent Copilot sessions (0 = workers × 2).
-	OutputDir    string
-	SkipTests    bool
+	Workers   int
+	OutputDir string
 	SkipReview   bool
 	DryRun       bool
 	ProgressMode string // "auto", "live", "log", "off"
@@ -145,9 +143,6 @@ func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFa
 			w = 8
 		}
 		opts.Workers = w
-	}
-	if opts.MaxSessions <= 0 {
-		opts.MaxSessions = opts.Workers * 2
 	}
 	if opts.OutputDir == "" {
 		opts.OutputDir = "./reports"
@@ -515,7 +510,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		TotalEvals:   len(tasks),
 	}
 
-	slog.Info("Starting run", "workers", e.opts.Workers, "max_sessions", e.opts.MaxSessions)
+	slog.Info("Starting run", "workers", e.opts.Workers)
 
 	start := time.Now()
 
@@ -536,7 +531,6 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	sem := make(chan struct{}, e.opts.Workers)
-	sessionSem := make(chan struct{}, e.opts.MaxSessions) // limits total concurrent Copilot sessions
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -545,16 +539,8 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		go func(t EvalTask) {
 			defer wg.Done()
 
-			// Acquire session semaphore first to limit total Copilot sessions.
-			// Use select so context cancellation unblocks waiting goroutines
-			// instead of leaking them (#129).
-			select {
-			case sessionSem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			defer func() { <-sessionSem }()
-
+			// Acquire worker semaphore. Use select so context cancellation
+			// unblocks waiting goroutines instead of leaking them (#129).
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
@@ -1385,9 +1371,6 @@ func buildRerunCommand(promptID, configName string, opts EngineOptions) string {
 	parts = append(parts, "--prompt-id", promptID)
 	parts = append(parts, "--config", configName)
 
-	if opts.SkipTests {
-		parts = append(parts, "--skip-tests")
-	}
 	if opts.SkipReview {
 		parts = append(parts, "--skip-review")
 	}

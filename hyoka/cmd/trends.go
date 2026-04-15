@@ -87,16 +87,14 @@ cmd.Flags().BoolVar(&analyze, "analyze", true, "Run AI-powered analysis of trend
 cmd.Flags().BoolVar(&openBrowser, "open", false, "Auto-open the HTML trend report in the browser")
 
 // --no-analyze opt-out: cobra doesn't auto-generate negation flags,
-// so we register a separate bool and reconcile in RunE.
+// so we register a separate bool and reconcile in PreRunE.
 var noAnalyze bool
 cmd.Flags().BoolVar(&noAnalyze, "no-analyze", false, "Skip AI-powered trend analysis")
-// Wire no-analyze into analyze before RunE executes
-origRunE := cmd.RunE
-cmd.RunE = func(cmd *cobra.Command, args []string) error {
-if noAnalyze {
+cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+if cmd.Flags().Changed("no-analyze") {
 analyze = false
 }
-return origRunE(cmd, args)
+return nil
 }
 
 return cmd

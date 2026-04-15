@@ -31,11 +31,11 @@ expected string
 {"config-file", ""},
 {"config-dir", "./configs"},
 {"workers", "0"},
-{"max-sessions", "0"},
 {"model", ""},
 {"output", "./reports"},
 {"progress", "auto"},
 {"max-session-actions", "50"},
+{"max-turns", "0"},
 {"max-files", "50"},
 {"max-output-size", "1MB"},
 {"criteria-dir", ""},
@@ -61,11 +61,9 @@ cmd.SetArgs([]string{"--help"})
 _ = cmd.Execute()
 
 falseFlags := []string{
-"skip-tests",
 "skip-review",
 "skip-trends",
 "dry-run",
-"stub",
 "yes",
 "all-configs",
 "allow-cloud",
