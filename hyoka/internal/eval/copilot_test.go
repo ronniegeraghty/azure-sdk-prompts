@@ -457,3 +457,62 @@ func TestBuildSessionConfig_AllowCloudNoSystemPrompt(t *testing.T) {
 		t.Errorf("expected SystemMessage nil when allowCloud=true and no system_prompt, got %+v", sc.SystemMessage)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Workspace containment tests (#346)
+// ---------------------------------------------------------------------------
+
+func TestExtractAbsPathsFromCommand(t *testing.T) {
+	tests := []struct {
+		cmd  string
+		want int
+	}{
+		{cmd: "ls -la", want: 0},
+		{cmd: "cat /etc/passwd", want: 1},
+		{cmd: "cp /home/user/file.txt /tmp/out.txt", want: 2},
+		{cmd: "echo hello", want: 0},
+		{cmd: "cd /workspace/test && ls", want: 1},
+	}
+	for _, tt := range tests {
+		paths := extractAbsPathsFromCommand(tt.cmd)
+		if len(paths) != tt.want {
+			t.Errorf("extractAbsPathsFromCommand(%q) returned %d paths, want %d: %v",
+				tt.cmd, len(paths), tt.want, paths)
+		}
+	}
+}
+
+func TestExtractAbsPathsFromCommandNormalizesTraversal(t *testing.T) {
+	paths := extractAbsPathsFromCommand("cat /workspace/../etc/passwd")
+	if len(paths) != 1 {
+		t.Fatalf("expected 1 path, got %d", len(paths))
+	}
+	// filepath.Abs normalizes the ../
+	if strings.Contains(paths[0], "..") {
+		t.Errorf("expected normalized path without .., got %q", paths[0])
+	}
+}
+
+func TestBuildSessionConfig_RemoteMCP(t *testing.T) {
+	e := &CopilotPromptRunner{}
+	cfg := &config.ToolConfig{
+		Name: "test",
+		Generator: &config.GeneratorConfig{
+			Model: "gpt-4",
+			Tools: []config.ToolEntry{
+				{Name: "remote-server", Type: "mcp", MCPType: "remote", URL: "https://mcp.example.com"},
+			},
+		},
+	}
+	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	if len(sc.MCPServers) != 1 {
+		t.Fatalf("expected 1 MCP server, got %d", len(sc.MCPServers))
+	}
+	serverCfg := sc.MCPServers["remote-server"]
+	if serverCfg["type"] != "remote" {
+		t.Errorf("expected type=remote, got %v", serverCfg["type"])
+	}
+	if serverCfg["url"] != "https://mcp.example.com" {
+		t.Errorf("expected url=https://mcp.example.com, got %v", serverCfg["url"])
+	}
+}

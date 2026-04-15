@@ -874,6 +874,23 @@ func isFileWriteTool(name string) bool {
 	return false
 }
 
+// extractAbsPathsFromCommand extracts absolute paths from a shell command string.
+// Used for containment checking of bash/shell tool invocations.
+func extractAbsPathsFromCommand(cmd string) []string {
+	var paths []string
+	for _, part := range strings.Fields(cmd) {
+		if strings.HasPrefix(part, "/") && len(part) > 1 {
+			abs, err := filepath.Abs(part)
+			if err == nil {
+				paths = append(paths, abs)
+			} else {
+				paths = append(paths, part)
+			}
+		}
+	}
+	return paths
+}
+
 // toolArgSummary extracts a short summary of the tool's primary argument.
 func toolArgSummary(event copilot.SessionEvent) string {
 	if event.Data.Path != nil && *event.Data.Path != "" {
