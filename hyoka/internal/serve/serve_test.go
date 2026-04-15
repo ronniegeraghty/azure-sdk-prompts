@@ -51,8 +51,6 @@ func setupTestDocs(t *testing.T) string {
 
 	os.WriteFile(filepath.Join(dir, "getting-started.md"), []byte("# Getting Started\n\nWelcome to hyoka."), 0644)
 	os.WriteFile(filepath.Join(dir, "architecture.md"), []byte("# Architecture\n\nOverview of the system."), 0644)
-	os.WriteFile(filepath.Join(dir, "cleanup-plan.md"), []byte("# Cleanup Plan\n\nInternal doc."), 0644)
-	os.WriteFile(filepath.Join(dir, "eval-tool-plan.md"), []byte("# Eval Tool Plan\n\nInternal doc."), 0644)
 
 	return dir
 }
@@ -249,7 +247,7 @@ func TestAPIDocsEndpoint(t *testing.T) {
 		t.Fatalf("failed to decode: %v", err)
 	}
 
-	// Should exclude internal docs
+	// All docs in the directory should be included
 	if len(docs) != 2 {
 		t.Fatalf("expected 2 docs, got %d: %+v", len(docs), docs)
 	}
@@ -261,8 +259,8 @@ func TestAPIDocsEndpoint(t *testing.T) {
 			t.Errorf("expected title for slug %q", d.Slug)
 		}
 	}
-	if slugs["cleanup-plan"] || slugs["eval-tool-plan"] {
-		t.Error("internal docs should be filtered out")
+	if !slugs["getting-started"] || !slugs["architecture"] {
+		t.Errorf("expected getting-started and architecture slugs, got %v", slugs)
 	}
 }
 
@@ -293,16 +291,16 @@ func TestAPIDocDetailEndpoint(t *testing.T) {
 	}
 }
 
-func TestAPIDocDetailInternalFiltered(t *testing.T) {
+func TestAPIDocDetailNotFound(t *testing.T) {
 	docsDir := setupTestDocs(t)
 	mux := buildMux(Options{ReportsDir: t.TempDir(), DocsDir: docsDir})
 
-	req := httptest.NewRequest("GET", "/api/docs/cleanup-plan", nil)
+	req := httptest.NewRequest("GET", "/api/docs/nonexistent-doc", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
-		t.Errorf("expected 404 for internal doc, got %d", rec.Code)
+		t.Errorf("expected 404 for nonexistent doc, got %d", rec.Code)
 	}
 }
 
@@ -436,17 +434,18 @@ func setupTestPrompts(t *testing.T) string {
 
 	promptContent := `---
 id: test-prompt-one
-service: identity
-plane: data-plane
-language: python
-category: auth
-difficulty: basic
-description: "Test prompt"
-sdk_package: azure-identity
+properties:
+  service: identity
+  plane: data-plane
+  language: python
+  category: auth
+  difficulty: basic
+  description: "Test prompt"
+  sdk_package: azure-identity
+  created: "2025-01-01"
+  author: test
 tags:
   - test
-created: "2025-01-01"
-author: test
 ---
 
 ## Prompt
@@ -457,18 +456,19 @@ This is a test prompt.
 
 	promptContent2 := `---
 id: test-prompt-two
-service: storage
-plane: management-plane
-language: go
-category: blobs
-difficulty: intermediate
-description: "Second test prompt"
-sdk_package: azure-storage-blob
+properties:
+  service: storage
+  plane: management-plane
+  language: go
+  category: blobs
+  difficulty: intermediate
+  description: "Second test prompt"
+  sdk_package: azure-storage-blob
+  created: "2025-02-01"
+  author: tester
 tags:
   - storage
   - blob
-created: "2025-02-01"
-author: tester
 ---
 
 ## Prompt

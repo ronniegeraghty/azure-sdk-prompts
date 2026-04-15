@@ -70,10 +70,16 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.plane, "plane", "", "Filter by data-plane/management-plane")
 	cmd.Flags().StringVar(&f.category, "category", "", "Filter by use-case category")
 	cmd.Flags().StringVar(&f.tags, "tags", "", "Filter by tags (comma-separated)")
-	cmd.Flags().StringVar(&f.promptID, "prompt-id", "", "Run a single prompt by ID")
+	cmd.Flags().StringVar(&f.promptID, "prompt-id", "", "Filter by a single prompt ID")
 	cmd.Flags().StringVar(&f.configName, "config", "", "Config name(s) from config file (comma-separated)")
 	cmd.Flags().StringVar(&f.configFile, "config-file", "", "Path to a specific configuration YAML file (default: load all from configs/)")
 	cmd.Flags().StringVar(&f.configDir, "config-dir", "./configs", "Directory containing configuration YAML files")
+	// Tiered criteria (#30)
+	cmd.Flags().StringVar(&f.criteriaDir, "criteria-dir", "", "Directory containing attribute-matched criteria YAML files (e.g., criteria/)")
+}
+
+// addRunFlags adds execution-only flags to the run command.
+func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().IntVar(&f.workers, "workers", 0, "Parallel evaluation workers (default: number of CPUs, max 8)")
 	cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
 	cmd.Flags().MarkHidden("model")
@@ -98,8 +104,6 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().BoolVar(&f.monitorResources, "monitor-resources", false, "Monitor CPU and memory usage of Copilot sessions during evaluation")
 	// Process lifecycle (#46)
 	cmd.Flags().BoolVar(&f.strictCleanup, "strict-cleanup", false, "Fail run with non-zero exit if orphaned Copilot processes remain after cleanup")
-	// Tiered criteria (#30)
-	cmd.Flags().StringVar(&f.criteriaDir, "criteria-dir", "", "Directory containing attribute-matched criteria YAML files (e.g., criteria/)")
 	// Directory exclusion (#63)
 	cmd.Flags().StringVar(&f.excludeDirs, "exclude-dirs", "", "Comma-separated directories to exclude from generated_files output (e.g., node_modules,target,dist)")
 	// Session timeout
@@ -282,6 +286,8 @@ func runCmd() *cobra.Command {
 			sdkEval := eval.NewCopilotPromptRunner(eval.PromptRunnerOptions{
 				AllowCloud:        f.allowCloud,
 				MaxSessionActions: f.maxSessionActions,
+				MaxTurns:          f.maxTurns,
+				MaxFiles:          f.maxFiles,
 			})
 			sdkEval.SetSessionTimeout(sessionTimeout)
 			evaluator = sdkEval
@@ -453,5 +459,6 @@ func runCmd() *cobra.Command {
 	}
 
 	addFilterFlags(cmd, f)
+	addRunFlags(cmd, f)
 	return cmd
 }

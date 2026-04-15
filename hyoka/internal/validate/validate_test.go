@@ -9,14 +9,15 @@ import (
 
 const validPrompt = `---
 id: storage-dp-dotnet-auth
-service: storage
-plane: data-plane
-language: dotnet
-category: authentication
-difficulty: basic
-description: "Authenticate to Azure Blob Storage"
-created: "2024-01-15"
-author: test
+properties:
+  service: storage
+  plane: data-plane
+  language: dotnet
+  category: authentication
+  difficulty: basic
+  description: "Authenticate to Azure Blob Storage"
+  created: "2024-01-15"
+  author: test
 ---
 
 # Storage Auth
@@ -28,14 +29,15 @@ Write auth code for Azure Blob Storage.
 
 const invalidServicePrompt = `---
 id: unknown-dp-dotnet-test
-service: unknown-service
-plane: data-plane
-language: dotnet
-category: authentication
-difficulty: basic
-description: "Test"
-created: "2024-01-15"
-author: test
+properties:
+  service: unknown-service
+  plane: data-plane
+  language: dotnet
+  category: authentication
+  difficulty: basic
+  description: "Test"
+  created: "2024-01-15"
+  author: test
 ---
 
 # Test
@@ -47,9 +49,10 @@ Some prompt text.
 
 const missingFieldsPrompt = `---
 id: storage-dp-dotnet-partial
-service: storage
-plane: data-plane
-language: dotnet
+properties:
+  service: storage
+  plane: data-plane
+  language: dotnet
 ---
 
 # Partial
@@ -61,14 +64,15 @@ Some prompt text.
 
 const badIDPrompt = `---
 id: wrong-prefix-dotnet
-service: storage
-plane: data-plane
-language: dotnet
-category: crud
-difficulty: basic
-description: "Bad ID"
-created: "2024-01-15"
-author: test
+properties:
+  service: storage
+  plane: data-plane
+  language: dotnet
+  category: crud
+  difficulty: basic
+  description: "Bad ID"
+  created: "2024-01-15"
+  author: test
 ---
 
 # Bad ID
@@ -80,14 +84,15 @@ Some prompt text.
 
 const noPromptSection = `---
 id: storage-dp-dotnet-noprompt
-service: storage
-plane: data-plane
-language: dotnet
-category: crud
-difficulty: basic
-description: "No prompt section"
-created: "2024-01-15"
-author: test
+properties:
+  service: storage
+  plane: data-plane
+  language: dotnet
+  category: crud
+  difficulty: basic
+  description: "No prompt section"
+  created: "2024-01-15"
+  author: test
 ---
 
 # No Prompt
@@ -272,7 +277,7 @@ t.Fatal("expected error for nonexistent directory")
 
 func TestValidateStarterProjectMissing(t *testing.T) {
 dir := t.TempDir()
-content := "---\nid: storage-dp-dotnet-starter\nservice: storage\nplane: data-plane\nlanguage: dotnet\ncategory: crud\ndifficulty: basic\ndescription: \"Test starter\"\ncreated: \"2024-01-15\"\nauthor: test\nstarter_project: ./nonexistent-starter/\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
+content := "---\nid: storage-dp-dotnet-starter\nproperties:\n  service: storage\n  plane: data-plane\n  language: dotnet\n  category: crud\n  difficulty: basic\n  description: \"Test starter\"\n  created: \"2024-01-15\"\n  author: test\nstarter_project: ./nonexistent-starter/\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
 writePromptFile(t, dir, "starter.prompt.md", content)
 
 result, err := Validate(dir)
@@ -297,7 +302,7 @@ func TestValidateStarterProjectNotADir(t *testing.T) {
 dir := t.TempDir()
 os.WriteFile(filepath.Join(dir, "starter"), []byte("not a directory"), 0644)
 
-content := "---\nid: storage-dp-dotnet-starter\nservice: storage\nplane: data-plane\nlanguage: dotnet\ncategory: crud\ndifficulty: basic\ndescription: \"Test starter\"\ncreated: \"2024-01-15\"\nauthor: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
+content := "---\nid: storage-dp-dotnet-starter\nproperties:\n  service: storage\n  plane: data-plane\n  language: dotnet\n  category: crud\n  difficulty: basic\n  description: \"Test starter\"\n  created: \"2024-01-15\"\n  author: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
 writePromptFile(t, dir, "starter.prompt.md", content)
 
 result, err := Validate(dir)
@@ -322,7 +327,7 @@ func TestValidateStarterProjectEmpty(t *testing.T) {
 dir := t.TempDir()
 os.MkdirAll(filepath.Join(dir, "starter"), 0755)
 
-content := "---\nid: storage-dp-dotnet-starter\nservice: storage\nplane: data-plane\nlanguage: dotnet\ncategory: crud\ndifficulty: basic\ndescription: \"Test starter\"\ncreated: \"2024-01-15\"\nauthor: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
+content := "---\nid: storage-dp-dotnet-starter\nproperties:\n  service: storage\n  plane: data-plane\n  language: dotnet\n  category: crud\n  difficulty: basic\n  description: \"Test starter\"\n  created: \"2024-01-15\"\n  author: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
 writePromptFile(t, dir, "starter.prompt.md", content)
 
 result, err := Validate(dir)
@@ -349,7 +354,7 @@ starterDir := filepath.Join(dir, "starter")
 os.MkdirAll(starterDir, 0755)
 os.WriteFile(filepath.Join(starterDir, "main.py"), []byte("# starter"), 0644)
 
-content := "---\nid: storage-dp-dotnet-starter\nservice: storage\nplane: data-plane\nlanguage: dotnet\ncategory: crud\ndifficulty: basic\ndescription: \"Test starter\"\ncreated: \"2024-01-15\"\nauthor: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
+content := "---\nid: storage-dp-dotnet-starter\nproperties:\n  service: storage\n  plane: data-plane\n  language: dotnet\n  category: crud\n  difficulty: basic\n  description: \"Test starter\"\n  created: \"2024-01-15\"\n  author: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
 writePromptFile(t, dir, "starter.prompt.md", content)
 
 result, err := Validate(dir)
@@ -367,7 +372,7 @@ starterDir := filepath.Join(dir, "starter")
 os.MkdirAll(starterDir, 0755)
 os.WriteFile(filepath.Join(starterDir, ".gitkeep"), []byte(""), 0644)
 
-content := "---\nid: storage-dp-dotnet-starter\nservice: storage\nplane: data-plane\nlanguage: dotnet\ncategory: crud\ndifficulty: basic\ndescription: \"Test starter\"\ncreated: \"2024-01-15\"\nauthor: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
+content := "---\nid: storage-dp-dotnet-starter\nproperties:\n  service: storage\n  plane: data-plane\n  language: dotnet\n  category: crud\n  difficulty: basic\n  description: \"Test starter\"\n  created: \"2024-01-15\"\n  author: test\nstarter_project: ./starter\n---\n\n# Starter Test\n\n## Prompt\n\nWrite code.\n"
 writePromptFile(t, dir, "starter.prompt.md", content)
 
 result, err := Validate(dir)
