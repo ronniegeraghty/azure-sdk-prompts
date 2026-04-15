@@ -1276,7 +1276,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			models := panelReviewer.Models()
 			rlg.Debug("Starting review panel")
 			sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
-			panel, consolidated, err := panelReviewer.ReviewPanel(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
+			panel, consolidated, skipped, err := panelReviewer.ReviewPanel(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
+			if len(skipped) > 0 {
+				evalReport.SkippedReviewers = skipped
+				rlg.Warn("Some reviewers were skipped", "skipped_count", len(skipped))
+			}
 			if err != nil {
 				rlg.Error("Review panel failed", "error", err)
 				sendEvent(progress.EventReasoning, fmt.Sprintf("Review panel failed: %v", err))
