@@ -34,10 +34,7 @@ type DocInfo struct {
 }
 
 // internalDocs lists documentation files that should be excluded from the API.
-var internalDocs = map[string]bool{
-	"cleanup-plan":   true,
-	"eval-tool-plan": true,
-}
+var internalDocs = map[string]bool{}
 
 // Start launches a local HTTP server for browsing reports.
 func Start(opts Options) error {

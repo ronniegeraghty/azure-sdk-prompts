@@ -55,8 +55,18 @@ func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 	case "tool":
 		return nil
 	case "mcp":
-		if entry.Command == "" {
-			return fmt.Errorf("config %q: tools[%d] mcp entry missing command", configName, idx)
+		mcpType := entry.ResolvedMCPType()
+		if mcpType == "remote" {
+			if entry.URL == "" {
+				return fmt.Errorf("config %q: tools[%d] remote mcp entry missing url", configName, idx)
+			}
+		} else {
+			if entry.Command == "" {
+				return fmt.Errorf("config %q: tools[%d] mcp entry missing command", configName, idx)
+			}
+		}
+		if entry.MCPType != "" && entry.MCPType != "local" && entry.MCPType != "remote" {
+			return fmt.Errorf("config %q: tools[%d] mcp entry has invalid mcp_type %q", configName, idx, entry.MCPType)
 		}
 	case "skill":
 		if entry.Path == "" && entry.Repo == "" {

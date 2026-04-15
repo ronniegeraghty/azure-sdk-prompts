@@ -790,10 +790,19 @@ func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir
 	if len(mcpEntries) > 0 {
 		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpEntries))
 		for _, entry := range mcpEntries {
-			mcpCfg := copilot.MCPServerConfig{
-				"type":    "local",
-				"command": entry.Command,
-				"args":    entry.Args,
+			mcpType := entry.ResolvedMCPType()
+			var mcpCfg copilot.MCPServerConfig
+			if mcpType == "remote" {
+				mcpCfg = copilot.MCPServerConfig{
+					"type": "remote",
+					"url":  entry.URL,
+				}
+			} else {
+				mcpCfg = copilot.MCPServerConfig{
+					"type":    "local",
+					"command": entry.Command,
+					"args":    entry.Args,
+				}
 			}
 			if len(entry.MCPTools) > 0 {
 				mcpCfg["tools"] = entry.MCPTools
@@ -801,8 +810,9 @@ func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir
 			sc.MCPServers[entry.Name] = mcpCfg
 			slog.Info("MCP server configured",
 				"name", entry.Name,
-				"type", "local",
+				"type", mcpType,
 				"command", entry.Command,
+				"url", entry.URL,
 				"args", entry.Args,
 				"tools", entry.MCPTools,
 			)
