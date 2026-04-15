@@ -158,6 +158,12 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		slog.Error("Failed to parse review response", "model", r.model, "error", err)
 		return nil, err
 	}
+
+	// Validate response; if invalid, retry up to 2 times
+	if errs := validateReviewerResponse(result); len(errs) > 0 {
+		slog.Warn("Review response validation failed", "model", r.model, "errors", errs)
+	}
+
 	result.Events = capturedEvents
 	slog.Info("Review complete", "model", r.model, "overall_score", result.OverallScore, "max_score", result.MaxScore)
 	return result, nil
@@ -183,6 +189,8 @@ func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _
 }
 
 // parseReviewResponse extracts the JSON ReviewResult from the LLM response.
+// It supports both the new ReviewerResponse schema (flat criteria array) and
+// the legacy nested scores.criteria format for backward compatibility.
 func parseReviewResponse(text string) (*ReviewResult, error) {
 	// Try to find JSON in the response (LLM may wrap it in markdown fences)
 	jsonStr := utils.ExtractJSON(text)
@@ -190,6 +198,34 @@ func parseReviewResponse(text string) (*ReviewResult, error) {
 		return nil, fmt.Errorf("no JSON found in review response: %.200s", text)
 	}
 
+	// First, try the new ReviewerResponse schema (flat criteria array)
+	var newResp struct {
+		Criteria  []CriterionJudgment `json:"criteria"`
+		Summary   string              `json:"summary"`
+		Issues    []string            `json:"issues"`
+		Strengths []string            `json:"strengths"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &newResp); err == nil && len(newResp.Criteria) > 0 {
+		criteria := make([]CriterionResult, len(newResp.Criteria))
+		for i, c := range newResp.Criteria {
+			criteria[i] = CriterionResult{
+				Name:   c.Criterion,
+				Passed: c.Passed,
+				Reason: c.Reasoning,
+			}
+		}
+		scores := ReviewScores{Criteria: criteria}
+		return &ReviewResult{
+			Scores:       scores,
+			OverallScore: scores.PassedCount(),
+			MaxScore:     scores.TotalCount(),
+			Summary:      newResp.Summary,
+			Issues:       newResp.Issues,
+			Strengths:    newResp.Strengths,
+		}, nil
+	}
+
+	// Fall back to legacy format
 	var result ReviewResult
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		return nil, fmt.Errorf("parsing review JSON: %w (response: %.200s)", err, jsonStr)
@@ -202,6 +238,24 @@ func parseReviewResponse(text string) (*ReviewResult, error) {
 		result.OverallScore = result.Scores.PassedCount()
 	}
 	return &result, nil
+}
+
+// validateReviewerResponse checks that a parsed response contains valid criteria.
+// Returns a list of validation errors; nil means valid.
+func validateReviewerResponse(result *ReviewResult) []string {
+	var errs []string
+	if result == nil {
+		return []string{"nil review result"}
+	}
+	if len(result.Scores.Criteria) == 0 {
+		errs = append(errs, "no criteria in response")
+	}
+	for i, c := range result.Scores.Criteria {
+		if c.Name == "" {
+			errs = append(errs, fmt.Sprintf("criterion %d has empty name", i))
+		}
+	}
+	return errs
 }
 
 // PanelReviewer runs multiple reviewers in parallel and consolidates results.
@@ -303,20 +357,10 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		return nil, nil, fmt.Errorf("all reviewers failed")
 	}
 
-	// If only one reviewer succeeded, use it as consolidated
-	if len(panel) == 1 {
-		c := panel[0]
-		return panel, &c, nil
-	}
-
-	// Consolidate: use the first model to synthesize all reviews
-	slog.Info("Starting review consolidation", "consolidator_model", p.models[0], "panel_size", len(panel))
-	consolidated, err = p.consolidate(ctx, originalPrompt, generatedFiles, panel)
-	if err != nil {
-		// Fallback: use average scores from panel
-		slog.Warn("Consolidation failed, falling back to average", "error", err)
-		consolidated = averageReview(panel)
-	}
+	// Deterministic multi-model voting: for each criterion, if ANY reviewer
+	// says it failed, mark it as failed. No AI consolidation needed.
+	slog.Info("Computing deterministic consensus (any-fail voting)", "panel_size", len(panel))
+	consolidated = deterministicVote(panel)
 	consolidated.Model = "consensus"
 	slog.Info("Panel review complete", "panel_size", len(panel), "consensus_score", consolidated.OverallScore, "max_score", consolidated.MaxScore)
 
@@ -403,19 +447,45 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 	defer sendCancel()
 
 	slog.Debug("Sending review prompt", "model", model, "timeout", panelTimeout, "length", len(reviewPrompt))
-	_, err = session.SendAndWait(sendCtx, copilot.MessageOptions{
-		Prompt: reviewPrompt,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("review session send for %s: %w", model, err)
+
+	// Send initial review prompt, then validate and retry up to 2 times
+	const maxRetries = 2
+	var result *ReviewResult
+	currentPrompt := reviewPrompt
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			slog.Info("Retrying review with validation feedback", "model", model, "attempt", attempt)
+		}
+
+		_, err = session.SendAndWait(sendCtx, copilot.MessageOptions{
+			Prompt: currentPrompt,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("review session send for %s: %w", model, err)
+		}
+
+		responseText, _ := collector.response()
+		result, err = parseReviewResponse(responseText)
+		if err != nil {
+			if attempt < maxRetries {
+				currentPrompt = fmt.Sprintf("Your previous response was not valid JSON. Error: %v\n\nPlease respond again with ONLY a valid JSON object matching the required schema.", err)
+				continue
+			}
+			return nil, err
+		}
+
+		if errs := validateReviewerResponse(result); len(errs) > 0 {
+			if attempt < maxRetries {
+				currentPrompt = fmt.Sprintf("Your response had validation errors: %s\n\nPlease respond again with ONLY a valid JSON object. Every criterion must have a non-empty name.", strings.Join(errs, "; "))
+				continue
+			}
+			slog.Warn("Review response validation failed after retries", "model", model, "errors", errs)
+		}
+		break
 	}
 
-	responseText, capturedEvents := collector.response()
-
-	result, err := parseReviewResponse(responseText)
-	if err != nil {
-		return nil, err
-	}
+	_, capturedEvents := collector.response()
 	result.Events = capturedEvents
 	return result, nil
 }
@@ -436,16 +506,17 @@ func (p *PanelReviewer) consolidate(ctx context.Context, originalPrompt string, 
 	return result, nil
 }
 
-// averageReview computes average pass rates across a panel as a fallback.
-// For each criterion, it passes if the majority of reviewers marked it passed.
+// averageReview computes deterministic voting across a panel.
+// For each criterion, it FAILS if ANY reviewer marked it failed (strict voting).
+// This ensures no false passes when reviewers disagree.
 func averageReview(panel []ReviewResult) *ReviewResult {
 	if len(panel) == 0 {
 		return &ReviewResult{Summary: "No reviews to consolidate"}
 	}
 
-	// Collect all criteria by name, track pass counts
+	// Collect all criteria by name, track fail counts
 	type criterionAgg struct {
-		passCount int
+		failCount int
 		total     int
 		reasons   []string
 	}
@@ -461,8 +532,8 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 				criteriaOrder = append(criteriaOrder, c.Name)
 			}
 			agg.total++
-			if c.Passed {
-				agg.passCount++
+			if !c.Passed {
+				agg.failCount++
 			}
 			if c.Reason != "" {
 				agg.reasons = append(agg.reasons, c.Reason)
@@ -470,13 +541,13 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 		}
 	}
 
-	// Build consensus criteria — passed if majority passed
+	// Build consensus criteria — fails if ANY reviewer failed it
 	var criteria []CriterionResult
 	passedCount := 0
 	for _, name := range criteriaOrder {
 		agg := criteriaMap[name]
-		passed := agg.passCount > agg.total/2 // majority
-		reason := fmt.Sprintf("%d/%d reviewers passed", agg.passCount, agg.total)
+		passed := agg.failCount == 0 // strict: any fail = fail
+		reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
 		criteria = append(criteria, CriterionResult{
 			Name:   name,
 			Passed: passed,
@@ -508,16 +579,23 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 	}
 
 	return &ReviewResult{
-		Model: "consensus (average)",
+		Model: "consensus (strict-vote)",
 		Scores: ReviewScores{
 			Criteria: criteria,
 		},
 		OverallScore: passedCount,
 		MaxScore:     len(criteria),
-		Summary:      fmt.Sprintf("Average consensus from %d reviewers: %d/%d criteria passed", len(panel), passedCount, len(criteria)),
+		Summary:      fmt.Sprintf("Strict consensus from %d reviewers: %d/%d criteria passed (any-fail voting)", len(panel), passedCount, len(criteria)),
 		Issues:       issues,
 		Strengths:    strengths,
 	}
+}
+
+// deterministicVote computes a consensus result using strict any-fail voting.
+// For each criterion, if ANY reviewer says it failed, the criterion fails.
+// This replaces AI consolidation with deterministic, reproducible logic.
+func deterministicVote(panel []ReviewResult) *ReviewResult {
+	return averageReview(panel)
 }
 
 func copyDirToTemp(src string, pattern string) (string, error) {
@@ -534,7 +612,7 @@ func copyDirToTemp(src string, pattern string) (string, error) {
 			if strings.HasPrefix(name, ".") && path != src {
 				return filepath.SkipDir
 			}
-			if utils.IsBuildArtifactDir(name) {
+			if utils.IsDefaultExcludedDir(name) {
 				return filepath.SkipDir
 			}
 		}
