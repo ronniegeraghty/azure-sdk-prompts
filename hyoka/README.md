@@ -1,451 +1,241 @@
-# hyoka — CLI Reference
+# hyoka — Developer Guide
 
-The `hyoka` tool evaluates AI agent code generation quality by running prompts from the `hyoka` prompt library through configurable Copilot sessions, verifying code with Copilot-based verification, reviewing code via a multi-model review panel with criteria-based pass/fail scoring, and generating JSON, HTML, and Markdown reports.
+> Internal developer reference for the `hyoka` Go source. For user-facing
+> documentation (installation, CLI usage, configuration), see the
+> [root README](../README.md) and [docs/](../docs/).
 
-## Prerequisites
+## Package Architecture
 
-- **Go 1.26.1+** — to build and run the tool
-- **GitHub Copilot CLI** — the SDK communicates with Copilot via the CLI in server mode. Must be installed and authenticated:
-  - Install: follow [GitHub Copilot CLI setup](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
-  - Authenticate: run `copilot` once to complete OAuth device flow, or set `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` env var
-  - Without this, the tool falls back to stub mode (no real evaluations)
-- **GitHub CLI (`gh`)** — optional but recommended for auth token management
-- **For `azure-mcp` config:** `npx` (Node.js) must be available since the Azure MCP server is launched via `npx -y @azure/mcp@latest`
+The CLI entry point is `main.go` → `cmd.Execute()`. All domain logic lives
+under `internal/`.
 
-## Installation
+### `cmd/`
 
-### Run from source (recommended for development)
+Cobra command definitions. Each file exports a `func xxxCmd() *cobra.Command`
+that is registered in `root.go` via `root.AddCommand(xxxCmd())`.
+
+### `internal/` packages
+
+| Package | What it does |
+|---------|-------------|
+| `checkenv` | Verifies required toolchains, Copilot CLI, MCP servers, and auth |
+| `clean` | Cleans stale Copilot session state, orphaned processes, and logs |
+| `comparison` | Config-vs-config, run-vs-run, and temporal diff analysis |
+| `config` | Loads and parses evaluation config YAML (generator, reviewer, tools) |
+| `criteria` | Tiered evaluation criteria with conditional YAML rule matching |
+| `eval` | Core evaluation engine — Copilot SDK session orchestration and workspace lifecycle |
+| `graders` | Pluggable grading system (6 kinds) with weighted scoring and gate semantics |
+| `logging` | Structured logging helpers on top of `log/slog` |
+| `pairwise` | Tool-ablation test variant expansion (disable one tool per variant) |
+| `pidfile` | Tracks SDK-spawned Copilot processes via PID files for orphan detection |
+| `plugin` | Composable plugin system bundling skills, MCP servers, and hooks |
+| `progress` | Progress display with live (ANSI), log, and off rendering modes |
+| `prompt` | Loads and parses `.prompt.md` files with YAML frontmatter and filters |
+| `report` | Generates JSON, HTML, and Markdown reports with aggregated statistics |
+| `rerender` | Re-renders HTML/Markdown reports from existing `report.json` files |
+| `review` | Multi-model LLM-as-judge code review via Copilot sessions |
+| `serve` | Local web server + API for browsing reports (serves the `site/` SPA) |
+| `trends` | Cross-run trend analysis (stable / improving / regressing / flaky) |
+| `utils` | Shared utilities — file I/O, string helpers, workspace handling |
+| `validate` | Prompt schema validation (required fields, enums, naming conventions) |
+
+### `site/`
+
+React + TypeScript SPA (Vite, Tailwind CSS). Proxies `/api` to the Go
+server during development. See `site/package.json` for scripts.
+
+## Build & Test
 
 ```bash
-cd hyoka
+# From the repo root (uses go.work):
+
+# Build
+go build ./hyoka/...
+
+# Test (always use -race)
+go test -race ./hyoka/...
+
+# Run the CLI
 go run ./hyoka <command> [flags]
+
+# Build the dashboard SPA
+cd site && npm ci && npm run build
 ```
 
-### Install globally
+## How to Add a New Command
+
+1. Create `hyoka/cmd/<name>.go`:
+
+```go
+package cmd
+
+import "github.com/spf13/cobra"
+
+func fooCmd() *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "foo",
+        Short: "One-line description",
+        RunE: func(cmd *cobra.Command, args []string) error {
+            // implementation
+            return nil
+        },
+    }
+    cmd.Flags().StringP("bar", "b", "", "Flag description")
+    return cmd
+}
+```
+
+2. Register in `hyoka/cmd/root.go`:
+
+```go
+root.AddCommand(fooCmd())
+```
+
+3. Add a test in `hyoka/cmd/<name>_test.go` — at minimum verify the command
+   creates without error and flag defaults are correct.
+
+## How to Add a New Grader
+
+Graders implement the `Grader` interface (`internal/graders/grader.go`):
+
+```go
+type Grader interface {
+    Kind() string                                                    // e.g. "file", "program"
+    Name() string                                                    // human-readable instance name
+    Grade(ctx context.Context, input GraderInput) (GraderResult, error)
+}
+```
+
+Steps:
+
+1. **Define the grader** — create `internal/graders/<kind>.go` with a struct
+   that satisfies `Grader`. Return a `GraderResult` with `Score` (0.0–1.0),
+   `Pass`, and optionally typed `*<Kind>Details`.
+
+2. **Define its config** — add a typed config struct and register it in
+   `DecodeConfig()` inside `internal/graders/config.go`.
+
+3. **Register in the factory** — add a `case` to the `switch` in
+   `NewGrader()` (`internal/graders/registry.go`).
+
+4. **Add the kind constant** — add `Kind<Name> = "<name>"` alongside the
+   existing constants.
+
+5. **Test** — add table-driven tests in `internal/graders/<kind>_test.go`.
+
+Existing kinds: `file`, `program`, `prompt`, `behavior`, `action_sequence`,
+`tool_constraint`.
+
+## How to Add a New Internal Package
+
+1. Create `hyoka/internal/<name>/` with a descriptive package name
+   (singular, lowercase).
+2. Export only what other packages need. Keep implementation details
+   unexported.
+3. Add `<name>_test.go` in the same directory — use table-driven tests
+   (see [Testing Patterns](#testing-patterns)).
+4. Do **not** introduce third-party logging — use `log/slog`.
+5. Return errors up the call stack with `fmt.Errorf("context: %w", err)`.
+   Never log-and-return.
+
+## Debugging Tips
 
 ```bash
-go install github.com/ronniegeraghty/hyoka@latest
-hyoka <command> [flags]
+# Verbose logging — writes to both stderr and the log file
+go run ./hyoka run --prompt-id <id> --config <cfg> \
+    --log-level debug --log-file hyoka-debug.log
+
+# Check for orphaned Copilot processes after a failed run
+go run ./hyoka clean
+
+# Verify environment prerequisites
+go run ./hyoka check-env
+
+# Dry-run to see which prompts match without executing
+go run ./hyoka run --service storage --language python --dry-run
+
+# Grep debug logs for role-tagged entries
+grep "role=" hyoka-debug.log | head -20
 ```
 
+## Testing Patterns
 
-## Features
+### Table-driven tests
 
-### Phase 1 (v0.1.0) ✅
-- Prompt library loading, filtering, and validation
-- Build verification for 9 languages (dotnet, Python, Go, Java, JS, TS, Rust, C++)
-- JSON report generation with directory hierarchy
-- Manifest generation and prompt validation
+```go
+func TestParseFoo(t *testing.T) {
+    tests := []struct {
+        name    string
+        input   string
+        want    Foo
+        wantErr bool
+    }{
+        {name: "valid", input: "bar", want: Foo{Val: "bar"}},
+        {name: "empty", input: "", wantErr: true},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got, err := ParseFoo(tt.input)
+            if (err != nil) != tt.wantErr {
+                t.Fatalf("ParseFoo(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+            }
+            if !tt.wantErr && got != tt.want {
+                t.Errorf("ParseFoo(%q) = %v, want %v", tt.input, got, tt.want)
+            }
+        })
+    }
+}
+```
 
-### Phase 2 (v0.2.0) ✅
-- **Copilot SDK integration** — Real code generation via `github.com/github/copilot-sdk/go`
-- **Multi-model review panel** — Multiple reviewer models evaluate code in parallel; first model consolidates with majority-vote consensus
-- **Criteria-based pass/fail scoring** — General criteria (Code Builds, Latest Package Versions, Best Practices, Error Handling, Code Quality) plus prompt-specific criteria from `## Evaluation Criteria` sections
-- **Reference answer comparison** — Optional reference code included in review prompt
-- **HTML reports** — Per-evaluation reports with criteria pass/fail visualization, review panel table with inline ✅/❌ icons and hover tooltips
-- **Summary dashboard** — Cross-config comparison with prompt pass rates, duration analysis by prompt, and prompt comparison section
-- **Reviewer action history** — Full event logs (tool calls, build attempts, version checks) captured per reviewer
-- **Graceful fallback** — Falls back to stub evaluator if Copilot CLI is unavailable
+### Race detection
 
-### Phase 2.1 (v0.3.0) ✅
-- **Copilot-based verification** — Separate Copilot session verifies code meets requirements (replaces build-only verification as default)
-- **Build verification optional** — Use `--verify-build` to also run language-specific build checks
-- **Session transcripts** — Full event capture (tool calls, assistant messages, errors) in JSON + HTML reports
-- **Failure diagnostics** — Failed evals show detailed error info, session events, and stub mode indicator
-- **Debug mode** — `--debug` streams real-time session events to stderr (tool calls, messages, verification/review status)
-- **Flat report structure** — Reports write to `reports/{timestamp}/` instead of `reports/runs/{timestamp}/`
-- **Evaluation Criteria** — Parser extracts `## Evaluation Criteria` sections from prompt files for review
-
-## Safety & Guardrails
-
-hyoka enforces safe defaults so evaluation runs are bounded and predictable without extra configuration.
-
-### Generator Guardrails
-
-Every code-generation session is automatically aborted if it exceeds:
-
-| Limit | Default | Flag | Description |
-|-------|---------|------|-------------|
-| Turn count | 25 | `--max-turns` | Maximum assistant conversation turns |
-| File count | 50 | `--max-files` | Maximum generated files |
-| Output size | 1 MB | `--max-output-size` | Maximum total output (supports KB, MB suffixes) |
-
-When a guardrail triggers, the evaluation is marked as failed with a descriptive reason (e.g., `guardrail: turn count 26 exceeded limit of 25`). Reports show these reasons instead of blank scores.
-
-### Safety Boundaries
-
-By default, generators receive a system instruction preventing real Azure resource provisioning. The agent will use mock data, local emulators (Azurite, CosmosDB emulator), environment variable placeholders, and IaC templates instead of live `az` CLI commands. Use `--allow-cloud` to opt out.
-
-### Fan-Out Confirmation
-
-Runs with more than 10 evaluations trigger a confirmation prompt. Use `-y` / `--yes` to skip. When multiple configs exist and no `--config` filter is specified, `--all-configs` is required.
-
-### Process Lifecycle
-
-All spawned Copilot processes are tracked via a `ProcessTracker`. On run completion or interrupt (SIGINT/SIGTERM), hyoka sends SIGTERM to all tracked processes, waits up to 5 seconds, then sends SIGKILL to any remaining. This prevents orphaned Copilot processes.
-
-### Smart Concurrency
-
-Workers default to the number of CPU cores (capped at 8). `--max-sessions` limits total concurrent Copilot instances to `workers × 3` by default.
-
-### Prompt Discovery
-
-`validate` and `run` fail with a clear error when zero prompts match. Near-miss detection scans for common naming mistakes and suggests corrections:
-- `auth-prompt.md` → `auth.prompt.md` (hyphen vs. dot separator)
-- `crud.prompt.txt` → `crud.prompt.md` (wrong extension)
-- `*.md` files with YAML frontmatter that aren't named `*.prompt.md`
-
-## Authentication
-
-The Copilot SDK evaluator requires a running Copilot CLI with valid authentication. The SDK will:
-1. Try `GITHUB_TOKEN` environment variable
-2. Try the logged-in user's GitHub CLI (`gh`) auth token
-3. If neither is available, fall back to the stub evaluator with a warning
-
-Use `--stub` to explicitly skip SDK initialization and use the stub evaluator.
-
-## Commands
-
-### `hyoka run`
-
-Run evaluations against the prompt library.
+Always run tests with `-race`:
 
 ```bash
-hyoka run [flags]
+go test -race ./hyoka/...
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--prompts` | `./prompts` (auto-detected) | Path to prompt library directory |
-| `--service` | | Filter by Azure service |
-| `--language` | | Filter by programming language |
-| `--plane` | | Filter by data-plane / management-plane |
-| `--category` | | Filter by use-case category |
-| `--tags` | | Filter by tags (comma-separated) |
-| `--prompt-id` | | Run a single prompt by ID |
-| `--config` | all | Config name(s) (comma-separated) |
-| `--config-file` | (auto-detected from `configs/` dir) | Path to configuration YAML |
-| `--workers` | CPU cores (max 8) | Parallel evaluation workers |
-| `--max-sessions` | workers × 3 | Maximum concurrent Copilot sessions |
-| `--timeout` | `300` | Per-prompt timeout in seconds |
-| `--model` | | Override model for all configs |
-| `--output` | `./reports` | Report output directory |
-| `--skip-tests` | `false` | Skip test generation |
-| `--skip-review` | `false` | Skip multi-model code review panel |
-| `--verify-build` | `false` | Also run build verification (in addition to Copilot verification) |
-| `--stub` | `false` | Force stub evaluator (no Copilot SDK) |
-| `--debug` | `false` | Verbose output |
-| `--dry-run` | `false` | List matches without executing |
-| `-y` / `--yes` | `false` | Skip confirmation prompt for large runs (>10 evaluations) |
-| `--all-configs` | `false` | Required when running all configs without a `--config` filter |
-| `--max-turns` | `25` | Maximum conversation turns per generation before aborting |
-| `--max-files` | `50` | Maximum generated files per evaluation before aborting |
-| `--max-output-size` | `1MB` | Maximum total output size per evaluation (supports KB, MB suffixes) |
-| `--allow-cloud` | `false` | Allow generated code to provision real Azure resources |
-| `--sandbox` | `true` | Alias confirming safe/local-only mode (default behavior) |
+### Stubs and dependency injection
 
-**Examples:**
+Use package-level function variables for external dependencies so tests can
+override them:
 
-```bash
-# Run all prompts with all configs (real Copilot SDK)
-hyoka run --all-configs
+```go
+// production code
+var runCommand = exec.Command
 
-# Run with stub evaluator (no SDK needed)
-hyoka run --stub
-
-# Run storage prompts with the baseline config, skip review
-hyoka run --service storage --config baseline --skip-review
-
-# Run a single prompt
-hyoka run --prompt-id storage-dp-dotnet-auth
-
-# Compare configs
-hyoka run --service storage --config baseline,azure-mcp
-
-# Skip confirmation for CI/automation
-hyoka run --prompt-id my-prompt --config baseline -y
-
-# Run everything non-interactively
-hyoka run --all-configs -y
-
-# Tighter guardrails for faster iteration
-hyoka run --max-turns 10 --max-files 20 --max-output-size 512KB
-
-# Allow real Azure resource provisioning
-hyoka run --allow-cloud
-
-# Limit concurrent sessions on shared machines
-hyoka run --max-sessions 4 --workers 2
+// test code
+func TestFoo(t *testing.T) {
+    orig := runCommand
+    defer func() { runCommand = orig }()
+    runCommand = func(name string, args ...string) *exec.Cmd {
+        return exec.Command("echo", "stub")
+    }
+    // ...
+}
 ```
 
-### `hyoka list`
+For Cobra commands, redirect stdout/stderr to `io.Discard` to suppress
+output during tests:
 
-List prompts matching the given filters (no evaluation).
-
-```bash
-hyoka list [flags]
+```go
+cmd := fooCmd()
+cmd.SetOut(io.Discard)
+cmd.SetErr(io.Discard)
 ```
 
-Takes the same filter flags as `run`. Output shows prompt ID, service/plane/language, category, and description.
+### Test fixtures
 
-### `hyoka manifest`
+Place fixture files under `hyoka/testdata/` — Go's test runner automatically
+excludes this directory from builds.
 
-(Optional) Generate a `manifest.yaml` snapshot from prompt files. The tool discovers prompts directly from the `prompts/` directory at runtime — this command is only needed to produce a static index for external tooling or documentation.
+### Logger suppression
 
-```bash
-hyoka manifest [flags]
+Suppress log output in tests that don't need it:
+
+```go
+func TestMain(m *testing.M) {
+    slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+    os.Exit(m.Run())
+}
 ```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--prompts` | `./prompts` (auto-detected) | Path to prompt library directory |
-| `--output` | `./manifest.yaml` (auto-detected) | Output path for manifest |
-
-### `hyoka validate`
-
-Validate prompt frontmatter against the schema.
-
-```bash
-hyoka validate [flags]
-```
-
-Checks required fields, enum values, ID naming conventions, and `## Prompt` section presence. Exits with code 1 on validation failure.
-
-### `hyoka configs`
-
-List available tool configurations.
-
-```bash
-hyoka configs [--config-file PATH]
-```
-
-### `hyoka version`
-
-Print the tool version.
-
-### `hyoka check-env`
-
-Check for required language toolchains and tools.
-
-```bash
-hyoka check-env
-```
-
-Reports availability of Python, .NET, Go, Node.js, Java, Rust, C/C++, Copilot CLI, gh authentication, and npx (for Azure MCP server). Uses ✅/❌ indicators with version strings.
-
-## Code Review (Multi-Model Panel)
-
-After code generation, `hyoka` runs a **multi-model review panel** — multiple reviewer models evaluate the generated code in parallel, then the first model consolidates results using majority-vote consensus. This avoids self-bias since the reviewers didn't generate the code.
-
-### Evaluation Criteria
-
-Each evaluation uses two sets of criteria, all scored as **pass/fail**:
-
-**General criteria** (always applied, defined in `hyoka/internal/review/rubric.md`):
-
-| Criterion | What it measures |
-|-----------|-----------------|
-| Code Builds | Does the generated code compile/build without errors? Reviewers actively attempt to build it. |
-| Latest Package Versions | Are the Azure SDK packages the latest stable versions? Reviewers verify with available tools. |
-| Best Practices | Azure SDK patterns (DefaultAzureCredential, proper disposal, async patterns) |
-| Error Handling | Proper error handling, retries, timeouts |
-| Code Quality | Clean, readable, well-structured code |
-
-**Prompt-specific criteria** (defined per prompt in the `## Evaluation Criteria` section of each `.prompt.md` file):
-
-Each prompt author lists what the generated code should include. These are evaluated individually as pass/fail alongside the general criteria.
-
-### Scoring
-
-- **Score** = count of passed criteria / total criteria (general + prompt-specific)
-- **Pass** = all criteria met
-- **Fail** = any criterion not met
-
-### Review Panel
-
-Each config file defines a `reviewer.models` list (e.g., `[claude-opus-4.6, gemini-3-pro-preview, gpt-4.1]`). All reviewers run in parallel, then:
-
-1. The **first model** in the list acts as the **consolidator**, synthesizing all reviews into a consensus result
-2. For each criterion, it passes if the **majority** of reviewers marked it passed
-3. If consolidation fails, the tool falls back to a Go-based `averageReview()` with majority-vote per criterion
-
-Reviewers actively verify code: they attempt builds, check SDK package versions, and test claims before scoring.
-
-### Reference Answers
-
-If a prompt has a `reference_answer` field pointing to a directory of reference code, that code is included in the review prompt for comparison.
-
-## Report Formats
-
-### JSON (machine-readable)
-
-```
-reports/<timestamp>/
-├── summary.json          # Aggregate run statistics
-└── results/
-    └── <service>/<plane>/<language>/<category>/<config>/
-        └── report.json   # Individual evaluation result (with criteria pass/fail and review panel)
-```
-
-### HTML (human-readable)
-
-```
-reports/<timestamp>/
-├── summary.html          # Cross-config comparison matrix dashboard
-└── results/
-    └── <service>/<plane>/<language>/<category>/<config>/
-        └── report.html   # Individual report with criteria pass/fail, review panel, and reviewer action history
-```
-
-The **summary.html** includes:
-- **Prompt Comparison** — pass rates grouped by prompt across configs
-- **Config Comparison** — matrix of prompt × config with pass/fail status
-- **Duration Analysis** — organized by prompt, with min/max tooltips showing which config produced each result
-
-| Prompt | baseline/sonnet | azure-mcp/sonnet |
-|---|---|---|
-| storage-dp-dotnet-auth | 8/8 ✅ | 8/8 ✅ |
-| storage-dp-python-crud | 6/9 ❌ | 9/9 ✅ |
-
-### Markdown (portable, git-friendly)
-
-```
-reports/<timestamp>/
-├── summary.md            # Cross-config comparison matrix (Markdown)
-└── results/
-    └── <service>/<plane>/<language>/<category>/<config>/
-        └── report.md     # Individual evaluation report (Markdown)
-```
-
-Markdown reports contain the same information as HTML reports (criteria pass/fail, review panel, tool calls, verification) in a clean, readable format suitable for viewing in GitHub, VS Code, or any Markdown renderer.
-
-### Report Enhancements
-
-- **Failure reasons:** Reports now show explicit failure reasons (guardrail violations, timeouts, missing files) instead of blank "-" scores. In HTML summaries, truncated reasons appear in the score column with full text in a tooltip.
-- **Collapsible file lists:** When an evaluation generates more than 20 files, the file list is collapsed by default with a "Show all N files" toggle. Each file also has a collapsible content preview.
-
-## Configuration Matrix
-
-Configurations live in the `configs/` directory at the repo root. Each file defines **one generator model** and a shared `reviewer.models` list. All configs are auto-discovered via `LoadDir()`:
-
-| File | Generator Model | Description |
-|------|----------------|-------------|
-| `configs/baseline-sonnet.yaml` | Claude Sonnet 4.5 | No MCP — raw Copilot |
-| `configs/baseline-opus.yaml` | Claude Opus 4.6 | No MCP — raw Copilot |
-| `configs/baseline-opus-skills.yaml` | Claude Opus 4.6 | No MCP — raw Copilot + generator skills |
-| `configs/baseline-codex.yaml` | GPT Codex | No MCP — raw Copilot |
-| `configs/azure-mcp-sonnet.yaml` | Claude Sonnet 4.5 | Azure MCP server attached |
-| `configs/azure-mcp-opus.yaml` | Claude Opus 4.6 | Azure MCP server attached |
-| `configs/azure-mcp-codex.yaml` | GPT Codex | Azure MCP server attached |
-
-All configs use the same review panel: `reviewer.models: [claude-opus-4.6, gemini-3-pro-preview, gpt-4.1]` (claude-opus-4.6 is the consolidator).
-
-**Sample config file:**
-
-```yaml
-configs:
-  - name: baseline/claude-sonnet-4.5
-    description: "Baseline — raw Copilot with Claude Sonnet 4.5"
-    generator:
-      model: "claude-sonnet-4.5"
-      tools:
-        - name: azure
-          type: mcp
-          command: npx
-          args: ["-y", "@azure/mcp@latest"]
-    reviewer:
-      models:
-        - "claude-opus-4.6"
-        - "gemini-3-pro-preview"
-        - "gpt-4.1"
-```
-
-### Config Fields
-
-| Field | Type | SDK Mapping | Description |
-|-------|------|-------------|-------------|
-| `name` | string | — | Unique config identifier |
-| `description` | string | — | Human-readable description |
-| `generator.model` | string | `SessionConfig.Model` | Generator AI model |
-| `generator.tools` | list | `SessionConfig.AvailableTools` / `SessionConfig.MCPServers` / `SessionConfig.SkillDirectories` | Tool entries (type: tool, mcp, skill) |
-| `generator.excluded_tools` | list | `SessionConfig.ExcludedTools` | Blocked tool names |
-| `reviewer.models` | list | — | Review panel models (first is consolidator) |
-| `reviewer.tools` | list | `SessionConfig.SkillDirectories` | Reviewer skill entries (type: skill) |
-
-#### Tools entries
-
-Tool entries live in `generator.tools` or `reviewer.tools` and require a `type`:
-
-- `tool` (default): named tool exposed to the agent, optionally conditional via `when`.
-- `mcp`: MCP server definition (`command`, `args`, optional `mcp_tools`).
-- `skill`: skill entry (`source: local|remote`, `path` or `repo`).
-
-**Adding skills:** Use `npx skills add microsoft/skills --directory skills/generator` to install skills from the [microsoft/skills](https://github.com/microsoft/skills) registry. See the main [README.md](../README.md#adding-skills-to-configs) for details.
-
-**Example — separate skills per role:**
-
-```yaml
-configs:
-  - name: full-skills/claude-opus-4.6
-    description: "Generator and reviewer skills"
-    generator:
-      model: "claude-opus-4.6"
-      tools:
-        - name: generator-skills
-          type: skill
-          source: local
-          path: "./skills/generator"
-    reviewer:
-      models:
-        - "claude-opus-4.6"
-        - "gemini-3-pro-preview"
-        - "gpt-4.1"
-      tools:
-        - name: reviewer-skills
-          type: skill
-          source: local
-          path: "./skills/reviewer"
-```
-
-## Smart Path Detection
-
-`hyoka` automatically resolves paths when flags aren't explicitly set:
-
-| Flag | Candidates checked |
-|------|--------------------|
-| `--prompts` | `./prompts` → `../prompts` |
-| `--config-file` | `./configs/` → `../configs/` (auto-discovered directory) |
-| `--output` (manifest) | `./manifest.yaml` → `../manifest.yaml` (optional snapshot only) |
-
-## Project Structure
-
-```
-hyoka/
-├── cmd/hyoka/main.go        # CLI entry point (cobra)
-├── go.mod / go.sum
-├── internal/
-│   ├── checkenv/                # Environment check (check-env command)
-│   ├── config/                  # Config file parsing
-│   ├── prompt/                  # Prompt loading, parsing, filtering
-│   ├── eval/                    # Engine, workspace, CopilotSDKEvaluator
-│   ├── build/                   # Build verification per language
-│   ├── report/                  # JSON + HTML report generation
-│   ├── review/                  # Multi-model review panel + criteria scoring
-│   │   └── rubric.md            # Criteria-based rubric (embedded via go:embed)
-│   ├── verify/                  # Copilot-based code verification
-│   ├── manifest/                # Optional manifest snapshot generation
-│   └── validate/                # Prompt frontmatter validation
-└── testdata/                    # Test fixtures
-```
-
-## Roadmap
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 1 | ✅ Done | Prompt library, build verification, JSON reports (stub evaluator) |
-| Phase 2 | ✅ Done | Copilot SDK integration, multi-model review panel, criteria-based scoring, HTML reports |
-| Phase 2.1 | ✅ Done | Copilot verification, session transcripts, debug mode, failure diagnostics |
-| Phase 3 | ✅ Done | Tool matrix, MCP server attachment, skill loading, cross-config comparison |
-| Phase 4 | ✅ Done | Guardrails, safety boundaries, smart concurrency, process lifecycle, prompt discovery |
-| Phase 5 | In Progress | Evaluation quality — check-env, expected_tools, reviewer skills |
-| Phase 6 | Planned | Polish — report re-rendering, embedded CLI, progress bars |
