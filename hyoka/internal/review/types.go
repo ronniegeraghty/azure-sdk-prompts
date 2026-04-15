@@ -7,6 +7,19 @@ type CriterionResult struct {
 	Reason string `json:"reason,omitempty"`
 }
 
+// ReviewerResponse is the structured JSON schema that reviewers must return.
+// Each criterion from the prompt is judged individually as pass/fail.
+type ReviewerResponse struct {
+	Criteria []CriterionJudgment `json:"criteria"`
+}
+
+// CriterionJudgment holds a single criterion evaluation from one reviewer.
+type CriterionJudgment struct {
+	Criterion string `json:"criterion"` // original criteria text
+	Passed    bool   `json:"passed"`
+	Reasoning string `json:"reasoning"`
+}
+
 // ReviewScores holds pass/fail results for each evaluation criterion.
 type ReviewScores struct {
 	Criteria []CriterionResult `json:"criteria"`

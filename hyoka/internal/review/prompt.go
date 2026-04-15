@@ -44,11 +44,13 @@ func BuildReviewPrompt(originalPrompt string, generatedFiles map[string]string, 
 	b.WriteString("## Scoring Instructions\n\n")
 	b.WriteString("For EACH criterion listed above, determine:\n")
 	b.WriteString("- **passed**: true if the criterion is fully met, false otherwise\n")
-	b.WriteString("- **reason**: brief explanation of why it passed or failed\n\n")
+	b.WriteString("- **reasoning**: brief explanation of why it passed or failed\n\n")
 	b.WriteString("The overall score = number of passed criteria out of total criteria.\n\n")
-	b.WriteString("Respond with ONLY a JSON object, no markdown fencing, no explanation:\n\n")
-	b.WriteString(`{"scores":{"criteria":[{"name":"criterion name","passed":true,"reason":"brief explanation"}]},"overall_score":N,"max_score":N,"summary":"...","issues":["..."],"strengths":["..."]}`)
-	b.WriteString("\n\nWhere overall_score = count of passed criteria, max_score = total criteria count.\n")
+	b.WriteString("Respond with ONLY a JSON object, no markdown fencing, no explanation.\n")
+	b.WriteString("Use this EXACT schema:\n\n")
+	b.WriteString(`{"criteria":[{"criterion":"original criteria text","passed":true,"reasoning":"brief explanation"}],"summary":"...","issues":["..."],"strengths":["..."]}`)
+	b.WriteString("\n\nEach criterion from the Evaluation Criteria section above MUST appear exactly once in the criteria array.\n")
+	b.WriteString("Use the original criterion text as the \"criterion\" field value.\n")
 
 	return b.String()
 }
