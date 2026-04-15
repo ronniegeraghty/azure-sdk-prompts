@@ -58,18 +58,13 @@ type CopilotEvalOptions struct {
 
 // NewCopilotSDKEvaluator creates a new evaluator backed by the Copilot SDK.
 func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
-	clientOpts := &copilot.ClientOptions{}
+	clientOpts := BuildBaseClientOpts()
 	if opts.GitHubToken != "" {
 		clientOpts.GitHubToken = opts.GitHubToken
 	}
 	if opts.CLIPath != "" {
 		clientOpts.CLIPath = opts.CLIPath
 	}
-	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-		clientOpts.LogLevel = "debug"
-	}
-	// Tag SDK-spawned processes with HYOKA_SESSION env var (#70).
-	clientOpts.Env = HyokaBaseEnv()
 	return &CopilotSDKEvaluator{
 		clientOpts:        clientOpts,
 		allowCloud:        opts.AllowCloud,

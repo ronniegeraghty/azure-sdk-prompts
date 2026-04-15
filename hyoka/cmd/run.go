@@ -283,9 +283,7 @@ func runCmd() *cobra.Command {
 			evaluator = sdkEval
 
 			// Verify Copilot CLI is available
-			client := copilot.NewClient(&copilot.ClientOptions{
-				Env: eval.HyokaBaseEnv(),
-			})
+			client := copilot.NewClient(eval.BuildBaseClientOpts())
 			if err := client.Start(context.Background()); err != nil {
 				return fmt.Errorf("copilot SDK unavailable: %w", err)
 			}
@@ -293,12 +291,7 @@ func runCmd() *cobra.Command {
 			slog.Info("Using Copilot SDK evaluator")
 			fmt.Println("Using Copilot SDK evaluator")
 
-			clientOpts := &copilot.ClientOptions{
-				Env: eval.HyokaBaseEnv(),
-			}
-			if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-				clientOpts.LogLevel = "debug"
-			}
+			clientOpts := eval.BuildBaseClientOpts()
 
 			// Extract reviewer skill directories from configs
 			var reviewerSkillsDirs []string
