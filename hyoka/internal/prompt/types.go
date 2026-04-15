@@ -31,8 +31,19 @@ PromptText string `yaml:"-" json:"prompt_text"`
 // or from the evaluation_criteria field (.prompt.yaml/.prompt.yml)
 EvaluationCriteria string `yaml:"-" json:"evaluation_criteria,omitempty"`
 
+// ParsedCriteria is the structured representation of EvaluationCriteria,
+// extracted by ParseEvaluationCriteria during prompt parsing.
+ParsedCriteria []CriterionEntry `yaml:"-" json:"parsed_criteria,omitempty"`
+
 // Source file path
 FilePath string `yaml:"-" json:"file_path"`
+}
+
+// CriterionEntry represents a single parsed evaluation criterion
+// with optional sub-points grouped under the parent.
+type CriterionEntry struct {
+Prompt    string   `json:"prompt"`
+SubPoints []string `json:"sub_points,omitempty"`
 }
 
 // Property returns the value of a metadata property by key.
