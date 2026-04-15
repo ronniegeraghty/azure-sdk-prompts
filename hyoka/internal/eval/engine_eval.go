@@ -306,6 +306,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.Environment = env
 
+	// Build tool availability summary: what was available vs actually used (#348).
+	evalReport.ToolAvailability = buildToolAvailability(env, evalReport.SessionEvents)
+
 	// Build SessionSetup from config and starter files (#219).
 	setup := &report.SessionSetupEvent{
 		Tools:        reportAvailableTools,
@@ -667,10 +670,89 @@ func buildRerunCommand(promptID, configName string, opts EngineOptions) string {
 	return strings.Join(parts, " ")
 }
 
+// buildToolAvailability constructs a summary of tools available vs actually used
+// during a generation session. It combines AvailableTools, MCPServers, and
+// SkillsInvoked from EnvironmentInfo with events to determine usage (#348).
+func buildToolAvailability(env *report.EnvironmentInfo, events []report.SessionEventRecord) []report.ToolAvailabilityEntry {
+	if env == nil {
+		return nil
+	}
 
+	// Collect tools actually used from session events
+	toolsUsed := make(map[string]bool)
+	skillsUsed := make(map[string]bool)
+	mcpUsed := make(map[string]bool)
 
+	for _, ev := range events {
+		switch ev.Type {
+		case "tool.execution_complete":
+			if ev.ToolName != "" {
+				toolsUsed[ev.ToolName] = true
+			}
+		case "skill.invoked":
+			if ev.SkillName != "" {
+				skillsUsed[ev.SkillName] = true
+			}
+		case "external_tool.completed":
+			if ev.MCPServerName != "" {
+				mcpUsed[ev.MCPServerName] = true
+			}
+			if ev.ToolName != "" {
+				toolsUsed[ev.ToolName] = true
+			}
+		}
+	}
 
+	var entries []report.ToolAvailabilityEntry
 
+	// Available tools (built-in tools like bash, create, etc.)
+	for _, t := range env.AvailableTools {
+		entries = append(entries, report.ToolAvailabilityEntry{
+			Name:      t,
+			Type:      "tool",
+			Available: true,
+			Used:      toolsUsed[t],
+		})
+	}
+
+	// MCP servers
+	for _, s := range env.MCPServers {
+		entries = append(entries, report.ToolAvailabilityEntry{
+			Name:      s,
+			Type:      "mcp",
+			Available: true,
+			Used:      mcpUsed[s],
+		})
+	}
+
+	// Skills — include loaded and invoked
+	skillSet := make(map[string]bool)
+	for _, s := range env.SkillsLoaded {
+		if !skillSet[s] {
+			skillSet[s] = true
+			entries = append(entries, report.ToolAvailabilityEntry{
+				Name:      s,
+				Type:      "skill",
+				Available: true,
+				Used:      skillsUsed[s],
+			})
+		}
+	}
+	// Add any invoked skills that weren't in the loaded list
+	for _, s := range env.SkillsInvoked {
+		if !skillSet[s] {
+			skillSet[s] = true
+			entries = append(entries, report.ToolAvailabilityEntry{
+				Name:      s,
+				Type:      "skill",
+				Available: true,
+				Used:      true,
+			})
+		}
+	}
+
+	return entries
+}
 
 // evaluateToolUsage compares expected tools from prompt frontmatter with actual tool calls.
 func evaluateToolUsage(expected, actual []string) *report.ToolUsageResult {

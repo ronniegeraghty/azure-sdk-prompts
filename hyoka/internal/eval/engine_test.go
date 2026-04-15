@@ -1266,3 +1266,101 @@ func TestReviewerLimitsExplicitOverride(t *testing.T) {
 		t.Errorf("ReviewerMaxActions = %d, want 15 (explicit override)", engine.opts.ReviewerMaxActions)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tool availability tracking tests (#348)
+// ---------------------------------------------------------------------------
+
+func TestBuildToolAvailability(t *testing.T) {
+	env := &report.EnvironmentInfo{
+		AvailableTools: []string{"bash", "create", "edit"},
+		MCPServers:     []string{"azure-mcp"},
+		SkillsLoaded:   []string{"sdk-skill"},
+		SkillsInvoked:  []string{"sdk-skill"},
+	}
+	events := []report.SessionEventRecord{
+		{Type: "tool.execution_complete", ToolName: "bash"},
+		{Type: "tool.execution_complete", ToolName: "create"},
+		{Type: "skill.invoked", SkillName: "sdk-skill"},
+		{Type: "external_tool.completed", MCPServerName: "azure-mcp", ToolName: "mcp_tool"},
+	}
+
+	entries := buildToolAvailability(env, events)
+
+	if len(entries) != 5 {
+		t.Fatalf("expected 5 entries (3 tools + 1 mcp + 1 skill), got %d", len(entries))
+	}
+
+	// Verify bash: available=true, used=true
+	found := false
+	for _, e := range entries {
+		if e.Name == "bash" {
+			found = true
+			if !e.Available || !e.Used {
+				t.Errorf("bash: available=%v used=%v, want true/true", e.Available, e.Used)
+			}
+			if e.Type != "tool" {
+				t.Errorf("bash type = %q, want tool", e.Type)
+			}
+		}
+	}
+	if !found {
+		t.Error("bash entry not found")
+	}
+
+	// Verify edit: available=true, used=false
+	for _, e := range entries {
+		if e.Name == "edit" {
+			if !e.Available || e.Used {
+				t.Errorf("edit: available=%v used=%v, want true/false", e.Available, e.Used)
+			}
+		}
+	}
+
+	// Verify azure-mcp: available=true, used=true
+	for _, e := range entries {
+		if e.Name == "azure-mcp" {
+			if !e.Available || !e.Used {
+				t.Errorf("azure-mcp: available=%v used=%v, want true/true", e.Available, e.Used)
+			}
+			if e.Type != "mcp" {
+				t.Errorf("azure-mcp type = %q, want mcp", e.Type)
+			}
+		}
+	}
+
+	// Verify skill: available=true, used=true
+	for _, e := range entries {
+		if e.Name == "sdk-skill" {
+			if !e.Available || !e.Used {
+				t.Errorf("sdk-skill: available=%v used=%v, want true/true", e.Available, e.Used)
+			}
+			if e.Type != "skill" {
+				t.Errorf("sdk-skill type = %q, want skill", e.Type)
+			}
+		}
+	}
+}
+
+func TestBuildToolAvailabilityNilEnv(t *testing.T) {
+	entries := buildToolAvailability(nil, nil)
+	if entries != nil {
+		t.Errorf("expected nil for nil env, got %v", entries)
+	}
+}
+
+func TestBuildToolAvailabilityNoEvents(t *testing.T) {
+	env := &report.EnvironmentInfo{
+		AvailableTools: []string{"bash"},
+		MCPServers:     []string{"mcp-1"},
+	}
+	entries := buildToolAvailability(env, nil)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	for _, e := range entries {
+		if e.Used {
+			t.Errorf("%s should not be used (no events)", e.Name)
+		}
+	}
+}

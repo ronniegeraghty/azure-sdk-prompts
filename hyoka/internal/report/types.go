@@ -155,6 +155,15 @@ type ToolUsageResult struct {
 	Match         bool     `json:"tool_usage_match"`
 }
 
+// ToolAvailabilityEntry records whether a specific tool/skill/MCP server
+// was available to the agent and whether it was actually used during the session.
+type ToolAvailabilityEntry struct {
+	Name      string `json:"name"`
+	Type      string `json:"type"`      // "tool", "skill", "mcp"
+	Available bool   `json:"available"`
+	Used      bool   `json:"used"`
+}
+
 // ReviewedFile holds an annotated code file with inline review comments.
 type ReviewedFile struct {
 	Path    string `json:"path"`
@@ -246,7 +255,8 @@ type EvalReport struct {
 	Review             *review.ReviewResult  `json:"review,omitempty"`
 	ReviewPanel        []review.ReviewResult `json:"review_panel,omitempty"`
 	GraderResults      []GraderResult        `json:"grader_results,omitempty"`
-	ToolUsage          *ToolUsageResult      `json:"tool_usage,omitempty"`
+	ToolUsage          *ToolUsageResult        `json:"tool_usage,omitempty"`
+	ToolAvailability   []ToolAvailabilityEntry `json:"tool_availability,omitempty"` // Tools available vs used (#348)
 	SessionEvents      []SessionEventRecord  `json:"session_events,omitempty"`
 	ActionTimeline     *ActionTimelineReport `json:"action_timeline,omitempty"` // Structured action log (#139)
 	EventCount         int                   `json:"event_count"`
