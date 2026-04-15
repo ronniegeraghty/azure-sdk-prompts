@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
@@ -28,7 +29,7 @@ func TestMain(m *testing.M) {
 // ProcessTracker so tests never scan/kill real Copilot CLI processes.
 func quietOpts(opts EngineOptions) EngineOptions {
 	opts.Stdout = io.Discard
-	opts.Tracker = &ProcessTracker{}
+	opts.Tracker = &process.ProcessTracker{}
 	return opts
 }
 

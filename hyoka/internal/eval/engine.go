@@ -21,6 +21,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
@@ -117,7 +118,7 @@ type EngineOptions struct {
 	Stdout io.Writer
 	// Tracker overrides the default process tracker (used in tests to avoid
 	// killing real Copilot CLI processes during orphan scans).
-	Tracker *ProcessTracker
+	Tracker *process.ProcessTracker
 }
 
 // Engine orchestrates evaluation runs.
@@ -125,7 +126,7 @@ type Engine struct {
 	evaluator       CopilotEvaluator
 	reviewerFactory ReviewerFactory
 	opts            EngineOptions
-	tracker         *ProcessTracker
+	tracker         *process.ProcessTracker
 	graderConfigs   []criteria.GraderConfig // attribute-matched grader configs (#30)
 	pluginGraders   []graders.GraderConfig  // pluggable grader configs (#136)
 }
@@ -174,7 +175,7 @@ func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFa
 	}
 	tracker := opts.Tracker
 	if tracker == nil {
-		tracker = DefaultTracker
+		tracker = process.DefaultTracker
 	}
 	return &Engine{
 		evaluator:       evaluator,
@@ -456,9 +457,9 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	// Resource monitor (#45) — opt-in via --monitor-resources.
-	var resMonitor *ResourceMonitor
+	var resMonitor *process.ResourceMonitor
 	if e.opts.MonitorResources {
-		resMonitor = NewResourceMonitor(e.tracker, 5*time.Second)
+		resMonitor = process.NewResourceMonitor(e.tracker, 5*time.Second)
 		resMonitor.Start()
 		defer resMonitor.Stop()
 	}
@@ -478,7 +479,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	// Set up signal handler so SIGINT/SIGTERM terminates spawned processes.
 	sigCh := make(chan os.Signal, 1)
-	notifyShutdownSignals(sigCh)
+	process.NotifyShutdownSignals(sigCh)
 	// Unregister signal handler before closing the channel to prevent
 	// a send-on-closed-channel panic (defers execute LIFO).
 	defer close(sigCh)
@@ -641,7 +642,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	// Only scan when using the DefaultTracker (production). Test-injected
 	// trackers have no registrations, so every real copilot process looks
 	// like an orphan — which would kill the user's Copilot CLI.
-	if e.tracker == DefaultTracker {
+	if e.tracker == process.DefaultTracker {
 		if orphans := e.tracker.TerminateOrphans(); orphans > 0 {
 			slog.Warn("Terminated orphaned copilot processes", "count", orphans)
 			if e.opts.StrictCleanup {

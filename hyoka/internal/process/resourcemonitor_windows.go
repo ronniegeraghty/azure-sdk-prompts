@@ -1,6 +1,6 @@
 //go:build windows
 
-package eval
+package process
 
 import (
 	"os"

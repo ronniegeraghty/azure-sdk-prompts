@@ -16,6 +16,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
@@ -80,7 +81,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	opts := *e.clientOpts
 	opts.Cwd = workDir
 	// Enrich env with prompt/config metadata for this specific eval (#70).
-	opts.Env = HyokaEvalEnv(p.ID, cfg.Name)
+	opts.Env = process.HyokaEvalEnv(p.ID, cfg.Name)
 	client := copilot.NewClient(&opts)
 
 	if err := client.Start(ctx); err != nil {
@@ -94,7 +95,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	// The PID is written to a file so the clean command can find orphaned
 	// processes even if hyoka crashes.
 	var trackedPIDs []int
-	for _, cpid := range findChildCopilotPIDs() {
+	for _, cpid := range process.FindChildCopilotPIDs() {
 		if err := pidfile.Write(pidfile.Info{PID: cpid, PromptID: p.ID, Config: cfg.Name}); err != nil {
 			slog.Debug("failed to write PID file", "pid", cpid, "error", err)
 		} else {
