@@ -682,6 +682,20 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		systemMsg = cfg.Generator.SystemPrompt
 	}
 
+	// Safety boundaries (#36): when --allow-cloud is false (default), instruct
+	// the generator to avoid provisioning real Azure resources. The agent should
+	// use mock data, local emulators, environment variable placeholders, and IaC
+	// templates instead of live CLI commands.
+	if !e.allowCloud {
+		systemMsg += "\n\nSAFETY BOUNDARIES:\n" +
+			"Do NOT provision, create, modify, or delete real Azure resources. " +
+			"Do NOT run `az`, `azd`, or ARM/Bicep deployment commands that target live Azure subscriptions. " +
+			"Instead, use mock/fake connection strings, environment variable placeholders (e.g., " +
+			"os.environ[\"AZURE_STORAGE_CONNECTION_STRING\"]), local emulators (Azurite, CosmosDB emulator), " +
+			"and Infrastructure-as-Code templates (Bicep/Terraform) that define resources declaratively " +
+			"without deploying them. All code must be runnable in a local-only, offline environment."
+	}
+
 	// Instruct the agent to use available skills before generating code.
 	// Without this hint, models tend to go straight to code generation
 	// and never invoke the skill tool, even when skills are loaded.

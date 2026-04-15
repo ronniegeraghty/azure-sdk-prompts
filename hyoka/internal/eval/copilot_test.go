@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
@@ -399,8 +400,12 @@ func TestBuildSessionConfig_SystemPromptSet(t *testing.T) {
 	if sc.SystemMessage.Mode != "append" {
 		t.Errorf("expected SystemMessage.Mode 'append', got %q", sc.SystemMessage.Mode)
 	}
-	if sc.SystemMessage.Content != "You are a helpful Azure SDK assistant." {
-		t.Errorf("expected SystemMessage.Content to match system_prompt, got %q", sc.SystemMessage.Content)
+	// With allowCloud=false (default), safety boundaries are appended.
+	if !strings.Contains(sc.SystemMessage.Content, "You are a helpful Azure SDK assistant.") {
+		t.Errorf("expected SystemMessage.Content to contain system_prompt, got %q", sc.SystemMessage.Content)
+	}
+	if !strings.Contains(sc.SystemMessage.Content, "SAFETY BOUNDARIES") {
+		t.Errorf("expected safety boundaries in system message when allowCloud=false, got %q", sc.SystemMessage.Content)
 	}
 }
 
@@ -411,7 +416,44 @@ func TestBuildSessionConfig_SystemPromptEmpty(t *testing.T) {
 		Generator: &config.GeneratorConfig{Model: "gpt-4"},
 	}
 	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	// With allowCloud=false (default), safety boundaries are appended even without system_prompt.
+	if sc.SystemMessage == nil {
+		t.Fatal("expected SystemMessage with safety boundaries when allowCloud=false")
+	}
+	if !strings.Contains(sc.SystemMessage.Content, "SAFETY BOUNDARIES") {
+		t.Errorf("expected safety boundaries when allowCloud=false, got %q", sc.SystemMessage.Content)
+	}
+}
+
+func TestBuildSessionConfig_AllowCloudSkipsSafetyBoundaries(t *testing.T) {
+	e := &CopilotSDKEvaluator{allowCloud: true}
+	cfg := &config.ToolConfig{
+		Name: "test",
+		Generator: &config.GeneratorConfig{
+			Model:        "gpt-4",
+			SystemPrompt: "You are a helpful Azure SDK assistant.",
+		},
+	}
+	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	if sc.SystemMessage == nil {
+		t.Fatal("expected SystemMessage to be set when generator.system_prompt is configured")
+	}
+	if strings.Contains(sc.SystemMessage.Content, "SAFETY BOUNDARIES") {
+		t.Error("expected no safety boundaries when allowCloud=true")
+	}
+	if sc.SystemMessage.Content != "You are a helpful Azure SDK assistant." {
+		t.Errorf("expected only system_prompt when allowCloud=true, got %q", sc.SystemMessage.Content)
+	}
+}
+
+func TestBuildSessionConfig_AllowCloudNoSystemPrompt(t *testing.T) {
+	e := &CopilotSDKEvaluator{allowCloud: true}
+	cfg := &config.ToolConfig{
+		Name:      "test",
+		Generator: &config.GeneratorConfig{Model: "gpt-4"},
+	}
+	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
 	if sc.SystemMessage != nil {
-		t.Errorf("expected SystemMessage nil when no system_prompt set, got %+v", sc.SystemMessage)
+		t.Errorf("expected SystemMessage nil when allowCloud=true and no system_prompt, got %+v", sc.SystemMessage)
 	}
 }
