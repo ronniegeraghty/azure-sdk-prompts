@@ -27,6 +27,7 @@ KindPrompt         = "prompt"
 KindBehavior       = "behavior"
 KindActionSequence = "action_sequence"
 KindToolConstraint = "tool_constraint"
+KindPromptReview   = "prompt_review"
 )
 
 // validKinds is the set of recognized grader kind values.
@@ -37,6 +38,7 @@ KindPrompt:         true,
 KindBehavior:       true,
 KindActionSequence: true,
 KindToolConstraint: true,
+KindPromptReview:   true,
 }
 
 // GraderConfigFile is the top-level YAML structure containing a list of graders.

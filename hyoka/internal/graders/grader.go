@@ -25,6 +25,11 @@ ActionLog     []ActionEvent  // Ordered list of agent actions
 PromptMeta    PromptMetadata // Metadata from the prompt frontmatter
 Config        GraderConfig   // The grader's own config entry
 Files         []FileEntry    // Listing of files in the workspace
+
+// Optional fields for graders that need review/SDK access (WI-023).
+OriginalPrompt string // Original prompt text sent to the generator
+ReferenceDir   string // Directory containing reference answers
+EvalCriteria   string // Merged evaluation criteria text
 }
 
 // ActionEvent represents a single agent action from the session log.
@@ -66,6 +71,7 @@ FileDetails     *FileGraderDetails     `json:"file_details,omitempty"`
 ProgramDetails  *ProgramGraderDetails  `json:"program_details,omitempty"`
 PromptDetails   *PromptGraderDetails   `json:"prompt_details,omitempty"`
 BehaviorDetails *BehaviorGraderDetails `json:"behavior_details,omitempty"`
+ReviewDetails   *ReviewGraderDetails   `json:"review_details,omitempty"`
 }
 
 // FileGraderDetails holds file-check specifics.
@@ -115,6 +121,39 @@ ActualSequence   []string       `json:"actual_sequence,omitempty"`
 MatchedActions   int            `json:"matched_actions,omitempty"`
 ConstraintsMet   bool           `json:"constraints_met,omitempty"`
 ToolCounts       map[string]int `json:"tool_counts,omitempty"`
+}
+
+// ReviewGraderDetails holds AI review specifics (WI-023).
+// The consolidated result is stored in the parent GraderResult fields.
+// Panel member results are stored in PanelResults.
+type ReviewGraderDetails struct {
+Model        string                `json:"model,omitempty"`
+OverallScore int                   `json:"overall_score"`
+MaxScore     int                   `json:"max_score"`
+Summary      string                `json:"summary"`
+Issues       []string              `json:"issues,omitempty"`
+Strengths    []string              `json:"strengths,omitempty"`
+IsConsensus  bool                  `json:"is_consensus,omitempty"`
+Criteria     []ReviewCriterion     `json:"criteria,omitempty"`
+PanelResults []ReviewPanelEntry    `json:"panel_results,omitempty"`
+}
+
+// ReviewCriterion holds a single criterion pass/fail from review.
+type ReviewCriterion struct {
+Name   string `json:"name"`
+Passed bool   `json:"passed"`
+Reason string `json:"reason,omitempty"`
+}
+
+// ReviewPanelEntry holds one panel member's review result.
+type ReviewPanelEntry struct {
+Model        string            `json:"model"`
+OverallScore int               `json:"overall_score"`
+MaxScore     int               `json:"max_score"`
+Summary      string            `json:"summary"`
+Issues       []string          `json:"issues,omitempty"`
+Strengths    []string          `json:"strengths,omitempty"`
+Criteria     []ReviewCriterion `json:"criteria,omitempty"`
 }
 
 // AggregateResult holds the final aggregated score from all graders.
