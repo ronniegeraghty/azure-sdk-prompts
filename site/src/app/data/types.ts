@@ -28,6 +28,87 @@ export interface ReviewPanelEntry {
   events?: unknown[];
 }
 
+// ── Grader system types (Phase 3) ────────────────────────────────
+
+export interface FileCheckDetail {
+  path: string;
+  exists: boolean;
+  pattern_matched?: boolean | null;
+  pattern?: string;
+}
+
+export interface FileGraderDetail {
+  checked_files: FileCheckDetail[];
+}
+
+export interface ProgramGraderDetail {
+  command: string;
+  exit_code: number;
+  stdout: string;
+  stderr: string;
+}
+
+export interface PromptGraderDetail {
+  model: string;
+  rubric: string;
+  reasoning: string;
+  raw_score?: number;
+  max_score?: number;
+}
+
+export interface BehaviorGraderDetail {
+  tools_used?: string[];
+  missing_tools?: string[];
+  forbidden_used?: string[];
+  turn_count?: number;
+  max_turns?: number;
+  actual_turns?: number;
+  total_actions?: number;
+  turn_limit_hit?: boolean;
+  violations?: string[];
+  sequence_match?: boolean;
+  expected_sequence?: string[];
+  actual_sequence?: string[];
+  matched_actions?: number;
+  constraints_met?: boolean;
+  tool_counts?: Record<string, number>;
+}
+
+export interface ReviewGraderDetail {
+  model?: string;
+  overall_score: number;
+  max_score: number;
+  summary: string;
+  issues?: string[];
+  strengths?: string[];
+  is_consensus?: boolean;
+  criteria?: ReviewCriteria[];
+  panel_results?: ReviewPanelEntry[];
+}
+
+export interface GraderResult {
+  grader_name: string;
+  grader_type: string;
+  model?: string;
+  scores?: ReviewScores;
+  overall_score?: number;
+  max_score?: number;
+  summary?: string;
+  issues?: string[];
+  strengths?: string[];
+  duration_seconds?: number;
+  is_consensus?: boolean;
+  score?: number;
+  weight?: number;
+  pass?: boolean | null;
+  gate?: boolean;
+  file_details?: FileGraderDetail;
+  program_details?: ProgramGraderDetail;
+  prompt_details?: PromptGraderDetail;
+  behavior_details?: BehaviorGraderDetail;
+  review_details?: ReviewGraderDetail;
+}
+
 export interface SessionEvent {
   type: string;
   tool_name?: string;
