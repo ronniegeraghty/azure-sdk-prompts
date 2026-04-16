@@ -16,60 +16,72 @@ prompts/
           blob-download.prompt.yaml
 ```
 
-## YAML Format (`.prompt.yaml`)
+## Frontmatter Schema (Markdown Format)
 
-Prompts can also be authored as pure YAML files with a `.prompt.yaml` extension. This is useful for programmatic generation or when frontmatter-in-markdown feels awkward:
+Prompts use YAML frontmatter with `id` and `tags` at the top level, and all other metadata nested under a `properties:` block:
+
+```yaml
+---
+id: storage-dp-python-crud              # Unique identifier (required)
+tags:                                   # Optional tags for categorization
+  - blob
+  - upload
+  - getting-started
+properties:
+  service: storage                      # Azure service name (required)
+  plane: data-plane                     # data-plane or management-plane (required)
+  language: python                      # Programming language (required)
+  category: crud                        # Use-case category (required)
+  difficulty: basic                     # basic, intermediate, advanced (required)
+  description: "Upload a blob..."       # Short description
+  sdk_package: azure-storage-blob       # Primary SDK package
+  doc_url: https://learn.microsoft.com/...  # Reference documentation
+  created: "2026-01-15"                 # Creation date
+  author: your-name                     # Original author
+expected_packages:                      # Packages the code should use (optional)
+  - azure-storage-blob
+  - azure-identity
+expected_tools:                         # Tools the agent should invoke (optional)
+  - create_file
+  - run_terminal_command
+starter_project: ./starter/             # Optional starter project directory
+reference_answer: ./reference/          # Optional reference answer directory
+timeout: 300                            # Prompt-specific timeout in seconds (optional)
+max_session_actions: 50                 # Max actions per Copilot session (optional)
+max_turns: 25                           # Max conversation turns (optional)
+project_context:                        # Project-level context variables (optional)
+  variable_name: value
+---
+```
+
+## YAML-Only Format (`.prompt.yaml`)
+
+Prompts can also be authored as pure YAML files with a `.prompt.yaml` or `.prompt.yml` extension. This is useful for programmatic generation or when frontmatter-in-markdown feels awkward:
 
 ```yaml
 # storage-dp-python-crud.prompt.yaml
 id: storage-dp-python-crud
-service: storage
-plane: data-plane
-language: python
-category: crud
-difficulty: basic
-description: "Upload a blob to Azure Storage"
-sdk_package: azure-storage-blob
-prompt: |
+tags:
+  - blob
+  - upload
+properties:
+  service: storage
+  plane: data-plane
+  language: python
+  category: crud
+  difficulty: basic
+  description: "Upload a blob to Azure Storage"
+  sdk_package: azure-storage-blob
+prompt_text: |
   Write a Python script that uploads a file to Azure Blob Storage
   using the azure-storage-blob SDK with DefaultAzureCredential.
-criteria:
+evaluation_criteria: |
   - Uses BlobServiceClient with DefaultAzureCredential
   - Creates container if it doesn't exist
   - Uploads file with proper content type detection
 ```
 
-The YAML format supports the same fields as the Markdown frontmatter. The `prompt` field replaces the `## Prompt` section and `criteria` replaces `## Evaluation Criteria`.
-
-## Frontmatter Schema (Markdown Format)
-
-```yaml
----
-id: storage-dp-python-crud           # Unique identifier (required)
-service: storage                      # Azure service name (required)
-plane: data-plane                     # data-plane or management-plane (required)
-language: python                      # Programming language (required)
-category: crud                        # Use-case category (required)
-difficulty: basic                     # basic, intermediate, advanced (required)
-description: "Upload a blob..."       # Short description
-sdk_package: azure-storage-blob       # Primary SDK package
-doc_url: https://learn.microsoft.com/...  # Reference documentation
-tags:
-  - blob
-  - upload
-created: "2026-01-15"
-author: your-name
-expected_packages:                    # Packages the code should use
-  - azure-storage-blob
-  - azure-identity
-expected_tools:                       # Tools the agent should invoke
-  - create_file
-  - run_terminal_command
-starter_project: ./starter/           # Optional starter project directory
-reference_answer: ./reference/        # Optional reference answer directory
-timeout: 300                          # Prompt-specific timeout (seconds)
----
-```
+The YAML format uses the same `id`, `tags`, and `properties:` structure as Markdown. The `prompt_text` field replaces the `## Prompt` section and `evaluation_criteria` replaces `## Evaluation Criteria`.
 
 ### Required Fields
 
