@@ -803,6 +803,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.StarterFiles = starterFiles
 
+	// Snapshot starter-file sizes so guardrails can charge the agent only for
+	// the bytes/files it actually contributed, not the starter project it was
+	// handed (#565).
+	starterSnapshot := snapshotStarterSizes(genDir, starterFiles)
+
 	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
 		"starter_files", len(starterFiles))
 
@@ -1102,32 +1107,25 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				"actions", actionCount, "max_session_actions", lim.maxSessionActions)
 		}
 
-		// Check file count
-		if len(generatedFiles) > lim.maxFiles {
-			reason := fmt.Sprintf("guardrail: file count %d exceeded limit of %d", len(generatedFiles), lim.maxFiles)
+		// Check file count — charge the agent only for files it created or
+		// deleted, not starter files it was handed (#565).
+		agentFileCount := computeAgentFileCount(generatedFiles, starterSnapshot)
+		if agentFileCount > lim.maxFiles {
+			reason := fmt.Sprintf("guardrail: agent file count %d exceeded limit of %d", agentFileCount, lim.maxFiles)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "files", len(generatedFiles), "max_files", lim.maxFiles)
+			lg.Warn("Guardrail triggered", "reason", reason, "agent_files", agentFileCount, "total_files", len(generatedFiles), "max_files", lim.maxFiles)
 		}
 
-		// Check total output size
-		var totalSize int64
-		for _, f := range generatedFiles {
-			absPath := f
-			if !filepath.IsAbs(f) {
-				absPath = filepath.Join(ws.Dir, f)
-			}
-			if info, err := os.Stat(absPath); err == nil {
-				totalSize += info.Size()
-			}
-		}
+		// Check total output size — starter-aware (#565).
+		totalSize := computeAgentOutputSize(ws.Dir, generatedFiles, starterSnapshot)
 		if totalSize > lim.maxOutputSize {
-			reason := fmt.Sprintf("guardrail: total output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
+			reason := fmt.Sprintf("guardrail: agent output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "total_size", totalSize, "max_size", lim.maxOutputSize)
+			lg.Warn("Guardrail triggered", "reason", reason, "agent_output_size", totalSize, "max_size", lim.maxOutputSize)
 		}
 	}
 
