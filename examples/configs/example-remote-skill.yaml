@@ -1,0 +1,46 @@
+# Example: generator config that pulls a skill from a remote GitHub repo.
+#
+# This config demonstrates hyoka's remote-skill fetch path. The `copilot-sdk`
+# skill from https://github.com/microsoft/skills is downloaded on first use
+# (including `--dry-run`, which exercises skill resolution) and cached at:
+#
+#   .skills-cache/<repo>/<name>/
+#   e.g. .skills-cache/microsoft/skills/copilot-sdk/
+#
+# Requirements:
+#   - `npx` on PATH — hyoka shells out to `npx -y skills add <repo>` to
+#     fetch skills from GitHub, so Node.js must be installed.
+#
+# The remote-skill pattern is the three fields under tools:
+#   source: remote
+#   repo:   microsoft/skills   # GitHub owner/repo
+#   name:   copilot-sdk        # specific skill within that repo
+#
+# Because this config lives under examples/configs/ (not the default
+# configs/ discovery path), invoke it with --config-file, e.g.:
+#
+#   go run ./hyoka run \
+#     --config-file examples/configs/example-remote-skill.yaml \
+#     --config example-remote-skill/claude-sonnet-4.5 \
+#     --language python --dry-run
+#
+# The copilot-sdk skill was chosen because hyoka itself is built on the
+# Copilot SDK and evaluates Copilot-generated code — a natural domain fit
+# for demonstrating a remote skill.
+configs:
+  - name: example-remote-skill/claude-sonnet-4.5
+    description: "Example — remote skill fetched from microsoft/skills"
+
+    generator:
+      model: "claude-sonnet-4.5"
+      tools:
+        # Remote skill — fetched from https://github.com/microsoft/skills
+        # via `npx -y skills add microsoft/skills` on first run.
+        - name: copilot-sdk
+          type: skill
+          source: remote
+          repo: microsoft/skills
+
+    reviewer:
+      models:
+        - "claude-sonnet-4.5"
