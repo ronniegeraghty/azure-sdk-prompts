@@ -1,24 +1,29 @@
 # Example: generator config that pulls a skill from a remote GitHub repo.
 #
-# This config demonstrates hyoka's remote-skill fetch path. The `copilot-sdk`
-# skill from https://github.com/microsoft/skills is downloaded on first use
-# (including `--dry-run`, which exercises skill resolution) and cached at:
+# This config demonstrates hyoka's two remote-skill fetch paths:
 #
-#   .skills-cache/<repo>/.claude/skills/<name>/
-#   e.g. .skills-cache/microsoft/skills/.claude/skills/copilot-sdk/
+# 1. Whole-repo fetch (default — this file).
+#    `repo: owner/name` → hyoka shells out to
+#    `npx skills add <repo> --skill <name> --agent claude-code --copy --yes`
+#    Cache: .skills-cache/<repo>/.claude/skills/<name>/
+#    Requires Node.js / `npx` on PATH.
 #
-# Requirements:
-#   - `npx` on PATH — hyoka shells out to
-#     `npx skills add <repo> --skill <name> --agent claude-code --copy --yes`
-#     to fetch a single skill from GitHub, so Node.js must be installed.
+# 2. Subpath fetch via git sparse-checkout (see the commented config below).
+#    `repo: owner/name/path/under/repo` → hyoka clones the repo with
+#    `git clone --filter=blob:none --no-checkout --depth=1` and pulls only
+#    the named subpath via `git sparse-checkout`. Use this for skills that
+#    live inside a monorepo's plugins/ tree (e.g. microsoft/skills ships
+#    Rust skills under .github/plugins/azure-sdk-rust/skills/).
+#    Cache: .skills-cache/<repo>/<subpath>/<name>/
+#    Requires `git` on PATH.
 #
-# The remote-skill pattern is the three fields under tools:
+# The remote-skill pattern is the fields under tools:
 #   source: remote
-#   repo:   microsoft/skills   # GitHub owner/repo
-#   name:   copilot-sdk        # specific skill within that repo (required —
-#                              # passed to `npx skills add --skill <name>`;
-#                              # without it every skill in the repo would
-#                              # install, which is almost never what you want)
+#   repo:   microsoft/skills     # 2 segments → npx flow
+#   repo:   microsoft/skills/.github/plugins/azure-sdk-rust/skills
+#                                # 3+ segments → sparse-checkout flow
+#   name:   copilot-sdk          # specific skill within that repo (required;
+#                                # selects which subdir to install/check out)
 #
 # Because this config lives under examples/configs/ (not the default
 # configs/ discovery path), invoke it with --config-file, e.g.:
@@ -33,17 +38,35 @@
 # for demonstrating a remote skill.
 configs:
   - name: example-remote-skill/claude-sonnet-4.5
-    description: "Example — remote skill fetched from microsoft/skills"
+    description: "Example — remote skill fetched from microsoft/skills (npx flow)"
 
     generator:
       model: "claude-sonnet-4.5"
       tools:
         # Remote skill — fetched from https://github.com/microsoft/skills
-        # via `npx -y skills add microsoft/skills` on first run.
+        # via `npx skills add microsoft/skills --skill copilot-sdk ...`.
         - name: copilot-sdk
           type: skill
           source: remote
           repo: microsoft/skills
+
+    reviewer:
+      models:
+        - "claude-sonnet-4.5"
+
+  # Subpath variant — demonstrates git sparse-checkout for skills that live
+  # inside a monorepo subdirectory. Pulls ONLY the azure-identity-rust skill
+  # from .github/plugins/azure-sdk-rust/skills/ in microsoft/skills.
+  - name: example-remote-skill-subpath/claude-sonnet-4.5
+    description: "Example — remote skill fetched from a subpath via git sparse-checkout"
+
+    generator:
+      model: "claude-sonnet-4.5"
+      tools:
+        - name: azure-identity-rust
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-rust/skills
 
     reviewer:
       models:
