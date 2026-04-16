@@ -18,7 +18,7 @@ The `hyoka` tool evaluates AI agent code generation quality by running prompts f
 
 ```bash
 cd hyoka
-go run ./hyoka <command> [flags]
+go run . <command> [flags]
 ```
 
 ### Install globally

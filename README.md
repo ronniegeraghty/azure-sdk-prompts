@@ -23,14 +23,18 @@ git clone https://github.com/ronniegeraghty/hyoka.git
 cd hyoka
 
 # List prompts
-go run ./hyoka list
+go run . list
 
 # Run all evaluations (auto-generates trend analysis after)
 # Note: requires --all-configs if multiple configs exist
-go run ./hyoka run --all-configs
+go run . run --all-configs
 
 # Filter by service and language
-go run ./hyoka run --service storage --language dotnet
+go run . run --service storage --language dotnet
+
+# Run a single prompt (recommended for testing changes)
+# Example: test a Key Vault CRUD prompt with baseline Opus config
+go run . run --prompt-id key-vault-dp-python-crud --config "baseline/claude-opus-4.6"
 ```
 
 ### Install as a CLI
@@ -207,19 +211,19 @@ hyoka list --json
 
 ```bash
 # Skip confirmation for large runs (CI-friendly)
-go run ./hyoka run --prompt-id my-prompt --config "baseline/claude-sonnet-4.5" -y
+go run . run --prompt-id my-prompt --config "baseline/claude-sonnet-4.5" -y
 
 # Run all prompts × all configs (requires --all-configs + -y for non-interactive)
-go run ./hyoka run --all-configs -y
+go run . run --all-configs -y
 
 # Tighten guardrails for faster iteration
-go run ./hyoka run --max-session-actions 10 --max-files 20
+go run . run --max-session-actions 10 --max-files 20
 
 # Allow real Azure resource provisioning (use with caution)
-go run ./hyoka run --allow-cloud
+go run . run --allow-cloud
 
 # Limit concurrent Copilot sessions on a shared machine
-go run ./hyoka run --max-sessions 4 --workers 2
+go run . run --max-sessions 4 --workers 2
 ```
 
 ### Init Command
@@ -426,7 +430,7 @@ cp templates/prompt-template.prompt.md \
 # 2. Edit the file — fill in frontmatter and write your prompt
 
 # 3. Validate
-go run ./hyoka validate
+go run . validate
 
 # 4. Commit
 git add prompts/
