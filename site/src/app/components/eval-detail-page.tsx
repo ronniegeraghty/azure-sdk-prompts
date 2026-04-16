@@ -1,12 +1,13 @@
 import { useParams, Link } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
-import type { RunSummary, EvalResult, SessionEvent, ReviewPanelEntry } from "../data/types";
+import type { RunSummary, EvalResult, SessionEvent, ReviewPanelEntry, GraderResult } from "../data/types";
 import {
   ArrowLeft, CheckCircle2, XCircle, Clock, FileCode2, Cpu,
   MessageSquare, Wrench, Terminal, ChevronDown, ChevronRight,
   AlertTriangle, Zap, Copy, Check, Loader2
 } from "lucide-react";
+import { GraderResultRow } from "./GraderResultRow";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -336,6 +337,11 @@ export function EvalDetailPage() {
   }
 
   const r = evalResult;
+  
+  // Grader results (Phase 3) or legacy review (backward compat)
+  const graderResults: GraderResult[] = (r as unknown as Record<string, unknown>).grader_results as GraderResult[] || [];
+  const hasGraders = graderResults.length > 0;
+  
   const review = r.review || {};
   const overallScore = review.overall_score ?? 0;
   const maxScore = review.max_score ?? 100;
@@ -351,6 +357,7 @@ export function EvalDetailPage() {
   const rerunCommand = (r as unknown as Record<string, unknown>).rerunCommand as string || "";
   const guardrailReason = (r as unknown as Record<string, unknown>).guardrail_abort_reason as string || "";
   const errorMsg = r.error || guardrailReason || "";
+  const workspaceDelta = (r as unknown as Record<string, unknown>).workspace_delta as Record<string, unknown> | undefined;
 
   const envModel = environment?.model as string || "";
   const envInputTokens = (environment?.totalInputTokens ?? environment?.total_input_tokens ?? 0) as number;
@@ -446,62 +453,91 @@ export function EvalDetailPage() {
           </div>
         )}
 
-        {/* Criteria */}
-        {criteria.length > 0 && (
+        {/* Workspace Delta (#566) */}
+        {workspaceDelta && (
           <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.03] p-5">
-            <h3 className="mb-3 flex items-center gap-2 text-white" style={{ fontSize: 14 }}>
-              <Wrench className="h-4 w-4 text-white/40" /> Evaluation Criteria
+            <h3 className="mb-3 text-white" style={{ fontSize: 14 }}>Workspace Changes</h3>
+            <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2 md:grid-cols-4" style={{ fontSize: 12 }}>
+              <div><span className="text-white/30">Files created:</span> <span className="text-emerald-400/70" style={mono}>{(workspaceDelta.files_created as number) ?? 0}</span></div>
+              <div><span className="text-white/30">Files modified:</span> <span className="text-amber-400/70" style={mono}>{(workspaceDelta.files_modified as number) ?? 0}</span></div>
+              <div><span className="text-white/30">Files deleted:</span> <span className="text-red-400/70" style={mono}>{(workspaceDelta.files_deleted as number) ?? 0}</span></div>
+              <div><span className="text-white/30">Total size:</span> <span className="text-white/60" style={mono}>{((workspaceDelta.total_size_bytes as number) ?? 0).toLocaleString()} bytes</span></div>
+            </div>
+          </div>
+        )}
+
+        {/* Grader Results (Phase 3 unified grader pipeline) */}
+        {hasGraders && (
+          <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.03] p-5">
+            <h3 className="mb-4 flex items-center gap-2 text-white" style={{ fontSize: 14 }}>
+              <Wrench className="h-4 w-4 text-white/40" /> Grader Results ({graderResults.length})
             </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {criteria.map(c => (
-                <span key={c.name} className={`flex items-center gap-1 rounded-md px-2 py-0.5 ${c.passed ? "bg-emerald-500/10 text-emerald-400/70" : "bg-red-500/10 text-red-400/70"}`} style={{ fontSize: 10 }}>
-                  {c.passed ? <CheckCircle2 className="h-2.5 w-2.5" /> : <XCircle className="h-2.5 w-2.5" />}
-                  {c.name}
-                </span>
+            <div className="space-y-2">
+              {graderResults.map((gr, i) => (
+                <GraderResultRow key={i} result={gr} />
               ))}
             </div>
           </div>
         )}
 
-        {/* Review Panel */}
-        {(review.summary || reviewPanel.length > 0) && (
-          <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.03] p-5">
-            <h3 className="mb-4 text-white" style={{ fontSize: 14 }}>
-              Review{reviewPanel.length > 0 ? ` Panel (${reviewPanel.length} reviewers)` : ""}
-            </h3>
-
-            {/* Consolidated */}
-            <div className="mb-4 rounded-lg border border-white/8 bg-white/[0.03] p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-white/50" style={{ fontSize: 13 }}>Consolidated Review</span>
-                <span className={scoreColor} style={{ ...mono, fontSize: 16 }}>{overallScore}/{maxScore}</span>
-              </div>
-              {review.summary && <p className="mb-3 text-white/45" style={{ fontSize: 13, lineHeight: 1.6 }}>{review.summary}</p>}
-              <div className="grid gap-4 sm:grid-cols-2">
-                {review.strengths && review.strengths.length > 0 && (
-                  <div>
-                    <p className="mb-1.5 text-emerald-400/60" style={{ fontSize: 11 }}>Strengths</p>
-                    {review.strengths.map((s, i) => (
-                      <div key={i} className="mb-1 flex gap-1.5">
-                        <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/50" />
-                        <span className="text-white/50" style={{ fontSize: 12 }}>{s}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {review.issues && review.issues.length > 0 && (
-                  <div>
-                    <p className="mb-1.5 text-red-400/60" style={{ fontSize: 11 }}>Issues</p>
-                    {review.issues.map((s, i) => (
-                      <div key={i} className="mb-1 flex gap-1.5">
-                        <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/50" />
-                        <span className="text-white/50" style={{ fontSize: 12 }}>{s}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+        {/* Legacy Review Panel (backward compat for pre-Phase-3 reports) */}
+        {!hasGraders && (review.summary || criteria.length > 0 || reviewPanel.length > 0) && (
+          <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-400/80" />
+              <h3 className="text-amber-400/80" style={{ fontSize: 14 }}>
+                Legacy Review (Pre-Phase-3)
+              </h3>
             </div>
+            <p className="mb-4 text-amber-400/60" style={{ fontSize: 12 }}>
+              This report uses the old review format. Re-run the evaluation to see grader results.
+            </p>
+            {/* Consolidated Review */}
+            {review.summary && (
+              <div className="mb-4 rounded-lg border border-white/8 bg-white/[0.03] p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-white/50" style={{ fontSize: 13 }}>Consolidated Review</span>
+                  <span className={scoreColor} style={{ ...mono, fontSize: 16 }}>{overallScore}/{maxScore}</span>
+                </div>
+                <p className="mb-3 text-white/45" style={{ fontSize: 13, lineHeight: 1.6 }}>{review.summary}</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {review.strengths && review.strengths.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-emerald-400/60" style={{ fontSize: 11 }}>Strengths</p>
+                      {review.strengths.map((s, i) => (
+                        <div key={i} className="mb-1 flex gap-1.5">
+                          <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/50" />
+                          <span className="text-white/50" style={{ fontSize: 12 }}>{s}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {review.issues && review.issues.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-red-400/60" style={{ fontSize: 11 }}>Issues</p>
+                      {review.issues.map((s, i) => (
+                        <div key={i} className="mb-1 flex gap-1.5">
+                          <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/50" />
+                          <span className="text-white/50" style={{ fontSize: 12 }}>{s}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Criteria badges */}
+            {criteria.length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-1.5">
+                {criteria.map(c => (
+                  <span key={c.name} className={`flex items-center gap-1 rounded-md px-2 py-0.5 ${c.passed ? "bg-emerald-500/10 text-emerald-400/70" : "bg-red-500/10 text-red-400/70"}`} style={{ fontSize: 10 }}>
+                    {c.passed ? <CheckCircle2 className="h-2.5 w-2.5" /> : <XCircle className="h-2.5 w-2.5" />}
+                    {c.name}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Individual reviewers */}
             {reviewPanel.length > 0 && (
