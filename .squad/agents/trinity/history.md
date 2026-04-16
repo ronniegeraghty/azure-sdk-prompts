@@ -9,7 +9,45 @@
 
 ## Learnings
 
-(New agent — no learnings yet.)
+### Session 2026-04-17 (#358 Eval Detail Redesign)
+
+**GraderResultRow component pattern:**
+- Prop contract: Single `GraderResult` prop with all optional fields handled gracefully
+- Presentational only — no data fetching, fully prop-driven
+- Expandable details via internal state (defaultExpanded prop for override)
+- Pass/fail/N/A badge logic: `pass === true/false/null`
+- Score display: normalized `score` (0–1) shown as %, `overall_score/max_score` shown as fraction, "—" if neither
+- Grader type label: Transform snake_case to Title Case (e.g., `prompt_review` → `Prompt Review`)
+- Typed detail blocks: File checks, program execution, LLM review, behavior analysis all conditionally rendered
+- Gate indicator: Small amber "GATE" badge if `gate: true`
+
+**TypeScript type alignment:**
+- Match Go struct field names exactly (snake_case in JSON)
+- All grader detail types: FileGraderDetail, ProgramGraderDetail, PromptGraderDetail, BehaviorGraderDetail, ReviewGraderDetail
+- EvalReport now has `grader_results?: GraderResult[]` and `review?: Review` (optional for backward compat)
+- WorkspaceDelta type added for #566 integration (files_created/modified/deleted/total_size_bytes)
+
+**eval-detail-page refactor:**
+- New grader results section: `hasGraders` flag determines if grader_results array exists
+- Legacy review panel: Shown with amber notice if `!hasGraders && (review.summary || criteria.length > 0)`
+- Workspace delta: Separate card showing file change counts (created/modified/deleted/size) if field present
+- Kept Environment as single block — did NOT split env/run-stats (follow-up task if needed)
+
+**Testing gotchas:**
+- `screen.getByText()` fails if text appears in multiple elements (grader name + type label both visible)
+- Use unique text (grader_name) for click targets, or use `getAllByText()` for assertions
+- Tests should cover: pass case, fail case, missing score, expanded state, gate indicator, typed details
+
+**Build process:**
+- Site build time: ~7s with 2963 modules transformed
+- Chunk size warning expected (1.17 MB) — not a blocker, can optimize later
+- Tests run first to catch type errors before build
+
+**#359 and #360 will consume GraderResultRow:**
+- Import from `./GraderResultRow`
+- Pass individual `GraderResult` objects
+- Can override `defaultExpanded` if needed (e.g., expand first grader only)
+- Component is empty-state safe — won't break on null/undefined fields
 
 ### Session 2026-04-04T00-05 (Morpheus Evolution Plan)
 
