@@ -129,3 +129,18 @@ Successfully integrated hotfix #567 (starter-aware guardrails) with Phase 3 work
 1. **File splits require careful merge attention**: When one branch splits a file and another modifies it, auto-merge may fail. Solution: understand the split intent, keep the split structure, port changes to the correct file.
 2. **Guardrail helpers are testable**: Extracting pure functions (snapshotStarterSizes, computeAgentOutputSize, computeAgentFileCount) to guardrail.go made the logic directly unit-testable (15 table-driven cases).
 3. **Phase 3 now includes hotfix**: The dev branch has both Phase 3 features AND the starter-aware guardrail fix. Future merges to main will include both.
+
+## 2026-04-16: Cross-Agent Update — Remote Skill Bug Flagged
+
+**From:** Tank 📡 (PR #573)  
+**Relevance:** Config/tool territory
+
+Tank discovered bug during remote skill example work: `internal/skills/fetcher.go::fetchRemote` shells out to `npx skills add` without `--yes`, causing interactive prompt to block under non-TTY and yield 0 skills selected (repo clones fine, but manifest resolution fails).
+
+**Impact on your work:**
+- **#566 (WorkspaceDelta):** Not directly blocked; delta is independent of skill fetching.
+- **Phase 4 config/tool work (#355–#357):** If you touch `FetchRemote` or skill fetcher, this is a known issue worth fixing: add `--yes` to `npx skills add` invocation.
+- **Real remote-skill usage:** Will fail in CI without fix.
+
+**Decision captured:** `.squad/decisions.md` → "Where example configs live + how to invoke them" (Tank decision, Tank caveat section).
+
