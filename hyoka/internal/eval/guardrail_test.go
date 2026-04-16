@@ -84,6 +84,24 @@ func TestComputeAgentOutputSize(t *testing.T) {
 			after:    map[string][]byte{"a.go": []byte("hi there"), "extra.txt": []byte("xxxx")}, // 8, 4
 			expected: (8 - 2) + 4,
 		},
+		{
+			name:     "zero-byte starter unchanged",
+			starter:  map[string][]byte{"empty.txt": []byte("")},
+			after:    map[string][]byte{"empty.txt": []byte("")},
+			expected: 0,
+		},
+		{
+			name:     "zero-byte starter grows",
+			starter:  map[string][]byte{"empty.txt": []byte("")},
+			after:    map[string][]byte{"empty.txt": []byte("content added")},
+			expected: 13,
+		},
+		{
+			name:     "empty starter project",
+			starter:  map[string][]byte{},
+			after:    map[string][]byte{"new.go": []byte("content")},
+			expected: 7,
+		},
 	}
 
 	for _, tc := range tests {
@@ -153,6 +171,12 @@ func TestComputeAgentFileCount(t *testing.T) {
 			snapshot: map[string]int64{},
 			current:  []string{"x.go", "y.go", "z.go"},
 			want:     3,
+		},
+		{
+			name:     "zero-byte starter files still count as starter",
+			snapshot: map[string]int64{"empty.txt": 0, "README.md": 0},
+			current:  []string{"empty.txt", "README.md", "new.go"},
+			want:     1, // only new.go
 		},
 	}
 	for _, tc := range tests {
