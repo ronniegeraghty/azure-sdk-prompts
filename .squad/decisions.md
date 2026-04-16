@@ -1012,3 +1012,80 @@ Embedded the built React SPA into the Go binary using `go:embed` so `hyoka serve
 ### Orchestration Log
 
 See `.squad/orchestration-log/2026-04-07T21-25-trinity.md`
+
+---
+
+### Decision: Pairwise Redesign with Deep Toggleability
+
+**Date:** 2026-04-07  
+**Author:** Ronnie Geraghty (User Directive)  
+**Status:** Proposed  
+**Summary:** Pairwise testing should toggle ALL tool types (MCP, skills, tools, plugins), not just `type=tool`. Composite entries (plugins with multiple MCP servers/skills, MCP servers with multiple tools) should support a `pairwise: deep` property enabling toggling of individual sub-components.
+
+**What:** For example, an MCP server with 5 tools could be tested with each tool individually on/off, not just the whole server on/off. Same pattern for plugins — test with each constituent MCP server and skill individually toggled.
+
+**Why:** Without this, pairwise is ineffective for actual configs (they primarily contain MCP and skill entries). Deep toggleability answers critical questions like "which specific Azure MCP tool makes the difference?"
+
+---
+
+### Decision: Unified Config Vision
+
+**Date:** 2026-04-07  
+**Author:** Ronnie Geraghty (User Directive)  
+**Status:** Proposed  
+**Summary:** Consolidate to ONE config file covering all pairwise testing dimensions. A single config should specify multiple generator models, multiple reviewer models, and tool bundles (plugins) with property-based filters. The engine fans out across all combinations.
+
+**Current state:** 7+ config files for different model/tool combinations.  
+**Target:** One config file, one command, full matrix expansion. Property-based filtering (via `when:` on ToolEntry) ensures prompt-language filtering already works.
+
+**Why:** User request — current approach doesn't scale.
+
+---
+
+### Decision: React SPA Embedding Strategy
+
+**Date:** 2026-04-07  
+**Author:** Morpheus 🕶️ (Architectural Proposal)  
+**Status:** Proposed  
+**Category:** Build System, Distribution, Developer Experience
+
+**Problem:** Users running `hyoka serve` encounter a blank page when the React dashboard hasn't been built. The site build is manual, output is gitignored, and new users (especially those using `go install`) have no guidance.
+
+**Recommendation:** Embed the built React SPA into the Go binary using `go:embed`, following the microsoft/waza pattern. Pre-build the site in CI, commit `site/dist/` to the repo, serve from embedded filesystem at runtime.
+
+**Impact:**
+- Binary size: +1.3 MB (3 files: index.html + 1 CSS + 1 JS)
+- User experience: Zero-config `hyoka serve` for all users (repo cloners, `go install` users, binary releases)
+- Build complexity: Add pre-build step to CI, update `.gitignore` to allow `site/dist/`
+
+---
+
+### Decision: Unify Tools Config (#252)
+
+**Date:** 2026-04-07  
+**Author:** Neo 🤖  
+**Status:** Implemented
+
+**Context:** Hyoka previously split generator tooling across `skills`, `mcp_servers`, and `available_tools`, creating redundant parsing and forcing downstream consumers to reconcile multiple fields when building Copilot sessions, reports, and pairwise ablations.
+
+**Decision:** Adopt a single `tools[]` array with typed `ToolEntry` values (`tool`, `mcp`, `skill`) for both generator and reviewer configs. MCP server definitions and skill references now expressed as tool entries; allowlisted tools resolved from typed entries.
+
+**Consequence:** Consumers filter `tools` by type to configure sessions and reports. Schema duplication removed, tool resolution logic centralized. All config files and documentation must use unified `tools` format.
+
+---
+
+### Decision: Embedded Site Always Default for `hyoka serve`
+
+**Date:** 2026-04-08  
+**Author:** Trinity 🖤  
+**PR:** #292  
+**Status:** Implemented
+
+**Context:** PR #289 embedded the React SPA into the Go binary. However, `serve` command auto-detected `site/dist/` on filesystem and used it to override the embedded copy, defeating the embedding for repo-based runs.
+
+**Decision:**
+- `--site-dir` flag is **opt-in only**. Embedded site is always default unless user explicitly passes the flag.
+- `site/dist/` is now **gitignored**. Canonical site assets live at `hyoka/internal/serve/site/` (embedded copy).
+- Development workflow: `npm run build` → copy to `hyoka/internal/serve/site/` → commit embedded copy.
+
+**Rationale:** Auto-detection created "works differently in dev vs production" bug. Stale artifacts in `site/dist/` silently override correct embedded copy, breaking UX for repo developers while `go install` users see correct site.
