@@ -83,3 +83,7 @@ All issues labeled, assigned, and staged for backlog prioritization. Backlog is 
 
 **Learnings:** Atomic big-bang migrations work when compiler errors guide all needed updates. Test failures provide a checklist.
 
+
+## 2026-04-16 — Phase 3 Merged to Dev (Neo)
+
+Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.

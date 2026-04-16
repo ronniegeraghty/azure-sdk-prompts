@@ -868,55 +868,7 @@ No explicit questions raised, but the recommendation for 12 documentation tasks 
 
 ---
 
-## Decision: Reviewer Factory Pattern for Per-Config Panels
-
-**Date:** 2026-01-19  
-**Author:** Neo 💊  
-**Status:** ✅ Implemented  
-**Issue:** #92  
-**PR:** #170  
-**Section:** Issue Resolution
-
-### Context
-
-Multi-config evaluations were broken. When running:
-```bash
-hyoka run --prompt-id identity-dp-python-default \
-  --config "baseline/claude-opus-4.6,azure-mcp/claude-opus-4.6"
-```
-
-Both configs used the reviewer panel from the FIRST config (baseline), not their own reviewer settings. This was due to lines 479-485 in main.go where the loop broke on first config match.
-
-### Decision
-
-Implement a **ReviewerFactory** pattern that creates reviewers lazily per-task, not once per engine.
-
-### Architecture
-
-- **Eval package:** Define ReviewerFactory function type
-- **Engine:** Store factory instead of concrete reviewers
-- **runSingleEval:** Create reviewer from task.Config at review time
-
-### Main.go Changes
-
-Replaced concrete reviewer creation with a factory that closes over clientOpts and maxActions but creates instances per-task based on task.Config's reviewer settings.
-
-### Testing
-
-Added `reviewer_factory_test.go` with:
-- `TestReviewerFactoryPerConfig`: Verifies each config gets correct models
-- `TestReviewerFactoryBackwardCompat`: Ensures deprecated API works
-- `TestReviewerFactoryNilWhenSkipReview`: Validates skip-review behavior
-
-All existing tests pass. Build and vet clean.
-
-### Lessons Learned
-
-1. **Factory > Singleton**: When different tasks need different configurations, use factories that create instances lazily per-task, not singletons created once.
-
-2. **Closure for Shared State**: Factories can close over shared resources (clientOpts, timeout) while still creating per-task instances with task-specific settings (models, skills).
-
-3. **Test Concurrent Execution**: Don't assert on task execution order. Use maps to track outcomes by task ID.
+**_Archived 2026-04-16: Decision Reviewer Factory Pattern moved to .squad/decisions-archive/_**
 
 ---
 
@@ -1089,3 +1041,59 @@ See `.squad/orchestration-log/2026-04-07T21-25-trinity.md`
 - Development workflow: `npm run build` → copy to `hyoka/internal/serve/site/` → commit embedded copy.
 
 **Rationale:** Auto-detection created "works differently in dev vs production" bug. Stale artifacts in `site/dist/` silently override correct embedded copy, breaking UX for repo developers while `go install` users see correct site.
+
+---
+
+### Decision: Phase 3 Merged into Dev with Hotfix Integration
+
+**Date:** 2026-04-16  
+**Author:** Neo 💊  
+**Status:** ✅ Complete
+
+**Context:** PR #562 (Phase 3: Advanced Core & CLI Polish) needed to be merged into `ronniegeraghty/dev`, but first the dev branch needed the hotfix from PR #567 (starter-aware MaxOutputSize guardrail, commit `6627d4a8`). Phase 2 (PR #560) split `engine.go` into `engine.go` + `engine_eval.go` on the dev branch, while main still had everything in a single `engine.go`. This created merge conflicts when trying to bring main's hotfix into dev.
+
+**Decision:** Execute the integration in three steps:
+1. Merge main → dev: Pull hotfix #567 into dev, resolving the file split conflict by keeping dev's shorter `engine.go`, porting hotfix changes to `engine_eval.go` where `runSingleEval()` now lives, adding `snapshotStarterSizes()` call after `CopyStarterFiles()`, and replacing old guardrail logic with starter-aware helpers.
+2. Merge dev → Phase 3 branch: Update Phase 3 PR branch with the updated dev (clean merge, no conflicts).
+3. Merge PR #562 → dev: Squash-merge Phase 3 after CI passes.
+
+**Outcome:** All steps complete. Merge commit `1ef6081d`: main → dev (hotfix integrated). Merge commit `02b7bd43`: dev → Phase 3 branch (clean auto-merge). Squash commit `4b4e95f9`: Phase 3 → dev (PR #562 merged). `ronniegeraghty/dev` now has both Phase 3 features AND the starter-aware guardrail fix. All tests pass (15 guardrail tests + Phase 3 tests). CI passed on Phase 3 branch before merge. Files modified: `hyoka/internal/eval/engine_eval.go` (Added starter snapshot, updated guardrail logic), `hyoka/internal/eval/guardrail.go` (NEW from hotfix), `hyoka/internal/eval/guardrail_test.go` (NEW from hotfix).
+
+**Implications:** 
+1. Future merges: Dev branch is now ahead of main. When main needs Phase 3, we'll do a dev → main PR.
+2. Guardrail integrity: The starter-aware guardrail logic is now in engine_eval.go, correctly integrated with Phase 3's advanced eval flow.
+3. No regressions: Phase 3 tests + guardrail tests all pass. The split-file merge did not break anything.
+
+**Follow-Up:** No immediate action needed. Phase 3 is on dev and ready for production testing. Next step would be merging dev → main when Phase 3 is validated.
+
+---
+
+### Decision: PR #567 Test Review Verdict — APPROVE ✅
+
+**Reviewer:** Switch 🤍  
+**Date:** 2026-04-16  
+**PR:** https://github.com/ronniegeraghty/hyoka/pull/567  
+**Issue:** #565 (Starter-aware MaxOutputSize guardrail)
+
+**Summary:** VERDICT: APPROVE with enhancement commit. Added 4 edge-case tests (zero-byte files, empty starter project) and pushed to the PR branch. All 15 table-driven cases now pass with `-race` detection.
+
+**Test Coverage Analysis:**
+- **TestSnapshotStarterSizes (3 cases):** Normal files in nested directories, missing files (recorded as size 0), nested directories.
+- **TestComputeAgentOutputSize (9 cases):** Unchanged starter → 0 bytes, modified starter → delta only, new agent file → full size, shrunk starter → no negative bytes, deleted starter → 0 bytes, mixed scenario (delta + new), zero-byte starter unchanged, zero-byte starter grows, empty starter project.
+- **TestComputeAgentFileCount (6 cases):** Only starters present → 0, one new file, one deleted starter, new + deleted, no starter → count all, zero-byte starters don't count as agent files.
+
+**Edge Cases Covered:**
+1. ✅ Empty starter (zero-byte files) — explicitly tested
+2. ⚠️ Symlinks — os.Stat() follows symlinks; no explicit test but safe
+3. ✅ Unicode filenames — Go stdlib is UTF-8 safe
+4. ✅ Partially-deleted starter files — covered by "deleted starter" case
+5. ✅ Nested starter dirs — covered by pkg/lib.go test
+6. ✅ Zero-byte files — explicitly tested
+7. ✅ Files modified to smaller size — covered by "shrunk starter" case
+8. ⚠️ Concurrent map access — snapshot is read-only; no concurrency in current pipeline
+
+**Risk Assessment:** Low risk. Pure functions with explicit contracts. Table-driven tests cover core scenarios + edge cases. Race detector clean. Symlink behavior relies on os.Stat() default (follows symlinks). No concurrent access in current eval pipeline. Phase 3.5 note: If concurrent access to snapshot map is planned, add sync.RWMutex or make it immutable.
+
+**Test Results:** go test -race ./hyoka/internal/eval/... -run 'TestCompute' -v → PASS. All 15 cases pass with race detector enabled.
+
+**Recommendation:** APPROVE. The hotfix is well-tested, safe, and solves the immediate problem. Enhanced coverage closes the zero-byte gap. Integration test is unnecessary for this surgical change.

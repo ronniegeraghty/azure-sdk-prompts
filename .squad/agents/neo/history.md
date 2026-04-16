@@ -105,3 +105,27 @@ Unified generator/reviewer tooling into a single `tools` array with typed entrie
 **Testing:** `go build ./hyoka/...`, `go vet ./hyoka/...`, `go test ./hyoka/... -count=1`
 
 **Key Learning:** Centralizing tool configuration simplifies downstream consumers — filter by type once and reuse the same entries for MCP, skills, and tool allowlists without duplicating schema fields.
+
+### Phase 3 Integration with Hotfix #567 (2026-04-16)
+**Branch:** Merged PR #562 into `ronniegeraghty/dev`  
+**PR:** [#562](https://github.com/ronniegeraghty/hyoka/pull/562) (Phase 3: Advanced Core & CLI Polish)  
+**Merge commits:** `1ef6081d` (main→dev), `4b4e95f9` (Phase 3→dev)  
+**Status:** ✅ Complete
+
+Successfully integrated hotfix #567 (starter-aware guardrails) with Phase 3 work. The challenge was that Phase 2 split engine.go into engine.go + engine_eval.go, while main still had everything in engine.go.
+
+**Conflict Resolution:**
+- Main tried to add `runSingleEval()` to engine.go, but dev already had it in engine_eval.go
+- Resolution: kept dev's engine.go (ends at line ~700), updated engine_eval.go with hotfix guardrail logic
+- Added `snapshotStarterSizes()` call after `CopyStarterFiles()` in engine_eval.go (line 125)
+- Replaced old guardrail logic (lines 422-448) with starter-aware helpers:
+  - `computeAgentFileCount()` for file count guardrail
+  - `computeAgentOutputSize()` for output size guardrail
+- New files from hotfix (guardrail.go, guardrail_test.go) merged cleanly
+
+**Testing:** Full test suite passed with race detector (`go test -race ./... -timeout 3m`). All 15 guardrail test cases pass, including zero-byte edge cases.
+
+**Key Learnings:**
+1. **File splits require careful merge attention**: When one branch splits a file and another modifies it, auto-merge may fail. Solution: understand the split intent, keep the split structure, port changes to the correct file.
+2. **Guardrail helpers are testable**: Extracting pure functions (snapshotStarterSizes, computeAgentOutputSize, computeAgentFileCount) to guardrail.go made the logic directly unit-testable (15 table-driven cases).
+3. **Phase 3 now includes hotfix**: The dev branch has both Phase 3 features AND the starter-aware guardrail fix. Future merges to main will include both.

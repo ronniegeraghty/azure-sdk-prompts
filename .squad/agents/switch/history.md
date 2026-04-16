@@ -52,3 +52,30 @@ Added first-ever test coverage for the `site/` React SPA dashboard. Set up Vites
 **Key outcome:** Site now has a test foundation. Future component work can be TDD'd. Setup file stubs ResizeObserver + IntersectionObserver for jsdom compatibility with recharts and motion libraries.
 
 **Files:** site/vite.config.ts, site/package.json, site/src/__tests__/*.test.{ts,tsx}, site/src/__tests__/setup.ts
+
+### Session 2026-04-16 (PR #567 Review — Starter-Aware Guardrails)
+
+**Status:** COMPLETE ✅  
+**Issue:** #565  
+**PR:** #567  
+**Verdict:** APPROVE
+
+Reviewed Neo's starter-aware guardrail refactor. Original PR had 11 table-driven cases covering core scenarios. I identified missing edge cases (zero-byte files, empty starter) and added 4 test cases. All 15 cases pass with `-race` detection.
+
+**Key findings:**
+- Core coverage was solid (unchanged, modified, new, shrunk, deleted, mixed)
+- Missing: explicit zero-byte file tests
+- Missing: empty starter project test
+- Symlinks: Safe (os.Stat follows symlinks automatically)
+- Concurrent access: Not a concern for hotfix (read-only snapshot)
+- Integration test: Not needed (3-line integration surface, pure functions)
+
+**Outcome:** Enhanced test suite from 11 → 15 cases. APPROVED with commit `f3ea8b9f` pushed to PR branch.
+
+**Cross-team:** Coordinator tracking #566 (Phase 3.5 followup: full `WorkspaceDelta` capture and guardrail softening).
+
+**Files reviewed:** `hyoka/internal/eval/guardrail.go`, `guardrail_test.go`, `engine.go`
+
+## 2026-04-16 — Phase 3 Merged to Dev (Neo)
+
+Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.

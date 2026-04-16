@@ -76,3 +76,7 @@ Updated `docs/prompt-authoring.md` to accurately reflect the current prompt fron
 
 Verified docs/prompt-authoring.md update is production-ready. Schema documentation now fully aligned with nested `properties:` format. All examples validated against parser source and 10+ production prompts. Ready for PR review and merge.
 
+
+## 2026-04-16 — Phase 3 Merged to Dev (Neo)
+
+Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.

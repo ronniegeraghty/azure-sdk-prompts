@@ -219,3 +219,7 @@ Initial setup complete.
 
 **Issue created:** #284 — "feat: Move session limits to prompt frontmatter with config/CLI fallback"
 **Assigned to:** Neo 💊 via `squad:neo 💊` label
+
+## 2026-04-16 — Phase 3 Merged to Dev (Neo)
+
+Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.

@@ -29,3 +29,7 @@ Implemented site embedding per Morpheus's architecture proposal. Key decisions a
 - **SPA fallback:** Opens file in `fs.FS`, checks `Stat()` for existence, serves via `http.FileServerFS`. Falls back to reading `index.html` via `fs.ReadFile` for client-side routing.
 - **Test update:** `TestSPANoSiteDir` changed from expecting 404 to 200 since embedded site is always available.
 - **PR:** #289 on branch `ronniegeraghty/issue-288-embed-site-spa`.
+
+## 2026-04-16 — Phase 3 Merged to Dev (Neo)
+
+Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.
