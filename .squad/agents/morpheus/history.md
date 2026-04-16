@@ -219,3 +219,29 @@ Initial setup complete.
 
 **Issue created:** #284 — "feat: Move session limits to prompt frontmatter with config/CLI fallback"
 **Assigned to:** Neo 💊 via `squad:neo 💊` label
+
+---
+
+### Session 2026-04-16 (PR #567 Architectural Review)
+
+**Status:** COMPLETE  
+**Focus:** Architectural review and live testing of PR #567 (starter-aware MaxOutputSize guardrail hotfix)
+
+**Deliverables:**
+1. **Code review:** Verified 3 pure helper functions (snapshotStarterSizes, computeAgentOutputSize, computeAgentFileCount) with comprehensive test coverage
+2. **Live test execution:** Created 900KB test starter project, ran real eval with `--prompt-id test-pr567-starter-aware --config baseline/claude-opus-4.6`
+   - Confirmed new logic counts only agent output (33 bytes) vs old logic (921,774 bytes)
+   - Evaluation completed successfully, no false guardrail failures
+3. **Architectural assessment:** Verified clean subsumption path for Phase 3.5 WorkspaceDelta (#566)
+   - Hotfix uses same conceptual model as delta (snapshot → compute net change)
+   - No coupling introduced; `guardrail.go` becomes dead code after #566 ships
+   - Hard-fail semantics preserved (required for hotfix scope)
+4. **Verdict document:** `.squad/decisions/inbox/morpheus-pr567-verdict.md` — **APPROVE** ✅
+
+**Key findings:**
+- PR is surgically scoped — solves immediate blocker without prematurely implementing full WorkspaceDelta architecture
+- Three questions answered: (1) Hard-fail preserved ✅ (2) Phase 3.5 compatible ✅ (3) Live test green ✅
+- Code quality: pure functions, graceful degradation on stat failures, table-driven tests with edge case coverage
+- Neo locked out per reviewer protocol — no architectural concerns requiring changes
+
+**Merge confidence:** HIGH. Right fix at right scope.
