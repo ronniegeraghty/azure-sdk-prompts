@@ -337,3 +337,53 @@ func TestToolEntryResolvedPairwise(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Remote MCP server tests (#345)
+// ---------------------------------------------------------------------------
+
+func TestValidateToolEntry_RemoteMCPValid(t *testing.T) {
+	entry := ToolEntry{Name: "remote-mcp", Type: "mcp", MCPType: "remote", URL: "https://mcp.example.com"}
+	if err := validateToolEntry(entry, "test", 0); err != nil {
+		t.Fatalf("unexpected error for valid remote MCP: %v", err)
+	}
+}
+
+func TestValidateToolEntry_RemoteMCPMissingURL(t *testing.T) {
+	entry := ToolEntry{Name: "remote-mcp", Type: "mcp", MCPType: "remote"}
+	if err := validateToolEntry(entry, "test", 0); err == nil {
+		t.Fatal("expected error for remote MCP missing URL")
+	}
+}
+
+func TestValidateToolEntry_InvalidMCPType(t *testing.T) {
+	entry := ToolEntry{Name: "mcp", Type: "mcp", MCPType: "invalid", Command: "npx"}
+	if err := validateToolEntry(entry, "test", 0); err == nil {
+		t.Fatal("expected error for invalid mcp_type")
+	}
+}
+
+func TestValidateToolEntry_LocalMCPDefault(t *testing.T) {
+	// No mcp_type specified — defaults to local, requires command
+	entry := ToolEntry{Name: "mcp", Type: "mcp", Command: "npx"}
+	if err := validateToolEntry(entry, "test", 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestToolEntryResolvedMCPType(t *testing.T) {
+	cases := []struct {
+		entry ToolEntry
+		want  string
+	}{
+		{entry: ToolEntry{Name: "a"}, want: "local"},
+		{entry: ToolEntry{Name: "a", MCPType: "local"}, want: "local"},
+		{entry: ToolEntry{Name: "a", MCPType: "remote"}, want: "remote"},
+		{entry: ToolEntry{Name: "a", MCPType: ""}, want: "local"},
+	}
+	for _, tc := range cases {
+		if got := tc.entry.ResolvedMCPType(); got != tc.want {
+			t.Errorf("ResolvedMCPType(%+v) = %q, want %q", tc.entry, got, tc.want)
+		}
+	}
+}

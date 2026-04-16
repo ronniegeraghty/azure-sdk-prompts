@@ -118,9 +118,11 @@ Run Summary:
 Reports are generated in `reports/<run-id>/`:
 
 ```bash
-# Open the summary HTML in your browser
-open reports/<run-id>/summary.html    # macOS
-xdg-open reports/<run-id>/summary.html  # Linux
+# Browse reports in the web dashboard
+go run ./hyoka serve
+
+# Or view the JSON summary directly
+cat reports/<run-id>/summary.json | python3 -m json.tool
 ```
 
 The summary includes:
@@ -128,9 +130,9 @@ The summary includes:
 - **Duration Analysis** — min/avg/max per config and prompt
 - **Config Comparison** — side-by-side pass rates
 - **Tool Usage** — aggregate tool call statistics
-- **Detailed Results** — individual eval links
+- **Detailed Results** — individual eval data
 
-Individual reports at `reports/<run-id>/results/.../report.html` show the full agent session: prompt, reasoning, tool calls, generated code, verification, and review scores.
+Individual reports at `reports/<run-id>/results/.../report.json` contain the full agent session: prompt, reasoning, tool calls, generated code, and review scores. Markdown reports are also generated alongside each JSON report.
 
 ## 5. Run Trend Analysis
 
@@ -285,7 +287,7 @@ Start the built-in report viewer:
 go run ./hyoka serve
 ```
 
-This launches a local web server at `http://localhost:8080` with an index of all evaluation runs, linking to individual HTML reports.
+This launches a local web server at `http://localhost:8080` with a dashboard for browsing all evaluation runs and their reports.
 
 ## Next Steps
 
@@ -294,4 +296,4 @@ This launches a local web server at `http://localhost:8080` with an index of all
 - [Prompt Authoring Guide](prompt-authoring.md) — How to write evaluation prompts
 - [Guardrails and Safety](guardrails.md) — Limits, process cleanup, and safety boundaries
 - [Architecture Overview](architecture.md) — How hyoka works end-to-end
-- [Contributing Guide](contributing.md) — Building, testing, and adding features
+- [Contributing Guide](../CONTRIBUTING.md) — Building, testing, and adding features

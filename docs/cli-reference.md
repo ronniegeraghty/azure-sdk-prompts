@@ -153,14 +153,14 @@ hyoka compare --config baseline/claude-opus-4.6 --since 2025-01-15
 
 ### `hyoka tools`
 
-Manage and list tools available to the generator agent.
+List available tools and plugins. Scans the `plugins/` and `skills/` directories.
 
 ```bash
-# List all available tools
-hyoka tools list
+# List all available tools and plugins
+hyoka tools
 
-# Add a new tool configuration
-hyoka tools add --name my-tool --description "Tool description"
+# Alias
+hyoka plugins
 ```
 
 ### `hyoka configs`
@@ -199,7 +199,7 @@ hyoka trends --reports-dir ./reports
 
 ### `hyoka report`
 
-Re-render reports from a previous run.
+Re-render Markdown reports from existing JSON data.
 
 ```bash
 hyoka report 20260327-113302

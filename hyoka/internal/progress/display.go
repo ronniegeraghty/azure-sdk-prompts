@@ -39,29 +39,47 @@ const (
 	evalError
 )
 
-// evalLine holds the state for one eval slot in the fixed-region display.
-type evalLine struct {
-	name        string
-	status      evalStatus
-	startTime   time.Time
-	activity    string
-	phase       Phase
+// evalSection holds the state for one eval in the section-based display.
+// Each eval renders as a multi-line section showing prompt, config, and
+// per-phase status lines.
+type evalSection struct {
+	promptID   string
+	configName string
+	status     evalStatus
+	startTime  time.Time
+	phase      Phase
+	activity   string
+
+	// Per-phase tracking
+	genStartTime time.Time
+	genDone      bool
+	genDuration  time.Duration
+	genActivity  string
+
+	revStartTime time.Time
+	revDone      bool
+	revDuration  time.Duration
+	revActivity  string
+
 	fileCount   int
 	reviewScore int
 	message     string
 	duration    time.Duration
 }
 
-// Display renders live progress for evaluation runs.
+// Display renders section-based progress for evaluation runs.
 //
-// In ANSI mode (real terminal), it prints a header, saves the cursor
-// position with DECSC (\0337), and redraws the eval region on a 500ms
-// timer using DECRC (\0338) + clear-to-end (\033[J). Lines are appended
-// dynamically as evals start — there are no pre-allocated "waiting" lines.
-// The ANSI region grows downward as new evals begin.
+// Each eval gets its own multi-line section:
 //
-// In non-ANSI mode (piped output, test buffers), it prints result lines
-// inline as evals complete, then a summary on Finish.
+//	Prompt: key-vault-dp-python-crud
+//	Config: baseline/claude-opus-4.6
+//	  ├─ Agent:  ✅ Complete (44.3s)
+//	  └─ Review: 🔄 Running... (12.5s)
+//
+// In ANSI mode (real terminal), the entire region is redrawn on a 500ms
+// timer using DECSC/DECRC cursor save/restore.
+// In non-ANSI mode (piped output, test buffers), sections print inline
+// as evals progress and complete.
 type Display struct {
 	total     int
 	workers   int
@@ -76,9 +94,9 @@ type Display struct {
 	startTime time.Time
 	reportDir string
 
-	// Dynamic eval lines — grows as evals start (not pre-allocated).
-	lines     []*evalLine
-	lineIndex map[string]int
+	// Dynamic eval sections — grows as evals start.
+	sections     []*evalSection
+	sectionIndex map[string]int
 
 	// ANSI redraw timer
 	ticker *time.Ticker
@@ -107,7 +125,6 @@ func NewDisplay(cfg DisplayConfig) *Display {
 			ansi = true
 		}
 	case ModeLog:
-		// Non-ANSI mode: append-only lines, no cursor movement
 		ansi = false
 	default: // ModeAuto or ""
 		if !disabled && cfg.Writer == nil {
@@ -120,15 +137,15 @@ func NewDisplay(cfg DisplayConfig) *Display {
 	}
 
 	d := &Display{
-		total:     cfg.Total,
-		workers:   cfg.Workers,
-		w:         w,
-		disabled:  disabled,
-		ansi:      ansi,
-		startTime: time.Now(),
-		reportDir: cfg.ReportDir,
-		lines:     []*evalLine{},
-		lineIndex: make(map[string]int),
+		total:        cfg.Total,
+		workers:      cfg.Workers,
+		w:            w,
+		disabled:     disabled,
+		ansi:         ansi,
+		startTime:    time.Now(),
+		reportDir:    cfg.ReportDir,
+		sections:     []*evalSection{},
+		sectionIndex: make(map[string]int),
 	}
 
 	if d.ansi && cfg.Total > 0 {
@@ -148,68 +165,109 @@ func NewDisplay(cfg DisplayConfig) *Display {
 
 // --- ANSI fixed-region rendering (terminal only) ---
 
-// buildRegion renders the eval region (started lines + summary) into a buffer.
-// Only lines for evals that have started are included — no waiting placeholders.
+// buildRegion renders all eval sections plus a summary line into a buffer.
 func (d *Display) buildRegion() []byte {
 	var buf bytes.Buffer
-	for _, l := range d.lines {
-		d.writeEvalLine(&buf, l)
+	for i, s := range d.sections {
+		if i > 0 {
+			buf.WriteByte('\n')
+		}
+		d.writeSection(&buf, s)
 	}
 	buf.WriteByte('\n')
 	d.writeSummaryLine(&buf)
 	return buf.Bytes()
 }
 
-// drawRegion writes the eval region to the output writer atomically.
 func (d *Display) drawRegion() {
 	d.w.Write(d.buildRegion())
 }
 
-// redrawRegion restores cursor to the saved position, clears everything
-// below, and redraws the region — all as a single atomic write.
-// Uses DECRC (\0338) + ED (\033[J) which is more widely supported than
-// the SCO \033[u sequence.
+// redrawRegion restores cursor to saved position, clears below, redraws.
 func (d *Display) redrawRegion() {
 	region := d.buildRegion()
-	// Prepend restore-cursor + clear-to-end-of-screen, write everything at once
 	var buf bytes.Buffer
 	buf.WriteString("\0338\033[J")
 	buf.Write(region)
 	d.w.Write(buf.Bytes())
 }
 
-func (d *Display) writeEvalLine(buf *bytes.Buffer, l *evalLine) {
-	switch l.status {
+// writeSection renders a multi-line section for one eval.
+func (d *Display) writeSection(buf *bytes.Buffer, s *evalSection) {
+	fmt.Fprintf(buf, "Prompt: %s\n", s.promptID)
+	fmt.Fprintf(buf, "Config: %s\n", s.configName)
+
+	switch s.status {
 	case evalActive:
-		activity := l.activity
-		if activity == "" && l.phase != "" {
-			activity = string(l.phase)
-		}
-		if activity != "" {
-			fmt.Fprintf(buf, "  🔄 %-40s  %s  %s\n", l.name, activity, fmtDuration(time.Since(l.startTime)))
-		} else {
-			fmt.Fprintf(buf, "  🔄 %-40s  %s\n", l.name, fmtDuration(time.Since(l.startTime)))
-		}
+		d.writeActivePhases(buf, s)
 	case evalPassed:
 		score := ""
-		if l.reviewScore > 0 {
-			score = fmt.Sprintf("  %d/10", l.reviewScore)
+		if s.reviewScore > 0 {
+			score = fmt.Sprintf("  %d/10", s.reviewScore)
 		}
-		fmt.Fprintf(buf, "  ✅ %-40s %d files%s  %s\n", l.name, l.fileCount, score, fmtDuration(l.duration))
+		fmt.Fprintf(buf, "  ✅ Passed  %d files%s  (%s)\n", s.fileCount, score, fmtDuration(s.duration))
 	case evalFailed, evalError:
-		msg := l.message
+		msg := s.message
 		if msg == "" {
 			msg = "failed"
 		}
-		fmt.Fprintf(buf, "  ❌ %-40s %s  %s\n", l.name, msg, fmtDuration(l.duration))
+		fmt.Fprintf(buf, "  ❌ %s  (%s)\n", msg, fmtDuration(s.duration))
+	}
+}
+
+// writeActivePhases renders the per-phase status lines for an in-progress eval.
+func (d *Display) writeActivePhases(buf *bytes.Buffer, s *evalSection) {
+	hasReview := s.phase == PhaseReviewing || s.revDone
+
+	agentConnector := "└─"
+	if hasReview {
+		agentConnector = "├─"
+	}
+
+	// Agent (generation) phase
+	if s.genDone {
+		fmt.Fprintf(buf, "  %s Agent:  ✅ Complete (%s)\n", agentConnector, fmtDuration(s.genDuration))
+	} else if s.phase == PhaseGenerating || s.phase == "" {
+		activity := s.genActivity
+		if activity == "" {
+			activity = s.activity
+		}
+		if activity == "" {
+			activity = "Starting..."
+		}
+		dur := fmtDuration(time.Since(s.genStartTime))
+		if s.genStartTime.IsZero() {
+			dur = fmtDuration(time.Since(s.startTime))
+		}
+		fmt.Fprintf(buf, "  %s Agent:  🔄 %s (%s)\n", agentConnector, activity, dur)
+	}
+
+	// Review phase
+	if hasReview {
+		if s.revDone {
+			fmt.Fprintf(buf, "  └─ Review: ✅ Complete (%s)\n", fmtDuration(s.revDuration))
+		} else {
+			activity := s.revActivity
+			if activity == "" {
+				activity = s.activity
+			}
+			if activity == "" {
+				activity = "Running..."
+			}
+			dur := fmtDuration(time.Since(s.revStartTime))
+			if s.revStartTime.IsZero() {
+				dur = fmtDuration(time.Since(s.startTime))
+			}
+			fmt.Fprintf(buf, "  └─ Review: 🔄 %s (%s)\n", activity, dur)
+		}
 	}
 }
 
 func (d *Display) writeSummaryLine(buf *bytes.Buffer) {
 	if d.completed == d.total && d.total > 0 {
-		fmt.Fprintf(buf, "  Summary: %d/%d passed", d.passed, d.total)
+		fmt.Fprintf(buf, "Summary: %d/%d passed", d.passed, d.total)
 	} else {
-		fmt.Fprintf(buf, "  %d/%d completed", d.completed, d.total)
+		fmt.Fprintf(buf, "%d/%d completed", d.completed, d.total)
 	}
 	if d.passed > 0 {
 		fmt.Fprintf(buf, "  ✅ %d", d.passed)
@@ -240,14 +298,15 @@ func (d *Display) redrawLoop() {
 // --- Slot assignment ---
 
 func (d *Display) getOrAssignSlot(evalID, promptID, configName string) int {
-	if idx, ok := d.lineIndex[evalID]; ok {
+	if idx, ok := d.sectionIndex[evalID]; ok {
 		return idx
 	}
-	idx := len(d.lines)
-	d.lines = append(d.lines, &evalLine{
-		name: promptID + "/" + configName,
+	idx := len(d.sections)
+	d.sections = append(d.sections, &evalSection{
+		promptID:   promptID,
+		configName: configName,
 	})
-	d.lineIndex[evalID] = idx
+	d.sectionIndex[evalID] = idx
 	return idx
 }
 
@@ -255,7 +314,7 @@ func (d *Display) getOrAssignSlot(evalID, promptID, configName string) int {
 
 // HandleEvent updates internal state from engine/evaluator events.
 // In ANSI mode, rendering happens on the timer — not here.
-// In non-ANSI mode, completion events print inline.
+// In non-ANSI mode, section-based output prints inline.
 func (d *Display) HandleEvent(evt ProgressEvent) {
 	if d.disabled {
 		return
@@ -266,18 +325,24 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 	switch evt.Type {
 	case EventStarting:
 		idx := d.getOrAssignSlot(evt.EvalID, evt.PromptID, evt.ConfigName)
-		l := d.lines[idx]
-		l.status = evalActive
-		l.startTime = time.Now()
-		l.activity = evt.Message
+		s := d.sections[idx]
+		s.status = evalActive
+		s.startTime = time.Now()
+		s.activity = evt.Message
 		if !d.ansi {
-			fmt.Fprintf(d.w, "  ▶ %-40s  starting...\n", l.name)
+			fmt.Fprintf(d.w, "Prompt: %s\nConfig: %s\n  └─ Agent:  🔄 Starting...\n\n", s.promptID, s.configName)
 		}
 
 	case EventSendingPrompt, EventReasoning, EventToolStart, EventToolComplete,
 		EventWritingFile, EventWaiting:
-		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].activity = evt.Message
+		if idx, ok := d.sectionIndex[evt.EvalID]; ok {
+			s := d.sections[idx]
+			s.activity = evt.Message
+			if s.phase == PhaseReviewing {
+				s.revActivity = evt.Message
+			} else {
+				s.genActivity = evt.Message
+			}
 			if !d.ansi && evt.Message != "" {
 				prefix := "  "
 				switch evt.Type {
@@ -294,69 +359,90 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 				default:
 					prefix = "    ⏳"
 				}
-				fmt.Fprintf(d.w, "%s [%s] %s\n", prefix, d.lines[idx].name, evt.Message)
+				fmt.Fprintf(d.w, "%s [%s/%s] %s\n", prefix, s.promptID, s.configName, evt.Message)
 			}
 		}
 
 	case EventPhaseChange:
-		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			d.lines[idx].phase = evt.Phase
-			d.lines[idx].activity = string(evt.Phase)
+		if idx, ok := d.sectionIndex[evt.EvalID]; ok {
+			s := d.sections[idx]
+			// Mark previous phase as done
+			if evt.Phase == PhaseReviewing && !s.genDone {
+				s.genDone = true
+				if !s.genStartTime.IsZero() {
+					s.genDuration = time.Since(s.genStartTime)
+				} else {
+					s.genDuration = time.Since(s.startTime)
+				}
+			}
+			s.phase = evt.Phase
+			s.activity = string(evt.Phase)
+			if evt.Phase == PhaseGenerating {
+				s.genStartTime = time.Now()
+			} else if evt.Phase == PhaseReviewing {
+				s.revStartTime = time.Now()
+			}
 			if !d.ansi {
-				fmt.Fprintf(d.w, "  ▶ %-40s  %s...\n", d.lines[idx].name, evt.Phase)
+				fmt.Fprintf(d.w, "  ▶ [%s/%s] %s...\n", s.promptID, s.configName, evt.Phase)
 			}
 		}
 
 	case EventPassed:
 		d.completed++
 		d.passed++
-		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			l := d.lines[idx]
-			l.status = evalPassed
-			l.duration = time.Since(l.startTime)
-			l.fileCount = evt.FileCount
-			l.reviewScore = evt.ReviewScore
+		if idx, ok := d.sectionIndex[evt.EvalID]; ok {
+			s := d.sections[idx]
+			s.status = evalPassed
+			s.duration = time.Since(s.startTime)
+			s.fileCount = evt.FileCount
+			s.reviewScore = evt.ReviewScore
+			if s.phase == PhaseReviewing && !s.revDone {
+				s.revDone = true
+				if !s.revStartTime.IsZero() {
+					s.revDuration = time.Since(s.revStartTime)
+				}
+			}
 			if !d.ansi {
 				score := ""
 				if evt.ReviewScore > 0 {
 					score = fmt.Sprintf("  %d/10", evt.ReviewScore)
 				}
-				fmt.Fprintf(d.w, "  ✅ %-40s %d files%s  %s\n",
-					l.name, evt.FileCount, score, fmtDuration(l.duration))
+				fmt.Fprintf(d.w, "  ✅ Passed  %d files%s  (%s)\n\n",
+					evt.FileCount, score, fmtDuration(s.duration))
 			}
 		}
 
 	case EventFailed:
 		d.completed++
 		d.failed++
-		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			l := d.lines[idx]
-			l.status = evalFailed
-			l.duration = time.Since(l.startTime)
-			l.message = evt.Message
-			if l.message == "" {
-				l.message = "failed"
+		if idx, ok := d.sectionIndex[evt.EvalID]; ok {
+			s := d.sections[idx]
+			s.status = evalFailed
+			s.duration = time.Since(s.startTime)
+			s.message = evt.Message
+			if s.message == "" {
+				s.message = "failed"
 			}
 			if !d.ansi {
-				fmt.Fprintf(d.w, "  ❌ %-40s %s  %s\n",
-					l.name, l.message, fmtDuration(l.duration))
+				fmt.Fprintf(d.w, "  ❌ %s  (%s)\n\n",
+					s.message, fmtDuration(s.duration))
 			}
 		}
 
 	case EventError:
 		d.completed++
 		d.errors++
-		if idx, ok := d.lineIndex[evt.EvalID]; ok {
-			l := d.lines[idx]
-			l.status = evalError
-			l.duration = time.Since(l.startTime)
-			l.message = evt.Message
-			if l.message == "" {
-				l.message = "ERROR"
+		if idx, ok := d.sectionIndex[evt.EvalID]; ok {
+			s := d.sections[idx]
+			s.status = evalError
+			s.duration = time.Since(s.startTime)
+			s.message = evt.Message
+			if s.message == "" {
+				s.message = "ERROR"
 			}
 			if !d.ansi {
-				fmt.Fprintf(d.w, "  ❌ %-40s %s  %s\n",
-					l.name, l.message, fmtDuration(l.duration))
+				fmt.Fprintf(d.w, "  ❌ %s  (%s)\n\n",
+					s.message, fmtDuration(s.duration))
 			}
 		}
 	}
@@ -377,7 +463,6 @@ func (d *Display) Finish() {
 		if d.total > 0 {
 			d.redrawRegion()
 		}
-		// Print reports path below the region (no cursor restore — this is final)
 		if d.reportDir != "" {
 			fmt.Fprintf(d.w, "\nReports: %s\n", d.reportDir)
 		} else {
@@ -391,7 +476,6 @@ func (d *Display) Finish() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	fmt.Fprint(d.w, "\n\n")
 	elapsed := time.Since(d.startTime)
 	fmt.Fprintf(d.w, "\nSummary: %d/%d passed", d.passed, d.total)
 	fmt.Fprintf(d.w, "  ✅ %d", d.passed)

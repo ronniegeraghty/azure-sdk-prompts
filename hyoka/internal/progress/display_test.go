@@ -17,11 +17,14 @@ d.HandleEvent(ProgressEvent{EvalID: "b", Type: EventFailed, Message: "bad code"}
 d.Finish()
 
 out := buf.String()
-if !strings.Contains(out, "p1/c1") {
-t.Errorf("expected p1/c1 in output, got %q", out)
+if !strings.Contains(out, "Prompt: p1") {
+t.Errorf("expected 'Prompt: p1' in output, got %q", out)
 }
-if !strings.Contains(out, "p2/c2") {
-t.Errorf("expected p2/c2 in output, got %q", out)
+if !strings.Contains(out, "Config: c1") {
+t.Errorf("expected 'Config: c1' in output, got %q", out)
+}
+if !strings.Contains(out, "Prompt: p2") {
+t.Errorf("expected 'Prompt: p2' in output, got %q", out)
 }
 if !strings.Contains(out, "✅") {
 t.Errorf("expected ✅ in output")
@@ -82,8 +85,11 @@ d.HandleEvent(ProgressEvent{EvalID: "a", Type: EventPassed, FileCount: 2})
 d.Finish()
 
 out := buf.String()
-if !strings.Contains(out, "starting...") {
-	t.Errorf("log mode should show starting line, got %q", out)
+if !strings.Contains(out, "Prompt: p1") {
+	t.Errorf("log mode should show Prompt label, got %q", out)
+}
+if !strings.Contains(out, "Config: c1") {
+	t.Errorf("log mode should show Config label, got %q", out)
 }
 if !strings.Contains(out, "generating...") {
 	t.Errorf("log mode should show phase transitions, got %q", out)
@@ -103,5 +109,30 @@ d.Finish()
 
 if buf.Len() != 0 {
 	t.Errorf("off mode should produce no output, got %q", buf.String())
+}
+}
+
+func TestDisplay_SectionLayout(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Disabled: false})
+
+d.HandleEvent(ProgressEvent{EvalID: "a", PromptID: "kv-crud", ConfigName: "baseline/opus", Type: EventStarting})
+d.HandleEvent(ProgressEvent{EvalID: "a", Type: EventPhaseChange, Phase: PhaseGenerating})
+d.HandleEvent(ProgressEvent{EvalID: "a", Type: EventPhaseChange, Phase: PhaseReviewing})
+d.HandleEvent(ProgressEvent{EvalID: "a", Type: EventPassed, FileCount: 5, ReviewScore: 9})
+d.Finish()
+
+out := buf.String()
+if !strings.Contains(out, "Prompt: kv-crud") {
+t.Errorf("expected 'Prompt: kv-crud', got %q", out)
+}
+if !strings.Contains(out, "Config: baseline/opus") {
+t.Errorf("expected 'Config: baseline/opus', got %q", out)
+}
+if !strings.Contains(out, "5 files") {
+t.Errorf("expected '5 files', got %q", out)
+}
+if !strings.Contains(out, "9/10") {
+t.Errorf("expected '9/10', got %q", out)
 }
 }

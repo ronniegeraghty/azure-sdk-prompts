@@ -23,7 +23,7 @@ func ReadDirFiles(dir string) (map[string]string, error) {
 			if strings.HasPrefix(name, ".") && path != dir {
 				return filepath.SkipDir
 			}
-			if IsBuildArtifactDir(name) {
+			if IsDefaultExcludedDir(name) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -54,9 +54,9 @@ func ReadDirFiles(dir string) (map[string]string, error) {
 	return files, err
 }
 
-// IsBuildArtifactDir returns true for well-known build artifact directory
+// IsDefaultExcludedDir returns true for well-known build artifact directory
 // names that should be excluded from file listings, copies, and review prompts.
-func IsBuildArtifactDir(name string) bool {
+func IsDefaultExcludedDir(name string) bool {
 	switch name {
 	case "target", // Rust/Cargo
 		"node_modules",  // Node.js/npm
@@ -71,6 +71,21 @@ func IsBuildArtifactDir(name string) bool {
 		".cargo",           // Cargo cache
 		"debug", "release": // Rust profile subdirs
 		return true
+	}
+	return false
+}
+
+// ShouldExcludeDir returns true if name matches any default excluded directory
+// or any of the extra directory names provided. This unifies the built-in
+// exclusion list with user-supplied --exclude-dirs values.
+func ShouldExcludeDir(name string, extra []string) bool {
+	if IsDefaultExcludedDir(name) {
+		return true
+	}
+	for _, e := range extra {
+		if name == e {
+			return true
+		}
 	}
 	return false
 }

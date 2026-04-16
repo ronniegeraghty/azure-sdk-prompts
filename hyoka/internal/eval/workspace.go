@@ -193,7 +193,7 @@ func listFiles(dir string) ([]string, error) {
 			if strings.HasPrefix(info.Name(), ".") && path != dir {
 				return filepath.SkipDir
 			}
-			if utils.IsBuildArtifactDir(info.Name()) {
+			if utils.IsDefaultExcludedDir(info.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -258,8 +258,8 @@ func copyDir(src, dst string) error {
 			if strings.HasPrefix(name, ".") && path != src {
 				return filepath.SkipDir
 			}
-			if utils.IsBuildArtifactDir(name) {
-				slog.Debug("Skipping build artifact directory", "dir", name)
+			if utils.IsDefaultExcludedDir(name) {
+				slog.Debug("Skipping excluded directory", "dir", name)
 				return filepath.SkipDir
 			}
 		}

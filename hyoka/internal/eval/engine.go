@@ -92,6 +92,10 @@ type EngineOptions struct {
 	MaxSessionActions int
 	MaxFiles          int
 	MaxOutputSize     int64
+	// Tiered limits (#347): separate generator and reviewer guardrails.
+	// Reviewer limits default to half of generator limits when zero.
+	ReviewerMaxTurns   int
+	ReviewerMaxActions int
 	// Process lifecycle (#46)
 	StrictCleanup bool // Fail run if orphaned processes detected after cleanup.
 	// Session timeout — maximum duration for a single SendAndWait call
@@ -159,6 +163,19 @@ func NewEngineWithReviewerFactory(evaluator PromptRunner, factory ReviewerFactor
 	}
 	if opts.MaxOutputSize <= 0 {
 		opts.MaxOutputSize = 1048576 // 1MB
+	}
+	// Tiered reviewer limits: default to half of generator limits (#347)
+	if opts.ReviewerMaxTurns <= 0 {
+		opts.ReviewerMaxTurns = opts.MaxTurns / 2
+		if opts.ReviewerMaxTurns < 5 {
+			opts.ReviewerMaxTurns = 5
+		}
+	}
+	if opts.ReviewerMaxActions <= 0 {
+		opts.ReviewerMaxActions = opts.MaxSessionActions / 2
+		if opts.ReviewerMaxActions < 10 {
+			opts.ReviewerMaxActions = 10
+		}
 	}
 	if opts.SessionTimeout <= 0 {
 		opts.SessionTimeout = 10 * time.Minute

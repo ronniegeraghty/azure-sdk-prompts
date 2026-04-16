@@ -608,20 +608,20 @@ func TestAverageReviewMajorityVoting(t *testing.T) {
 
 	// Build: 3/3 pass → pass
 	if !criteriaMap["Build"] {
-		t.Error("Build should pass (3/3 majority)")
+		t.Error("Build should pass (0/3 failed)")
 	}
-	// Style: 1/3 pass → fail (1 > 1 is false)
+	// Style: 1/3 pass → fail (strict: any fail = fail)
 	if criteriaMap["Style"] {
-		t.Error("Style should fail (1/3 majority)")
+		t.Error("Style should fail (2/3 failed, strict voting)")
 	}
-	// Errors: 2/3 pass → pass (2 > 1 is true)
-	if !criteriaMap["Errors"] {
-		t.Error("Errors should pass (2/3 majority)")
+	// Errors: 2/3 pass → fail (strict: any fail = fail)
+	if criteriaMap["Errors"] {
+		t.Error("Errors should fail (1/3 failed, strict any-fail voting)")
 	}
 
-	// Verify correct overall score: Build + Errors = 2 passed
-	if result.OverallScore != 2 {
-		t.Errorf("OverallScore = %d, want 2", result.OverallScore)
+	// Verify correct overall score: only Build passes = 1
+	if result.OverallScore != 1 {
+		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
 	}
 	if result.MaxScore != 3 {
 		t.Errorf("MaxScore = %d, want 3", result.MaxScore)
@@ -703,8 +703,8 @@ func TestAverageReviewSummaryFormat(t *testing.T) {
 	if !strings.Contains(result.Summary, "2 reviewers") {
 		t.Errorf("Summary should mention reviewer count, got: %q", result.Summary)
 	}
-	if result.Model != "consensus (average)" {
-		t.Errorf("Model = %q, want %q", result.Model, "consensus (average)")
+	if result.Model != "consensus (strict-vote)" {
+		t.Errorf("Model = %q, want %q", result.Model, "consensus (strict-vote)")
 	}
 }
 
@@ -729,7 +729,7 @@ func TestAverageReviewPreservesCriteriaOrder(t *testing.T) {
 }
 
 func TestAverageReviewEvenSplitFailsByCriteria(t *testing.T) {
-	// With 2 reviewers, 1 pass + 1 fail → passCount=1, total=2 → 1 > 2/2=1 → false (tie fails)
+	// With 2 reviewers, 1 pass + 1 fail → strict any-fail = fail
 	panel := []ReviewResult{
 		{Scores: ReviewScores{Criteria: []CriterionResult{{Name: "X", Passed: true}}}},
 		{Scores: ReviewScores{Criteria: []CriterionResult{{Name: "X", Passed: false}}}},
@@ -741,7 +741,7 @@ func TestAverageReviewEvenSplitFailsByCriteria(t *testing.T) {
 		t.Fatal("expected 1 criterion")
 	}
 	if result.Scores.Criteria[0].Passed {
-		t.Error("tie (1/2) should fail — majority requires strictly more than half")
+		t.Error("tie (1/2) should fail — strict any-fail voting")
 	}
 }
 
@@ -1709,3 +1709,147 @@ t.Error("should contain reviews section even with empty panel")
 
 // helper
 func strPtr(s string) *string { return &s }
+
+// ---------------------------------------------------------------------------
+// ReviewerResponse / new JSON schema tests (#343)
+// ---------------------------------------------------------------------------
+
+func TestParseReviewResponseNewSchema(t *testing.T) {
+	input := `{"criteria":[{"criterion":"Uses DefaultAzureCredential","passed":true,"reasoning":"Correctly imports and uses DefaultAzureCredential"},{"criterion":"Handles errors","passed":false,"reasoning":"Missing error handling for auth failures"}],"summary":"Partial pass","issues":["No error handling"],"strengths":["Correct auth"]}`
+
+	result, err := parseReviewResponse(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Scores.Criteria) != 2 {
+		t.Fatalf("expected 2 criteria, got %d", len(result.Scores.Criteria))
+	}
+	if result.Scores.Criteria[0].Name != "Uses DefaultAzureCredential" {
+		t.Errorf("criterion[0].Name = %q, want %q", result.Scores.Criteria[0].Name, "Uses DefaultAzureCredential")
+	}
+	if !result.Scores.Criteria[0].Passed {
+		t.Error("criterion[0] should pass")
+	}
+	if result.Scores.Criteria[1].Passed {
+		t.Error("criterion[1] should fail")
+	}
+	if result.OverallScore != 1 {
+		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
+	}
+	if result.MaxScore != 2 {
+		t.Errorf("MaxScore = %d, want 2", result.MaxScore)
+	}
+}
+
+func TestParseReviewResponseNewSchemaInMarkdown(t *testing.T) {
+	input := "```json\n" + `{"criteria":[{"criterion":"Build","passed":true,"reasoning":"OK"}],"summary":"Good","issues":[],"strengths":["Clean"]}` + "\n```"
+	result, err := parseReviewResponse(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Scores.Criteria) != 1 {
+		t.Fatalf("expected 1 criterion, got %d", len(result.Scores.Criteria))
+	}
+	if result.Scores.Criteria[0].Reason != "OK" {
+		t.Errorf("reason = %q, want %q", result.Scores.Criteria[0].Reason, "OK")
+	}
+}
+
+func TestValidateReviewerResponseValid(t *testing.T) {
+	result := &ReviewResult{
+		Scores: ReviewScores{Criteria: []CriterionResult{
+			{Name: "A", Passed: true},
+			{Name: "B", Passed: false, Reason: "missing"},
+		}},
+	}
+	errs := validateReviewerResponse(result)
+	if len(errs) > 0 {
+		t.Errorf("expected no errors, got %v", errs)
+	}
+}
+
+func TestValidateReviewerResponseNoCriteria(t *testing.T) {
+	result := &ReviewResult{Scores: ReviewScores{}}
+	errs := validateReviewerResponse(result)
+	if len(errs) == 0 {
+		t.Error("expected error for missing criteria")
+	}
+}
+
+func TestValidateReviewerResponseEmptyName(t *testing.T) {
+	result := &ReviewResult{
+		Scores: ReviewScores{Criteria: []CriterionResult{
+			{Name: "", Passed: true},
+		}},
+	}
+	errs := validateReviewerResponse(result)
+	if len(errs) == 0 {
+		t.Error("expected error for empty criterion name")
+	}
+}
+
+func TestValidateReviewerResponseNil(t *testing.T) {
+	errs := validateReviewerResponse(nil)
+	if len(errs) == 0 {
+		t.Error("expected error for nil result")
+	}
+}
+
+func TestDeterministicVoteStrictFailure(t *testing.T) {
+	panel := []ReviewResult{
+		{
+			Model: "m1",
+			Scores: ReviewScores{Criteria: []CriterionResult{
+				{Name: "Auth", Passed: true},
+				{Name: "Build", Passed: true},
+			}},
+		},
+		{
+			Model: "m2",
+			Scores: ReviewScores{Criteria: []CriterionResult{
+				{Name: "Auth", Passed: true},
+				{Name: "Build", Passed: false, Reason: "compile error"},
+			}},
+		},
+	}
+
+	result := deterministicVote(panel)
+
+	criteriaMap := map[string]bool{}
+	for _, c := range result.Scores.Criteria {
+		criteriaMap[c.Name] = c.Passed
+	}
+	// Auth: both pass → pass
+	if !criteriaMap["Auth"] {
+		t.Error("Auth should pass (0 failures)")
+	}
+	// Build: one fail → fail (any-fail voting)
+	if criteriaMap["Build"] {
+		t.Error("Build should fail (any-fail voting)")
+	}
+	if result.OverallScore != 1 {
+		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
+	}
+}
+
+func TestCriterionJudgmentJSONRoundTrip(t *testing.T) {
+	resp := ReviewerResponse{
+		Criteria: []CriterionJudgment{
+			{Criterion: "test criterion", Passed: true, Reasoning: "looks good"},
+		},
+	}
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded ReviewerResponse
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Criteria) != 1 {
+		t.Fatalf("expected 1 criterion, got %d", len(decoded.Criteria))
+	}
+	if decoded.Criteria[0].Criterion != "test criterion" {
+		t.Error("criterion text should round-trip")
+	}
+}

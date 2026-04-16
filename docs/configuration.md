@@ -281,3 +281,13 @@ Place multiple `.yaml` files in the config directory. All are loaded automatical
 ## Tiered Evaluation Criteria
 
 Use `--criteria-dir` to point to a directory of attribute-matched criteria YAML files. These are matched against prompt metadata (language, service, plane) and merged with prompt-specific criteria at review time. See [prompt-authoring.md](prompt-authoring.md) for details.
+
+## Plugins
+
+Plugins bundle related skills, MCP servers, and hooks into a single reusable YAML definition. Place plugin files in the `plugins/` directory. Each plugin can declare:
+
+- **Skills** — Local or remote Copilot skills
+- **MCP Servers** — MCP server configurations
+- **Hooks** — Pre/post tool-use hooks for custom logic
+
+Use `hyoka tools` (or `hyoka plugins`) to list all discovered plugins and skills.

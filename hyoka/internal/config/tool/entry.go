@@ -4,6 +4,10 @@ package tool
 // When the When map is empty, the entry is unconditionally included.
 // When the When map has entries, all key-value pairs must match the
 // prompt's properties for the entry to be included.
+//
+// For MCP servers (type: "mcp"), entries default to local MCP servers
+// (spawned via command/args). Set MCPType to "remote" and provide a URL
+// for remote MCP servers that are accessed over HTTP.
 type Entry struct {
 	Name     string            `yaml:"name" json:"name"`
 	Type     string            `yaml:"type,omitempty" json:"type,omitempty"` // "tool" (default), "mcp", "skill"
@@ -14,6 +18,8 @@ type Entry struct {
 	Command  string   `yaml:"command,omitempty" json:"command,omitempty"`
 	Args     []string `yaml:"args,omitempty" json:"args,omitempty"`
 	MCPTools []string `yaml:"mcp_tools,omitempty" json:"mcp_tools,omitempty"`
+	MCPType  string   `yaml:"mcp_type,omitempty" json:"mcp_type,omitempty"` // "local" (default) or "remote"
+	URL      string   `yaml:"url,omitempty" json:"url,omitempty"`           // for remote MCP servers
 	// Skill-specific fields
 	Source   string `yaml:"source,omitempty" json:"source,omitempty"` // "local" or "remote"
 	Path     string `yaml:"path,omitempty" json:"path,omitempty"`
@@ -54,4 +60,13 @@ func (e Entry) SkillSource() string {
 		return SourceRemote
 	}
 	return ""
+}
+
+// ResolvedMCPType returns the normalized MCP server type ("local" or "remote").
+// Defaults to "local" when MCPType is unset.
+func (e Entry) ResolvedMCPType() string {
+	if e.MCPType == "remote" {
+		return "remote"
+	}
+	return "local"
 }

@@ -24,7 +24,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	genCtx, genCancel := context.WithCancel(ctx)
 	defer genCancel()
 
-	debugPrefix := task.Prompt.ID + "/" + task.Config.Name
 	// Structured logger with eval context fields (#42)
 	lg := logging.EvalLogger(task.Prompt.ID, task.Config.Name, "generation", 0)
 	start := time.Now()
@@ -128,19 +127,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
 		"starter_files", len(starterFiles))
 
-	// Snapshot home directory and CWD before eval so we can recover misplaced files after
-	homeDir, _ := os.UserHomeDir()
-	var preEvalHomeFiles map[string]bool
-	if homeDir != "" {
-		preEvalHomeFiles = snapshotDir(homeDir)
-	}
-	// Also snapshot CWD — agents may write files relative to the process working directory
-	cwdDir, _ := os.Getwd()
-	var preEvalCwdFiles map[string]bool
-	if cwdDir != "" && cwdDir != homeDir && cwdDir != ws.Dir {
-		preEvalCwdFiles = snapshotDir(cwdDir)
-	}
-
 	// Run evaluation (generation phase — uses its own timeout)
 	sendPhase(progress.PhaseGenerating)
 
@@ -188,28 +174,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Collect generated files — workspace listing is the primary source since
 	// ForceStop preserves files on disk.
-	// First, recover any files the agent wrote to the home directory instead of the workspace.
-	// The Copilot CLI sometimes creates files in ~ when the agent omits the path parameter.
-	if homeDir != "" && preEvalHomeFiles != nil {
-		recovered := recoverMisplacedFiles(homeDir, preEvalHomeFiles, genDir, debugPrefix)
-		if recovered > 0 {
-			lg.Info("Recovered misplaced files from home dir", "count", recovered)
-		}
-		// Post-recovery validation: flag anything recovery couldn't handle (#26)
-		if remaining := ValidateWorkspaceContainment(homeDir, preEvalHomeFiles); len(remaining) > 0 {
-			lg.Warn("Items still outside workspace after recovery (home)", "count", len(remaining), "items", remaining)
-		}
-	}
-	// Also recover from CWD
-	if cwdDir != "" && preEvalCwdFiles != nil {
-		recovered := recoverMisplacedFiles(cwdDir, preEvalCwdFiles, genDir, debugPrefix)
-		if recovered > 0 {
-			lg.Info("Recovered misplaced files from CWD", "count", recovered)
-		}
-		if remaining := ValidateWorkspaceContainment(cwdDir, preEvalCwdFiles); len(remaining) > 0 {
-			lg.Warn("Items still outside workspace after recovery (CWD)", "count", len(remaining), "items", remaining)
-		}
-	}
+	// PreToolUse hooks now enforce containment at the tool level (#346),
+	// so the snapshot-and-recovery approach is no longer needed.
 
 	// Copy generated files from isolated workspace to persistent report directory (#26)
 	if err := copyDir(genDir, ws.Dir); err != nil {
@@ -345,6 +311,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.Environment = env
 
+	// Build tool availability summary: what was available vs actually used (#348).
+	evalReport.ToolAvailability = buildToolAvailability(env, evalReport.SessionEvents)
+
 	// Build SessionSetup from config and starter files (#219).
 	setup := &report.SessionSetupEvent{
 		Tools:        reportAvailableTools,
@@ -445,191 +414,139 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	// Pluggable grader execution (#136) — runs after generation, before review.
-	if len(e.pluginGraders) > 0 && len(generatedFiles) > 0 {
+	// Unified grading pipeline (WI-023) — all graders (pluggable + AI review)
+	// run in a single phase. The review is now a grader type ("prompt_review"),
+	// not a separate phase. This fixes the results overwrite bug where
+	// GraderResultsFromReview() clobbered pluggable grader results.
+	if len(generatedFiles) > 0 {
+		gradeStart := time.Now()
 		glg := logging.WithPhase(lg, "grading")
 
-		applicable := graders.ApplicableGraders(e.pluginGraders, props)
-		glg.Debug("Applicable graders", "total", len(e.pluginGraders), "applicable", len(applicable))
+		// Collect all grader results across pluggable graders and AI review.
+		var allGraderResults []graders.GraderResult
 
-		if len(applicable) > 0 {
-			instances, err := graders.InstantiateGraders(applicable)
-			if err != nil {
-				glg.Error("Failed to instantiate graders", "error", err)
-			} else {
-				input := graders.GraderInput{
-					WorkspacePath: genWs.Dir,
-				}
-				// Populate ActionLog from the structured action timeline (#139)
-				if result != nil && result.ActionTimeline != nil {
-					input.ActionLog = result.ActionTimeline.ToGraderActionLog()
-				}
-
-				results := graders.RunGraders(ctx, instances, applicable, input)
-				agg, aggErr := graders.AggregateResults(results)
-				if aggErr != nil {
-					glg.Error("Failed to aggregate grader results", "error", aggErr)
-				} else {
-					reportResults := make([]report.GraderResult, len(agg.Results))
-					for i, r := range agg.Results {
-						pass := r.Pass
-						rr := report.GraderResult{
-							GraderName: r.Name,
-							GraderType: r.Kind,
-							Summary:    r.Message,
-							Score:      r.Score,
-							Weight:     r.Weight,
-							Pass:       &pass,
-							Gate:       r.Gate,
-						}
-						if r.FileDetails != nil {
-							checks := make([]report.FileCheckDetail, len(r.FileDetails.CheckedFiles))
-							for j, c := range r.FileDetails.CheckedFiles {
-								checks[j] = report.FileCheckDetail{
-									Path: c.Path, Exists: c.Exists,
-									PatternMatched: c.PatternMatched, Pattern: c.Pattern,
-								}
-							}
-							rr.FileDetails = &report.FileGraderDetail{CheckedFiles: checks}
-						}
-						if r.ProgramDetails != nil {
-							rr.ProgramDetails = &report.ProgramGraderDetail{
-								Command: r.ProgramDetails.Command, ExitCode: r.ProgramDetails.ExitCode,
-								Stdout: r.ProgramDetails.Stdout, Stderr: r.ProgramDetails.Stderr,
-							}
-						}
-						if r.PromptDetails != nil {
-							rr.PromptDetails = &report.PromptGraderDetail{
-								Model: r.PromptDetails.Model, Rubric: r.PromptDetails.Rubric,
-								Reasoning: r.PromptDetails.Reasoning,
-								RawScore:  r.PromptDetails.RawScore, MaxScore: r.PromptDetails.MaxScore,
-							}
-						}
-						if r.BehaviorDetails != nil {
-							rr.BehaviorDetails = &report.BehaviorGraderDetail{
-								ToolsUsed: r.BehaviorDetails.ToolsUsed, MissingTools: r.BehaviorDetails.MissingTools,
-								ForbiddenUsed: r.BehaviorDetails.ForbiddenUsed,
-								TurnCount:     r.BehaviorDetails.TurnCount, MaxTurns: r.BehaviorDetails.MaxTurns,
-								ActualTurns: r.BehaviorDetails.ActualTurns, TotalActions: r.BehaviorDetails.TotalActions,
-								TurnLimitHit: r.BehaviorDetails.TurnLimitHit, Violations: r.BehaviorDetails.Violations,
-								SequenceMatch:    r.BehaviorDetails.SequenceMatch,
-								ExpectedSequence: r.BehaviorDetails.ExpectedSequence,
-								ActualSequence:   r.BehaviorDetails.ActualSequence,
-								MatchedActions:   r.BehaviorDetails.MatchedActions,
-								ConstraintsMet:   r.BehaviorDetails.ConstraintsMet,
-								ToolCounts:       r.BehaviorDetails.ToolCounts,
-							}
-						}
-						reportResults[i] = rr
-					}
-					evalReport.GraderResults = reportResults
-					evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
-
-					if !agg.Pass && !evalFailed {
-						evalReport.Success = false
-						if agg.GateFailed {
-							evalReport.FailureReason = "gate grader(s) failed"
-						}
-					}
-
-					glg.Info("Grader execution complete",
-						"graders", len(results),
-						"score", fmt.Sprintf("%.2f", agg.Score),
-						"passed", agg.Pass,
-						"gate_failed", agg.GateFailed)
-					sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
-						agg.Score*100, countPassed(results), len(results)))
-				}
-			}
+		// Build common grader input shared by all grader types.
+		graderInput := graders.GraderInput{
+			WorkspacePath:  genWs.Dir,
+			OriginalPrompt: task.Prompt.PromptText,
+			EvalCriteria:   e.mergedCriteria(task.Prompt, props),
 		}
-	}
-
-	// Code review — use panel reviewer if available, otherwise single reviewer
-	// Uses its own independent timeout context (fixes issue #3).
-	if !e.opts.SkipReview && len(generatedFiles) > 0 {
-		reviewStart := time.Now()
-		sendPhase(progress.PhaseReviewing)
-		rlg := logging.WithPhase(lg, "review")
-
-		// Create an isolated reviewer workspace with a copy of the generated
-		// files. Reviewers operate on this copy and cannot modify the original
-		// output in the report directory (#26).
-		reviewWorkDir, err := NewReviewerWorkspace(ws.Dir)
-		if err != nil {
-			rlg.Warn("Reviewer workspace creation failed, using original", "error", err)
-			reviewWorkDir = ws.Dir
-		} else {
-			defer os.RemoveAll(reviewWorkDir)
-		}
-
-		referenceDir := ""
 		if task.Prompt.ReferenceAnswer != "" {
-			referenceDir = task.Prompt.ReferenceAnswer
+			graderInput.ReferenceDir = task.Prompt.ReferenceAnswer
+		}
+		if result != nil && result.ActionTimeline != nil {
+			graderInput.ActionLog = result.ActionTimeline.ToGraderActionLog()
 		}
 
-		// Merge evaluation criteria (#30)
-		evalCriteria := e.mergedCriteria(task.Prompt, props)
+		// --- Phase 1: Pluggable graders (file, program, behavior, etc.) ---
+		if len(e.pluginGraders) > 0 {
+			applicable := graders.ApplicableGraders(e.pluginGraders, props)
+			glg.Debug("Applicable graders", "total", len(e.pluginGraders), "applicable", len(applicable))
 
-		// Create reviewer for this specific config using the factory (#92)
-		var reviewer review.Reviewer
-		var panelReviewer *review.PanelReviewer
-		if e.reviewerFactory != nil {
-			reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
-			if err != nil {
-				rlg.Warn("Reviewer creation failed, skipping review", "error", err)
-			}
-		}
-
-		if panelReviewer != nil {
-			models := panelReviewer.Models()
-			rlg.Debug("Starting review panel")
-			sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
-			panel, consolidated, err := panelReviewer.ReviewPanel(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
-			if err != nil {
-				rlg.Error("Review panel failed", "error", err)
-				sendEvent(progress.EventReasoning, fmt.Sprintf("Review panel failed: %v", err))
-			} else {
-				evalReport.ReviewPanel = panel
-				evalReport.Review = consolidated
-				evalReport.GraderResults = report.GraderResultsFromReview(consolidated, panel)
-				// With criteria-based scoring, success = all criteria passed
-				if !evalFailed {
-					evalReport.Success = consolidated.Scores.AllPassed()
+			if len(applicable) > 0 {
+				instances, err := graders.InstantiateGraders(applicable)
+				if err != nil {
+					glg.Error("Failed to instantiate graders", "error", err)
+				} else {
+					pluginResults := graders.RunGraders(ctx, instances, applicable, graderInput)
+					allGraderResults = append(allGraderResults, pluginResults...)
+					glg.Debug("Pluggable graders complete", "count", len(pluginResults))
 				}
-				sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed", consolidated.OverallScore, consolidated.MaxScore))
-				rlg.Debug("Review panel complete",
-					"reviewers", len(panel),
-					"score", consolidated.OverallScore,
-					"max_score", consolidated.MaxScore)
-			}
-		} else if reviewer != nil {
-			rlg.Debug("Starting single review session")
-			sendEvent(progress.EventToolStart, "Single model review")
-			reviewResult, err := reviewer.Review(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
-			if err != nil {
-				rlg.Error("Code review failed", "error", err)
-				sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", err))
-			} else {
-				evalReport.Review = reviewResult
-				evalReport.GraderResults = report.GraderResultsFromReview(reviewResult, nil)
-				// With criteria-based scoring, success = all criteria passed
-				if !evalFailed {
-					evalReport.Success = reviewResult.Scores.AllPassed()
-				}
-				sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed", reviewResult.OverallScore, reviewResult.MaxScore))
-				rlg.Debug("Review complete",
-					"score", reviewResult.OverallScore,
-					"max_score", reviewResult.MaxScore)
 			}
 		}
 
-		// Capture reviewed (annotated) files from the reviewer workspace
-		reviewedFiles, err := readReviewedFiles(reviewWorkDir)
-		if err == nil && len(reviewedFiles) > 0 {
-			evalReport.ReviewedFiles = reviewedFiles
-			rlg.Debug("Captured reviewed files", "count", len(reviewedFiles))
+		// --- Phase 2: AI review grader (runs alongside pluggable graders) ---
+		var reviewGrader *graders.PromptReviewGrader
+		if !e.opts.SkipReview {
+			sendPhase(progress.PhaseReviewing)
+
+			var reviewer review.Reviewer
+			var panelReviewer *review.PanelReviewer
+			if e.reviewerFactory != nil {
+				reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
+				if err != nil {
+					glg.Warn("Reviewer creation failed, skipping review", "error", err)
+				}
+			}
+
+			if panelReviewer != nil || reviewer != nil {
+				reviewGrader = graders.NewPromptReviewGrader("ai_review", reviewer, panelReviewer)
+
+				if panelReviewer != nil {
+					models := panelReviewer.Models()
+					sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
+				} else {
+					sendEvent(progress.EventToolStart, "Single model review")
+				}
+
+				reviewResult, reviewErr := reviewGrader.Grade(ctx, graderInput)
+				if reviewErr != nil {
+					glg.Error("Review grader failed", "error", reviewErr)
+					sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", reviewErr))
+					// Add a failing result so aggregation accounts for the review attempt.
+					reviewResult = graders.GraderResult{
+						Kind:    graders.KindPromptReview,
+						Name:    "ai_review",
+						Pass:    false,
+						Score:   0,
+						Message: fmt.Sprintf("review grader error: %v", reviewErr),
+					}
+				} else {
+					if reviewGrader.LastConsolidated != nil {
+						sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed",
+							reviewGrader.LastConsolidated.OverallScore, reviewGrader.LastConsolidated.MaxScore))
+					}
+				}
+				// Apply default weight — review has weight 1.0, not a gate grader.
+				if reviewResult.Weight == 0 {
+					reviewResult.Weight = 1.0
+				}
+				allGraderResults = append(allGraderResults, reviewResult)
+
+				// Populate backward-compat report fields.
+				evalReport.ReviewPanel = reviewGrader.LastPanel
+				evalReport.Review = reviewGrader.LastConsolidated
+			}
 		}
-		evalReport.ReviewDuration = time.Since(reviewStart).Seconds()
+
+		// --- Aggregate all results and update report ---
+		if len(allGraderResults) > 0 {
+			agg, aggErr := graders.AggregateResults(allGraderResults)
+			if aggErr != nil {
+				glg.Error("Failed to aggregate grader results", "error", aggErr)
+			} else {
+				reportResults := convertGraderResults(agg.Results)
+				evalReport.GraderResults = reportResults
+				evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
+
+				if !agg.Pass && !evalFailed {
+					evalReport.Success = false
+					if agg.GateFailed {
+						evalReport.FailureReason = "gate grader(s) failed"
+					}
+				}
+
+				glg.Info("Grader execution complete",
+					"graders", len(allGraderResults),
+					"score", fmt.Sprintf("%.2f", agg.Score),
+					"passed", agg.Pass,
+					"gate_failed", agg.GateFailed)
+				sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
+					agg.Score*100, countPassed(allGraderResults), len(allGraderResults)))
+			}
+		}
+
+		// Capture reviewed (annotated) files from the reviewer workspace.
+		if reviewGrader != nil && reviewGrader.LastReviewWorkDir != "" {
+			reviewedFiles, rfErr := readReviewedFiles(reviewGrader.LastReviewWorkDir)
+			if rfErr == nil && len(reviewedFiles) > 0 {
+				evalReport.ReviewedFiles = reviewedFiles
+				glg.Debug("Captured reviewed files", "count", len(reviewedFiles))
+			}
+			reviewGrader.CleanupWorkspace()
+		}
+
+		evalReport.ReviewDuration = time.Since(gradeStart).Seconds()
 	}
 
 	// Tool usage evaluation (compare expected vs actual tools)
@@ -698,10 +615,89 @@ func buildRerunCommand(promptID, configName string, opts EngineOptions) string {
 	return strings.Join(parts, " ")
 }
 
+// buildToolAvailability constructs a summary of tools available vs actually used
+// during a generation session. It combines AvailableTools, MCPServers, and
+// SkillsInvoked from EnvironmentInfo with events to determine usage (#348).
+func buildToolAvailability(env *report.EnvironmentInfo, events []report.SessionEventRecord) []report.ToolAvailabilityEntry {
+	if env == nil {
+		return nil
+	}
 
+	// Collect tools actually used from session events
+	toolsUsed := make(map[string]bool)
+	skillsUsed := make(map[string]bool)
+	mcpUsed := make(map[string]bool)
 
+	for _, ev := range events {
+		switch ev.Type {
+		case "tool.execution_complete":
+			if ev.ToolName != "" {
+				toolsUsed[ev.ToolName] = true
+			}
+		case "skill.invoked":
+			if ev.SkillName != "" {
+				skillsUsed[ev.SkillName] = true
+			}
+		case "external_tool.completed":
+			if ev.MCPServerName != "" {
+				mcpUsed[ev.MCPServerName] = true
+			}
+			if ev.ToolName != "" {
+				toolsUsed[ev.ToolName] = true
+			}
+		}
+	}
 
+	var entries []report.ToolAvailabilityEntry
 
+	// Available tools (built-in tools like bash, create, etc.)
+	for _, t := range env.AvailableTools {
+		entries = append(entries, report.ToolAvailabilityEntry{
+			Name:      t,
+			Type:      "tool",
+			Available: true,
+			Used:      toolsUsed[t],
+		})
+	}
+
+	// MCP servers
+	for _, s := range env.MCPServers {
+		entries = append(entries, report.ToolAvailabilityEntry{
+			Name:      s,
+			Type:      "mcp",
+			Available: true,
+			Used:      mcpUsed[s],
+		})
+	}
+
+	// Skills — include loaded and invoked
+	skillSet := make(map[string]bool)
+	for _, s := range env.SkillsLoaded {
+		if !skillSet[s] {
+			skillSet[s] = true
+			entries = append(entries, report.ToolAvailabilityEntry{
+				Name:      s,
+				Type:      "skill",
+				Available: true,
+				Used:      skillsUsed[s],
+			})
+		}
+	}
+	// Add any invoked skills that weren't in the loaded list
+	for _, s := range env.SkillsInvoked {
+		if !skillSet[s] {
+			skillSet[s] = true
+			entries = append(entries, report.ToolAvailabilityEntry{
+				Name:      s,
+				Type:      "skill",
+				Available: true,
+				Used:      true,
+			})
+		}
+	}
+
+	return entries
+}
 
 // evaluateToolUsage compares expected tools from prompt frontmatter with actual tool calls.
 func evaluateToolUsage(expected, actual []string) *report.ToolUsageResult {
@@ -795,4 +791,122 @@ func countPassed(results []graders.GraderResult) int {
 		}
 	}
 	return n
+}
+
+// convertGraderResults converts internal grader results to report format.
+// Review grader results are expanded into individual panel + consensus entries
+// for backward compatibility with the report schema.
+func convertGraderResults(results []graders.GraderResult) []report.GraderResult {
+	var reportResults []report.GraderResult
+	for _, r := range results {
+		if r.Kind == graders.KindPromptReview && r.ReviewDetails != nil {
+			reportResults = append(reportResults, expandReviewGraderResult(r)...)
+			continue
+		}
+		pass := r.Pass
+		rr := report.GraderResult{
+			GraderName: r.Name,
+			GraderType: r.Kind,
+			Summary:    r.Message,
+			Score:      r.Score,
+			Weight:     r.Weight,
+			Pass:       &pass,
+			Gate:       r.Gate,
+		}
+		if r.FileDetails != nil {
+			checks := make([]report.FileCheckDetail, len(r.FileDetails.CheckedFiles))
+			for j, c := range r.FileDetails.CheckedFiles {
+				checks[j] = report.FileCheckDetail{
+					Path: c.Path, Exists: c.Exists,
+					PatternMatched: c.PatternMatched, Pattern: c.Pattern,
+				}
+			}
+			rr.FileDetails = &report.FileGraderDetail{CheckedFiles: checks}
+		}
+		if r.ProgramDetails != nil {
+			rr.ProgramDetails = &report.ProgramGraderDetail{
+				Command: r.ProgramDetails.Command, ExitCode: r.ProgramDetails.ExitCode,
+				Stdout: r.ProgramDetails.Stdout, Stderr: r.ProgramDetails.Stderr,
+			}
+		}
+		if r.PromptDetails != nil {
+			rr.PromptDetails = &report.PromptGraderDetail{
+				Model: r.PromptDetails.Model, Rubric: r.PromptDetails.Rubric,
+				Reasoning: r.PromptDetails.Reasoning,
+				RawScore:  r.PromptDetails.RawScore, MaxScore: r.PromptDetails.MaxScore,
+			}
+		}
+		if r.BehaviorDetails != nil {
+			rr.BehaviorDetails = &report.BehaviorGraderDetail{
+				ToolsUsed: r.BehaviorDetails.ToolsUsed, MissingTools: r.BehaviorDetails.MissingTools,
+				ForbiddenUsed: r.BehaviorDetails.ForbiddenUsed,
+				TurnCount:     r.BehaviorDetails.TurnCount, MaxTurns: r.BehaviorDetails.MaxTurns,
+				ActualTurns: r.BehaviorDetails.ActualTurns, TotalActions: r.BehaviorDetails.TotalActions,
+				TurnLimitHit: r.BehaviorDetails.TurnLimitHit, Violations: r.BehaviorDetails.Violations,
+				SequenceMatch:    r.BehaviorDetails.SequenceMatch,
+				ExpectedSequence: r.BehaviorDetails.ExpectedSequence,
+				ActualSequence:   r.BehaviorDetails.ActualSequence,
+				MatchedActions:   r.BehaviorDetails.MatchedActions,
+				ConstraintsMet:   r.BehaviorDetails.ConstraintsMet,
+				ToolCounts:       r.BehaviorDetails.ToolCounts,
+			}
+		}
+		reportResults = append(reportResults, rr)
+	}
+	return reportResults
+}
+
+// expandReviewGraderResult converts a review grader result into multiple
+// report entries — one per panel member plus the consensus. This replaces
+// the removed GraderResultsFromReview function in the main code path.
+func expandReviewGraderResult(r graders.GraderResult) []report.GraderResult {
+	rd := r.ReviewDetails
+	var results []report.GraderResult
+
+	// Panel member entries.
+	for _, p := range rd.PanelResults {
+		scores := review.ReviewScores{}
+		for _, c := range p.Criteria {
+			scores.Criteria = append(scores.Criteria, review.CriterionResult{
+				Name: c.Name, Passed: c.Passed, Reason: c.Reason,
+			})
+		}
+		results = append(results, report.GraderResult{
+			GraderName:   p.Model,
+			GraderType:   "review",
+			Model:        p.Model,
+			Scores:       scores,
+			OverallScore: p.OverallScore,
+			MaxScore:     p.MaxScore,
+			Summary:      p.Summary,
+			Issues:       p.Issues,
+			Strengths:    p.Strengths,
+		})
+	}
+
+	// Consolidated entry.
+	consensusName := rd.Model
+	if consensusName == "" {
+		consensusName = "consensus"
+	}
+	scores := review.ReviewScores{}
+	for _, c := range rd.Criteria {
+		scores.Criteria = append(scores.Criteria, review.CriterionResult{
+			Name: c.Name, Passed: c.Passed, Reason: c.Reason,
+		})
+	}
+	results = append(results, report.GraderResult{
+		GraderName:   consensusName,
+		GraderType:   "review",
+		Model:        rd.Model,
+		Scores:       scores,
+		OverallScore: rd.OverallScore,
+		MaxScore:     rd.MaxScore,
+		Summary:      rd.Summary,
+		Issues:       rd.Issues,
+		Strengths:    rd.Strengths,
+		IsConsensus:  len(rd.PanelResults) > 0,
+	})
+
+	return results
 }

@@ -105,6 +105,61 @@ t.Errorf("sub[0] = %q", result[0].SubPoints[0])
 }
 }
 
+func TestSplitSections(t *testing.T) {
+tests := []struct {
+name     string
+body     string
+expected map[string]string
+}{
+{
+"single section",
+"\n## Prompt\n\nWrite some code.\n",
+map[string]string{"Prompt": "Write some code."},
+},
+{
+"multiple sections",
+"\n## Prompt\n\nWrite some code.\n\n## Evaluation Criteria\n\n- Use DefaultAzureCredential\n- Handle errors\n",
+map[string]string{
+"Prompt":              "Write some code.",
+"Evaluation Criteria": "- Use DefaultAzureCredential\n- Handle errors",
+},
+},
+{
+"with preamble",
+"\n# Title\n\nSome intro.\n\n## Prompt\n\nCode here.\n\n## Notes\n\nExtra info.\n",
+map[string]string{
+"":       "# Title\n\nSome intro.",
+"Prompt": "Code here.",
+"Notes":  "Extra info.",
+},
+},
+{
+"empty body",
+"",
+map[string]string{},
+},
+{
+"no sections",
+"\nJust plain text.\n",
+map[string]string{"": "Just plain text."},
+},
+}
+
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+got := splitSections(tt.body)
+if len(got) != len(tt.expected) {
+t.Fatalf("section count = %d, want %d; got %v", len(got), len(tt.expected), got)
+}
+for key, want := range tt.expected {
+if got[key] != want {
+t.Errorf("sections[%q] = %q, want %q", key, got[key], want)
+}
+}
+})
+}
+}
+
 func TestParseEvaluationCriteria_InPromptFile(t *testing.T) {
 content := []byte(`---
 id: test-criteria

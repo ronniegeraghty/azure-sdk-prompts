@@ -11,7 +11,6 @@ These limits apply per-evaluation and abort the run if exceeded:
 | Max Session Actions | 50 | `--max-session-actions` | Maximum actions (reasoning, response, or tool call) per Copilot session. |
 | Max Files | 50 | `--max-files` | Maximum files generated. Prevents agents from creating excessive output. |
 | Max Output Size | 1 MB | `--max-output-size` | Total size of all generated files. Accepts `KB`, `MB`, `GB` suffixes. |
-| Max Session Actions | 50 | `--max-session-actions` | Maximum actions (reasoning, response, or tool call) per Copilot session. |
 
 When a guardrail triggers:
 - The evaluation is marked as **failed**
@@ -77,7 +76,7 @@ Each phase has an independent timeout:
 
 | Phase | Default | Flag |
 |-------|---------|------|
-| Session timeout | `--session-timeout` |
+| Session timeout | 600s | `--session-timeout` |
 
 If a phase times out, the report includes `error_category: "timeout"` with details.
 

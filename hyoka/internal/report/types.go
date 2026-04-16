@@ -38,6 +38,7 @@ type GraderResult struct {
 	ProgramDetails  *ProgramGraderDetail  `json:"program_details,omitempty"`
 	PromptDetails   *PromptGraderDetail   `json:"prompt_details,omitempty"`
 	BehaviorDetails *BehaviorGraderDetail `json:"behavior_details,omitempty"`
+	ReviewDetails   *ReviewGraderDetail   `json:"review_details,omitempty"`
 }
 
 // FileCheckDetail records the outcome of a single file check.
@@ -92,6 +93,36 @@ type BehaviorGraderDetail struct {
 	Weight float64 `json:"weight,omitempty"` // Weight for aggregation (default 1.0)
 	Gate   bool    `json:"gate,omitempty"`   // If true, failure overrides weighted scoring
 	Pass   bool    `json:"pass,omitempty"`   // Binary pass/fail
+}
+
+// ReviewGraderDetail holds AI review grader specifics (WI-023).
+type ReviewGraderDetail struct {
+	Model        string                      `json:"model,omitempty"`
+	OverallScore int                         `json:"overall_score"`
+	MaxScore     int                         `json:"max_score"`
+	Issues       []string                    `json:"issues,omitempty"`
+	Strengths    []string                    `json:"strengths,omitempty"`
+	IsConsensus  bool                        `json:"is_consensus,omitempty"`
+	Criteria     []ReviewGraderCriterion     `json:"criteria,omitempty"`
+	PanelResults []ReviewGraderPanelEntry    `json:"panel_results,omitempty"`
+}
+
+// ReviewGraderCriterion holds a single criterion result from an AI review grader.
+type ReviewGraderCriterion struct {
+	Name   string `json:"name"`
+	Passed bool   `json:"passed"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// ReviewGraderPanelEntry holds one panel member's review in a review grader.
+type ReviewGraderPanelEntry struct {
+	Model        string                  `json:"model"`
+	OverallScore int                     `json:"overall_score"`
+	MaxScore     int                     `json:"max_score"`
+	Summary      string                  `json:"summary"`
+	Issues       []string                `json:"issues,omitempty"`
+	Strengths    []string                `json:"strengths,omitempty"`
+	Criteria     []ReviewGraderCriterion `json:"criteria,omitempty"`
 }
 
 // ScoreContribution describes a single grader's contribution to the final score.
@@ -153,6 +184,15 @@ type ToolUsageResult struct {
 	MissingTools  []string `json:"missing_tools"`
 	ExtraTools    []string `json:"extra_tools"`
 	Match         bool     `json:"tool_usage_match"`
+}
+
+// ToolAvailabilityEntry records whether a specific tool/skill/MCP server
+// was available to the agent and whether it was actually used during the session.
+type ToolAvailabilityEntry struct {
+	Name      string `json:"name"`
+	Type      string `json:"type"`      // "tool", "skill", "mcp"
+	Available bool   `json:"available"`
+	Used      bool   `json:"used"`
 }
 
 // ReviewedFile holds an annotated code file with inline review comments.
@@ -246,7 +286,8 @@ type EvalReport struct {
 	Review             *review.ReviewResult  `json:"review,omitempty"`
 	ReviewPanel        []review.ReviewResult `json:"review_panel,omitempty"`
 	GraderResults      []GraderResult        `json:"grader_results,omitempty"`
-	ToolUsage          *ToolUsageResult      `json:"tool_usage,omitempty"`
+	ToolUsage          *ToolUsageResult        `json:"tool_usage,omitempty"`
+	ToolAvailability   []ToolAvailabilityEntry `json:"tool_availability,omitempty"` // Tools available vs used (#348)
 	SessionEvents      []SessionEventRecord  `json:"session_events,omitempty"`
 	ActionTimeline     *ActionTimelineReport `json:"action_timeline,omitempty"` // Structured action log (#139)
 	EventCount         int                   `json:"event_count"`

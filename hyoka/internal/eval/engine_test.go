@@ -1212,3 +1212,284 @@ func TestStrictCleanupOptionWired(t *testing.T) {
 		t.Error("expected StrictCleanup to default to false")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tiered limits tests (#347)
+// ---------------------------------------------------------------------------
+
+func TestReviewerLimitsDefaultToHalfGenerator(t *testing.T) {
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:           1,
+		OutputDir:         t.TempDir(),
+		MaxTurns:          20,
+		MaxSessionActions: 40,
+	}))
+
+	if engine.opts.ReviewerMaxTurns != 10 {
+		t.Errorf("ReviewerMaxTurns = %d, want 10 (half of 20)", engine.opts.ReviewerMaxTurns)
+	}
+	if engine.opts.ReviewerMaxActions != 20 {
+		t.Errorf("ReviewerMaxActions = %d, want 20 (half of 40)", engine.opts.ReviewerMaxActions)
+	}
+}
+
+func TestReviewerLimitsMinimumFloor(t *testing.T) {
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:           1,
+		OutputDir:         t.TempDir(),
+		MaxTurns:          6,
+		MaxSessionActions: 10,
+	}))
+
+	if engine.opts.ReviewerMaxTurns < 5 {
+		t.Errorf("ReviewerMaxTurns = %d, want >= 5 (minimum floor)", engine.opts.ReviewerMaxTurns)
+	}
+	if engine.opts.ReviewerMaxActions < 10 {
+		t.Errorf("ReviewerMaxActions = %d, want >= 10 (minimum floor)", engine.opts.ReviewerMaxActions)
+	}
+}
+
+func TestReviewerLimitsExplicitOverride(t *testing.T) {
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:            1,
+		OutputDir:          t.TempDir(),
+		MaxTurns:           20,
+		MaxSessionActions:  40,
+		ReviewerMaxTurns:   8,
+		ReviewerMaxActions: 15,
+	}))
+
+	if engine.opts.ReviewerMaxTurns != 8 {
+		t.Errorf("ReviewerMaxTurns = %d, want 8 (explicit override)", engine.opts.ReviewerMaxTurns)
+	}
+	if engine.opts.ReviewerMaxActions != 15 {
+		t.Errorf("ReviewerMaxActions = %d, want 15 (explicit override)", engine.opts.ReviewerMaxActions)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tool availability tracking tests (#348)
+// ---------------------------------------------------------------------------
+
+func TestBuildToolAvailability(t *testing.T) {
+	env := &report.EnvironmentInfo{
+		AvailableTools: []string{"bash", "create", "edit"},
+		MCPServers:     []string{"azure-mcp"},
+		SkillsLoaded:   []string{"sdk-skill"},
+		SkillsInvoked:  []string{"sdk-skill"},
+	}
+	events := []report.SessionEventRecord{
+		{Type: "tool.execution_complete", ToolName: "bash"},
+		{Type: "tool.execution_complete", ToolName: "create"},
+		{Type: "skill.invoked", SkillName: "sdk-skill"},
+		{Type: "external_tool.completed", MCPServerName: "azure-mcp", ToolName: "mcp_tool"},
+	}
+
+	entries := buildToolAvailability(env, events)
+
+	if len(entries) != 5 {
+		t.Fatalf("expected 5 entries (3 tools + 1 mcp + 1 skill), got %d", len(entries))
+	}
+
+	// Verify bash: available=true, used=true
+	found := false
+	for _, e := range entries {
+		if e.Name == "bash" {
+			found = true
+			if !e.Available || !e.Used {
+				t.Errorf("bash: available=%v used=%v, want true/true", e.Available, e.Used)
+			}
+			if e.Type != "tool" {
+				t.Errorf("bash type = %q, want tool", e.Type)
+			}
+		}
+	}
+	if !found {
+		t.Error("bash entry not found")
+	}
+
+	// Verify edit: available=true, used=false
+	for _, e := range entries {
+		if e.Name == "edit" {
+			if !e.Available || e.Used {
+				t.Errorf("edit: available=%v used=%v, want true/false", e.Available, e.Used)
+			}
+		}
+	}
+
+	// Verify azure-mcp: available=true, used=true
+	for _, e := range entries {
+		if e.Name == "azure-mcp" {
+			if !e.Available || !e.Used {
+				t.Errorf("azure-mcp: available=%v used=%v, want true/true", e.Available, e.Used)
+			}
+			if e.Type != "mcp" {
+				t.Errorf("azure-mcp type = %q, want mcp", e.Type)
+			}
+		}
+	}
+
+	// Verify skill: available=true, used=true
+	for _, e := range entries {
+		if e.Name == "sdk-skill" {
+			if !e.Available || !e.Used {
+				t.Errorf("sdk-skill: available=%v used=%v, want true/true", e.Available, e.Used)
+			}
+			if e.Type != "skill" {
+				t.Errorf("sdk-skill type = %q, want skill", e.Type)
+			}
+		}
+	}
+}
+
+func TestBuildToolAvailabilityNilEnv(t *testing.T) {
+	entries := buildToolAvailability(nil, nil)
+	if entries != nil {
+		t.Errorf("expected nil for nil env, got %v", entries)
+	}
+}
+
+func TestBuildToolAvailabilityNoEvents(t *testing.T) {
+	env := &report.EnvironmentInfo{
+		AvailableTools: []string{"bash"},
+		MCPServers:     []string{"mcp-1"},
+	}
+	entries := buildToolAvailability(env, nil)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	for _, e := range entries {
+		if e.Used {
+			t.Errorf("%s should not be used (no events)", e.Name)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Unified grading pipeline tests (WI-023)
+// ---------------------------------------------------------------------------
+
+// TestReviewResultsAppendedNotOverwritten verifies the fix for the results
+// overwrite bug: pluggable grader results must coexist with review results
+// in the same GraderResults slice.
+func TestReviewResultsAppendedNotOverwritten(t *testing.T) {
+	// Set up a file grader that will pass (stub_output.txt exists).
+	gradersDir := t.TempDir()
+	graderYAML := `graders:
+  - kind: file
+    name: "stub_exists"
+    config:
+      path: "stub_output.txt"
+    weight: 1.0
+`
+	os.WriteFile(filepath.Join(gradersDir, "test.yaml"), []byte(graderYAML), 0644)
+
+	reviewer := &review.StubReviewer{}
+	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+		return reviewer, nil, nil
+	}
+
+	engine := NewEngineWithReviewerFactory(&StubRunner{}, reviewerFactory, quietOpts(EngineOptions{
+		Workers:    1,
+		OutputDir:  t.TempDir(),
+		GradersDir: gradersDir,
+	}))
+
+	prompts := []*prompt.Prompt{
+		{
+			ID:         "overwrite-test",
+			Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "python", "category": "crud"},
+			PromptText: "Create a test file",
+		},
+	}
+	configs := []config.ToolConfig{
+		{Name: "test-config", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	}
+
+	summary, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(summary.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(summary.Results))
+	}
+
+	r := summary.Results[0]
+
+	// The bug previously caused review results to overwrite grader results.
+	// After the fix, both must be present.
+	if len(r.GraderResults) < 2 {
+		t.Fatalf("expected at least 2 grader results (file grader + review), got %d", len(r.GraderResults))
+	}
+
+	hasFile := false
+	hasReview := false
+	for _, gr := range r.GraderResults {
+		if gr.GraderType == "file" {
+			hasFile = true
+		}
+		if gr.GraderType == "review" {
+			hasReview = true
+		}
+	}
+	if !hasFile {
+		t.Error("expected file grader result to be present")
+	}
+	if !hasReview {
+		t.Error("expected review grader result to be present")
+	}
+
+	// Review backward-compat fields should still be populated.
+	if r.Review == nil {
+		t.Error("expected Review field to be populated for backward compat")
+	}
+}
+
+// TestUnifiedGraderSuccessIncludesReview verifies that evalReport.Success
+// is determined from ALL grader results, not just the review.
+func TestUnifiedGraderSuccessIncludesReview(t *testing.T) {
+	// File grader passes (stub_output.txt exists).
+	// Review passes (StubReviewer always passes).
+	// Overall should pass.
+	gradersDir := t.TempDir()
+	graderYAML := `graders:
+  - kind: file
+    name: "stub_check"
+    config:
+      path: "stub_output.txt"
+    weight: 1.0
+`
+	os.WriteFile(filepath.Join(gradersDir, "test.yaml"), []byte(graderYAML), 0644)
+
+	reviewerFactory := func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+		return &review.StubReviewer{}, nil, nil
+	}
+
+	engine := NewEngineWithReviewerFactory(&StubRunner{}, reviewerFactory, quietOpts(EngineOptions{
+		Workers:    1,
+		OutputDir:  t.TempDir(),
+		GradersDir: gradersDir,
+	}))
+
+	prompts := []*prompt.Prompt{
+		{
+			ID:         "unified-success-test",
+			Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "python", "category": "crud"},
+			PromptText: "test",
+		},
+	}
+	configs := []config.ToolConfig{
+		{Name: "cfg", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
+	}
+
+	summary, err := engine.Run(context.Background(), prompts, configs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	r := summary.Results[0]
+	if !r.Success {
+		t.Error("expected unified success when all graders pass")
+	}
+}
+

@@ -9,12 +9,12 @@ import (
 "gopkg.in/yaml.v3"
 )
 
-var promptSectionRe = regexp.MustCompile(`(?m)^## Prompt\s*\n`)
-var evaluationCriteriaRe = regexp.MustCompile(`(?m)^## Evaluation Criteria\s*\n`)
+// sectionHeadingRe matches level-2 markdown headings at the start of a line.
+var sectionHeadingRe = regexp.MustCompile(`(?m)^## (.+)$`)
 
-// rawFrontmatter is an intermediate struct used to decode frontmatter.
-// It accepts both the old flat format and the new nested properties format.
-type rawFrontmatter struct {
+// frontmatter is the YAML structure decoded from prompt file frontmatter.
+// All metadata string fields live under the properties: map.
+type frontmatter struct {
 ID              string            `yaml:"id"`
 Tags            []string          `yaml:"tags"`
 ProjectContext  map[string]string `yaml:"project_context"`
@@ -26,67 +26,66 @@ MaxTurns          int               `yaml:"max_turns"`
 ExpectedPkgs      []string          `yaml:"expected_packages"`
 ExpectedTools     []string          `yaml:"expected_tools"`
 
-// New nested format
 Properties map[string]string `yaml:"properties"`
 
-// Old flat format fields — populated only when properties: is absent
-Service     string `yaml:"service"`
-Plane       string `yaml:"plane"`
-Language    string `yaml:"language"`
-Category    string `yaml:"category"`
-Difficulty  string `yaml:"difficulty"`
-Description string `yaml:"description"`
-SDKPackage  string `yaml:"sdk_package"`
-DocURL      string `yaml:"doc_url"`
-Created     string `yaml:"created"`
-Author      string `yaml:"author"`
-
-// YAML-only prompt fields
+// YAML-only prompt fields (used by .prompt.yaml/.prompt.yml)
 PromptTextField         string `yaml:"prompt_text"`
 EvaluationCriteriaField string `yaml:"evaluation_criteria"`
 }
 
-// rawToPrompt converts a decoded rawFrontmatter into a Prompt,
-// populating Properties from flat fields when the nested format is absent.
-func rawToPrompt(raw *rawFrontmatter) *Prompt {
-p := &Prompt{
-ID:                raw.ID,
-Tags:              raw.Tags,
-ProjectContext:    raw.ProjectContext,
-StarterProject:    raw.StarterProject,
-ReferenceAnswer:   raw.ReferenceAnswer,
-Timeout:           raw.Timeout,
-MaxSessionActions: raw.MaxSessionActions,
-MaxTurns:          raw.MaxTurns,
-ExpectedPkgs:      raw.ExpectedPkgs,
-ExpectedTools:     raw.ExpectedTools,
+// frontmatterToPrompt converts a decoded frontmatter into a Prompt.
+func frontmatterToPrompt(fm *frontmatter) *Prompt {
+props := fm.Properties
+if props == nil {
+props = make(map[string]string)
+}
+return &Prompt{
+ID:                fm.ID,
+Tags:              fm.Tags,
+ProjectContext:    fm.ProjectContext,
+StarterProject:    fm.StarterProject,
+ReferenceAnswer:   fm.ReferenceAnswer,
+Timeout:           fm.Timeout,
+MaxSessionActions: fm.MaxSessionActions,
+MaxTurns:          fm.MaxTurns,
+ExpectedPkgs:      fm.ExpectedPkgs,
+ExpectedTools:     fm.ExpectedTools,
+Properties:        props,
+}
 }
 
-if raw.Properties != nil {
-p.Properties = raw.Properties
+// splitSections splits a markdown body at all ## headings into a map of
+// heading name → section content. Content before any ## heading is stored
+// under the empty-string key.
+func splitSections(body string) map[string]string {
+sections := make(map[string]string)
+locs := sectionHeadingRe.FindAllStringSubmatchIndex(body, -1)
+if len(locs) == 0 {
+if t := strings.TrimSpace(body); t != "" {
+sections[""] = t
+}
+return sections
+}
+// Content before the first heading
+if preamble := strings.TrimSpace(body[:locs[0][0]]); preamble != "" {
+sections[""] = preamble
+}
+for i, loc := range locs {
+heading := strings.TrimSpace(body[loc[2]:loc[3]])
+contentStart := loc[1]
+var contentEnd int
+if i+1 < len(locs) {
+contentEnd = locs[i+1][0]
 } else {
-p.Properties = make(map[string]string)
-setIfNonEmpty := func(k, v string) {
-if v != "" {
-p.Properties[k] = v
+contentEnd = len(body)
 }
+sections[heading] = strings.TrimSpace(body[contentStart:contentEnd])
 }
-setIfNonEmpty("service", raw.Service)
-setIfNonEmpty("plane", raw.Plane)
-setIfNonEmpty("language", raw.Language)
-setIfNonEmpty("category", raw.Category)
-setIfNonEmpty("difficulty", raw.Difficulty)
-setIfNonEmpty("description", raw.Description)
-setIfNonEmpty("sdk_package", raw.SDKPackage)
-setIfNonEmpty("doc_url", raw.DocURL)
-setIfNonEmpty("created", raw.Created)
-setIfNonEmpty("author", raw.Author)
-}
-return p
+return sections
 }
 
 // ParsePromptFile parses a .prompt.md file's content into a Prompt struct.
-// It supports both the new nested properties format and the old flat format.
+// Metadata must use the nested properties: format in frontmatter.
 // For .prompt.yaml/.prompt.yml files, use ParsePromptYAML instead.
 func ParsePromptFile(content []byte, filePath string) (*Prompt, error) {
 text := string(content)
@@ -98,39 +97,24 @@ parts := strings.SplitN(text[3:], "---", 2)
 if len(parts) < 2 {
 return nil, fmt.Errorf("missing closing frontmatter delimiter: %s", filePath)
 }
-frontmatter := strings.TrimSpace(parts[0])
+fmText := strings.TrimSpace(parts[0])
 body := parts[1]
 
-var raw rawFrontmatter
-dec := yaml.NewDecoder(bytes.NewReader([]byte(frontmatter)))
-if err := dec.Decode(&raw); err != nil {
+var fm frontmatter
+dec := yaml.NewDecoder(bytes.NewReader([]byte(fmText)))
+if err := dec.Decode(&fm); err != nil {
 return nil, fmt.Errorf("parsing frontmatter in %s: %w", filePath, err)
 }
 
-p := rawToPrompt(&raw)
+p := frontmatterToPrompt(&fm)
 
-loc := promptSectionRe.FindStringIndex(body)
-if loc != nil {
-promptBody := body[loc[1]:]
-nextHeading := regexp.MustCompile(`(?m)^## `)
-nextLoc := nextHeading.FindStringIndex(promptBody)
-if nextLoc != nil {
-promptBody = promptBody[:nextLoc[0]]
+sections := splitSections(body)
+if s, ok := sections["Prompt"]; ok {
+p.PromptText = s
 }
-p.PromptText = strings.TrimSpace(promptBody)
-}
-
-// Extract ## Evaluation Criteria section
-covLoc := evaluationCriteriaRe.FindStringIndex(body)
-if covLoc != nil {
-covBody := body[covLoc[1]:]
-nextHeading := regexp.MustCompile(`(?m)^## `)
-nextLoc := nextHeading.FindStringIndex(covBody)
-if nextLoc != nil {
-covBody = covBody[:nextLoc[0]]
-}
-p.EvaluationCriteria = strings.TrimSpace(covBody)
-p.ParsedCriteria = ParseEvaluationCriteria(p.EvaluationCriteria)
+if s, ok := sections["Evaluation Criteria"]; ok {
+p.EvaluationCriteria = s
+p.ParsedCriteria = ParseEvaluationCriteria(s)
 }
 
 p.FilePath = filePath
@@ -145,17 +129,16 @@ return p, nil
 // ParsePromptYAML parses a pure YAML prompt file (.prompt.yaml or .prompt.yml)
 // into a Prompt struct. All fields including prompt_text and evaluation_criteria
 // are expressed as top-level YAML keys.
-// It supports both the new nested properties format and the old flat format.
 func ParsePromptYAML(content []byte, filePath string) (*Prompt, error) {
-var raw rawFrontmatter
+var fm frontmatter
 dec := yaml.NewDecoder(bytes.NewReader(content))
-if err := dec.Decode(&raw); err != nil {
+if err := dec.Decode(&fm); err != nil {
 return nil, fmt.Errorf("parsing YAML prompt %s: %w", filePath, err)
 }
 
-p := rawToPrompt(&raw)
-p.PromptText = raw.PromptTextField
-p.EvaluationCriteria = raw.EvaluationCriteriaField
+p := frontmatterToPrompt(&fm)
+p.PromptText = fm.PromptTextField
+p.EvaluationCriteria = fm.EvaluationCriteriaField
 if p.EvaluationCriteria != "" {
 p.ParsedCriteria = ParseEvaluationCriteria(p.EvaluationCriteria)
 }

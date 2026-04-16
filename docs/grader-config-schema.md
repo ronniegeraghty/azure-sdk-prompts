@@ -1,6 +1,5 @@
 # Grader Config YAML Schema
 
-**Status:** DRAFT  
 **Issue:** #103 (Task 1.2a)  
 **Decisions:** DM3 (gate semantics), DM4 (typed result fields), DM19 (one model per prompt grader)
 
@@ -127,6 +126,11 @@ exit code. Deterministic for build/lint checks.
 ---
 
 ### `prompt` — LLM-as-Judge Review
+
+> **Status:** The `prompt` grader type is defined and registered but requires an
+> `LLMCaller` integration to invoke models at grading time. This wiring is
+> planned for a future release. Use the existing multi-model review panel
+> (configured via `reviewer.models`) for LLM-based evaluation in the meantime.
 
 Sends generated code to a single LLM model for rubric-based review. Each
 `prompt` grader uses exactly one model (DM19). For multi-model review,

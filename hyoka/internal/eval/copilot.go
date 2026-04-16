@@ -27,6 +27,8 @@ type CopilotPromptRunner struct {
 	clientOpts        *copilot.ClientOptions
 	allowCloud        bool
 	maxSessionActions int
+	maxTurns          int
+	maxFiles          int
 	sessionTimeout    time.Duration
 	progressFn        progress.ProgressFunc
 }
@@ -55,6 +57,10 @@ type PromptRunnerOptions struct {
 	// tool execution start) during generation. When reached, the session context
 	// is cancelled to stop the run immediately.
 	MaxSessionActions int
+	// MaxTurns limits the number of assistant turns during generation (#347).
+	MaxTurns int
+	// MaxFiles limits the number of files created during generation (#347).
+	MaxFiles int
 }
 
 // NewCopilotPromptRunner creates a new evaluator backed by the Copilot SDK.
@@ -70,6 +76,8 @@ func NewCopilotPromptRunner(opts PromptRunnerOptions) *CopilotPromptRunner {
 		clientOpts:        clientOpts,
 		allowCloud:        opts.AllowCloud,
 		maxSessionActions: opts.MaxSessionActions,
+		maxTurns:          opts.MaxTurns,
+		maxFiles:          opts.MaxFiles,
 	}
 }
 
@@ -170,12 +178,33 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	// Capture turn counter for expanded events
 	var turnCounter int
 	var actionCounter int
+	var fileCounter int // tracks files created during session (#347)
 
 	// Mid-generation action limit. Create a cancellable child context
 	// so the OnEvent callback can stop runaway sessions in real time.
 	genCtx, genCancel := context.WithCancel(ctx)
 	defer genCancel()
 	var actionLimitHit bool
+	var turnLimitHit bool
+	var fileLimitHit bool
+
+	// Use runner-level limits for real-time enforcement
+	maxTurnsLimit := e.maxTurns
+	if maxTurnsLimit <= 0 {
+		maxTurnsLimit = 25
+	}
+	maxFilesLimit := e.maxFiles
+	if maxFilesLimit <= 0 {
+		maxFilesLimit = 50
+	}
+
+	// Build expected tool sets for verification after session creation (#347)
+	expectedMCPServers := make(map[string]bool)
+	for _, entry := range cfg.Generator.Tools {
+		if entry.ResolvedType() == "mcp" {
+			expectedMCPServers[entry.Name] = true
+		}
+	}
 
 	sessionCfg.OnEvent = func(event copilot.SessionEvent) {
 		mu.Lock()
@@ -232,6 +261,13 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			turnCounter++
 			rec.TurnNumber = turnCounter
 			lg.Info("Turn started", "turn", turnCounter)
+			// Real-time turn limit enforcement (#347)
+			if maxTurnsLimit > 0 && turnCounter > maxTurnsLimit && !turnLimitHit {
+				turnLimitHit = true
+				lg.Warn("Turn limit reached, cancelling session",
+					"turns", turnCounter, "max_turns", maxTurnsLimit)
+				genCancel()
+			}
 		case copilot.SessionEventTypeAssistantTurnEnd:
 			rec.TurnNumber = turnCounter
 			if event.Data.Duration != nil {
@@ -259,6 +295,16 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		case copilot.SessionEventTypeSessionWorkspaceFileChanged:
 			if event.Data.Operation != nil {
 				rec.FileOperation = string(*event.Data.Operation)
+				// Real-time file count enforcement (#347)
+				if string(*event.Data.Operation) == "create" {
+					fileCounter++
+					if maxFilesLimit > 0 && fileCounter > maxFilesLimit && !fileLimitHit {
+						fileLimitHit = true
+						lg.Warn("File limit reached, cancelling session",
+							"files", fileCounter, "max_files", maxFilesLimit)
+						genCancel()
+					}
+				}
 			}
 		case copilot.SessionEventTypeCommandExecute:
 			if event.Data.Command != nil {
@@ -302,15 +348,30 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				}
 				rec.Content = strings.Join(names, ", ")
 				lg.Info("Skills loaded", "skills", rec.Content)
+			} else if tool.CountSkills(sessionCfg.SkillDirectories) > 0 {
+				lg.Warn("No skills loaded despite configured skill directories",
+					"expected_dirs", len(sessionCfg.SkillDirectories))
 			}
 		case copilot.SessionEventTypeSessionMcpServersLoaded:
 			if len(event.Data.Servers) > 0 {
+				loadedNames := make(map[string]bool, len(event.Data.Servers))
 				names := make([]string, 0, len(event.Data.Servers))
 				for _, s := range event.Data.Servers {
 					names = append(names, s.Name)
+					loadedNames[s.Name] = true
 				}
 				rec.Content = strings.Join(names, ", ")
 				lg.Info("MCP servers loaded", "servers", rec.Content)
+				// Verify all expected MCP servers loaded (#347)
+				for expected := range expectedMCPServers {
+					if !loadedNames[expected] {
+						lg.Warn("Expected MCP server not loaded",
+							"server", expected, "loaded", names)
+					}
+				}
+			} else if len(expectedMCPServers) > 0 {
+				lg.Warn("No MCP servers loaded despite configuration",
+					"expected", len(expectedMCPServers))
 			}
 		case copilot.SessionEventTypeSessionToolsUpdated:
 			lg.Info("Tools updated")
@@ -790,10 +851,19 @@ func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir
 	if len(mcpEntries) > 0 {
 		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpEntries))
 		for _, entry := range mcpEntries {
-			mcpCfg := copilot.MCPServerConfig{
-				"type":    "local",
-				"command": entry.Command,
-				"args":    entry.Args,
+			mcpType := entry.ResolvedMCPType()
+			var mcpCfg copilot.MCPServerConfig
+			if mcpType == "remote" {
+				mcpCfg = copilot.MCPServerConfig{
+					"type": "remote",
+					"url":  entry.URL,
+				}
+			} else {
+				mcpCfg = copilot.MCPServerConfig{
+					"type":    "local",
+					"command": entry.Command,
+					"args":    entry.Args,
+				}
 			}
 			if len(entry.MCPTools) > 0 {
 				mcpCfg["tools"] = entry.MCPTools
@@ -801,8 +871,9 @@ func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir
 			sc.MCPServers[entry.Name] = mcpCfg
 			slog.Info("MCP server configured",
 				"name", entry.Name,
-				"type", "local",
+				"type", mcpType,
 				"command", entry.Command,
+				"url", entry.URL,
 				"args", entry.Args,
 				"tools", entry.MCPTools,
 			)
@@ -862,6 +933,23 @@ func isFileWriteTool(name string) bool {
 		return true
 	}
 	return false
+}
+
+// extractAbsPathsFromCommand extracts absolute paths from a shell command string.
+// Used for containment checking of bash/shell tool invocations.
+func extractAbsPathsFromCommand(cmd string) []string {
+	var paths []string
+	for _, part := range strings.Fields(cmd) {
+		if strings.HasPrefix(part, "/") && len(part) > 1 {
+			abs, err := filepath.Abs(part)
+			if err == nil {
+				paths = append(paths, abs)
+			} else {
+				paths = append(paths, part)
+			}
+		}
+	}
+	return paths
 }
 
 // toolArgSummary extracts a short summary of the tool's primary argument.
