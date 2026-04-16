@@ -7,7 +7,13 @@ import (
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
 )
+
+// WorkspaceDelta is a type alias for the workspace delta type.
+// This allows report consumers to access workspace.WorkspaceDelta
+// without creating an import cycle.
+type WorkspaceDelta = workspace.WorkspaceDelta
 
 // CurrentSchemaVersion is the latest report schema version.
 // v1 = legacy monolithic ReviewResult; v2 = grader-based.
@@ -296,6 +302,7 @@ type EvalReport struct {
 	ResourceUsage      *ResourceStats        `json:"resource_usage,omitempty"`  // Per-eval resource stats (#45)
 	ScoreBreakdown     *ScoreBreakdown       `json:"score_breakdown,omitempty"` // Weighted aggregation breakdown (#143)
 	SessionSetup       *SessionSetupEvent    `json:"session_setup,omitempty"`   // Tool/skill/MCP loading status (#219)
+	WorkspaceDelta     *WorkspaceDelta       `json:"workspace_delta,omitempty"` // File-level changes agent made (#566)
 	Success            bool                  `json:"success"`
 	Error              string                `json:"error,omitempty"`
 	ErrorDetails       string                `json:"error_details,omitempty"`

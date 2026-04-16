@@ -14,7 +14,7 @@ export function Footer() {
             </span>
           </div>
           <p className="text-white/40" style={{ fontSize: 13 }}>
-            Evaluate AI code generation quality for Azure SDKs.
+            Evaluate AI agent output quality across any domain.
           </p>
           <p className="text-white/30" style={{ fontSize: 12 }}>
             © {new Date().getFullYear()} hyoka · MIT License

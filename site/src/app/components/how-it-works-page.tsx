@@ -1,41 +1,35 @@
-import { Code2, Bot, ClipboardCheck, GitMerge, BarChart3, FileCode2 } from "lucide-react";
+import { Code2, Bot, ClipboardCheck, GitMerge, BarChart3 } from "lucide-react";
 import { motion } from "motion/react";
 
 const pipeline = [
   {
     icon: Code2,
     title: "Prompt Authoring",
-    desc: "Define natural language prompts categorized by difficulty (basic, intermediate, advanced) and scenario type (authentication, CRUD, pagination, streaming, error handling).",
-    details: ["Categorized by Azure service", "Multiple difficulty tiers", "Covers data & management plane"],
+    desc: "Define natural language prompts categorized by difficulty (basic, intermediate, advanced) and task type (authentication, CRUD, pagination, streaming, error handling).",
+    details: ["Categorized by domain/service", "Multiple difficulty tiers", "Flexible attribute tagging"],
   },
   {
     icon: Bot,
-    title: "AI Code Generation",
-    desc: "AI agents (like GitHub Copilot) generate Azure SDK code from each prompt. Multiple model/config combinations run in parallel for comparison.",
-    details: ["Tracks generation duration", "Records files generated & tool calls", "Captures step-by-step agent reasoning"],
-  },
-  {
-    icon: FileCode2,
-    title: "Build Verification",
-    desc: "Generated code is compiled/built to verify syntactic correctness. Build success, failure details, and build duration are recorded.",
-    details: ["Compile-time validation", "Build duration metrics", "Error log capture"],
+    title: "Agent Session",
+    desc: "AI agents execute tasks from each prompt. Multiple model/config combinations run in parallel for comparison. Each session is recorded with full tool use and reasoning traces.",
+    details: ["Tracks session duration", "Records files generated & tool calls", "Captures step-by-step agent reasoning"],
   },
   {
     icon: ClipboardCheck,
-    title: "Multi-Reviewer Scoring",
-    desc: "Multiple AI reviewers independently evaluate the generated code. Each reviewer scores on criteria like correctness, completeness, and best practices.",
-    details: ["Independent assessments", "Per-criteria numeric scoring", "Strengths & issues identified"],
+    title: "Graders",
+    desc: "Multiple graders evaluate the agent output. Graders can be LLM reviewers, program checks (builds, tests), file validators, or behavior analyzers.",
+    details: ["Mix multiple grader types", "Independent assessments", "Per-grader pass/fail & scoring"],
   },
   {
     icon: GitMerge,
-    title: "Score Consolidation",
-    desc: "A consolidator AI merges all reviewer assessments into a final unified score, resolving disagreements and producing a consensus evaluation.",
-    details: ["Weighted consensus", "Conflict resolution", "Final pass/fail determination"],
+    title: "Summary & Insights",
+    desc: "A summary agent analyzes grader results, identifies patterns, and produces high-level insights about the evaluation run.",
+    details: ["Cross-grader analysis", "Pattern identification", "Actionable recommendations"],
   },
   {
     icon: BarChart3,
-    title: "Analysis & Reporting",
-    desc: "Aggregated results show pass rates by prompt, config, and model. AI-generated analysis surfaces patterns about where code generation excels or falls short.",
+    title: "Reports",
+    desc: "Aggregated results show pass rates by prompt, config, and model. Detailed reports include session timelines, grader breakdowns, and tool usage statistics.",
     details: ["Cross-config comparisons", "Duration trend analysis", "Tool usage statistics"],
   },
 ];
@@ -49,7 +43,7 @@ export function HowItWorksPage() {
             How hyoka Works
           </h1>
           <p className="mx-auto max-w-xl text-white/50" style={{ fontSize: 16, lineHeight: 1.7 }}>
-            A six-stage pipeline that takes natural language prompts and produces comprehensive quality evaluations.
+            A five-stage pipeline that takes natural language prompts and produces comprehensive agent performance evaluations.
           </p>
         </div>
 
