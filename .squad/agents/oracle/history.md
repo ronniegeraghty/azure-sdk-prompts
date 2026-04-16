@@ -80,3 +80,22 @@ Verified docs/prompt-authoring.md update is production-ready. Schema documentati
 ## 2026-04-16 — Phase 3 Merged to Dev (Neo)
 
 Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.
+
+### Session 2026-04-16T22:45 (Phase 4 Kickoff: Examples Update #363)
+
+**Status:** COMPLETE  
+**PR:** #568
+
+Updated `examples/configs/example-full.yaml` to reflect Phase 3 unified grading architecture (PR #562):
+
+**Changes:**
+- Unified tools list: MCP servers now specified as `type: mcp` within `tools:` array (not separate `mcp_servers:` section)
+- MCP entry format: `type: mcp`, `command`, `args`, `mcp_tools` (formerly `tools:` in mcp_servers)
+- Updated comments to explain Phase 3 architecture: generator→reviewer→graders are now unified pipeline (review is a grader type, not separate phase)
+- Completed minimal config example with `reviewer:` section (was previously incomplete)
+- Added `limits:` section with all available options (max_turns, max_files, max_output_size, max_session_actions)
+- All examples pass `go run . validate` (12 configs, 89 prompts, 2 criteria files valid)
+
+**Reference:** Phase 3 PR #562 implemented unified grading pipeline where review panel is now `PromptReviewGrader` running alongside pluggable graders. Phase 4 brief §3 (Morpheus) directed examples update to reflect this architecture.
+
+**No deletions needed:** `examples/configs/example-registry.yaml` was already gone (dead feature from pre-Phase-3 tool registry system). Brief mentioned deleting it; already removed in prior phase.
