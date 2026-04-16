@@ -177,7 +177,7 @@ func fetchRemote(entry config.ToolEntry, baseDir string) (string, error) {
 	}
 
 	// Use npx skills add to fetch the skill
-	args := []string{"skills", "add", entry.Repo, "--directory", installDir}
+	args := []string{"skills", "add", entry.Repo, "--directory", installDir, "--yes"}
 	if entry.Name != "" {
 		args = append(args, "--name", entry.Name)
 	}
