@@ -4,17 +4,21 @@
 # skill from https://github.com/microsoft/skills is downloaded on first use
 # (including `--dry-run`, which exercises skill resolution) and cached at:
 #
-#   .skills-cache/<repo>/<name>/
-#   e.g. .skills-cache/microsoft/skills/copilot-sdk/
+#   .skills-cache/<repo>/.claude/skills/<name>/
+#   e.g. .skills-cache/microsoft/skills/.claude/skills/copilot-sdk/
 #
 # Requirements:
-#   - `npx` on PATH — hyoka shells out to `npx -y skills add <repo>` to
-#     fetch skills from GitHub, so Node.js must be installed.
+#   - `npx` on PATH — hyoka shells out to
+#     `npx skills add <repo> --skill <name> --agent claude-code --copy --yes`
+#     to fetch a single skill from GitHub, so Node.js must be installed.
 #
 # The remote-skill pattern is the three fields under tools:
 #   source: remote
 #   repo:   microsoft/skills   # GitHub owner/repo
-#   name:   copilot-sdk        # specific skill within that repo
+#   name:   copilot-sdk        # specific skill within that repo (required —
+#                              # passed to `npx skills add --skill <name>`;
+#                              # without it every skill in the repo would
+#                              # install, which is almost never what you want)
 #
 # Because this config lives under examples/configs/ (not the default
 # configs/ discovery path), invoke it with --config-file, e.g.:
