@@ -99,3 +99,29 @@ Updated `examples/configs/example-full.yaml` to reflect Phase 3 unified grading 
 **Reference:** Phase 3 PR #562 implemented unified grading pipeline where review panel is now `PromptReviewGrader` running alongside pluggable graders. Phase 4 brief §3 (Morpheus) directed examples update to reflect this architecture.
 
 **No deletions needed:** `examples/configs/example-registry.yaml` was already gone (dead feature from pre-Phase-3 tool registry system). Brief mentioned deleting it; already removed in prior phase.
+
+### Session 2026-04-16T23:33 (README Command Audit)
+
+**Status:** COMPLETE  
+**Branch:** ronniegeraghty/fix-readme-commands  
+**Commit:** f5715393  
+
+Audited and fixed all outdated commands in README.md. Many examples failed because they omitted the required `--config` flag (hyoka now requires either `--config <name>` or `--all-configs` when multiple configs exist).
+
+**Key fixes:**
+- Added `--config baseline/claude-opus-4.6` to all example run commands in Quick Start and Filtering sections
+- Replaced non-existent "hyoka tools" command with "hyoka plugins" (tools command never existed)
+- Fixed repo structure: `hyoka/cmd/hyoka/main.go` → `hyoka/main.go` (moved in PR #569)
+- Updated heading "Tool Configurations" → "Configurations" (clearer, no command named "tools")
+- Added `--prompt-id` to config examples to make them actually executable
+- Clarified that `--all-configs` is required when running without specific config filter
+
+**Testing method:** Ran every command from the README in dry-run mode or with `--help` to verify syntax. Used `go run ./hyoka` from worktree. All commands now work.
+
+**Commands verified working:**
+- `go run ./hyoka list`, `validate`, `check-env`, `configs`, `plugins`, `compare`, `trends`, `serve`, `report`, `new-prompt`, `clean`, `version`
+- `go run ./hyoka run` with all flag combinations: `--service`, `--language`, `--prompt-id`, `--config`, `--all-configs`, `--dry-run`
+- Build: `go build ./hyoka/...`
+
+**Pattern for docs audits:** Always test commands in a live environment (worktree or main checkout). Use `--dry-run` for expensive operations. Cross-reference AGENTS.md for authoritative command syntax.
+
