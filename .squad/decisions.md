@@ -2,6 +2,50 @@
 
 ## Active Decisions
 
+### Decision: Morpheus Phase 4 Kickoff Approved (2026-04-17)
+
+**Author:** Morpheus 🕶️  
+**Date:** 2026-04-17  
+**Status:** Approved by Ronnie  
+**Tracking:** #310
+
+**Phase 4 North Star:** Rebuild site and reporting experience to consume the unified grading pipeline from Phase 3. Every page renders real grader data, the comparison engine is a single code path for CLI and site, and hyoka is repositioned as a general-purpose AI agent evaluation tool.
+
+**Dependency Graph:**
+- **Critical path:** #566 (Neo, 2-day timebox) → #355/#356 (parallel, Neo) → #357 (Neo) → #358 (Trinity) → #359 (Trinity)
+- **Parallel tracks:** #363 (Oracle, independent), #360/#361/#362 (Trinity, mostly independent)
+
+**Key Decisions:**
+1. **#566 WorkspaceDelta (Option A):** Neo takes #566 first (2-day hard cap) before #355–#357. Rationale: Stabilizes `EvalReport` and `GraderInput` core types before broader phase; subsumes starter-aware guardrail work from Phase 3 hotfix.
+2. **Trinity workload:** 5 of 9 items (#358, #359, #360, #361, #362). Overflow plan: #362 (content) and #360 (pairwise) can shift to Tank if burnout risk rises.
+3. **Architectural contract:** Neo publishes `ComparisonResult` struct signature before implementing #357; Trinity codes to that contract for serve endpoints. No parallel data models.
+
+**Per-Agent Launch:**
+- **Neo:** Start #566 NOW (2-day sprint), then #355/#356 parallel, then #357. Packages: `internal/workspace/`, `internal/review/`, `internal/criteria/`, `internal/comparison/`.
+- **Trinity:** Start #358 (XL, critical path) + #362 (content, independent) NOW. Parallel: #360, #361 (wait for Neo's #357 comparison endpoints). After #358: #359.
+- **Oracle:** Start #363 (Examples) NOW — no blockers. Validation pass required.
+- **Switch:** Write tests for #566 immediately (delta computation, guardrails, output field presence), then #355/#356 as Neo completes, then Vitest components as Trinity's #358 stabilizes.
+
+**Risk Register:**
+1. Trinity carries 5/9 — overflow to Tank (#362, #360) if needed.
+2. #358 is XL and linchpin — Morpheus review at 50% mark.
+3. Serve API mismatch — Neo defines `ComparisonResult` contract first.
+4. #566 overrun — hard 2-day cap; defer guardrail thresholds to Phase 4.5 if needed.
+5. #357 scope creep — Neo gets approval before implementing.
+
+**Go-Live Gates:**
+1. All 9 items closed (+ #566 if adopted)
+2. Switch's test review green (#375 checklist, `go test -race`, `npm test`)
+3. Site renders real eval data (not mock)
+4. `hyoka compare` CLI and site page produce identical results
+5. Branding updated (general-purpose AI evaluation, zero Azure SDK mentions)
+6. Examples pass `go run ./hyoka validate`
+7. All Phase 4 work merged to `ronniegeraghty/dev`, CI passing
+
+**Full Brief:** See archived `.squad/decisions/archive/morpheus-phase4-kickoff.md` (full rationale, architecture guidance, examples)
+
+---
+
 ### Decision: Plan Directory Created (2026-04-04)
 
 **Author:** Morpheus 🕶️  

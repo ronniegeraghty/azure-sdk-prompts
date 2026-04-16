@@ -5,22 +5,22 @@ import {
 import { Link } from "react-router";
 import { motion } from "motion/react";
 
-const services = ["Storage", "Key Vault", "Cosmos DB", "Event Hubs", "Service Bus", "Identity"];
+const services = ["Identity", "Storage", "Key Vault", "Databases", "Messaging", "Compute"];
 const languages = ["Go", "Python", ".NET", "Java", "JavaScript", "TypeScript"];
 
 const features = [
-  { icon: GitCompare, title: "Side-by-Side Comparison", desc: "Compare multiple AI models and configurations to find the best code generation approach for each scenario." },
+  { icon: GitCompare, title: "Side-by-Side Comparison", desc: "Compare multiple AI models and configurations to find the best approach for each evaluation scenario." },
   { icon: BarChart3, title: "Deep Metrics", desc: "Track pass rates, durations, token usage, tool calls, and scoring across every evaluation run." },
-  { icon: Shield, title: "Multi-Reviewer Consensus", desc: "Multiple AI reviewers independently score code, then a consolidator merges assessments for unbiased results." },
-  { icon: Languages, title: "Polyglot Support", desc: "Evaluate code generation across Go, Python, .NET, Java, and JavaScript/TypeScript." },
-  { icon: Layers, title: "Data & Management Plane", desc: "Test both data plane and management plane API usage patterns across Azure services." },
-  { icon: Zap, title: "Difficulty Levels", desc: "Prompts range from basic to advanced, covering auth, CRUD, pagination, streaming, and error handling." },
+  { icon: Shield, title: "Multi-Grader Pipeline", desc: "Combine multiple graders — LLM reviewers, program checks, file validators — to assess agent output comprehensively." },
+  { icon: Languages, title: "Polyglot Support", desc: "Evaluate agent output across Go, Python, .NET, Java, JavaScript, TypeScript, and more." },
+  { icon: Layers, title: "Flexible Grading", desc: "Mix and match grader types: AI reviews, build verification, behavior analysis, custom program checks." },
+  { icon: Zap, title: "Difficulty Levels", desc: "Prompts range from basic to advanced, covering authentication, CRUD operations, error handling, and complex workflows." },
 ];
 
 const steps = [
-  { icon: Code2, title: "Define Prompts", desc: "Write natural language prompts describing the Azure SDK code you want generated." },
-  { icon: Bot, title: "Run Evaluations", desc: "AI agents generate code across multiple configs, languages, and models simultaneously." },
-  { icon: ClipboardCheck, title: "Review Results", desc: "Get detailed scoring, build verification, and AI-generated analysis of patterns and insights." },
+  { icon: Code2, title: "Define Prompts", desc: "Write natural language prompts describing the tasks you want AI agents to perform." },
+  { icon: Bot, title: "Run Evaluations", desc: "AI agents execute tasks across multiple configurations and models simultaneously." },
+  { icon: ClipboardCheck, title: "Review Results", desc: "Get detailed grader reports, session analysis, and insights across all evaluation runs." },
 ];
 
 export function HomePage() {
@@ -42,14 +42,14 @@ export function HomePage() {
             </div>
 
             <h1 className="mb-6 text-white" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "clamp(2rem, 5vw, 3.5rem)", lineHeight: 1.1 }}>
-              Evaluate AI Code
+              Evaluate AI Agent
               <br />
-              <span className="text-emerald-400">Generation Quality</span>
+              <span className="text-emerald-400">Output Quality</span>
             </h1>
 
             <p className="mx-auto mb-10 max-w-2xl text-white/50" style={{ fontSize: 17, lineHeight: 1.7 }}>
-              hyoka tests how well AI agents produce working Azure SDK code from natural language prompts —
-              across multiple languages, services, and models.
+              hyoka evaluates how well AI agents perform tasks from natural language prompts —
+              across multiple models, configurations, and evaluation criteria.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -77,7 +77,7 @@ export function HomePage() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3">
           {services.map((s) => (
             <span key={s} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/50" style={{ fontSize: 13 }}>
-              Azure {s}
+              {s}
             </span>
           ))}
           <span className="mx-2 text-white/20">·</span>
@@ -97,7 +97,7 @@ export function HomePage() {
               Why hyoka?
             </h2>
             <p className="text-white/40" style={{ fontSize: 15 }}>
-              Everything you need to understand AI code generation quality.
+              Everything you need to evaluate AI agent performance.
             </p>
           </div>
 
@@ -154,7 +154,7 @@ export function HomePage() {
             Ready to evaluate?
           </h2>
           <p className="mb-8 text-white/50" style={{ fontSize: 15 }}>
-            Start measuring AI code generation quality across your Azure SDK prompts.
+            Start measuring AI agent performance across your evaluation prompts.
           </p>
           <Link
             to="/dashboard"

@@ -10,8 +10,8 @@ describe("HomePage", () => {
         <HomePage />
       </MemoryRouter>
     );
-    expect(screen.getByText("Evaluate AI Code")).toBeInTheDocument();
-    expect(screen.getByText("Generation Quality")).toBeInTheDocument();
+    expect(screen.getByText("Evaluate AI Agent")).toBeInTheDocument();
+    expect(screen.getByText("Output Quality")).toBeInTheDocument();
   });
 
   it("renders the developer evaluation tool badge", () => {
@@ -31,7 +31,7 @@ describe("HomePage", () => {
     );
     expect(screen.getByText("Side-by-Side Comparison")).toBeInTheDocument();
     expect(screen.getByText("Deep Metrics")).toBeInTheDocument();
-    expect(screen.getByText("Multi-Reviewer Consensus")).toBeInTheDocument();
+    expect(screen.getByText("Multi-Grader Pipeline")).toBeInTheDocument();
     expect(screen.getByText("Polyglot Support")).toBeInTheDocument();
   });
 
@@ -52,8 +52,8 @@ describe("HomePage", () => {
         <HomePage />
       </MemoryRouter>
     );
-    expect(screen.getByText("Azure Storage")).toBeInTheDocument();
-    expect(screen.getByText("Azure Key Vault")).toBeInTheDocument();
-    expect(screen.getByText("Azure Identity")).toBeInTheDocument();
+    expect(screen.getByText("Storage")).toBeInTheDocument();
+    expect(screen.getByText("Key Vault")).toBeInTheDocument();
+    expect(screen.getByText("Identity")).toBeInTheDocument();
   });
 });
