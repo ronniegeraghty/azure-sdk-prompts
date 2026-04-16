@@ -42,3 +42,24 @@ Agent Morpheus initialized as Lead/Architect for hyoka. The project has guardrai
 ## 2026-04-16 — Phase 3 Merged to Dev (Neo)
 
 Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.
+
+## 2026-04-17 — Phase 4 Kickoff Brief
+
+**Brief:** `.squad/decisions/inbox/morpheus-phase4-kickoff.md`
+
+### Dependency insights surfaced
+
+- **Critical path is Neo-gated:** #566 → #355/#356 → #357 feeds into Trinity's #361 (serve comparison endpoints). Trinity's #358 (Eval Detail) is independently startable against Phase 3 data, but #359 is hard-blocked on #358.
+- **`ComparisonResult` is the key shared boundary.** Neo owns the type definition in `internal/comparison/`, Trinity consumes it in `internal/serve/`. Misalignment here blocks site comparison features. Called this out as a risk with an explicit interface review gate.
+- **`report/summary_stats.go` is dead code walking.** #357 should delete it and consolidate into `internal/comparison/`. Currently two code paths can produce different comparison results — a correctness bug waiting to happen.
+- **Oracle's #363 has zero blockers.** All prereqs (#353, #344) shipped in Phase 3. Cleanest start of any agent.
+
+### #566 WorkspaceDelta decision
+
+**Option A: Neo does #566 first, before Phase 4 proper.** Rationale: it adds fields to `EvalReport` and `GraderInput` — the core types everything else reads from. Landing it first stabilizes the schema before 8 other issues touch surrounding code. 2-day time-box with fallback to ship type+wiring only if guardrail softening is complex.
+
+### Phase 3 observations affecting Phase 4
+
+- Phase 3 shipped 98 files changed, +4804/-7851 lines — a massive refactor. The unified grading pipeline (#344) is the foundation everything in Phase 4 builds on.
+- `workspace.go` and `workspace_test.go` already exist in `hyoka/internal/eval/` from the hotfix path. #566 should decide: promote to `internal/workspace/` or extend in place. I recommended the new package for separation of concerns.
+- The site structure uses React Router with component-per-page in `site/src/app/components/`. Trinity's #358 redesign should establish reusable component patterns (e.g., `GraderResultRow`) that #359 and #360 can inherit — called this out in the launch plan.
