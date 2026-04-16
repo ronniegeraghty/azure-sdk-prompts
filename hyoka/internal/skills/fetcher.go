@@ -163,37 +163,57 @@ func resolveSkillDir(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-// fetchRemote fetches a remote skill from a GitHub repo using npx skills add.
-// Returns the directory where the skill was installed.
+// fetchRemote fetches a single skill from a GitHub repo using "npx skills add".
+//
+// The skills CLI installs into <cwd>/.claude/skills/<skill-name>/ when the
+// claude-code agent is targeted. hyoka sets cmd.Dir to a per-repo cache
+// directory so multiple configs don't clobber each other, then returns the
+// absolute path to the installed skill for the session to load.
+//
+// entry.Name is required and is passed as --skill, selecting exactly one skill
+// from the repository (repositories often publish many skills).
 func fetchRemote(entry config.ToolEntry, baseDir string) (string, error) {
-	// Determine install directory: use a skills cache dir under baseDir
-	installDir := filepath.Join(baseDir, ".skills-cache", entry.Repo)
-	if entry.Name != "" {
-		installDir = filepath.Join(installDir, entry.Name)
+	if entry.Name == "" {
+		return "", fmt.Errorf("remote skill from %q requires a 'name' field (the skill to install from the repo)", entry.Repo)
 	}
 
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return "", fmt.Errorf("creating skill install dir: %w", err)
+	// Per-repo cache dir; skills CLI will create .claude/skills/<name>/ inside it.
+	cacheDir := filepath.Join(baseDir, ".skills-cache", entry.Repo)
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return "", fmt.Errorf("creating skill cache dir: %w", err)
 	}
 
-	// Use npx skills add to fetch the skill
-	args := []string{"skills", "add", entry.Repo, "--directory", installDir, "--yes"}
-	if entry.Name != "" {
-		args = append(args, "--name", entry.Name)
+	// Flags reference: https://www.npmjs.com/package/skills
+	//   --skill <name>       select a single skill from the repo
+	//   --agent claude-code  install layout hyoka consumes (.claude/skills/<name>/SKILL.md)
+	//   --copy               copy files instead of symlinking (portable across machines)
+	//   --yes                skip interactive confirmation prompts
+	args := []string{"skills", "add", entry.Repo,
+		"--skill", entry.Name,
+		"--agent", "claude-code",
+		"--copy",
+		"--yes",
 	}
 
 	fmt.Printf("Fetching remote skill: %s (repo: %s)\n", entry.Name, entry.Repo)
-	slog.Info("Fetching remote skill", "skill", entry.Name, "repo", entry.Repo)
+	slog.Info("Fetching remote skill", "skill", entry.Name, "repo", entry.Repo, "cache_dir", cacheDir)
 	cmd := exec.Command("npx", args...)
+	cmd.Dir = cacheDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("npx skills add: %w", err)
 	}
 
-	abs, absErr := filepath.Abs(installDir)
+	installedDir := filepath.Join(cacheDir, ".claude", "skills", entry.Name)
+	if _, err := os.Stat(filepath.Join(installedDir, "SKILL.md")); err != nil {
+		return "", fmt.Errorf("skills add completed but SKILL.md not found at %s (skill %q may not exist in repo %q)", installedDir, entry.Name, entry.Repo)
+	}
+
+	abs, absErr := filepath.Abs(installedDir)
 	if absErr != nil {
-		slog.Warn("Failed to resolve absolute install path", "path", installDir, "error", absErr)
+		slog.Warn("Failed to resolve absolute install path", "path", installedDir, "error", absErr)
+		return installedDir, nil
 	}
 	return abs, nil
 }
