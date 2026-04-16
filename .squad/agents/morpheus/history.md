@@ -63,3 +63,24 @@ Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev�
 - Phase 3 shipped 98 files changed, +4804/-7851 lines — a massive refactor. The unified grading pipeline (#344) is the foundation everything in Phase 4 builds on.
 - `workspace.go` and `workspace_test.go` already exist in `hyoka/internal/eval/` from the hotfix path. #566 should decide: promote to `internal/workspace/` or extend in place. I recommended the new package for separation of concerns.
 - The site structure uses React Router with component-per-page in `site/src/app/components/`. Trinity's #358 redesign should establish reusable component patterns (e.g., `GraderResultRow`) that #359 and #360 can inherit — called this out in the launch plan.
+
+## Learnings
+
+### Wave 1 Review — PRs #571 and #572 (2026-04-18)
+
+**PR #571 (#566 WorkspaceDelta) — REQUEST CHANGES**
+
+Key finding: the PR diff does not contain the Go workspace code claimed in the description. `hyoka/internal/workspace/delta.go` and `delta_test.go` already exist on `ronniegeraghty/dev`. The actual diff only adds TS grader-result type definitions to `types.ts` and scribe history. Either a rebase issue or the Go code was merged separately — needs clarification.
+
+The TS grader types align well with Go `report/types.go` JSON field names. But they are standalone — not wired into the `EvalReport` TS interface. Missing `grader_results` and `workspace_delta` fields on `EvalReport` create downstream pain.
+
+**PR #572 (#358 Eval Detail + GraderResultRow) — APPROVE with follow-ups**
+
+Strong work. `GraderResultRow` is an exemplary presentational component — single prop, no context leakage, reusable by #359 and #360 unmodified. Backward compat handles legacy review format correctly with amber notice.
+
+Critical drift: `workspace_delta` TS field names (`files_created`, `files_modified`, `files_deleted`, `total_size_bytes`) do NOT match Go JSON tags (`new_file_count`, `modified_file_count`, `deleted_file_count`, `bytes_added`/`bytes_removed`/`bytes_net`). Will silently render zeros when real data arrives.
+
+**Go↔TS drift patterns to watch in future waves:**
+- Two `GraderResult` types exist in Go: `graders.GraderResult` (internal, uses `Kind`/`Name`/`Score`/`Pass`/`Message`) and `report.GraderResult` (serialized, uses `GraderName`/`GraderType`/`OverallScore`/`Summary`). TS must match the *report* version since that's what JSON contains.
+- `EvalResult` (lean summary) vs `EvalReport` (full detail) type split in TS is causing widespread `as unknown as Record<string, unknown>` casting. Must resolve before #359/#360 or the pattern will compound.
+- `review` field changed from required to optional in #572 — correct for forward compat, but any TS code assuming non-null `review` will break.
