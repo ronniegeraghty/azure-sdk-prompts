@@ -125,3 +125,41 @@ Audited and fixed all outdated commands in README.md. Many examples failed becau
 
 **Pattern for docs audits:** Always test commands in a live environment (worktree or main checkout). Use `--dry-run` for expensive operations. Cross-reference AGENTS.md for authoritative command syntax.
 
+### Session 2026-04-17T01:15 (Phase 3.5 + Wave 1 CHANGELOG & Drift Sweep)
+
+**Status:** COMPLETE  
+**PR:** #576
+
+CHANGELOG.md created and populated with 6 merged PRs from Phase 3.5 + Wave 1:
+
+**Added entries:**
+- PR #562: Unified grading architecture (AI review is now a grader type, structured JSON responses, deterministic voting)
+- PR #567: Starter-aware MaxOutputSize guardrails (only count delta output, not starter files)
+- PR #568: Examples updated for Phase 3 unified grading
+- PR #570: Site rebranding from Azure SDK code-gen to general-purpose AI agent evaluation
+- PR #571: WorkspaceDelta feature (file-level tracking) + eval detail page rendering
+- PR #572: GraderResultRow component + eval detail redesign
+
+**Drift fixes:**
+- README.md: Rebranded intro from "Azure SDK code" to "comprehensive evaluation tool for AI agents"
+- README.md: Updated `review/` package comment from "Multi-model review panel + rubric" → "Multi-model review (PromptReviewGrader)"
+- README.md: Updated guardrails table to reflect starter-aware counting (MaxOutputSize counts deltas only)
+- AGENTS.md: Same branding refresh (removed "Azure SDK code" reference)
+- AGENTS.md: Same `review/` package comment update
+
+**Drift patterns found:**
+1. **Branding lag** — README and AGENTS still referenced "Azure SDK code generation" despite site rebrand (PR #570). Fixed by rewriting overview sections.
+2. **Architecture comment drift** — `review/` package comment mentioned "rubric" (pre-Phase-3) instead of unified grader pattern. Fixed.
+3. **Guardrails documentation lag** — guardrails table didn't mention starter-aware calculation (PR #567 hotfix). Added clarification that MaxOutputSize/MaxFiles count deltas only.
+
+**Files most out-of-sync:**
+1. README.md (line 3) — branding + line 87 guardrails table
+2. AGENTS.md (line 5, 31) — branding + architecture comment
+3. CHANGELOG.md — didn't exist yet (created from scratch)
+
+**Watch for next wave:**
+- PR bodies should guide CHANGELOG entries (most accurate)
+- Site rebrands need systematic README/AGENTS refresh
+- Architecture package comments need updates when grader types change
+- Guardrails documentation needs to stay current with limit-calculation logic changes
+
