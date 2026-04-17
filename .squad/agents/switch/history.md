@@ -79,3 +79,46 @@ Reviewed Neo's starter-aware guardrail refactor. Original PR had 11 table-driven
 ## 2026-04-16 — Phase 3 Merged to Dev (Neo)
 
 Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.
+
+---
+
+## 2026-04-17 — Phase 4 Kickoff: WorkspaceDelta Test Plan (#566)
+
+**Status:** Test plan delivered  
+**Issue:** #566  
+**Deliverable:** `.squad/decisions/inbox/switch-566-test-plan.md`
+
+Created comprehensive test plan for WorkspaceDelta feature with 40+ test scenarios across 6 categories:
+
+1. **Delta Computation (9 scenarios):** Fresh workspace, unchanged starter, modified files (growth/shrink), deletions, mixed operations, zero-byte files, empty final workspace
+2. **JSON Output (3 scenarios):** Serialization stability, backward compat with missing delta, zero-value handling
+3. **Grader Integration (2 scenarios):** GraderInput exposure, nil-safety patterns
+4. **Guardrail Interaction (4 scenarios):** Warning vs hard-fail, delta-based vs total size, negative deltas, MaxNewFiles threshold
+5. **Edge Cases (6 scenarios):** Binary files, build artifacts, symlinks, large files (GB-scale), Unicode filenames, permission changes
+6. **Integration (2 scenarios):** Existing test suite compat, guardrail test refactor
+
+**Key patterns established:**
+- **Table-driven structure** for all delta computation tests (setup → action → expected delta → assertions)
+- **Fixture-based approach** for workspace state (tempdir, known file sizes, reproducible snapshots)
+- **Nil-safety requirements** for graders consuming `WorkspaceDelta` (document pattern: `if input.WorkspaceDelta != nil`)
+- **Size-only tracking** for binary files and large files (no content diffing, prevent OOM)
+- **Exclusion filter integration** with `DefaultIgnoreDirs` (build artifacts don't pollute delta)
+
+**Learnings:**
+- WorkspaceDelta guardrails are harder to test than the hotfix — they're warning-based, not hard-fail. Test pattern: assert `Success = true` AND `GuardrailWarnings` contains message.
+- Starter-aware workspace state requires consistent fixture setup — snapshot before, mutate workspace, compute delta. Reusable helper: `writeFile(t, baseDir, rel, contents)`.
+- Binary file handling is critical — must track size without loading content. Test with sparse files or `fallocate` to verify no OOM.
+- Edge case: agent creates then deletes file in same session → zero delta. Final state == initial state, so no net change recorded.
+- Backward compat: older reports with no `workspace_delta` field must decode cleanly (nil check pattern).
+
+**Handoff to Neo:**
+Test plan document enumerates all scenarios with setup/action/expected triplets. Neo reads it during implementation; I codify it as `delta_test.go` once his branch `squad/566-workspace-delta` exists with types defined. Coordination via decision inbox.
+
+**Files created:** `.squad/decisions/inbox/switch-566-test-plan.md` (17 KB, 40+ scenarios)
+
+**Next actions:**
+1. Monitor for Neo's branch `squad/566-workspace-delta`
+2. When types exist: checkout branch, write `hyoka/internal/workspace/delta_test.go`
+3. Run tests, report gaps to Neo
+4. Iterate until all green
+5. Review Neo's PR #566 with test lens
