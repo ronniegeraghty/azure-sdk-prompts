@@ -59,8 +59,10 @@ describe("RunsPage", () => {
     );
 
     await waitFor(() => {
+      // Timestamps are now displayed as run names
       expect(screen.getByText(/Mar 29, 2026/)).toBeInTheDocument();
       expect(screen.getByText(/Mar 28, 2026/)).toBeInTheDocument();
+      // Eval counts shown
       expect(screen.getByText(/10 evaluations/)).toBeInTheDocument();
       expect(screen.getByText(/5 evaluations/)).toBeInTheDocument();
     });
@@ -104,6 +106,7 @@ describe("RunsPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/3 evaluations/)).toBeInTheDocument();
     });
+    // Invalid timestamp renders "Unknown" instead of "Invalid Date"
     expect(screen.getByText("Unknown")).toBeInTheDocument();
   });
 
@@ -129,8 +132,10 @@ describe("RunsPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/0 evaluations/)).toBeInTheDocument();
     });
+    // Missing timestamp renders "Unknown"
     const unknownElements = screen.getAllByText("Unknown");
     expect(unknownElements.length).toBeGreaterThanOrEqual(1);
+    // Pass rate should show 0.0% (not NaN%)
     expect(screen.getByText("0.0%")).toBeInTheDocument();
   });
 });
