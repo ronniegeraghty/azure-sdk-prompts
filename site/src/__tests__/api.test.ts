@@ -113,7 +113,7 @@ describe("API module", () => {
   // ── fetchCompareConfigs ────────────────────────────────────────────
 
   it("fetchCompareConfigs encodes both config names", async () => {
-    mockFetchOk({ config_a: "a", config_b: "b", per_prompt: [], summary: {} });
+    mockFetchOk({ kind: "configs", label_a: "a", label_b: "b", per_prompt: [], summary: {} });
     await fetchCompareConfigs("baseline/opus", "azure-mcp/opus");
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/compare/configs?a=baseline%2Fopus&b=azure-mcp%2Fopus"

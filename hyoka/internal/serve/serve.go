@@ -191,6 +191,8 @@ func handleAPIRunDetail(w http.ResponseWriter, r *http.Request, reportsDir strin
 			handleAPITimeline(w, r, reportsDir, runID)
 		case "score-breakdown":
 			handleAPIScoreBreakdown(w, r, reportsDir, runID)
+		case "comparisons":
+			handleAPIRunComparisons(w, r, reportsDir, runID)
 		default:
 			http.NotFound(w, r)
 		}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { fetchRuns, fetchCompareConfigs } from "../data/api";
-import type { RunSummary, ConfigComparison, PromptDiff, GraderDiff } from "../data/types";
+import type { RunSummary, ComparisonResult, PromptDiff, GraderDiff } from "../data/types";
 import {
   Select,
   SelectContent,
@@ -228,7 +228,7 @@ export function ComparisonPage() {
   const [configNames, setConfigNames] = useState<string[]>([]);
   const [configA, setConfigA] = useState<string>("");
   const [configB, setConfigB] = useState<string>("");
-  const [comparison, setComparison] = useState<ConfigComparison | null>(null);
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [runsLoading, setRunsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -543,10 +543,10 @@ export function ComparisonPage() {
                       Prompt
                     </TableHead>
                     <TableHead className="text-white/50" style={{ fontSize: 12 }}>
-                      {comparison.config_a}
+                      {comparison.label_a}
                     </TableHead>
                     <TableHead className="text-white/50" style={{ fontSize: 12 }}>
-                      {comparison.config_b}
+                      {comparison.label_b}
                     </TableHead>
                     <TableHead className="text-white/50" style={{ fontSize: 12 }}>
                       Delta (B − A)

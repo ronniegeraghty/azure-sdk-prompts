@@ -201,3 +201,27 @@ This is multi-day refactor touching review/, graders/, eval/. Decided to ship fo
 2. **Premature implementation risk:** Recognized session splitting scope early, deferred to avoid half-working feature in PR.
 3. **Test-first for schema:** Wrote hierarchical tests before validating real files; caught empty-file edge case.
 
+
+## #357 Comparison Unification — Phase 4 Wave 3
+
+**Branch:** `squad/357-comparison-unification` → PR #583 → `squad/phase-4-remainder`
+**Worktree:** `/home/rgeraghty/projects/hyoka-357`
+
+### Architecture decisions
+
+- **Single `ComparisonResult` type keyed on `ComparisonKind`** replaces the three wrapper types (`ConfigComparison`/`RunComparison`/`TemporalComparison`). CLI, serve API, and auto-gen all land on the same struct → Morpheus gate (CLI == site) is satisfied by shared code path, not by testing two paths for equality.
+- **`CompareReports` is the in-memory core.** Every public entry point delegates. Disk-backed `CompareConfigs`/`CompareRuns`/`TemporalDiff` = load reports + call `CompareReports`. `AutoGenerateForRun` = fan out to `CompareReports` across pairs.
+- **Auto-gen writes `comparisons.json` alongside `summary.json`** rather than a field on `RunSummary`. Rationale: adding `Comparisons []ComparisonResult` to `report.RunSummary` creates `comparison → report → comparison` cycle. File-adjacent is cleaner + site can read or recompute — either gives identical output.
+- **`summary_stats.PromptDeltas` retained.** Pass/fail toggle is a distinct aggregate view from score-delta comparison. Direct import would cycle. Documented in PR body.
+
+### Lessons
+
+- **Worktrees for parallel agents.** Main checkout had Trinity's branch active mid-task. Running `git worktree add ../hyoka-357 -b squad/357-comparison-unification origin/squad/phase-4-remainder` gave isolated working directory. `.squad/decisions/inbox/` is gitignored so inbox files are worktree-local — informational only for Trinity.
+- **Drop the contract early.** `ComparisonResult` type file committed + pushed as a WIP commit before the rewrite. Trinity could import against the shape while I refactored behavior.
+- **Serve handlers as pass-through wins.** `dashboard.go` handlers at lines 111/127/147 needed *no* code change — they just `writeJSON(w, cmp)` over whatever the comparison pkg returns. The type swap flowed through for free.
+- **Mux route collisions.** `mux.HandleFunc("/api/runs/", ...)` in `dashboard.go` collided with the existing catchall in `serve.go`. Fix: add `comparisons` as a sub-resource case in the existing switch, not a new registration.
+- **Test file indentation:** `cmd/compare_test.go` uses pure tabs, no leading whitespace. Small detail that bites on edits.
+
+### Follow-ups to consider
+
+- If the site surface never consumes `summary_stats.PromptDeltas`, future cleanup: move the pass-toggle computation into the `comparison` package (or a third shared one) and delete from `summary_stats.go`. Out of scope for #357 (semantics differ + import cycle).
