@@ -448,3 +448,64 @@ if rec.Code != http.StatusNotFound {
 t.Errorf("expected 404, got %d", rec.Code)
 }
 }
+
+func TestAPIPairwise(t *testing.T) {
+dir := setupTestReportsWithEvals(t)
+runID := "20260327-113302"
+
+// Seed pairwise.json so the endpoint has something to serve.
+pairwisePayload := map[string]any{
+"run_id":    runID,
+"timestamp": "2026-03-27T18:33:02Z",
+"reports": []map[string]any{
+{
+"prompt_id": "test-prompt-one",
+"baseline": map[string]any{
+"config_name": "baseline/claude-opus-4.6",
+"score":       0.85,
+"max_score":   1.0,
+"success":     true,
+},
+"variants": []any{},
+"impacts":  []any{},
+},
+},
+"aggregate_impacts": []any{},
+}
+data, _ := json.Marshal(pairwisePayload)
+if err := os.WriteFile(filepath.Join(dir, runID, "pairwise.json"), data, 0644); err != nil {
+t.Fatalf("seed pairwise.json: %v", err)
+}
+
+mux := buildMux(Options{ReportsDir: dir})
+req := httptest.NewRequest("GET", "/api/runs/"+runID+"/pairwise", nil)
+rec := httptest.NewRecorder()
+mux.ServeHTTP(rec, req)
+
+if rec.Code != http.StatusOK {
+t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+}
+if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+t.Errorf("expected JSON content type, got %q", ct)
+}
+var got map[string]any
+if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+t.Fatalf("decode: %v", err)
+}
+if got["run_id"] != runID {
+t.Errorf("expected run_id=%s, got %v", runID, got["run_id"])
+}
+}
+
+func TestAPIPairwiseMissing(t *testing.T) {
+dir := setupTestReportsWithEvals(t)
+mux := buildMux(Options{ReportsDir: dir})
+
+// No pairwise.json in this run → 404.
+req := httptest.NewRequest("GET", "/api/runs/20260327-113302/pairwise", nil)
+rec := httptest.NewRecorder()
+mux.ServeHTTP(rec, req)
+if rec.Code != http.StatusNotFound {
+t.Errorf("expected 404 for run without pairwise.json, got %d", rec.Code)
+}
+}

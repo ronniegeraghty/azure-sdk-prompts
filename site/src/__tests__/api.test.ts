@@ -8,6 +8,7 @@ import {
   fetchPrompts,
   fetchPrompt,
   fetchCompareConfigs,
+  fetchPairwise,
 } from "../app/data/api";
 
 describe("API module", () => {
@@ -123,5 +124,29 @@ describe("API module", () => {
   it("fetchCompareConfigs throws on server error", async () => {
     mockFetchError(404, "Not Found");
     await expect(fetchCompareConfigs("a", "b")).rejects.toThrow("API error 404: Not Found");
+  });
+
+  // ── fetchPairwise ──────────────────────────────────────────────────
+
+  it("fetchPairwise calls the correct endpoint", async () => {
+    mockFetchOk({ run_id: "run-1", timestamp: "t", reports: [] });
+    const result = await fetchPairwise("run-1");
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/runs/run-1/pairwise");
+    expect(result).toEqual({ run_id: "run-1", timestamp: "t", reports: [] });
+  });
+
+  it("fetchPairwise returns null on 404 (run has no pairwise data)", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+    } as Response);
+    const result = await fetchPairwise("run-without-pairwise");
+    expect(result).toBeNull();
+  });
+
+  it("fetchPairwise throws on non-404 server errors", async () => {
+    mockFetchError(500, "Internal Server Error");
+    await expect(fetchPairwise("run-1")).rejects.toThrow("API error 500: Internal Server Error");
   });
 });
