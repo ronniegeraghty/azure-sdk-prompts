@@ -2,7 +2,7 @@
 
 ## Overview
 
-hyoka is a Go CLI tool that evaluates AI agents generating Azure SDK code. It uses GitHub Copilot sessions to generate code from prompts, then runs a multi-model review panel to score the output.
+hyoka is a Go CLI tool that evaluates AI agents generating code. It uses GitHub Copilot sessions to generate code from prompts, then runs a multi-model review panel to score the output using extensible graders.
 
 ## Repository Structure
 
@@ -28,7 +28,7 @@ hyoka/              # Go source (module: github.com/ronniegeraghty/hyoka)
     prompt/         # Prompt loading, filtering, validation
     rerender/       # Report re-rendering from JSON
     report/         # Report generation (JSON, HTML, Markdown)
-    review/         # Multi-model review panel + rubric
+    review/         # Multi-model review (PromptReviewGrader)
     serve/          # Local web server for report browsing (#20)
     skills/         # Skill fetching (local + remote)
     tools/          # Tool-related utilities and registry

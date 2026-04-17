@@ -1,6 +1,6 @@
 # hyoka
 
-A curated library of prompts for evaluating how well AI agents generate Azure SDK code, paired with a Go evaluation tool (`hyoka`) that runs prompts through the Copilot SDK, reviews code via a multi-model panel, and produces criteria-based pass/fail reports.
+A comprehensive evaluation tool for AI agents generating code. hyoka runs prompts through the GitHub Copilot SDK, scores generated code against extensible grader criteria (builder, complexity, prompt adherence, behavior, and AI review), and produces detailed pass/fail reports with workspace delta tracking.
 
 ## Quick Start
 
@@ -83,8 +83,8 @@ Every code-generation session is automatically aborted if it exceeds any of thes
 | Limit | Default | Flag | Purpose |
 |-------|---------|------|---------|
 | Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
-| File count | 50 | `--max-files` | Prevents excessive file creation |
-| Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (supports KB, MB suffixes) |
+| File count | 50 | `--max-files` | Prevents excessive file creation (counts new files + deleted starters, ignores starter files) |
+| Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (counts only deltas: new files or modifications to starters; supports KB, MB suffixes) |
 
 Prompts can override these defaults via frontmatter fields (`max_session_actions`, `max_turns`). The resolution order is: prompt frontmatter > config YAML > CLI flag > engine default.
 
@@ -482,7 +482,7 @@ hyoka/
 │       ├── prompt/                    # Prompt loading, filtering, validation
 │       ├── rerender/                  # Report re-rendering from JSON
 │       ├── report/                    # Report generation (JSON, HTML, Markdown)
-│       ├── review/                    # Multi-model review panel + rubric
+│       ├── review/                    # Multi-model review (PromptReviewGrader)
 │       ├── serve/                     # Local web server for report browsing
 │       ├── skills/                    # Skill fetching (local + remote)
 │       ├── trends/                    # Cross-run trend analysis
