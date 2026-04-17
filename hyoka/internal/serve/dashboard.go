@@ -168,6 +168,65 @@ func handleAPICompareTemporal(w http.ResponseWriter, r *http.Request, reportsDir
 	writeJSON(w, cmp)
 }
 
+// handleAPIRunComparisons returns the auto-generated comparisons for a run
+// (written by comparison.WriteForRun at end-of-run). Reads {runDir}/comparisons.json
+// if present; on miss, computes on-demand by loading the run's reports so the
+// site always gets a result even for runs that pre-date auto-generation.
+func handleAPIRunComparisons(w http.ResponseWriter, _ *http.Request, reportsDir, runID string) {
+	if strings.Contains(runID, "..") || runID == "" {
+		http.Error(w, "invalid run ID", http.StatusBadRequest)
+		return
+	}
+	runDir := filepath.Join(reportsDir, runID)
+	if info, err := os.Stat(runDir); err != nil || !info.IsDir() {
+		http.Error(w, "run not found", http.StatusNotFound)
+		return
+	}
+
+	results, err := comparison.LoadForRun(runDir)
+	if err != nil {
+		slog.Error("loading run comparisons", "error", err, "run", runID)
+		http.Error(w, "failed to load comparisons", http.StatusInternalServerError)
+		return
+	}
+	if results == nil {
+		// Legacy run without comparisons.json — compute on demand using the
+		// same engine so the response matches what end-of-run would have
+		// produced.
+		reports, err := loadRunReports(runDir)
+		if err != nil {
+			slog.Error("loading run reports", "error", err, "run", runID)
+			http.Error(w, "failed to load reports", http.StatusInternalServerError)
+			return
+		}
+		results = comparison.AutoGenerateForRun(reports)
+	}
+	if results == nil {
+		results = []comparison.ComparisonResult{}
+	}
+	writeJSON(w, results)
+}
+
+// loadRunReports walks a run directory and decodes every report.json it finds.
+func loadRunReports(runDir string) ([]report.EvalReport, error) {
+	var out []report.EvalReport
+	err := filepath.Walk(runDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || info.Name() != "report.json" {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		var r report.EvalReport
+		if err := json.Unmarshal(data, &r); err == nil {
+			out = append(out, r)
+		}
+		return nil
+	})
+	return out, err
+}
+
 func handleAPITrends(w http.ResponseWriter, r *http.Request, reportsDir string) {
 	q := r.URL.Query()
 	opts := trends.TrendOptions{

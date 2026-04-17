@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/comparison"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
@@ -699,6 +700,23 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		summary.PairwiseResults = pairwiseReports
 		if _, err := report.WritePairwiseReport(runID, pairwiseReports, pairwiseImpacts, e.opts.OutputDir); err != nil {
 			slog.Warn("Failed to write pairwise report", "error", err)
+		}
+	}
+
+	// Auto-generate pairwise comparisons for multi-config runs (#357). Written
+	// to {runDir}/comparisons.json so the site comparison surface can render
+	// without recomputing and is guaranteed to match what `hyoka compare`
+	// prints for the same inputs.
+	if len(summary.Results) > 0 {
+		runDir := filepath.Join(e.opts.OutputDir, runID)
+		derefReports := make([]report.EvalReport, 0, len(summary.Results))
+		for _, r := range summary.Results {
+			if r != nil {
+				derefReports = append(derefReports, *r)
+			}
+		}
+		if _, err := comparison.WriteForRun(runDir, derefReports); err != nil {
+			slog.Warn("Failed to write auto-generated comparisons", "error", err)
 		}
 	}
 

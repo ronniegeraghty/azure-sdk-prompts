@@ -226,11 +226,14 @@ var result map[string]any
 if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
 t.Fatalf("failed to decode: %v", err)
 }
-if result["config_a"] != "baseline/opus" {
-t.Errorf("expected config_a baseline/opus, got %v", result["config_a"])
+if result["kind"] != "configs" {
+t.Errorf("expected kind configs, got %v", result["kind"])
 }
-if result["config_b"] != "azure-mcp/opus" {
-t.Errorf("expected config_b azure-mcp/opus, got %v", result["config_b"])
+if result["label_a"] != "baseline/opus" {
+t.Errorf("expected label_a baseline/opus, got %v", result["label_a"])
+}
+if result["label_b"] != "azure-mcp/opus" {
+t.Errorf("expected label_b azure-mcp/opus, got %v", result["label_b"])
 }
 perPrompt, ok := result["per_prompt"].([]any)
 if !ok {
@@ -295,11 +298,14 @@ var result map[string]any
 if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
 t.Fatalf("failed to decode: %v", err)
 }
-if result["run_a"] != "run-000" {
-t.Errorf("expected run_a run-000, got %v", result["run_a"])
+if result["kind"] != "runs" {
+t.Errorf("expected kind runs, got %v", result["kind"])
 }
-if result["run_b"] != "run-001" {
-t.Errorf("expected run_b run-001, got %v", result["run_b"])
+if result["label_a"] != "run-000" {
+t.Errorf("expected label_a run-000, got %v", result["label_a"])
+}
+if result["label_b"] != "run-001" {
+t.Errorf("expected label_b run-001, got %v", result["label_b"])
 }
 }
 
