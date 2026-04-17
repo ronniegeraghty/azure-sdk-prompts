@@ -19,7 +19,10 @@ import (
 )
 
 // registerDashboardRoutes adds dashboard-specific API routes to the mux.
-func registerDashboardRoutes(mux *http.ServeMux, opts Options) {
+// Comparison and trend handlers operate on aggregated data that we don't
+// currently cache — they walk entire run directories — so cache wiring is
+// limited to the per-run report loaders.
+func registerDashboardRoutes(mux *http.ServeMux, opts Options, cache *fileCache) {
 	mux.HandleFunc("/api/compare/configs", func(w http.ResponseWriter, r *http.Request) {
 		handleAPICompareConfigs(w, r, opts.ReportsDir)
 	})
@@ -32,10 +35,11 @@ func registerDashboardRoutes(mux *http.ServeMux, opts Options) {
 	mux.HandleFunc("/api/trends", func(w http.ResponseWriter, r *http.Request) {
 		handleAPITrends(w, r, opts.ReportsDir)
 	})
+	_ = cache // reserved for future per-report caching in dashboard endpoints
 }
 
-func handleAPIGraders(w http.ResponseWriter, _ *http.Request, reportsDir, runID string) {
-	evals, err := loadRunEvals(reportsDir, runID)
+func handleAPIGraders(w http.ResponseWriter, _ *http.Request, reportsDir, runID string, cache *fileCache) {
+	evals, err := loadRunEvals(reportsDir, runID, cache)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -56,8 +60,8 @@ func handleAPIGraders(w http.ResponseWriter, _ *http.Request, reportsDir, runID 
 	writeJSON(w, result)
 }
 
-func handleAPITimeline(w http.ResponseWriter, _ *http.Request, reportsDir, runID string) {
-	evals, err := loadRunEvals(reportsDir, runID)
+func handleAPITimeline(w http.ResponseWriter, _ *http.Request, reportsDir, runID string, cache *fileCache) {
+	evals, err := loadRunEvals(reportsDir, runID, cache)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -82,8 +86,8 @@ func handleAPITimeline(w http.ResponseWriter, _ *http.Request, reportsDir, runID
 	writeJSON(w, result)
 }
 
-func handleAPIScoreBreakdown(w http.ResponseWriter, _ *http.Request, reportsDir, runID string) {
-	evals, err := loadRunEvals(reportsDir, runID)
+func handleAPIScoreBreakdown(w http.ResponseWriter, _ *http.Request, reportsDir, runID string, cache *fileCache) {
+	evals, err := loadRunEvals(reportsDir, runID, cache)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -282,7 +286,11 @@ func handleAPIPromptHistory(w http.ResponseWriter, r *http.Request, reportsDir s
 	writeJSON(w, tr)
 }
 
-func loadRunEvals(reportsDir, runID string) ([]*report.EvalReport, error) {
+// loadRunEvals walks a run directory and returns parsed EvalReport values for
+// every report.json it finds. Report bytes are served through the cache so
+// repeated requests for the same run (graders, timeline, score-breakdown all
+// call this) are a memory hit after the first read.
+func loadRunEvals(reportsDir, runID string, cache *fileCache) ([]*report.EvalReport, error) {
 	runDir := filepath.Join(reportsDir, runID)
 	if _, err := os.Stat(runDir); err != nil {
 		return nil, err
@@ -295,7 +303,7 @@ func loadRunEvals(reportsDir, runID string) ([]*report.EvalReport, error) {
 		if info.IsDir() || info.Name() != "report.json" {
 			return nil
 		}
-		data, readErr := os.ReadFile(path)
+		data, readErr := cache.ReadFile(path)
 		if readErr != nil {
 			return nil
 		}
