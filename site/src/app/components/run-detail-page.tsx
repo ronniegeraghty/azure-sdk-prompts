@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
 import type { RunSummary, EvalResult, EvalReport } from "../data/types";
-import { CheckCircle2, XCircle, Clock, FileCode2, ArrowLeft, Loader2, Tag } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, FileCode2, ArrowLeft, Loader2, Tag, Zap } from "lucide-react";
 import { GraderResultRow } from "./GraderResultRow";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
@@ -148,6 +148,26 @@ export function RunDetailPage() {
               {run.analysis}
             </p>
           </div>
+        )}
+
+        {run.pairwise_results && run.pairwise_results.length > 0 && (
+          <Link
+            to={`/pairwise?run=${encodeURIComponent(run.run_id)}`}
+            className="mb-8 flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 no-underline transition hover:border-emerald-500/40 hover:bg-emerald-500/[0.08]"
+          >
+            <div className="flex items-center gap-3">
+              <Zap className="h-4 w-4 text-emerald-400" />
+              <div>
+                <div className="text-emerald-400" style={{ fontSize: 13, fontWeight: 500 }}>
+                  Pairwise tool-ablation available
+                </div>
+                <div className="text-white/40" style={{ fontSize: 12 }}>
+                  {run.pairwise_results.length} prompt{run.pairwise_results.length === 1 ? "" : "s"} with per-tool impact analysis
+                </div>
+              </div>
+            </div>
+            <span className="text-emerald-400/70" style={{ ...mono, fontSize: 12 }}>View →</span>
+          </Link>
         )}
 
         <div className="mb-4 flex items-center justify-between">

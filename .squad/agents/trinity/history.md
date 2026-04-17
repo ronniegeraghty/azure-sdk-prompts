@@ -71,3 +71,24 @@ Implemented site embedding per Morpheus's architecture proposal. Key decisions a
 ## 2026-04-16 — Phase 3 Merged to Dev (Neo)
 
 Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.
+
+### Session 2026-04-19 (Phase 4 Wave 3 — #360, #361)
+
+**#361 — Serve package caching + pairwise endpoint + security docs (PR #581)**
+
+- **Per-buildMux file cache:** `fileCache` struct scoped to one `buildMux` call (NOT a package-level global). Tests and concurrent `Start()` calls stay isolated. Fingerprint is `(mtime, size)` — any change busts the entry. Errors evict the entry so a failed read can't poison subsequent requests.
+- **Race-tested with 50×20 concurrent readers** under `-race`. RWMutex with upgrade pattern: read-lock for cache lookup, release, re-acquire write-lock to populate.
+- **`loadRunEvals` signature changed** to accept `*fileCache` — ripple updates required in `serve_test.go` (pass `newFileCache()`). Any future caller needs the same update.
+- **Pairwise endpoint pattern:** `GET /api/runs/{id}/pairwise` serves `pairwise.json` directly; returns 404 if missing. `fetchPairwise()` on the frontend special-cases 404 → `null` (as opposed to throwing) so consumers can branch on "no data" without try/catch.
+- **Security docblock expansion:** package comment on `serve.go` now spells out "no auth, bind to localhost or put behind a reverse proxy" explicitly. Startup-time `log.Println("⚠ hyoka serve has no authentication...")` warning makes it impossible to miss.
+
+**#360 — Pairwise page polish**
+
+- **URL sync via useSearchParams:** `?run=<run_id>` deep-links from run-detail. Two-way binding — reading on mount for selection, writing on change via `setSearchParams(..., {replace: true})` so the back button doesn't get polluted.
+- **Tool Usage Frequency chart — proxy signal, clearly labeled:** the ground-truth `tool_availability` field lives on per-eval `EvalReport.ToolAvailability`, NOT aggregated in summary.json. Rather than add a backend aggregation endpoint for this PR, I derived frequency from pairwise impact data already on the page: "used" = impact ≠ 0 OR baseline_pass ≠ without_pass, "available-unused" = in impacts list but no measurable effect, "not available" = tool not in that prompt's impacts. Labeled the chart explicitly as a proxy and pointed at the eval detail page for ground truth. Follow-up issue worth filing if anyone wants the exact invocation counts.
+- **Methodology info box:** collapsible `<button>` + state-driven expansion (not `<details>` — styled consistency with the rest of the design system). Explains baseline vs without-X, impact formula, thresholds, and limitations (always_on / pairwise-off tools don't appear).
+- **Cross-link from run-detail:** amber-accented banner with `<Zap>` icon, shown only when `run.pairwise_results?.length > 0`. Linking via `to={\`/pairwise?run=\${encodeURIComponent(runId)}\`}` — `encodeURIComponent` matters because run IDs can contain slashes depending on the generator.
+
+**Reusable patterns:**
+- For "needs ground truth, but can fake it from existing page data" decisions: ship with the proxy + explicit label + follow-up note, rather than blocking on a new backend endpoint. Keeps PR scope tight.
+- Stacked horizontal bar with percent widths + title attributes (hover tooltip) + inline numeric labels (only when segment > 12%) is a clean, dependency-free alternative to pulling in yet another chart variant from recharts.
