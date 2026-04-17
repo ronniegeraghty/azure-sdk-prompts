@@ -102,3 +102,20 @@ Critical drift: `workspace_delta` TS field names (`files_created`, `files_modifi
 **Merge conflict detected:** `git merge-tree` confirms #581 ↔ #583 content conflict in `hyoka/internal/serve/serve.go` — both add cases to `handleAPIRunDetail` switch. Recommended merge order: **#583 first → Switch coverage re-run on rewritten `comparison/` pkg → #581 rebased (cache wired into #583's comparisons handler) → #582 (site-only, trivial).**
 
 **Phase 4 go-live: NO-GO** until #583 TS fix + Switch re-run. After that, GO for 0.3.1. Phase 4 complete once consolidation PR `squad/phase-4-remainder → ronniegeraghty/dev` merges green.
+
+### Phase 4 Final Gate Review — PR #584 (2026-04-17)
+
+**Verdict: APPROVE.** All 7 gate criteria pass. PR #584 consolidates 6 sub-PRs (#577–#579, #581–#583) into `ronniegeraghty/dev`.
+
+**TS drift fix verified:** `ComparisonResult` correctly uses `kind`/`label_a`/`label_b` in both `types.ts` and `comparison-page.tsx`. No stale `ConfigComparison`/`config_a`/`config_b` remnants.
+
+**serve.go merge conflict resolved correctly:** Switch dispatches all 6 sub-resources (`eval`, `graders`, `timeline`, `score-breakdown`, `comparisons`, `pairwise`). Cache param wired where applicable.
+
+**Go↔TS drift audit:** Zero NEW drift in Phase 4. PR fixed ComparisonResult drift and added correct PairwiseRunReport. Pre-existing drift remains in EvalReport (~18 missing fields), BehaviorGraderDetail (4 missing fields), RunSummary (missing report_paths) — recommend Phase 5 issue for full TS type sync.
+
+**Key metrics:** 24/24 test packages pass with `-race`. CI green (both Go and site). `hyoka validate` passes (89 prompts, 12 configs, 25 graders). Zero "Azure SDK code-gen" branding remnants. Shared `CompareReports` core with `TestAutoGenerateForRun_UsesSameEngine` proving CLI≡site byte-level equivalence.
+
+**Follow-up items for Phase 5:**
+1. Close issues #355–#363, #566, #375 upon merge
+2. File issue for TS type sync (EvalReport, BehaviorGraderDetail, RunSummary)
+3. Snapshot test for Switch on comparison routes (belt-and-suspenders)
