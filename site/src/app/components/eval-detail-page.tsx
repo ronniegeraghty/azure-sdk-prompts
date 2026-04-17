@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
-import type { RunSummary, EvalResult, SessionEvent, ReviewPanelEntry, GraderResult } from "../data/types";
+import type { RunSummary, EvalResult, EvalReport, SessionEvent, ReviewPanelEntry, GraderResult } from "../data/types";
 import {
   ArrowLeft, CheckCircle2, XCircle, Clock, FileCode2, Cpu,
   MessageSquare, Wrench, Terminal, ChevronDown, ChevronRight,
@@ -336,10 +336,11 @@ export function EvalDetailPage() {
     );
   }
 
-  const r = evalResult;
+  // Cast to EvalReport for detail-level access (EvalResult is summary-only in types)
+  const r = evalResult as unknown as EvalReport;
   
   // Grader results (Phase 3) or legacy review (backward compat)
-  const graderResults: GraderResult[] = (r as unknown as Record<string, unknown>).grader_results as GraderResult[] || [];
+  const graderResults: GraderResult[] = r.grader_results || [];
   const hasGraders = graderResults.length > 0;
   
   const review = r.review || {};
@@ -349,24 +350,24 @@ export function EvalDetailPage() {
   const scoreColor = scorePct >= 80 ? "text-emerald-400" : scorePct >= 60 ? "text-amber-400" : "text-red-400";
 
   // Session events may come from the individual eval or from the summary result
-  const sessionEvents: SessionEvent[] = (r as unknown as Record<string, unknown>).session_events as SessionEvent[] || [];
-  const reviewPanel: ReviewPanelEntry[] = (r as unknown as Record<string, unknown>).review_panel as ReviewPanelEntry[] || [];
-  const environment = (r as unknown as Record<string, unknown>).environment as Record<string, unknown> | undefined;
+  const sessionEvents: SessionEvent[] = r.session_events || [];
+  const reviewPanel: ReviewPanelEntry[] = r.review_panel || [];
+  const environment = r.environment;
   const generatedFiles = r.generated_files || [];
   const criteria = review.scores?.criteria || [];
-  const rerunCommand = (r as unknown as Record<string, unknown>).rerunCommand as string || "";
-  const guardrailReason = (r as unknown as Record<string, unknown>).guardrail_abort_reason as string || "";
+  const rerunCommand = r.rerunCommand || "";
+  const guardrailReason = r.guardrail_abort_reason || "";
   const errorMsg = r.error || guardrailReason || "";
-  const workspaceDelta = (r as unknown as Record<string, unknown>).workspace_delta as Record<string, unknown> | undefined;
+  const workspaceDelta = r.workspace_delta;
 
-  const envModel = environment?.model as string || "";
-  const envInputTokens = (environment?.totalInputTokens ?? environment?.total_input_tokens ?? 0) as number;
-  const envOutputTokens = (environment?.totalOutputTokens ?? environment?.total_output_tokens ?? 0) as number;
-  const envTurnCount = (environment?.turnCount ?? environment?.turn_count ?? 0) as number;
+  const envModel = environment?.model || "";
+  const envInputTokens = environment?.totalInputTokens ?? environment?.total_input_tokens ?? 0;
+  const envOutputTokens = environment?.totalOutputTokens ?? environment?.total_output_tokens ?? 0;
+  const envTurnCount = environment?.turnCount ?? environment?.turn_count ?? 0;
 
   const durationTotal = r.duration_seconds || 0;
-  const durationGen = ((r as unknown as Record<string, unknown>).generation_duration_seconds as number) || 0;
-  const durationReview = ((r as unknown as Record<string, unknown>).review_duration_seconds as number) || 0;
+  const durationGen = r.generation_duration_seconds || 0;
+  const durationReview = r.review_duration_seconds || 0;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] px-4 py-8 sm:px-6" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -458,10 +459,10 @@ export function EvalDetailPage() {
           <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.03] p-5">
             <h3 className="mb-3 text-white" style={{ fontSize: 14 }}>Workspace Changes</h3>
             <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2 md:grid-cols-4" style={{ fontSize: 12 }}>
-              <div><span className="text-white/30">Files created:</span> <span className="text-emerald-400/70" style={mono}>{(workspaceDelta.files_created as number) ?? 0}</span></div>
-              <div><span className="text-white/30">Files modified:</span> <span className="text-amber-400/70" style={mono}>{(workspaceDelta.files_modified as number) ?? 0}</span></div>
-              <div><span className="text-white/30">Files deleted:</span> <span className="text-red-400/70" style={mono}>{(workspaceDelta.files_deleted as number) ?? 0}</span></div>
-              <div><span className="text-white/30">Total size:</span> <span className="text-white/60" style={mono}>{((workspaceDelta.total_size_bytes as number) ?? 0).toLocaleString()} bytes</span></div>
+              <div><span className="text-white/30">Files created:</span> <span className="text-emerald-400/70" style={mono}>{workspaceDelta.new_file_count ?? 0}</span></div>
+              <div><span className="text-white/30">Files modified:</span> <span className="text-amber-400/70" style={mono}>{workspaceDelta.modified_file_count ?? 0}</span></div>
+              <div><span className="text-white/30">Files deleted:</span> <span className="text-red-400/70" style={mono}>{workspaceDelta.deleted_file_count ?? 0}</span></div>
+              <div><span className="text-white/30">Net bytes:</span> <span className="text-white/60" style={mono}>{(workspaceDelta.bytes_net ?? 0).toLocaleString()} bytes</span></div>
             </div>
           </div>
         )}

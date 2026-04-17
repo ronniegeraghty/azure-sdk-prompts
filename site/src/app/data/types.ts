@@ -257,19 +257,12 @@ export interface EvalReport {
   grader_results?: GraderResult[];
   review?: Review; // Legacy, kept for backward compat
   review_panel?: ReviewPanelEntry[];
-  grader_results?: GraderResult[];
   workspace_delta?: WorkspaceDelta;
   prompt_metadata: PromptMetadata;
   environment?: Environment;
   config_used?: { model: string; name: string };
   rerunCommand?: string;
   guardrail_abort_reason?: string;
-  workspace_delta?: {
-    files_created: number;
-    files_modified: number;
-    files_deleted: number;
-    total_size_bytes: number;
-  };
 }
 
 export interface DocEntry {
