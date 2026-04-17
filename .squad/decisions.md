@@ -1198,3 +1198,464 @@ See `.squad/orchestration-log/2026-04-07T21-25-trinity.md`
 **Test Results:** go test -race ./hyoka/internal/eval/... -run 'TestCompute' -v → PASS. All 15 cases pass with race detector enabled.
 
 **Recommendation:** APPROVE. The hotfix is well-tested, safe, and solves the immediate problem. Enhanced coverage closes the zero-byte gap. Integration test is unnecessary for this surgical change.
+
+---
+
+## Pending Decisions (2026-04-17)
+
+### Decision: Where example configs live + how to invoke them
+
+**Author:** Tank 📡  
+**Date:** 2026-04-16  
+**Related:** PR #573
+
+**Decision:**
+
+Example configs live under `examples/configs/` (not `configs/`). They are **not** auto-discovered by the default loader.
+
+Users invoke them via:
+```bash
+go run ./hyoka run \
+  --config-file examples/configs/<name>.yaml \
+  --config <config-name-from-yaml> \
+  [--prompt-id <id> | --language <lang> | ...] \
+  --dry-run
+```
+
+Two flags needed:
+- `--config-file` points at the YAML file (bypasses the default `configs/` dir scan).
+- `--config` picks the config entry by its `name:` field inside the YAML.
+
+**Why this matters for the team:**
+- Every new example config PR should include the `--config-file …` invocation in its header comment. This pattern has been added to `examples/configs/example-remote-skill.yaml`.
+- Future work could add example-config auto-discovery (e.g. `--examples` flag, or merge `examples/configs/` into the default loader when a flag is set), but that's a separate change — not quietly changing loader behavior.
+
+**Caveat surfaced during this work:**
+`internal/skills/fetcher.go::fetchRemote` shells out to `npx skills add <repo> --name <name>` but does **not** pass `--yes`. The skills CLI still shows an interactive "Select skills to install" prompt, so under non-TTY stdin the fetch silently resolves 0 skills (the repo does clone successfully). Worth fixing for real remote-skill usage — filing separately if/when prioritised.
+
+---
+
+### Decision: WorkspaceDelta Type & Integration (#566)
+
+**Author:** Neo 💊  
+**Date:** 2026-04-16  
+**Status:** Implemented  
+**PR:** [#571](https://github.com/ronniegeraghty/hyoka/pull/571)
+
+**Context:**
+
+Phase 4 kickoff identified WorkspaceDelta as a critical-path prerequisite (#566). Two forces converged:
+
+1. **Graders need change awareness:** Today's review graders inline all files, making it impossible to distinguish agent work from starter code.
+2. **Guardrails need principled limits:** The 1MB `MaxOutputSize` cap was protecting review prompt context. Once review moves off inline-files (separate work), what remains is runaway-generation protection.
+
+Computing the delta solves both: graders get rich input about what changed, and guardrails can use `delta.BytesNet` as the true measure of agent output.
+
+**Decision:**
+
+**1. WorkspaceDelta Type** (location: new package `hyoka/internal/workspace/`)
+
+```go
+type WorkspaceDelta struct {
+    // Byte metrics
+    BytesAdded   int64 `json:"bytes_added"`  
+    BytesRemoved int64 `json:"bytes_removed"`
+    BytesNet     int64 `json:"bytes_net"`    
+
+    // File counts
+    NewFileCount      int `json:"new_file_count"`
+    ModifiedFileCount int `json:"modified_file_count"`
+    DeletedFileCount  int `json:"deleted_file_count"`
+
+    // Detailed file lists
+    NewFiles      []NewFile      `json:"new_files"`
+    ModifiedFiles []ModifiedFile `json:"modified_files"`
+    DeletedFiles  []DeletedFile  `json:"deleted_files"`
+}
+
+type NewFile struct {
+    Path string `json:"path"` // Relative to workspace root
+    Size int64  `json:"size"`
+    Hash string `json:"hash"` // SHA-256 hex
+}
+
+type ModifiedFile struct {
+    Path       string `json:"path"`
+    SizeBefore int64  `json:"size_before"`
+    SizeAfter  int64  `json:"size_after"`
+    HashAfter  string `json:"hash_after"` // SHA-256 hex
+}
+
+type DeletedFile struct {
+    Path         string `json:"path"`
+    OriginalSize int64  `json:"original_size"`
+}
+```
+
+**Rationale:**
+- **Byte metrics** give guardrails a single number (`BytesNet`) to check
+- **File counts** provide quick summary stats for reports
+- **Detailed lists** enable graders to reason about specific changes
+- **SHA-256 hashes** ensure correct change detection (not just size/mtime)
+
+**2. Snapshot + Compute Pattern**
+
+```go
+// Take "before" snapshot after starter files copied
+beforeSnapshot, _ := workspace.TakeSnapshot(genDir)
+
+// Run Copilot session...
+
+// Take "after" snapshot and compute delta
+afterSnapshot, _ := workspace.TakeSnapshot(genDir)
+delta := workspace.ComputeDelta(beforeSnapshot, afterSnapshot)
+```
+
+**Rationale:** Snapshot-based approach is cleaner than trying to track changes incrementally during execution. Workspace state is immutable between snapshots.
+
+**3. Integration Points**
+
+**EvalReport (JSON output):**
+```go
+type EvalReport struct {
+    // ... existing fields ...
+    WorkspaceDelta *WorkspaceDelta `json:"workspace_delta,omitempty"` // #566
+}
+```
+
+**GraderInput (grader consumption):**
+```go
+type GraderInput struct {
+    // ... existing fields ...
+    WorkspaceDelta *workspace.WorkspaceDelta // #566
+}
+```
+
+**Rationale:** 
+- Report consumers (Trinity's site) get delta in JSON
+- Graders get delta as optional input field (graders that don't need it ignore it)
+- No grader behavior changes in this issue — just data availability
+
+**4. Guardrail Treatment**
+
+**Decision:** Keep as hard-fails for now. Defer softening to follow-up issue.
+
+**Rationale:**
+- Current limits (1 MB size, 50 files) are proven safe in production
+- No real eval data yet to inform what "warning" thresholds should be
+- Fits within 2-day time-box
+- Guardrail softening can be data-driven once we have delta distributions from real runs
+
+**Future work (not in #566):**
+- Move to warning-based guardrails (populate `EvalReport.GuardrailWarnings []string`)
+- Widen thresholds now that they're not context-safety caps
+- Add new `MaxNewFiles` guardrail based on `delta.NewFileCount`
+
+**5. JSON Schema for Site Consumption**
+
+Trinity's #358 (Eval Detail) will render workspace delta from report JSON. Schema:
+
+```json
+{
+  "workspace_delta": {
+    "bytes_added": 12345,
+    "bytes_removed": 678,
+    "bytes_net": 11667,
+    "new_file_count": 3,
+    "modified_file_count": 1,
+    "deleted_file_count": 0,
+    "new_files": [
+      {"path": "main.py", "size": 450, "hash": "abc123..."},
+      {"path": "test.py", "size": 200, "hash": "def456..."}
+    ],
+    "modified_files": [
+      {"path": "config.json", "size_before": 100, "size_after": 150, "hash_after": "789abc..."}
+    ],
+    "deleted_files": []
+  }
+}
+```
+
+**Field descriptions:**
+- `bytes_added`: Total bytes in new files + growth in modified files
+- `bytes_removed`: Total bytes from deleted files + shrinkage in modified files
+- `bytes_net`: `bytes_added - bytes_removed` (negative if overall deletion)
+- `new_files`: Files the agent created (not in starter)
+- `modified_files`: Files the agent changed (hash differs from starter)
+- `deleted_files`: Files the agent removed (were in starter, now gone)
+
+**Implementation Notes:**
+- **Package location:** `hyoka/internal/workspace/` (new package)
+- **Import cycle avoidance:** `graders` imports `workspace`, `report` re-exports as type alias
+- **Hash algorithm:** SHA-256 (stdlib `crypto/sha256`)
+- **Hidden files:** Excluded from snapshots (consistent with existing workspace logic)
+
+**Testing:**
+7 table-driven tests in `delta_test.go`:
+1. `TestTakeSnapshot`: Verify snapshot captures all non-hidden files
+2. `TestComputeDelta_NewFiles`: New file → `BytesAdded`, `NewFileCount` correct
+3. `TestComputeDelta_DeletedFiles`: Deleted file → `BytesRemoved`, `DeletedFileCount` correct
+4. `TestComputeDelta_ModifiedFiles`: Modified file growth → `BytesAdded`
+5. `TestComputeDelta_ModifiedFileShrink`: Modified file shrinkage → `BytesRemoved`
+6. `TestComputeDelta_MixedChanges`: Combination of new/modified/deleted
+7. `TestComputeDelta_NoChanges`: Identical snapshots → zero delta
+
+All existing tests pass with race detector (`go test -race ./hyoka/... -timeout 3m`).
+
+**Follow-Up Work (not in scope for #566):**
+1. **Guardrail softening** — Convert hard-fails to warnings, widen thresholds (separate issue)
+2. **Review restructure** — Stop inlining files in review prompts (Option B: file manifest + on-demand workspace tools)
+3. **Behavior grader constraints** — `max_new_files`, `must_modify`, `must_not_delete` (separate issue)
+4. **Site visualization** — Trinity's #358 will render delta in eval detail page
+
+**Approval:** Morpheus signed off on Option A (Neo does #566 before #355–#357) in Phase 4 kickoff brief §4. This stabilizes `EvalReport` and `GraderInput` types before the rest of Phase 4 work.
+
+---
+
+### Decision: Phase 3 Examples Update Completed (#363)
+
+**Author:** Oracle 🔮  
+**Date:** 2026-04-16  
+**Status:** Implemented  
+**PR:** #568
+
+**Summary:**
+
+Updated `examples/configs/example-full.yaml` to reflect Phase 3 unified grading architecture as directed by Morpheus's Phase 4 kickoff brief (§3, Oracle section).
+
+**Changes Made:**
+
+**File:** `examples/configs/example-full.yaml`
+
+1. **Unified Tools List:**
+   - Moved MCP servers from separate `mcp_servers:` section into `tools:` array
+   - MCP entry format: `type: mcp`, `command`, `args`, `mcp_tools: ["*"]`
+   - Skills already used unified format; now MCP is co-located in same list
+   - This reflects Phase 3 architecture where tools (skills and MCP) are configured uniformly
+
+2. **Architecture Comments:**
+   - Added explanation of Phase 3 unified grading: "review is now a grader type that runs alongside other graders in a unified pipeline (not a separate evaluation phase)"
+   - Clarified section purposes: generator controls code generation session, reviewer controls multi-model review panel, limits are optional per-config overrides
+   - Noted that both types can be local or remote; all configured in `tools:`
+
+3. **Minimal Config Completion:**
+   - Added missing `reviewer:` section with default models
+   - Previously was incomplete (just generator, no reviewer)
+   - Now shows minimum viable config: one generator model, one reviewer model array
+
+4. **Session Limits Section:**
+   - Added `limits:` section with all available options: max_turns, max_files, max_output_size, max_session_actions
+   - Added comment: "when both prompt frontmatter and config limits are set, prompt takes precedence"
+   - Values demonstrate real-world usage
+
+**Validation:**
+
+- **All examples pass validation:** `go run . validate`
+  - 12 configs valid (including 2 examples)
+  - 89 prompts valid
+  - 2 criteria files valid (25 graders)
+- No config structure errors or deprecation warnings
+
+**Technical Background:**
+
+**Phase 3 Unified Grading (PR #562):**
+- Review panel now implements `Grader` interface as `PromptReviewGrader` (kind=prompt_review)
+- All graders (file, program, behavior, prompt_review) execute in unified pipeline
+- Success determined from ALL grader results via `AggregateResults()` (not separate review phase)
+- Grader input includes OriginalPrompt, ReferenceDir, EvalCriteria for SDK/review access
+
+**Config Implications:**
+- No changes to config file format itself (already aligned in Phase 3)
+- Examples updated to demonstrate current best practices
+- Comments clarify architecture so users understand grading flow
+
+**Sign-Off:**
+- ✅ Examples pass validation
+- ✅ PR #568 created, ready for review
+- ✅ Morpheus's Phase 4 brief §3 requirements met
+- ✅ History updated in `.squad/agents/oracle/history.md`
+
+---
+
+### Decision: WorkspaceDelta Test Plan (#566)
+
+**Author:** Switch 🤍  
+**Date:** 2026-04-17  
+**Issue:** #566  
+**Status:** Test plan ready for Neo's implementation
+
+**Overview:**
+
+Enumerates all test scenarios for the WorkspaceDelta feature (#566). Once Neo's branch `squad/566-workspace-delta` exists with the new types, these scenarios will be codified as table-driven tests in `hyoka/internal/workspace/delta_test.go`.
+
+**Reading audience:** Neo (implement the type to satisfy these), Switch (codify these into _test.go), Morpheus (audit coverage).
+
+[Full plan included in source document — see `.squad/decisions/inbox/switch-566-test-plan.md` for complete 6 sections: Delta Computation Correctness, JSON Output Integration, Grader Integration, Guardrail Interaction, Edge Cases, Integration with Existing Tests]
+
+**Test Organization:**
+
+**File Structure:**
+```
+hyoka/internal/workspace/
+  delta.go               # WorkspaceDelta type + computation logic
+  delta_test.go          # All scenarios (table-driven)
+  snapshot.go            # snapshotStarterSizes helper
+  snapshot_test.go       # Snapshot logic tests
+
+hyoka/internal/eval/
+  guardrail.go           # Updated to use WorkspaceDelta
+  guardrail_test.go      # Updated test cases
+```
+
+**Test Patterns:**
+- **Table-driven tests** for all delta computation scenarios
+- **JSON marshal/unmarshal tests** for serialization
+- **Integration tests** with `GraderInput`
+- **Guardrail tests** with warning assertions
+
+**Acceptance Criteria:**
+
+A test case passes when:
+1. **Setup** state is reproducible (temp dirs, fixture files)
+2. **Expected delta** matches computed delta (all fields)
+3. **No panics** on nil/missing delta
+4. **No regressions** in existing tests
+5. **JSON round-trips** correctly (marshal → unmarshal → equal)
+6. **Guardrail warnings** appear in `GuardrailWarnings`, not hard-fail
+7. **Edge cases** (binary, symlinks, large files) handled gracefully
+
+**Handoff to Neo:**
+
+**Status:** ✅ Test plan complete. Awaiting Neo's implementation branch.
+
+**Next steps:**
+1. Neo: Define `WorkspaceDelta` struct + computation logic
+2. Switch: Code `delta_test.go` against Neo's branch
+3. Switch: Run tests, report gaps
+4. Neo: Fix gaps, iterate
+5. Merge: All tests green → PR ready
+
+---
+
+### Decision: GraderResultRow Component Contract
+
+**Author:** Trinity 🖤  
+**Date:** 2026-04-17  
+**Issue:** #358  
+**Status:** Implemented (PR #572)
+
+**Summary:**
+
+Establishes `GraderResultRow` as the canonical reusable component for rendering Phase 3 unified grader results across the site. Component is presentational, prop-driven, and designed for consumption by #359 (results table) and #360 (trends views).
+
+**Component Contract:**
+
+**Props:**
+```typescript
+interface GraderResultRowProps {
+  result: GraderResult;
+  defaultExpanded?: boolean;
+}
+```
+
+**Single prop:** `GraderResult` from `site/src/app/data/types.ts`  
+**Optional control:** `defaultExpanded` to override initial expand state
+
+**Behavior:**
+- **Pass/fail badge:** Rendered based on `result.pass` (true = green PASS, false = red FAIL, null = gray N/A)
+- **Score display:**
+  - If `result.score` exists: Show as percentage (e.g., `0.85` → `85%`)
+  - Else if `result.overall_score` and `result.max_score` exist: Show as fraction (e.g., `85/100`)
+  - Else: Show `—`
+- **Grader type label:** Transform `grader_type` from snake_case to Title Case (e.g., `prompt_review` → `Prompt Review`)
+- **Gate indicator:** Small amber "GATE" badge if `result.gate === true`
+- **Expandable details:** Summary, issues, strengths, and typed grader-specific details (file checks, program execution, LLM review, behavior analysis) shown on click
+- **Empty-state safe:** All optional fields handled gracefully — won't break on `null`/`undefined`
+
+**Grader Type Support:**
+
+Component renders typed detail blocks for all grader types:
+
+| Type | Field | Detail Rendered |
+|------|-------|-----------------|
+| File | `file_details` | Per-file existence checks + pattern match results |
+| Program | `program_details` | Command, exit code, stdout, stderr |
+| Prompt | `prompt_details` | Model, rubric, reasoning |
+| Behavior | `behavior_details` | Tools used, turn counts, violations, constraints |
+| Review | `review_details` | Criteria badges, panel results |
+
+**Integration Pattern:**
+
+For #359 Results Table:
+```tsx
+import { GraderResultRow } from "../components/GraderResultRow";
+
+<div className="space-y-2">
+  {graderResults.map((gr, i) => (
+    <GraderResultRow key={i} result={gr} />
+  ))}
+</div>
+```
+
+For #360 Trends Views (same import/usage, optionally with expand control):
+```tsx
+<GraderResultRow result={graderResult} defaultExpanded={index === 0} />
+```
+
+**Type Alignment:**
+
+TypeScript types in `site/src/app/data/types.ts` match Go structs exactly:
+- `GraderResult` → `hyoka/internal/report.GraderResult`
+- `FileGraderDetail` → `hyoka/internal/report.FileGraderDetail`
+- `ProgramGraderDetail` → `hyoka/internal/report.ProgramGraderDetail`
+- `PromptGraderDetail` → `hyoka/internal/report.PromptGraderDetail`
+- `BehaviorGraderDetail` → `hyoka/internal/report.BehaviorGraderDetail`
+- `ReviewGraderDetail` → `hyoka/internal/report.ReviewGraderDetail`
+
+Field names use snake_case to match Go JSON tags.
+
+**Testing:**
+
+Component has 10 tests covering:
+1. Pass case rendering
+2. Fail case rendering
+3. Missing score graceful handling
+4. Expand/collapse interaction
+5. Grader type label formatting
+6. Gate indicator display
+7. `overall_score/max_score` fallback
+8. Null/undefined `pass` status
+9. File details rendering
+10. Program details rendering
+
+All tests in `site/src/app/components/GraderResultRow.test.tsx`.
+
+**Design Decisions:**
+
+**Why presentational only?**
+- **Reusability:** Same component works in detail page, results table, trends view
+- **Testability:** Pure prop-driven components are easier to test (no mocking data fetchers)
+- **Performance:** Parent controls data fetching; component just renders
+
+**Why single `result` prop instead of destructured fields?**
+- **Type safety:** Ensures all grader types conform to the same interface
+- **Future-proof:** Adding new grader types doesn't require component prop changes
+- **Clarity:** Clear that this component consumes one grader result
+
+**Why not show summary when collapsed?**
+- **Density:** Results table may have 5+ graders per eval — collapsed state must be compact
+- **Hierarchy:** Badge + name + score is enough for scan-then-drill workflow
+- **Consistency:** Expandable pattern matches session timeline cards
+
+**Known Limitations:**
+- **No sorting/filtering:** Component just renders; parent handles ordering
+- **No nested graders:** Assumes flat list (graders don't contain sub-graders)
+- **No custom renderers:** If a new grader type needs special UI, component must be updated (alternative: pass render prop, but adds complexity)
+
+**Follow-up Work:**
+- **#359 results table:** Import `GraderResultRow`, render one per grader
+- **#360 trends:** Use for pairwise tool-ablation grader diffs
+- **Phase 5 pages:** Any new eval-detail-like views (prompt detail, comparison detail) can reuse
+
+**Impact:** This component pattern is the foundation for Phase 4's grader-centric UI. Consistency here ensures #359/#360 ship faster and maintain visual coherence.
+

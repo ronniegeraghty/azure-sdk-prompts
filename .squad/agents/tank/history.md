@@ -87,3 +87,10 @@ All issues labeled, assigned, and staged for backlog prioritization. Backlog is 
 ## 2026-04-16 — Phase 3 Merged to Dev (Neo)
 
 Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev→Phase3 (clean), Phase3→dev (PR #562 squash-merged). Dev branch now has both Phase 3 features and starter-aware guardrail fix. All tests pass, CI green.
+
+## Learnings — example-remote-skill PR (#573)
+
+- `examples/configs/*.yaml` are NOT auto-loaded. The default loader reads `configs/` only (see `hyoka/cmd/run.go` + `internal/config/LoadDir`). To use an example config, pass `--config-file examples/configs/<name>.yaml` **plus** `--config <config-name>` (the `name:` field inside the YAML). Document this in the config's comment header so users copy the right invocation.
+- `--dry-run` **does** execute the remote-skill fetch path (`internal/skills/fetcher.go::fetchRemote` → `npx skills add`). The "Fetching remote skill: …" line + repo clone both happen during dry-run. Good for wiring tests without eating Copilot sessions.
+- Known gap: `fetchRemote` passes `--name` but not `--yes`, so `npx skills add` still prompts interactively for skill selection. Under a non-TTY (CI, piped stdin) the prompt consumes no selection and 0 skills are resolved. The dry-run still exits 0. Filing as a follow-up if it blocks real usage.
+- `--all-prompts` does **not** exist. Use `--prompt-id <id>` for single, or filter flags (`--language`, `--service`, `--plane`, `--category`, `--tags`). A `--language python` filter on the full prompt set = 22 evals, which trips the >10 confirm prompt and hangs on non-TTY stdin; always narrow for dry-run smoke tests.

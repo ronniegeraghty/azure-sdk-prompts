@@ -254,9 +254,9 @@ export interface EvalReport {
   session_events?: SessionEvent[];
   event_count?: number;
   tool_calls?: string[];
-  review: Review;
-  review_panel?: ReviewPanelEntry[];
   grader_results?: GraderResult[];
+  review?: Review; // Legacy, kept for backward compat
+  review_panel?: ReviewPanelEntry[];
   workspace_delta?: WorkspaceDelta;
   prompt_metadata: PromptMetadata;
   environment?: Environment;
