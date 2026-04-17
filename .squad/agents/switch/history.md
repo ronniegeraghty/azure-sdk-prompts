@@ -199,6 +199,28 @@ Reviewed #568 (Oracle — examples update) and #570 (Trinity — site branding):
 - **#568:** `go run . validate` ✅ — 89 prompts valid, 12 configs valid, 25 graders valid
 - **#570:** `npm test` (43 tests pass) + `npm run build` (✅ clean build) — site branding/content changes safe
 
+---
+
+## 2026-04-18 — Phase 4 Wave 3 Review (#581, #582, #583)
+
+**Status:** COMPLETE — review at `.squad/decisions/switch-wave3-review.md`
+**Gate:** Phase 4 criterion #4 (CLI↔site parity) now test-enforced.
+
+**Primary deliverable — CLI↔site equivalence test.** Neo's #583 claimed the gate is "satisfied by construction" via shared `CompareReports`. I codified the claim in `hyoka/internal/serve/equivalence_test.go` (commit `e91997a5` on `squad/357-comparison-unification`):
+- `TestCLISiteEquivalence_AutoGenComparisons` — on-demand path (no `comparisons.json`; API recomputes via `AutoGenerateForRun`).
+- `TestCLISiteEquivalence_LoadedComparisonsFile` — cached path (`WriteForRun` writes, API reads from disk).
+Both `reflect.DeepEqual` on wire-format-roundtripped structs. Passed `-race -count=3`.
+
+**Per-PR verdicts:** #581 LGTM (file cache + pairwise endpoint, 83.7% pkg cov). #582 LGTM w/ notes (239 new lines, zero new FE tests — pairwise-page stmt cov 44.85%). #583 LGTM (total Go cov 64.4%, above 64% baseline).
+
+**Merge order flagged:** #581 and #583 both edit `dashboard.go`/`serve.go`. Recommended order: #582 → #581 → #583 (rebased). One rebase is unavoidable.
+
+**Key learnings:**
+1. "Shared core" claims need tests that compare both paths byte-for-byte. Marshal+unmarshal both sides before DeepEqual so `omitempty` asymmetry is normalized at wire-format level.
+2. `AutoGenerateForRun` returns nil for <2 configs — equivalence test must seed ≥2 configs or silently pass on empty slices. Also assert `len(apiResults) == expected` to catch that.
+3. The earlier "94% site baseline" number was test-count, not statement coverage. Real statement coverage is 66.66%. Future reviews should distinguish.
+4. When two PRs refactor the same handler signatures, the second merger rebases — flag this in the review rather than letting the merge-bot surprise the team.
+
 Both PRs approved with "LGTM ✅" comments.
 
 **NOT IN SCOPE:**
