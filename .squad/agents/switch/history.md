@@ -122,3 +122,104 @@ Test plan document enumerates all scenarios with setup/action/expected triplets.
 3. Run tests, report gaps to Neo
 4. Iterate until all green
 5. Review Neo's PR #566 with test lens
+
+---
+
+## 2026-04-17 — Phase 4 Wave 1: Test Codification Complete (#566, #571)
+
+**Status:** Tests codified, CI green, PRs reviewed  
+**Issue:** #566 (WorkspaceDelta foundation)  
+**PR:** #571 (Neo's types)  
+**Commit:** `b15371e9` on `squad/566-workspace-delta-v2`
+
+**PRIMARY — Codified anticipatory tests against Neo's types:**
+
+Neo delivered WorkspaceDelta types on PR #571. His baseline included 7 table-driven tests covering basic scenarios (new/modified/deleted/mixed). My test plan had 40 scenarios — I filled the gaps:
+
+**New test files created:**
+1. **`delta_extended_test.go`** (9 edge-case tests):
+   - Zero-byte files (Scenario 1.8)
+   - Empty workspace after agent (Scenario 1.9)
+   - Create+delete same file (Scenario 1.6)
+   - Unicode filenames (Scenario 5.5)
+   - Binary files (Scenario 5.1)
+   - Permission-only changes (Scenario 5.6)
+   - Hidden file exclusion
+   - JSON roundtrip
+   
+2. **`delta_json_test.go`** (4 EvalReport JSON tests):
+   - WorkspaceDelta serialization (Scenario 2.1)
+   - Backward compat (missing delta decodes cleanly) (Scenario 2.2)
+   - Zero values serialize (not omitted) (Scenario 2.3)
+   - Nil delta omits field (saves bytes)
+
+3. **`delta_nil_safety_test.go`** (4 grader tests):
+   - GraderInput.WorkspaceDelta nil vs non-nil (Scenarios 3.1, 3.2)
+   - Mock grader demonstrates safe access pattern
+
+**Type enhancement:**
+Added `WorkspaceDelta` field to `GraderInput` so future graders can access delta (e.g., a "code churn" grader could analyze modified file counts). Included type alias in `graders` package to avoid import cycles.
+
+**Test results:**
+✅ All tests pass with `-race` flag:
+- workspace: 16 tests (7 Neo baseline + 9 new)
+- report: 4 new delta JSON tests
+- graders: 4 new nil-safety tests
+- Full suite: `go test -race ./hyoka/... -timeout 3m` ✅
+
+**CI status on PR #571:** ✅ Both checks green (Build+Test, Site Build+Test)
+
+**Coverage gaps filled:**
+- JSON serialization (Scenarios 2.1–2.3) ✅
+- Grader nil-safety (Scenarios 3.1–3.2) ✅
+- Edge cases (Scenarios 5.1, 5.5, 5.6, 1.6, 1.8, 1.9) ✅
+
+**Learnings:**
+
+1. **Neo's baseline was solid** — covered the core delta computation logic (new/modified/deleted, size tracking, hash comparison). The gaps were edge cases and integration points.
+
+2. **JSON backward compatibility is critical** — old reports (pre-#566) must decode without error. Test pattern: unmarshal JSON without `workspace_delta` field, assert `report.WorkspaceDelta == nil` (not panic).
+
+3. **Grader nil-safety pattern established** — future graders that use `WorkspaceDelta` must check `if input.WorkspaceDelta != nil` before accessing. Mock grader test demonstrates this. Document in grader authoring guide.
+
+4. **Zero-byte files are edge cases worth testing** — `__init__.py` is common in Python projects, must appear in `NewFiles` even with size 0. BytesNet remains 0.
+
+5. **Permission-only changes do NOT trigger modification** — WorkspaceDelta is size-based (via hash comparison). File with `chmod 755 → 644` but identical content has same hash → not in `ModifiedFiles`. This is correct (permission changes aren't agent code output).
+
+6. **Hidden files are already excluded** — `TakeSnapshot` skips files starting with `.` (matches existing `copyDir` behavior). Test confirmed `.hidden` and `.hiddendir/` are not in snapshot.
+
+7. **Binary files work as expected** — `hashFile` reads binary content without panic. Test with PNG header bytes confirmed file appears in `NewFiles` with correct size and hash.
+
+8. **Unicode paths work** — `文档.txt` and `résumé.md` serialize correctly in JSON (Go's string handling is UTF-8 native). No special escaping needed.
+
+**QUICK-PASS REVIEWS:**
+
+Reviewed #568 (Oracle — examples update) and #570 (Trinity — site branding):
+
+- **#568:** `go run . validate` ✅ — 89 prompts valid, 12 configs valid, 25 graders valid
+- **#570:** `npm test` (43 tests pass) + `npm run build` (✅ clean build) — site branding/content changes safe
+
+Both PRs approved with "LGTM ✅" comments.
+
+**NOT IN SCOPE:**
+- PR #572 (Trinity R2 — Eval Detail component) — Morpheus is architectural reviewer per charter
+- Guardrail interaction tests (Scenarios 4.1–4.4) — deferred to future work (current PR keeps hard-fail behavior, no guardrail changes yet)
+
+**Next actions:**
+1. Coordinator merges PRs when ready (#568, #570, #571)
+2. Monitor for follow-up PRs in Phase 4 (Trinity R2, Oracle's workspace integration)
+3. If guardrail warnings feature ships, add Scenarios 4.1–4.4 tests
+
+**Files created:**
+- `hyoka/internal/workspace/delta_extended_test.go`
+- `hyoka/internal/report/delta_json_test.go`
+- `hyoka/internal/graders/delta_nil_safety_test.go`
+
+**Files modified:**
+- `hyoka/internal/graders/grader.go` (added WorkspaceDelta field + type alias)
+
+**Cross-team:**
+- Neo: PR #571 has tests codified, safe to merge
+- Morpheus: Architectural review of #572 in progress
+- Coordinator: Ready to merge #568, #570, #571 when greenlit
+

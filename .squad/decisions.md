@@ -2,6 +2,63 @@
 
 ## Active Decisions
 
+### Decision: WorkspaceDelta Test Plan for #566 (2026-04-17)
+
+**Author:** Switch 🤍  
+**Date:** 2026-04-17  
+**Issue:** #566  
+**Status:** Test plan complete, awaiting Neo's implementation  
+
+**Overview:** Comprehensive test scenarios for WorkspaceDelta feature (#566). Covers 6 test suites (48 scenarios total): delta computation correctness (1.1–1.9), JSON output integration (2.1–2.3), grader integration (3.1–3.2), guardrail interaction (4.1–4.4), edge cases (5.1–5.6), and existing test compatibility (6.1–6.2).
+
+**Key scenarios:**
+- Fresh workspace, modified starter files, deleted starter files, mixed operations, zero-byte files, empty workspace
+- JSON serialization/deserialization with backward compatibility
+- Grader nil-safety, graceful delta handling
+- Guardrail warnings for oversized output and file count thresholds
+- Binary files, build artifacts, symlinks, large GB-scale files, Unicode names, permission changes
+
+**Test organization:** Table-driven tests in `hyoka/internal/workspace/delta_test.go`, JSON tests in `report_test.go`, integration tests with `GraderInput`, updated guardrail tests.
+
+**Handoff:** Once Neo's branch `squad/566-workspace-delta` exists with `WorkspaceDelta` struct defined, Switch will codify all scenarios as passing tests. No regressions in existing workspace/guardrail tests allowed.
+
+**Full plan:** See `.squad/decisions/archive/switch-566-test-plan.md`
+
+---
+
+### Decision: Remote Skill Fetcher Flag Issues — Follow-up Needed (2026-04-16)
+
+**Author:** Tank 📡  
+**Date:** 2026-04-16  
+**Related:** PR #573, `npx skills` CLI compatibility  
+**Status:** Proposed follow-up (blocked pending #573 merge)  
+
+**Issue:** PR #573 fixed the hang in `fetchRemote` by adding `--yes`, but revealed deeper problems: `fetchRemote` and `InstallSkillsAndPlugins` pass flags the skills CLI doesn't understand (`--directory`, `--name`). The CLI silently ignores them and installs 10+ bundled skills into `.agents/skills/` instead of the intended cache location.
+
+**What the skills CLI actually supports:**
+- `-s, --skill <skills>` — select specific skill(s)
+- `-a, --agent <agents>` — target specific agent dirs
+- `-g, --global` — install user-level
+- `-y, --yes` — skip confirmation
+- `--copy` — copy instead of symlink
+- `--all` — shorthand for `-s '*' -a '*' -y`
+
+**Observed side effect:** Calling `skills add <repo> --yes` installs all bundled skills into `.agents/skills/` and pollutes the directory on every fetch.
+
+**Proposed rework:**
+1. Use `-s <name>` instead of `--name <name>` to select only the requested skill
+2. Drop `--directory` (no-op); resolve actual install path under `.agents/skills/<name>/` or use `-g --global`
+3. Decide on `--copy` vs symlinks for cache safety
+4. Clean up sibling skills or accept as collateral
+
+**Why not in PR #573:** Changes the resolved install path contract → ripples through `skills.Resolve` and plugin registry. Needs thought on caching model (is `.skills-cache/` even correct if CLI uses `.agents/skills/`?).
+
+**Recommendation:** Open new issue "Remote skill fetcher passes invalid flags to skills CLI; resolved paths wrong" and assign to Tank. Block new remote-skill features until this lands.
+
+**Full plan:** See `.squad/decisions/archive/tank-fetch-remote-yes-fix.md`
+
+---
+
 ### Decision: Morpheus Phase 4 Kickoff Approved (2026-04-17)
 
 **Author:** Morpheus 🕶️  

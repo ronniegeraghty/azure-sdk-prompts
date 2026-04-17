@@ -3,7 +3,13 @@ package graders
 import (
 "context"
 "fmt"
+
+"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
 )
+
+// WorkspaceDelta is a type alias for the workspace delta type.
+// This allows graders to access workspace.WorkspaceDelta without creating an import cycle.
+type WorkspaceDelta = workspace.WorkspaceDelta
 
 // Grader is the core evaluation abstraction. Each grader is a single-concern
 // evaluator (file check, build verification, LLM review, etc.) that scores
@@ -20,16 +26,17 @@ Grade(ctx context.Context, input GraderInput) (GraderResult, error)
 // GraderInput is a concrete struct containing everything a grader might need
 // (DM5). Graders use what they need and ignore the rest.
 type GraderInput struct {
-WorkspacePath string         // Absolute path to the agent's output workspace
-ActionLog     []ActionEvent  // Ordered list of agent actions
-PromptMeta    PromptMetadata // Metadata from the prompt frontmatter
-Config        GraderConfig   // The grader's own config entry
-Files         []FileEntry    // Listing of files in the workspace
+	WorkspacePath  string          // Absolute path to the agent's output workspace
+	ActionLog      []ActionEvent   // Ordered list of agent actions
+	PromptMeta     PromptMetadata  // Metadata from the prompt frontmatter
+	Config         GraderConfig    // The grader's own config entry
+	Files          []FileEntry     // Listing of files in the workspace
+	WorkspaceDelta *WorkspaceDelta // File-level changes made by agent (#566), may be nil
 
-// Optional fields for graders that need review/SDK access (WI-023).
-OriginalPrompt string // Original prompt text sent to the generator
-ReferenceDir   string // Directory containing reference answers
-EvalCriteria   string // Merged evaluation criteria text
+	// Optional fields for graders that need review/SDK access (WI-023).
+	OriginalPrompt string // Original prompt text sent to the generator
+	ReferenceDir   string // Directory containing reference answers
+	EvalCriteria   string // Merged evaluation criteria text
 }
 
 // ActionEvent represents a single agent action from the session log.
