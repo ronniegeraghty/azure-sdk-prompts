@@ -306,9 +306,14 @@ export interface ComparisonSummary {
   top_regressed?: PromptDiff[];
 }
 
-export interface ConfigComparison {
-  config_a: string;
-  config_b: string;
+export type ComparisonKind = "configs" | "runs" | "temporal";
+
+export interface ComparisonResult {
+  kind: ComparisonKind;
+  label_a: string;
+  label_b: string;
+  config?: string;
+  since?: string;
   per_prompt: PromptDiff[];
   summary: ComparisonSummary;
 }

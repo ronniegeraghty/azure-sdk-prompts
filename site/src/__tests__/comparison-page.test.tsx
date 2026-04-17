@@ -28,8 +28,9 @@ const mockRuns = [
 ];
 
 const mockComparison = {
-  config_a: "baseline/claude-opus-4.6",
-  config_b: "azure-mcp/claude-opus-4.6",
+  kind: "configs",
+  label_a: "baseline/claude-opus-4.6",
+  label_b: "azure-mcp/claude-opus-4.6",
   per_prompt: [
     { prompt_id: "identity-dp-python-auth", score_a: 0.9, score_b: 0.95, delta: 0.05 },
     { prompt_id: "storage-dp-python-crud", score_a: 0.7, score_b: 0.65, delta: -0.05 },
