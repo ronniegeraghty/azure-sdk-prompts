@@ -15,6 +15,10 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/generator"
+        - name: azure-storage-blob-rust
+          type: skill
+          source: remote
+          repo: "microsoft/skills/.github/plugins/azure-sdk-for-rust/skills"
     reviewer:
       models:
         - "claude-opus-4.6"
@@ -28,3 +32,5 @@ configs:
           path: "./skills/reviewer"
     limits:
       max_turns: 75
+    plugins:
+      - "heaths/azsdk-samples-mcp"
