@@ -199,6 +199,28 @@ Reviewed #568 (Oracle — examples update) and #570 (Trinity — site branding):
 - **#568:** `go run . validate` ✅ — 89 prompts valid, 12 configs valid, 25 graders valid
 - **#570:** `npm test` (43 tests pass) + `npm run build` (✅ clean build) — site branding/content changes safe
 
+---
+
+## 2026-04-18 — Phase 4 Wave 3 Review (#581, #582, #583)
+
+**Status:** COMPLETE — review at `.squad/decisions/switch-wave3-review.md`
+**Gate:** Phase 4 criterion #4 (CLI↔site parity) now test-enforced.
+
+**Primary deliverable — CLI↔site equivalence test.** Neo's #583 claimed the gate is "satisfied by construction" via shared `CompareReports`. I codified the claim in `hyoka/internal/serve/equivalence_test.go` (commit `e91997a5` on `squad/357-comparison-unification`):
+- `TestCLISiteEquivalence_AutoGenComparisons` — on-demand path (no `comparisons.json`; API recomputes via `AutoGenerateForRun`).
+- `TestCLISiteEquivalence_LoadedComparisonsFile` — cached path (`WriteForRun` writes, API reads from disk).
+Both `reflect.DeepEqual` on wire-format-roundtripped structs. Passed `-race -count=3`.
+
+**Per-PR verdicts:** #581 LGTM (file cache + pairwise endpoint, 83.7% pkg cov). #582 LGTM w/ notes (239 new lines, zero new FE tests — pairwise-page stmt cov 44.85%). #583 LGTM (total Go cov 64.4%, above 64% baseline).
+
+**Merge order flagged:** #581 and #583 both edit `dashboard.go`/`serve.go`. Recommended order: #582 → #581 → #583 (rebased). One rebase is unavoidable.
+
+**Key learnings:**
+1. "Shared core" claims need tests that compare both paths byte-for-byte. Marshal+unmarshal both sides before DeepEqual so `omitempty` asymmetry is normalized at wire-format level.
+2. `AutoGenerateForRun` returns nil for <2 configs — equivalence test must seed ≥2 configs or silently pass on empty slices. Also assert `len(apiResults) == expected` to catch that.
+3. The earlier "94% site baseline" number was test-count, not statement coverage. Real statement coverage is 66.66%. Future reviews should distinguish.
+4. When two PRs refactor the same handler signatures, the second merger rebases — flag this in the review rather than letting the merge-bot surprise the team.
+
 Both PRs approved with "LGTM ✅" comments.
 
 **NOT IN SCOPE:**
@@ -222,4 +244,100 @@ Both PRs approved with "LGTM ✅" comments.
 - Neo: PR #571 has tests codified, safe to merge
 - Morpheus: Architectural review of #572 in progress
 - Coordinator: Ready to merge #568, #570, #571 when greenlit
+
+---
+
+## 2026-04-17 — Phase 4 Wave 2: Test Review Complete (#375, PR #577)
+
+**Status:** COMPLETE ✅  
+**Issue:** #375  
+**PR:** #577 (branch: `squad/375-phase4-test-review-v2`)
+
+**Audit scope:**
+- Go test suite (24 packages)
+- Site test suite (Vitest, 9 test files)
+- CI stability (last 15 runs)
+- Race detector (3 consecutive runs)
+- Coverage baseline for Phase 4 tracking
+
+**Findings:**
+
+**Go Test Suite: ✅ SOLID**
+- Overall coverage: **64.1%**
+- Race detector: **3/3 clean runs**, zero race conditions
+- CI: **15/15 green** on ronniegeraghty/dev
+- Flakiness: **ZERO** (resourcemonitor pattern from Phase 0 PR #167 still holding strong)
+
+**Site Test Suite: ⚠️ 3 FAILURES**
+- Status: **50/53 tests passing** (94.3%)
+- Failures: `runs-page.test.tsx` (3 tests) — stale fixtures after Trinity's PR #572 UI updates
+- Root cause: Tests query for `run.run_id` text, but component now displays formatted timestamps
+- Fix: Update assertions (low priority, cosmetic)
+
+**Coverage Gaps Identified (Top 5):**
+
+1. **Progress display edge cases** (40.6%) — narrow terminals, long prompt IDs, concurrent updates, `--progress off` leakage
+2. **Process monitoring error paths** (43.6%) — /proc failures, PID reuse, zombie processes, CPU read errors
+3. **Eval engine guardrail interactions** (54.1%) — MaxSessionActions mid-turn, MaxTurns graceful shutdown, nested workspace, reviewer timeout
+4. **Review session modes** (60.8%, pending Neo #355) — `combined` vs `isolated`, per-grader overrides, invalid mode handling
+5. **Hierarchical `when` filtering** (87.0%, pending Neo #356) — 3-layer interaction, overlapping conditions, precedence rules
+
+**Site Component Coverage:**
+- **11 untested components** (out of 16 total)
+- High-priority: `eval-detail-page.tsx` (WI-044, PR #572), `run-detail-page.tsx` (WI-045 pending), `pairwise-page.tsx` (WI-049 pending)
+- `GraderResultRow.tsx` HAS tests ✅ (10 tests in GraderResultRow.test.tsx)
+
+**Integration Test Gaps:**
+1. CLI → Engine → Report → Serve (end-to-end smoke test)
+2. Comparison unification + serve API (pending Neo #357)
+3. Pairwise expansion + site display (pending Trinity #360)
+4. WorkspaceDelta + guardrail warnings (Phase 4.5 deferred)
+
+**Recommendations:**
+1. Enable `-race` in CI by default (P2)
+2. Enforce 60% coverage threshold in CI (P3)
+3. Add Vitest coverage reporting to CI (P2)
+4. Fix stale site tests (P1)
+5. Document test patterns in testing-guide.md (P3)
+
+**Follow-up issues recommended:**
+10 P1-P3 issues spanning process monitoring, eval engine, site tests, integration tests, CI improvements, documentation.
+
+**Deliverables:**
+- Report: `.squad/decisions/switch-375-test-review.md` (20KB, 8 sections)
+- PR #577: 1 file, 435 lines added
+
+**Learnings:**
+
+1. **Coverage baseline established** — 64.1% Go, 94.3% site tests passing. Future PRs can be compared against this snapshot. Phase 4 packages (workspace, graders, report, serve, criteria, review) all have adequate baseline coverage; gaps are in older packages (progress, process, eval, cmd).
+
+2. **CI is rock-solid** — 15/15 green runs, zero flakiness. The event-driven async test pattern from Phase 0 (resourcemonitor fix) has prevented any new race conditions. Race detector runs locally but not in CI — recommended to add `-race` flag to CI workflow for earlier detection.
+
+3. **Site tests lag behind UI updates** — Trinity's PR #572 changed RunsPage component, but tests weren't updated in same PR. Established pattern: UI PRs should include test updates or explicitly note "tests deferred." Without this, test suite becomes untrustworthy (3 failures == "tests are stale, ignore them").
+
+4. **Untested != broken** — 11 React components have no tests, but site builds cleanly and renders correctly (manual smoke test). Test coverage gaps are technical debt, not bugs. Priority order: (1) fix failing tests (hygiene), (2) test new Phase 4 components (eval-detail, run-detail, pairwise), (3) backfill older components (prompts-page, docs-page).
+
+5. **Phase 4 test gaps are mostly "pending implementation"** — Review session modes (#355), hierarchical `when` (#356), comparison unification (#357) are untested because Neo hasn't landed them yet. Test plan exists (my 40-scenario WorkspaceDelta plan is reference template). I'll codify tests once Neo's PRs land.
+
+6. **Integration tests are sparse** — Only 3 integration test files exist (`eval/integration_test.go`, `eval/grader_integration_test.go`, `serve/serve_test.go`). Recommended end-to-end flow: `CLI → Engine → Report → Serve` — validates full user journey, catches integration bugs. Complexity: high (subprocess + HTTP + file I/O). Value: high (release confidence).
+
+7. **Coverage reporting is manual** — Had to run `go test -coverprofile`, parse output, manually extract percentages. CI runs tests but doesn't report coverage trends. Recommended: add coverage threshold gate (60% floor) + trend tracking over time.
+
+8. **Site coverage tooling missing** — Had to install `@vitest/coverage-v8` manually (not in package.json). Site tests run in CI but no coverage metrics collected. Without visibility, can't track whether new components have tests. Recommended: add `npm test -- --coverage` to site CI job.
+
+9. **Test review timing is critical** — Conducted audit AFTER PRs #568, #570, #571, #572 merged. Ideal: review DURING PR phase (quick-pass checks, not blocking). Established CI gatekeeper role for Wave 2 PRs (#355/#356/#359) — I'll comment with test assessment once they're open.
+
+10. **Stale tests are worse than no tests** — 3 failing tests create uncertainty ("is this a real bug or just outdated fixtures?"). Teams start ignoring test failures. Pattern: if tests fail for >1 day without fix, either (a) fix immediately, or (b) skip/disable with TODO comment. Never leave failing tests in main/dev branch.
+
+**Next actions:**
+1. Monitor Wave 2 PRs (#355, #356, #359) for quick-pass test reviews
+2. File 10 follow-up issues (process monitoring, eval engine, site tests, CI improvements) — defer to next session or coordinator
+3. Fix stale site tests in `runs-page.test.tsx` (P1) — can do in follow-up or assign to Trinity
+
+**Cross-team:**
+- Coordinator: PR #577 ready for review, report at `.squad/decisions/switch-375-test-review.md`
+- Neo: When #355/#356 land, ping me to codify review mode + hierarchical `when` tests
+- Trinity: When #359 lands, ping me for quick-pass site test review
+- Tank: Recommended to add `-race` to CI, coverage threshold gate (P2/P3 infra work)
+- Oracle: Recommended to write testing-guide.md (P3 documentation)
 

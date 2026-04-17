@@ -69,7 +69,7 @@ func setupTestSite(t *testing.T) string {
 
 func TestListRunSummaries(t *testing.T) {
 	dir := setupTestReports(t)
-	runs, err := listRunSummaries(dir)
+	runs, err := listRunSummaries(dir, newFileCache())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestListRunSummaries(t *testing.T) {
 
 func TestListRunSummariesEmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	runs, err := listRunSummaries(dir)
+	runs, err := listRunSummaries(dir, newFileCache())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

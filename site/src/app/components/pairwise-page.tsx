@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router";
 import {
   BarChart,
   Bar,
@@ -17,6 +18,10 @@ import {
   BarChart3,
   Zap,
   AlertTriangle,
+  Info,
+  ChevronDown,
+  ChevronRight,
+  Activity,
 } from "lucide-react";
 import { fetchRuns } from "../data/api";
 import type { RunSummary, PairwiseReport, ToolImpact } from "../data/types";
@@ -287,6 +292,189 @@ function ToolImpactHeatmap({ reports }: { reports: PairwiseReport[] }) {
   );
 }
 
+// ── Methodology explainer (R152) ─────────────────────────────────────
+
+function MethodologyInfo() {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mb-6 rounded-xl border border-blue-500/15 bg-blue-500/[0.03]">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="flex w-full items-center gap-2 px-5 py-3 text-left transition hover:bg-blue-500/[0.06]"
+      >
+        <Info className="h-4 w-4 text-blue-400" />
+        <span className="text-blue-400" style={{ fontSize: 13, fontWeight: 500 }}>
+          How are tool impact scores calculated?
+        </span>
+        <span className="ml-auto text-blue-400/60">
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </span>
+      </button>
+      {expanded && (
+        <div className="space-y-3 border-t border-blue-500/10 px-5 py-4 text-white/70" style={{ fontSize: 13, lineHeight: 1.65 }}>
+          <p>
+            Pairwise evaluation runs each prompt <strong className="text-white">N+1 times</strong>:
+            once with every tool enabled (the <em>baseline</em>), and once with each togglable tool
+            individually removed (<em>without-X</em> variants).
+          </p>
+          <p>
+            For each tool X:
+          </p>
+          <pre className="overflow-x-auto rounded bg-black/40 p-3 text-blue-300" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+{`impact(X) = baseline_score - without_X_score`}
+          </pre>
+          <ul className="list-disc space-y-1 pl-5 text-white/65">
+            <li><strong className="text-emerald-400">Positive impact</strong> — removing the tool hurt the score, so the tool <em>helped</em>.</li>
+            <li><strong className="text-red-400">Negative impact</strong> — removing the tool improved the score, so the tool <em>hurt</em>.</li>
+            <li><strong className="text-white/50">Zero impact</strong> — the tool had no measurable effect on this prompt.</li>
+          </ul>
+          <p>
+            The <strong className="text-white">Tool Contribution</strong> bar chart shows each
+            tool's impact averaged across all prompts in the run. The <strong className="text-white">Heatmap</strong>
+            breaks it down per prompt. Aggregate pass/fail columns (<em>Breaks</em> / <em>Fixes</em>)
+            flag tools whose presence flipped the pass state.
+          </p>
+          <p className="text-white/40" style={{ fontSize: 12 }}>
+            Tools marked <code className="rounded bg-white/5 px-1 text-white/60">always_on</code> or
+            <code className="rounded bg-white/5 px-1 text-white/60">pairwise: off</code> in the
+            config are never toggled and therefore have no impact entry.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tool Usage Frequency (R152) ──────────────────────────────────────
+//
+// For each tool in the run, count across all prompts:
+//   - "available and used"   — tool appears in the prompt's pairwise impacts
+//     AND the impact signal is measurable (|impact| > 0 or baseline_pass
+//     differs from without_pass)
+//   - "available but unused" — tool appears in impacts but showed no
+//     measurable effect when removed (likely loaded but never invoked, or
+//     redundant with another tool)
+//   - "not available"        — tool appears in SOME prompts' impacts but
+//     not this one (not in this variant's togglable set)
+//
+// The signal is derived from the pairwise impact data already on this page;
+// it's a proxy for "did the agent actually invoke this tool?" rather than
+// ground truth. For exact invocation counts, see each eval's tool_availability
+// field on the eval detail page.
+
+interface ToolFrequencyRow {
+  tool_name: string;
+  available_used: number;
+  available_unused: number;
+  not_available: number;
+  total_prompts: number;
+}
+
+function computeToolFrequency(reports: PairwiseReport[]): ToolFrequencyRow[] {
+  if (reports.length === 0) return [];
+
+  // Union of every tool name seen across the run.
+  const allTools = new Set<string>();
+  for (const r of reports) {
+    for (const imp of r.impacts) allTools.add(imp.tool_name);
+  }
+
+  const rows: ToolFrequencyRow[] = [];
+  for (const tool of allTools) {
+    let used = 0;
+    let unused = 0;
+    let absent = 0;
+    for (const r of reports) {
+      const imp = r.impacts.find((i) => i.tool_name === tool);
+      if (!imp) {
+        absent += 1;
+        continue;
+      }
+      const hadEffect = imp.impact !== 0 || imp.baseline_pass !== imp.without_pass;
+      if (hadEffect) used += 1;
+      else unused += 1;
+    }
+    rows.push({
+      tool_name: tool,
+      available_used: used,
+      available_unused: unused,
+      not_available: absent,
+      total_prompts: reports.length,
+    });
+  }
+
+  // Sort: most-used first, then alphabetical.
+  rows.sort((a, b) => b.available_used - a.available_used || a.tool_name.localeCompare(b.tool_name));
+  return rows;
+}
+
+function ToolUsageFrequencyChart({ reports }: { reports: PairwiseReport[] }) {
+  const rows = useMemo(() => computeToolFrequency(reports), [reports]);
+
+  if (rows.length === 0) {
+    return <p className="py-8 text-center text-white/30" style={{ fontSize: 13 }}>No tool usage data</p>;
+  }
+
+  const total = rows[0].total_prompts;
+
+  return (
+    <div className="space-y-2">
+      {rows.map((r) => {
+        const usedPct = (r.available_used / total) * 100;
+        const unusedPct = (r.available_unused / total) * 100;
+        const absentPct = (r.not_available / total) * 100;
+        return (
+          <div key={r.tool_name} className="flex items-center gap-3">
+            <div
+              className="truncate text-white/65"
+              style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace", width: 160, flexShrink: 0 }}
+              title={r.tool_name}
+            >
+              {r.tool_name}
+            </div>
+            <div className="flex h-6 flex-1 overflow-hidden rounded bg-white/[0.04]">
+              {r.available_used > 0 && (
+                <div
+                  className="flex items-center justify-center bg-emerald-500/70 text-white"
+                  style={{ width: `${usedPct}%`, fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}
+                  title={`Available and used: ${r.available_used}/${total}`}
+                >
+                  {usedPct > 12 ? r.available_used : ""}
+                </div>
+              )}
+              {r.available_unused > 0 && (
+                <div
+                  className="flex items-center justify-center bg-amber-500/50 text-white/90"
+                  style={{ width: `${unusedPct}%`, fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}
+                  title={`Available but unused: ${r.available_unused}/${total}`}
+                >
+                  {unusedPct > 12 ? r.available_unused : ""}
+                </div>
+              )}
+              {r.not_available > 0 && (
+                <div
+                  className="flex items-center justify-center bg-white/10 text-white/50"
+                  style={{ width: `${absentPct}%`, fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}
+                  title={`Not available: ${r.not_available}/${total}`}
+                >
+                  {absentPct > 12 ? r.not_available : ""}
+                </div>
+              )}
+            </div>
+            <div
+              className="text-white/40"
+              style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: 60, textAlign: "right", flexShrink: 0 }}
+            >
+              {r.available_used}/{total}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────
 
 export function PairwisePage() {
@@ -294,18 +482,35 @@ export function PairwisePage() {
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     fetchRuns()
       .then((data) => {
         setRuns(data);
-        // Auto-select the most recent run that has pairwise data
         const withPairwise = data.filter((r) => r.pairwise_results && r.pairwise_results.length > 0);
-        if (withPairwise.length > 0) setSelectedRunId(withPairwise[0].run_id);
+        // Deep-link support: ?run=<run_id> wins over auto-selection as long as
+        // the requested run actually has pairwise data.
+        const requested = searchParams.get("run");
+        const requestedMatch = requested && withPairwise.find((r) => r.run_id === requested);
+        if (requestedMatch) {
+          setSelectedRunId(requestedMatch.run_id);
+        } else if (withPairwise.length > 0) {
+          setSelectedRunId(withPairwise[0].run_id);
+        }
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the URL in sync with the user's selection so the page is shareable.
+  useEffect(() => {
+    if (!selectedRunId) return;
+    if (searchParams.get("run") === selectedRunId) return;
+    setSearchParams({ run: selectedRunId }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRunId]);
 
   const selectedRun = runs.find((r) => r.run_id === selectedRunId);
   const pairwiseReports = selectedRun?.pairwise_results ?? [];
@@ -404,6 +609,9 @@ export function PairwisePage() {
           </div>
         ) : (
           <>
+            {/* Methodology explainer */}
+            <MethodologyInfo />
+
             {/* Impact Summary Cards */}
             <div className="mb-8">
               <ImpactSummaryCard impacts={aggregatedImpacts} />
@@ -454,6 +662,35 @@ export function PairwisePage() {
               ) : (
                 <p className="py-8 text-center text-white/30" style={{ fontSize: 13 }}>No heatmap data</p>
               )}
+            </div>
+
+            {/* Tool Usage Frequency */}
+            <div className="mb-8 rounded-xl border border-white/8 bg-white/[0.03] p-6">
+              <div className="mb-1 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-emerald-400" />
+                <h3 className="text-white" style={{ fontSize: 15 }}>Tool Usage Frequency</h3>
+                <span className="ml-2 text-white/30" style={{ fontSize: 12 }}>
+                  How often each tool was available vs. actually exercised
+                </span>
+              </div>
+              <p className="mb-5 text-white/35" style={{ fontSize: 12 }}>
+                Derived from the pairwise impact signal — a tool is counted as "used" when its
+                presence changed the score or pass state on that prompt. For exact invocation
+                counts, see each eval's tool_availability on the detail page.
+              </p>
+              <ToolUsageFrequencyChart reports={pairwiseReports} />
+              <div className="mt-5 flex flex-wrap justify-center gap-4">
+                {[
+                  { label: "Available and used", color: "rgba(16,185,129,0.7)" },
+                  { label: "Available but unused", color: "rgba(245,158,11,0.5)" },
+                  { label: "Not available on this prompt", color: "rgba(255,255,255,0.1)" },
+                ].map((l) => (
+                  <div key={l.label} className="flex items-center gap-1.5">
+                    <div className="h-2.5 w-6 rounded-sm" style={{ background: l.color }} />
+                    <span className="text-white/40" style={{ fontSize: 11 }}>{l.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Detailed Table */}

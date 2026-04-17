@@ -197,8 +197,14 @@ var result map[string]any
 if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
 }
-if result["config_a"] != "config-a" {
-t.Errorf("expected config_a = config-a, got %v", result["config_a"])
+if result["kind"] != "configs" {
+t.Errorf("expected kind = configs, got %v", result["kind"])
+}
+if result["label_a"] != "config-a" {
+t.Errorf("expected label_a = config-a, got %v", result["label_a"])
+}
+if result["label_b"] != "config-b" {
+t.Errorf("expected label_b = config-b, got %v", result["label_b"])
 }
 }
 
