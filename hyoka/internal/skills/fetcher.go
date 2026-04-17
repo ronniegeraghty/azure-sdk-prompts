@@ -260,7 +260,7 @@ func fetchRemoteNpx(entry config.ToolEntry, repo, baseDir string) (string, error
 // The final skill dir is <cacheDir>/<subpath>/<entry.Name>/ and must contain
 // SKILL.md. Subsequent runs reuse the existing clone and refresh via "git pull".
 func fetchRemoteSparse(entry config.ToolEntry, repo, subpath, baseDir string) (string, error) {
-	cacheDir := filepath.Join(baseDir, ".skills-cache", repo)
+	cacheDir := filepath.Join(baseDir, ".skills-cache", "sparse", repo)
 	skillDir := filepath.Join(cacheDir, subpath, entry.Name)
 	cloneURL := fmt.Sprintf("https://github.com/%s.git", repo)
 

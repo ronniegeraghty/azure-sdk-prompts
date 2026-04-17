@@ -1,29 +1,30 @@
-# Example: generator config that pulls a skill from a remote GitHub repo.
+# Example: generator config that pulls skills from a remote GitHub repo.
 #
-# This config demonstrates hyoka's two remote-skill fetch paths:
+# This config demonstrates hyoka's two remote-skill fetch paths in ONE
+# generator — the repo's published skill AND a skill from a subpath:
 #
-# 1. Whole-repo fetch (default — this file).
+# 1. Whole-repo fetch via `npx skills add` (the `copilot-sdk` entry below).
 #    `repo: owner/name` → hyoka shells out to
 #    `npx skills add <repo> --skill <name> --agent claude-code --copy --yes`
 #    Cache: .skills-cache/<repo>/.claude/skills/<name>/
 #    Requires Node.js / `npx` on PATH.
+#    Use this for skills the repo publishes through the skills CLI.
 #
-# 2. Subpath fetch via git sparse-checkout (see the commented config below).
+# 2. Subpath fetch via `git sparse-checkout` (the `azure-identity-rust` entry).
 #    `repo: owner/name/path/under/repo` → hyoka clones the repo with
 #    `git clone --filter=blob:none --no-checkout --depth=1` and pulls only
-#    the named subpath via `git sparse-checkout`. Use this for skills that
-#    live inside a monorepo's plugins/ tree (e.g. microsoft/skills ships
-#    Rust skills under .github/plugins/azure-sdk-rust/skills/).
+#    the named subpath via `git sparse-checkout`.
 #    Cache: .skills-cache/<repo>/<subpath>/<name>/
 #    Requires `git` on PATH.
+#    Use this for skills that live inside a monorepo's plugins/ tree —
+#    e.g. microsoft/skills ships Rust-specific Azure SDK skills under
+#    .github/plugins/azure-sdk-rust/skills/ that aren't surfaced by
+#    `npx skills list`.
 #
 # The remote-skill pattern is the fields under tools:
 #   source: remote
-#   repo:   microsoft/skills     # 2 segments → npx flow
-#   repo:   microsoft/skills/.github/plugins/azure-sdk-rust/skills
-#                                # 3+ segments → sparse-checkout flow
-#   name:   copilot-sdk          # specific skill within that repo (required;
-#                                # selects which subdir to install/check out)
+#   repo:   <owner>/<name>[/<sub>/<path>]   # segment count selects fetch path
+#   name:   <skill-name>                    # required; selects which subdir
 #
 # Because this config lives under examples/configs/ (not the default
 # configs/ discovery path), invoke it with --config-file, e.g.:
@@ -34,35 +35,24 @@
 #     --language python --dry-run
 #
 # The copilot-sdk skill was chosen because hyoka itself is built on the
-# Copilot SDK and evaluates Copilot-generated code — a natural domain fit
-# for demonstrating a remote skill.
+# Copilot SDK and evaluates Copilot-generated code — a natural domain fit.
+# The azure-identity-rust skill demonstrates pulling a single skill from a
+# plugin directory that the skills CLI doesn't surface directly.
 configs:
   - name: example-remote-skill/claude-sonnet-4.5
-    description: "Example — remote skill fetched from microsoft/skills (npx flow)"
+    description: "Example — remote skills fetched from microsoft/skills (both fetch paths)"
 
     generator:
       model: "claude-sonnet-4.5"
       tools:
-        # Remote skill — fetched from https://github.com/microsoft/skills
-        # via `npx skills add microsoft/skills --skill copilot-sdk ...`.
+        # Published skill — fetched via `npx skills add microsoft/skills`.
         - name: copilot-sdk
           type: skill
           source: remote
           repo: microsoft/skills
 
-    reviewer:
-      models:
-        - "claude-sonnet-4.5"
-
-  # Subpath variant — demonstrates git sparse-checkout for skills that live
-  # inside a monorepo subdirectory. Pulls ONLY the azure-identity-rust skill
-  # from .github/plugins/azure-sdk-rust/skills/ in microsoft/skills.
-  - name: example-remote-skill-subpath/claude-sonnet-4.5
-    description: "Example — remote skill fetched from a subpath via git sparse-checkout"
-
-    generator:
-      model: "claude-sonnet-4.5"
-      tools:
+        # Subpath skill — fetched via `git sparse-checkout` of
+        # .github/plugins/azure-sdk-rust/skills/ in the same repo.
         - name: azure-identity-rust
           type: skill
           source: remote
