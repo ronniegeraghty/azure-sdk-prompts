@@ -109,6 +109,38 @@ export interface GraderResult {
   review_details?: ReviewGraderDetail;
 }
 
+// ── Workspace Delta types (#566) ──────────────────────────────────
+
+export interface NewFile {
+  path: string;
+  size: number;
+  hash: string;
+}
+
+export interface ModifiedFile {
+  path: string;
+  size_before: number;
+  size_after: number;
+  hash_after: string;
+}
+
+export interface DeletedFile {
+  path: string;
+  original_size: number;
+}
+
+export interface WorkspaceDelta {
+  bytes_added: number;
+  bytes_removed: number;
+  bytes_net: number;
+  new_file_count: number;
+  modified_file_count: number;
+  deleted_file_count: number;
+  new_files: NewFile[];
+  modified_files: ModifiedFile[];
+  deleted_files: DeletedFile[];
+}
+
 export interface SessionEvent {
   type: string;
   tool_name?: string;
@@ -224,6 +256,8 @@ export interface EvalReport {
   tool_calls?: string[];
   review: Review;
   review_panel?: ReviewPanelEntry[];
+  grader_results?: GraderResult[];
+  workspace_delta?: WorkspaceDelta;
   prompt_metadata: PromptMetadata;
   environment?: Environment;
   config_used?: { model: string; name: string };
