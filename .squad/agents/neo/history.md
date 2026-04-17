@@ -144,3 +144,60 @@ Tank discovered bug during remote skill example work: `internal/skills/fetcher.g
 
 **Decision captured:** `.squad/decisions.md` → "Where example configs live + how to invoke them" (Tank decision, Tank caveat section).
 
+
+### Session 2026-04-17: #355 + #356 Review Modes & Hierarchical When
+
+**Branch:** `squad/355-356-review-modes-and-when`  
+**PR:** TBD  
+**Status:** ✅ Implemented (hierarchical when complete, review modes foundation only)
+
+Implemented hierarchical `when` conditions (#356) and laid foundation for review session modes (#355).
+
+**#356 Hierarchical When — COMPLETE:**
+- Extended `GraderEntry` with `When` (grader-level) and `Isolate` fields
+- Created `GraderGroup` type for grouping graders with shared conditions
+- Extended `GraderConfig` with `Groups` array
+- Implemented `mergeWhen()` helper for three-level hierarchy resolution
+- Updated `MatchingGraders()` to respect file → group → grader precedence
+- 9 new tests in `hierarchical_test.go` covering all resolution paths
+- 100% backward compatible — old YAML files work unchanged
+
+**#355 Review Modes — FOUNDATION ONLY:**
+- Added `--review-mode` CLI flag (combined|isolated)
+- Flag validation in run command
+- Wired through to `EngineOptions.ReviewMode`
+- Session splitting NOT implemented (deferred to follow-up)
+
+**Rationale for deferral:**
+Current architecture merges all criteria into a single string before review. Implementing true isolation requires:
+1. Criteria parsing (split merged string back to graders)
+2. Session orchestration (separate Copilot sessions per grader)
+3. Result consolidation (merge ReviewResults)
+4. Panel integration (decide panel runs once or per-grader)
+
+This is multi-day refactor touching review/, graders/, eval/. Decided to ship foundation + hierarchical when (complete) and defer session splitting to focused follow-up issue.
+
+**Key design decisions:**
+- Three-level when hierarchy: file → group → grader
+- Child overrides parent for same key (merge semantics)
+- `isolate: true` parsed but not yet functional
+- Default review mode: `combined` (backward compat)
+
+**Files modified:**
+- `hyoka/internal/criteria/criteria.go` — schema, matching, merging
+- `hyoka/internal/criteria/hierarchical_test.go` — new comprehensive tests
+- `hyoka/internal/eval/engine.go` — EngineOptions.ReviewMode
+- `hyoka/cmd/run.go` — CLI flag, validation, wiring
+- `docs/hierarchical-when-examples.md` — usage documentation
+- `.squad/decisions/inbox/neo-355-356-decisions.md` — architectural decisions
+
+**Testing:**
+✅ `go build ./...` clean  
+✅ `go test -race ./... -timeout 3m` all pass (incl. 9 new hierarchical tests)  
+✅ `go run . validate` — all criteria files valid (backward compat confirmed)
+
+**Learnings:**
+1. **Hierarchical merge semantics:** Settled on "always merge, child wins" after considering alternatives. Matches user expectations for additive filtering.
+2. **Premature implementation risk:** Recognized session splitting scope early, deferred to avoid half-working feature in PR.
+3. **Test-first for schema:** Wrote hierarchical tests before validating real files; caught empty-file edge case.
+

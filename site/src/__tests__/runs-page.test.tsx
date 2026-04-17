@@ -59,8 +59,12 @@ describe("RunsPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/run-abc123/)).toBeInTheDocument();
-      expect(screen.getByText(/run-def456/)).toBeInTheDocument();
+      // Timestamps are now displayed as run names
+      expect(screen.getByText(/Mar 29, 2026/)).toBeInTheDocument();
+      expect(screen.getByText(/Mar 28, 2026/)).toBeInTheDocument();
+      // Eval counts shown
+      expect(screen.getByText(/10 evaluations/)).toBeInTheDocument();
+      expect(screen.getByText(/5 evaluations/)).toBeInTheDocument();
     });
   });
 
@@ -100,10 +104,10 @@ describe("RunsPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/run-baddate/)).toBeInTheDocument();
+      expect(screen.getByText(/3 evaluations/)).toBeInTheDocument();
     });
-    // Invalid timestamp renders "N/A" instead of "Invalid Date"
-    expect(screen.getByText("N/A")).toBeInTheDocument();
+    // Invalid timestamp renders "Unknown" instead of "Invalid Date"
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
   });
 
   it("handles missing duration and pass counts gracefully", async () => {
@@ -126,11 +130,11 @@ describe("RunsPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/run-missing/)).toBeInTheDocument();
+      expect(screen.getByText(/0 evaluations/)).toBeInTheDocument();
     });
-    // Missing duration and timestamp both render "N/A"
-    const naElements = screen.getAllByText("N/A");
-    expect(naElements.length).toBeGreaterThanOrEqual(2);
+    // Missing timestamp renders "Unknown"
+    const unknownElements = screen.getAllByText("Unknown");
+    expect(unknownElements.length).toBeGreaterThanOrEqual(1);
     // Pass rate should show 0.0% (not NaN%)
     expect(screen.getByText("0.0%")).toBeInTheDocument();
   });

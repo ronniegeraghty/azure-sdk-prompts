@@ -13,11 +13,18 @@ function formatDuration(s: number | undefined | null): string {
   return `${m}m ${sec}s`;
 }
 
-function formatDate(ts: string | undefined | null): string {
-  if (!ts) return "N/A";
+function formatTimestamp(ts: string | undefined | null): string {
+  if (!ts) return "Unknown";
   const d = new Date(ts);
-  if (isNaN(d.getTime())) return "N/A";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (isNaN(d.getTime())) return "Unknown";
+  return d.toLocaleDateString("en-US", { 
+    month: "short", 
+    day: "numeric", 
+    year: "numeric", 
+    hour: "2-digit", 
+    minute: "2-digit",
+    hour12: true
+  });
 }
 
 export function RunsPage() {
@@ -86,16 +93,11 @@ export function RunsPage() {
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex-1">
-                        <div className="mb-1 flex items-center gap-3">
-                          <span className="text-emerald-400" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15 }}>
-                            {run.run_id}
-                          </span>
-                          <span className="rounded-md bg-white/5 px-2 py-0.5 text-white/30" style={{ fontSize: 11 }}>
-                            {run.total_evaluations} evals
-                          </span>
+                        <div className="mb-1 text-white/80" style={{ fontSize: 15 }}>
+                          {formatTimestamp(run.timestamp)}
                         </div>
-                        <p className="text-white/40" style={{ fontSize: 13 }}>
-                          {formatDate(run.timestamp)}
+                        <p className="text-white/40" style={{ fontSize: 12 }}>
+                          {run.total_evaluations} evaluations
                         </p>
                       </div>
 
