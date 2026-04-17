@@ -1,10 +1,12 @@
 # Example: full config showing all available options.
 #
-# The config is split into two clear sections:
+# Phase 3 unified grading architecture:
 #   generator: — everything about the code generation agent
-#   reviewer:  — everything about the review/grading plane
+#   reviewer:  — everything about the multi-model review panel
+#   limits:    — optional per-config session limits (max_turns, max_files, etc.)
 #
-# Skills use a unified list with type: remote or type: local.
+# Tools use a unified list across both generator and reviewer sections.
+# Each tool entry specifies its type (skill, mcp) and source (local, remote).
 configs:
   - name: example-full/claude-sonnet-4.5
     description: "Full example — all config options demonstrated"
@@ -13,8 +15,16 @@ configs:
     generator:
       model: "claude-sonnet-4.5"
 
-      # Unified tools list replaces skill_directories + generator_skill_directories
+      # Unified tools list: skills and MCP servers
+      # Both types can be local or remote; all are configured here (no separate mcp_servers: section)
       tools:
+        # MCP server — Model Context Protocol server providing tools to the agent
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start"]
+          mcp_tools: ["*"]
+
         # Remote skill — fetched from a GitHub repository
         - name: azure-keyvault-py
           type: skill
@@ -29,26 +39,20 @@ configs:
         #   skill_dir: true
         #   path: "./skills/generator"
 
-      # MCP servers attached to the generator session
-      mcp_servers:
-        azure:
-          type: local
-          command: npx
-          args: ["-y", "@azure/mcp@latest", "server", "start"]
-          tools: ["*"]
-
       # Tool restrictions (optional — omit for all defaults)
       # available_tools: ["create", "edit", "bash", "view", "glob", "grep"]
       # excluded_tools: ["web_fetch"]
 
     # Reviewer section — controls the multi-model review panel
+    # Phase 3: review is now a grader type that runs alongside other graders
+    # in a unified pipeline (not a separate evaluation phase)
     reviewer:
       models:
         - "claude-opus-4.6"        # first model acts as consolidator
         - "gemini-3-pro-preview"
         - "gpt-4.1"
 
-      # Reviewer-specific tools (e.g., rubric knowledge, build verification)
+      # Reviewer-specific tools (e.g., build verification tools, test runners)
       tools:
         - name: reviewer-skills
           type: skill
@@ -56,8 +60,20 @@ configs:
           skill_dir: true
           path: "./skills/reviewer"
 
+    # Optional session limits — applied only to this config
+    # (when both prompt frontmatter and config limits are set, prompt takes precedence)
+    limits:
+      max_turns: 75
+      max_files: 50
+      max_output_size: 1048576  # 1 MB
+      max_session_actions: 50
+
   # Minimal config — only required fields
   - name: example-minimal/gpt-4
-    description: "Minimal config"
+    description: "Minimal config — generator and reviewer with default models"
     generator:
       model: "gpt-4"
+    reviewer:
+      models:
+        - "claude-opus-4.6"
+
