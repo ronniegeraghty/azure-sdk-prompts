@@ -163,3 +163,9 @@ CHANGELOG.md created and populated with 6 merged PRs from Phase 3.5 + Wave 1:
 - Architecture package comments need updates when grader types change
 - Guardrails documentation needs to stay current with limit-calculation logic changes
 
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md

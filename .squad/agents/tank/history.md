@@ -94,3 +94,9 @@ Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev�
 - `--dry-run` **does** execute the remote-skill fetch path (`internal/skills/fetcher.go::fetchRemote` → `npx skills add`). The "Fetching remote skill: …" line + repo clone both happen during dry-run. Good for wiring tests without eating Copilot sessions.
 - Known gap: `fetchRemote` passes `--name` but not `--yes`, so `npx skills add` still prompts interactively for skill selection. Under a non-TTY (CI, piped stdin) the prompt consumes no selection and 0 skills are resolved. The dry-run still exits 0. Filing as a follow-up if it blocks real usage.
 - `--all-prompts` does **not** exist. Use `--prompt-id <id>` for single, or filter flags (`--language`, `--service`, `--plane`, `--category`, `--tags`). A `--language python` filter on the full prompt set = 22 evals, which trips the >10 confirm prompt and hangs on non-TTY stdin; always narrow for dry-run smoke tests.
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
