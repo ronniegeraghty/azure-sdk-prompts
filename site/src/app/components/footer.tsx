@@ -1,4 +1,4 @@
-import { Terminal } from "lucide-react";
+import { HyokaLogo } from "./ui/hyoka-logo";
 
 export function Footer() {
   return (
@@ -7,7 +7,7 @@ export function Footer() {
         <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20">
-              <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+              <HyokaLogo className="text-emerald-400" size={16} />
             </div>
             <span className="text-white/80" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
               hyoka
