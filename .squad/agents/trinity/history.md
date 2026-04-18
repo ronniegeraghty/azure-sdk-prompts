@@ -92,3 +92,24 @@ Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev�
 **Reusable patterns:**
 - For "needs ground truth, but can fake it from existing page data" decisions: ship with the proxy + explicit label + follow-up note, rather than blocking on a new backend endpoint. Keeps PR scope tight.
 - Stacked horizontal bar with percent widths + title attributes (hover tooltip) + inline numeric labels (only when segment > 12%) is a clean, dependency-free alternative to pulling in yet another chart variant from recharts.
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
+
+### Session 2026-04-18 (Issue #362 — Logo Design)
+
+Completed the logo design requirement (R143) that was missed in PR #570.
+
+- **Custom HyokaLogo component:** SVG combining checkmark (validation) + rising bar chart (metrics/improvement). Works at all sizes (16px–32px+). Clean icon language aligns with "evaluation" brand.
+- **Icon replacement:** Swapped out generic Terminal icon in navbar and footer. Logo is now the visual signature across all site pages.
+- **Homepage ticker generalization:** Changed from Azure-specific service names ("Identity", "Storage", "Key Vault") to general use case categories ("Authentication", "CRUD Operations", "API Integration", "Data Processing", "Error Handling", "Async Workflows"). Removes last vestige of Azure SDK branding from homepage.
+- **Page title update:** Changed from "Developer Tool Evaluation Site" to "hyoka - AI Agent Evaluation Tool" for better SEO and clarity.
+
+**Testing:** All site tests pass (56/56), Go build clean, Go tests with -race pass. Site builds without errors.
+
+**PR #589** on branch `ronniegeraghty/issue-362-site-content`. Closes #362.
+
+**Pattern learned:** Always check acceptance criteria against merged PRs. PR #570 claimed to close #362 but only addressed 3 of 4 requirements. The logo requirement (R143) was overlooked and remained incomplete.

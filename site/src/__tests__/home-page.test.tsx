@@ -46,14 +46,15 @@ describe("HomePage", () => {
     expect(screen.getByText("Review Results")).toBeInTheDocument();
   });
 
-  it("renders supported services", () => {
+  it("renders supported use cases and languages", () => {
     render(
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>
     );
-    expect(screen.getByText("Storage")).toBeInTheDocument();
-    expect(screen.getByText("Key Vault")).toBeInTheDocument();
-    expect(screen.getByText("Identity")).toBeInTheDocument();
+    expect(screen.getByText("Authentication")).toBeInTheDocument();
+    expect(screen.getByText("CRUD Operations")).toBeInTheDocument();
+    expect(screen.getByText("Python")).toBeInTheDocument();
+    expect(screen.getByText("Go")).toBeInTheDocument();
   });
 });

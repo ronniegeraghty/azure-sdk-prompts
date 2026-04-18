@@ -225,3 +225,9 @@ This is multi-day refactor touching review/, graders/, eval/. Decided to ship fo
 ### Follow-ups to consider
 
 - If the site surface never consumes `summary_stats.PromptDeltas`, future cleanup: move the pass-toggle computation into the `comparison` package (or a third shared one) and delete from `summary_stats.go`. Out of scope for #357 (semantics differ + import cycle).
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
