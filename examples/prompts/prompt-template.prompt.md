@@ -17,6 +17,7 @@ properties:
 tags: []
 # max_session_actions: # Optional: override session action limit for this prompt (e.g., 100 for complex prompts)
 # max_turns:           # Optional: override max conversation turns for this prompt (e.g., 40 for complex prompts)
+# expected_tools: []   # Optional: tool names the generation session should use (e.g., create_file, run_terminal_command, azure_mcp)
 # starter_project:     # Optional: path to starter project directory (relative to prompt file). Used with project_context: existing.
 # project_context:     # Optional: map with type: blank (default) or type: existing
 ---

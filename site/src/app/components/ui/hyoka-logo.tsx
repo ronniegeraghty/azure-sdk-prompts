@@ -12,6 +12,9 @@ export function HyokaLogo({ className = "", size = 24 }: HyokaLogoProps) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      role="img"
+      aria-label="hyoka logo"
+      focusable="false"
     >
       {/* Stylized checkmark forming "h" */}
       <path
