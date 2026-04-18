@@ -24,24 +24,37 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+  const id = `switch-${label.replace(/\s+/g, "-").toLowerCase()}`;
   return (
-    <label className="flex items-center gap-2 cursor-pointer select-none">
-      <div
+    <div className="flex items-center gap-2 select-none">
+      <button
+        type="button"
+        id={id}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
         onClick={onChange}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+        onKeyDown={(e) => {
+          if (e.key === " " || e.key === "Enter") {
+            e.preventDefault();
+            onChange();
+          }
+        }}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400/60 ${
           checked ? "bg-emerald-500/30" : "bg-white/10"
         }`}
       >
         <span
+          aria-hidden="true"
           className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${
             checked ? "translate-x-5 bg-emerald-400" : "translate-x-0.5 bg-white/40"
           }`}
         />
-      </div>
-      <span className="text-white/25" style={{ fontSize: 11 }}>
+      </button>
+      <label htmlFor={id} className="text-white/25 cursor-pointer" style={{ fontSize: 11 }}>
         {label}
-      </span>
-    </label>
+      </label>
+    </div>
   );
 }
 
@@ -486,7 +499,12 @@ export function EvalDetailPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {environment.available_tools?.map(tool => {
                     const isSkill = environment.skills_loaded?.includes(tool) ?? false;
-                    const isMCP = environment.mcp_servers?.some(s => tool.includes(s)) ?? false;
+                    // Use prefix match (`server.tool` or `server_tool`) instead of substring
+                    // to avoid false positives where a builtin tool name happens to contain
+                    // a server name as a substring.
+                    const isMCP = environment.mcp_servers?.some(s =>
+                      tool === s || tool.startsWith(s + ".") || tool.startsWith(s + "_") || tool.startsWith(s + "/")
+                    ) ?? false;
                     const isInvoked = environment.skills_invoked?.includes(tool) ?? false;
                     
                     let badge = "";
@@ -721,9 +739,25 @@ export function EvalDetailPage() {
                       </button>
                       {reviewed && isExpanded && (
                         <div className="border-t border-white/5 p-4">
-                          <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-white/70" style={{ ...mono, fontSize: 11, lineHeight: 1.5 }}>
-                            <code>{reviewed.content}</code>
-                          </pre>
+                          {(() => {
+                            const MAX_CONTENT_BYTES = 256 * 1024; // 256 KiB
+                            const tooBig = reviewed.content.length > MAX_CONTENT_BYTES;
+                            const display = tooBig
+                              ? reviewed.content.slice(0, MAX_CONTENT_BYTES)
+                              : reviewed.content;
+                            return (
+                              <>
+                                <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-white/70" style={{ ...mono, fontSize: 11, lineHeight: 1.5 }}>
+                                  <code>{display}</code>
+                                </pre>
+                                {tooBig && (
+                                  <div className="mt-2 text-amber-400/70" style={{ fontSize: 11 }}>
+                                    File truncated for display ({reviewed.content.length.toLocaleString()} bytes; showing first {MAX_CONTENT_BYTES.toLocaleString()}).
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
