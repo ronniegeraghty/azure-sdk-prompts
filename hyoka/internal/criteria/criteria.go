@@ -21,15 +21,12 @@ import (
 )
 
 // GraderEntry defines a single grader with its evaluation prompt and weight.
-// Supports hierarchical when conditions and session isolation.
+// Supports hierarchical when conditions for prompt-based matching.
 type GraderEntry struct {
 Name   string            `yaml:"name" json:"name"`
 Weight float64           `yaml:"weight" json:"weight"`
 Prompt string            `yaml:"prompt" json:"prompt"`
 When   map[string]string `yaml:"when,omitempty" json:"when,omitempty"` // Grader-level when conditions
-// Isolate forces this grader to run in its own review session even when
-// overall mode is "combined". Ignored in "isolated" mode (all isolated already).
-Isolate bool `yaml:"isolate,omitempty" json:"isolate,omitempty"`
 }
 
 // GraderGroup is a named collection of graders with optional when conditions.
