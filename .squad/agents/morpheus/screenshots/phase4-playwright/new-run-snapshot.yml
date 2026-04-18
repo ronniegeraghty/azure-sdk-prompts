@@ -1,0 +1,106 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - link "hyoka logo hyoka" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "hyoka logo" [ref=e8]
+        - generic [ref=e15]: hyoka
+      - generic [ref=e16]:
+        - link "Home" [ref=e17] [cursor=pointer]:
+          - /url: /
+        - link "How It Works" [ref=e18] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "Runs" [ref=e19] [cursor=pointer]:
+          - /url: /runs
+        - link "Prompts" [ref=e20] [cursor=pointer]:
+          - /url: /prompts
+        - link "Pairwise" [ref=e21] [cursor=pointer]:
+          - /url: /pairwise
+        - link "Compare" [ref=e22] [cursor=pointer]:
+          - /url: /compare
+        - link "Dashboard" [ref=e23] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Docs" [ref=e24] [cursor=pointer]:
+          - /url: /docs
+      - link "Get Started" [ref=e25] [cursor=pointer]:
+        - /url: https://github.com/ronniegeraghty/hyoka
+  - generic [ref=e27]:
+    - link "All Runs" [ref=e28] [cursor=pointer]:
+      - /url: /runs
+      - img [ref=e29]
+      - text: All Runs
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - heading "Apr 18, 2026, 01:24 AM" [level=1] [ref=e33]
+        - paragraph [ref=e34]: "Run ID: 20260418-012409 · 1 evaluations · 1m 5s"
+      - generic [ref=e35]:
+        - generic [ref=e36]: Pass Rate
+        - generic [ref=e37]: 100.0%
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - img [ref=e41]
+          - generic [ref=e44]: Passed
+        - text: "1"
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - generic [ref=e51]: Failed
+        - text: "0"
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - img [ref=e54]
+          - generic [ref=e57]: Duration
+        - text: 1m 5s
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - img [ref=e60]
+          - generic [ref=e65]: Files
+        - text: "2"
+    - generic [ref=e66]:
+      - generic [ref=e67]:
+        - combobox [ref=e68]:
+          - option "All Status" [selected]
+          - option "Passed"
+          - option "Failed"
+        - combobox [ref=e69]:
+          - option "All Services" [selected]
+          - option "key-vault"
+        - combobox [ref=e70]:
+          - option "All Languages" [selected]
+          - option "python"
+        - generic [ref=e71]: 1 results
+      - generic [ref=e72]:
+        - button "Table" [ref=e73]
+        - button "Matrix" [ref=e74]
+    - table [ref=e76]:
+      - rowgroup [ref=e77]:
+        - row "Score Prompt Model Tools Service Lang Difficulty Duration" [ref=e78]:
+          - columnheader "Score" [ref=e79]
+          - columnheader "Prompt" [ref=e80]
+          - columnheader "Model" [ref=e81]
+          - columnheader "Tools" [ref=e82]
+          - columnheader "Service" [ref=e83]
+          - columnheader "Lang" [ref=e84]
+          - columnheader "Difficulty" [ref=e85]
+          - columnheader "Duration" [ref=e86]
+          - columnheader [ref=e87]
+      - rowgroup [ref=e88]:
+        - row "0/3 key-vault-dp-python-crud claude-opus-4.6 key-vault python basic 63.7s →" [ref=e89] [cursor=pointer]:
+          - cell "0/3" [ref=e90]:
+            - generic [ref=e91]: 0/3
+          - cell "key-vault-dp-python-crud" [ref=e92]
+          - cell "claude-opus-4.6" [ref=e93]
+          - cell [ref=e94]
+          - cell "key-vault" [ref=e95]
+          - cell "python" [ref=e96]
+          - cell "basic" [ref=e97]
+          - cell "63.7s" [ref=e98]
+          - cell "→" [ref=e99]
+  - contentinfo [ref=e100]:
+    - generic [ref=e102]:
+      - generic [ref=e103]:
+        - img "hyoka logo" [ref=e105]
+        - generic [ref=e112]: hyoka
+      - paragraph [ref=e113]: Evaluate AI agent output quality across any domain.
+      - paragraph [ref=e114]: © 2026 hyoka · MIT License

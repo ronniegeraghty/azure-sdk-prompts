@@ -394,3 +394,5 @@ Deep code review of three Phase 4 PRs that just landed on `ronniegeraghty/dev`:
 - Coordinator/Morpheus: Phase 4 epic #310 = GO. PR #591 is the only outstanding work and it's small.
 - Trinity: When you write more custom form controls, please follow the `Switch` accessibility template in #591.
 - Oracle: Worth keeping `expected_tools` (and other optional fields like `expected_packages`) visible in the template — authors discover features by reading templates.
+
+**2026-04-18 — Morpheus Phase 4 Verification:** Accessibility compliance confirmed (semantic HTML, ARIA roles, a11y snapshots). No Switch a11y issues found during re-verification.

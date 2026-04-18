@@ -169,3 +169,5 @@ CHANGELOG.md created and populated with 6 merged PRs from Phase 3.5 + Wave 1:
 Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
 
 Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
+
+**2026-04-18 — Morpheus Phase 4 Verification:** Playwright-cli now established as standard for UI verification. Oracle's playwright-cli skill complete and validated across full feature set. Skill ready for team use.

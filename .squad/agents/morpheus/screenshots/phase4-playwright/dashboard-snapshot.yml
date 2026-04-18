@@ -1,0 +1,214 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - link "hyoka logo hyoka" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img "hyoka logo" [ref=e8]
+          - generic [ref=e15]: hyoka
+        - generic [ref=e16]:
+          - link "Home" [ref=e17] [cursor=pointer]:
+            - /url: /
+          - link "How It Works" [ref=e18] [cursor=pointer]:
+            - /url: /how-it-works
+          - link "Runs" [ref=e19] [cursor=pointer]:
+            - /url: /runs
+          - link "Prompts" [ref=e20] [cursor=pointer]:
+            - /url: /prompts
+          - link "Pairwise" [ref=e21] [cursor=pointer]:
+            - /url: /pairwise
+          - link "Compare" [ref=e22] [cursor=pointer]:
+            - /url: /compare
+          - link "Dashboard" [ref=e23] [cursor=pointer]:
+            - /url: /dashboard
+          - link "Docs" [ref=e24] [cursor=pointer]:
+            - /url: /docs
+        - link "Get Started" [ref=e25] [cursor=pointer]:
+          - /url: https://github.com/ronniegeraghty/hyoka
+    - generic [ref=e160]:
+      - generic [ref=e161]:
+        - generic [ref=e162]:
+          - heading "Evaluation Dashboard" [level=1] [ref=e163]
+          - paragraph [ref=e164]: "Last updated: March 29, 2026 · 14:32 UTC"
+        - button "Filters" [ref=e165]:
+          - img [ref=e166]
+          - text: Filters
+      - generic [ref=e168]:
+        - generic [ref=e169]:
+          - generic [ref=e170]:
+            - img [ref=e171]
+            - generic [ref=e176]: Total Evaluations
+          - text: 1,247
+        - generic [ref=e177]:
+          - generic [ref=e178]:
+            - img [ref=e179]
+            - generic [ref=e182]: Overall Pass Rate
+          - text: 78.3%
+        - generic [ref=e183]:
+          - generic [ref=e184]:
+            - img [ref=e185]
+            - generic [ref=e188]: Avg Duration
+          - text: 9.8s
+        - generic [ref=e189]:
+          - generic [ref=e190]:
+            - img [ref=e191]
+            - generic [ref=e194]: Models Tested
+          - text: "6"
+      - generic [ref=e195]:
+        - generic [ref=e196]:
+          - generic [ref=e197]:
+            - heading "Pass Rate" [level=3] [ref=e198]
+            - generic [ref=e199]:
+              - button "service" [ref=e200]
+              - button "language" [ref=e201]
+          - generic [ref=e203]:
+            - img [ref=e204]:
+              - generic [ref=e206]:
+                - generic [ref=e208]: Storage
+                - generic [ref=e210]: Key Vault
+                - generic [ref=e212]: Cosmos DB
+                - generic [ref=e214]: Event Hubs
+                - generic [ref=e216]: Service Bus
+                - generic [ref=e218]: Identity
+              - generic [ref=e220]:
+                - generic [ref=e222]: "0"
+                - generic [ref=e224]: "25"
+                - generic [ref=e226]: "50"
+                - generic [ref=e228]: "75"
+                - generic [ref=e230]: "100"
+            - generic:
+              - generic:
+                - paragraph: Identity
+                - list:
+                  - listitem: "rate : 91"
+        - generic [ref=e246]:
+          - heading "Duration Trends (seconds)" [level=3] [ref=e247]
+          - img [ref=e250]:
+            - generic [ref=e252]:
+              - generic [ref=e254]: Run 1
+              - generic [ref=e256]: Run 2
+              - generic [ref=e258]: Run 3
+              - generic [ref=e260]: Run 4
+              - generic [ref=e262]: Run 5
+              - generic [ref=e264]: Run 6
+            - generic [ref=e266]:
+              - generic [ref=e268]: "0"
+              - generic [ref=e270]: "4"
+              - generic [ref=e272]: "8"
+              - generic [ref=e274]: "12"
+              - generic [ref=e276]: "16"
+          - generic [ref=e283]:
+            - generic [ref=e286]: Generation
+            - generic [ref=e289]: Build
+            - generic [ref=e292]: Review
+      - generic [ref=e293]:
+        - generic [ref=e294]:
+          - heading "Model Comparison by Criteria" [level=3] [ref=e295]
+          - img [ref=e298]:
+            - generic [ref=e312]:
+              - generic [ref=e314]: Correctness
+              - generic [ref=e317]: Completeness
+              - generic [ref=e320]: Best Practices
+              - generic [ref=e322]: Error Handling
+              - generic [ref=e325]: Security
+              - generic [ref=e328]: Documentation
+          - generic [ref=e338]:
+            - generic [ref=e341]: GPT-4o
+            - generic [ref=e344]: Claude 3.5
+            - generic [ref=e347]: Copilot
+        - generic [ref=e348]:
+          - heading "Recent Evaluations" [level=3] [ref=e349]
+          - table [ref=e351]:
+            - rowgroup [ref=e352]:
+              - row "ID Prompt Lang Model Score Status Time" [ref=e353]:
+                - columnheader "ID" [ref=e354]
+                - columnheader "Prompt" [ref=e355]
+                - columnheader "Lang" [ref=e356]
+                - columnheader "Model" [ref=e357]
+                - columnheader "Score" [ref=e358]
+                - columnheader "Status" [ref=e359]
+                - columnheader "Time" [ref=e360]
+            - rowgroup [ref=e361]:
+              - row "EVL-0042 Create a blob storage client with retry Python GPT-4o 92 8.3s" [ref=e362]:
+                - cell "EVL-0042" [ref=e363]
+                - cell "Create a blob storage client with retry" [ref=e364]
+                - cell "Python" [ref=e365]
+                - cell "GPT-4o" [ref=e366]
+                - cell "92" [ref=e367]
+                - cell [ref=e368]:
+                  - img [ref=e369]
+                - cell "8.3s" [ref=e372]
+              - row "EVL-0041 Implement Key Vault secret rotation Go Claude 3.5 67 14.1s" [ref=e373]:
+                - cell "EVL-0041" [ref=e374]
+                - cell "Implement Key Vault secret rotation" [ref=e375]
+                - cell "Go" [ref=e376]
+                - cell "Claude 3.5" [ref=e377]
+                - cell "67" [ref=e378]
+                - cell [ref=e379]:
+                  - img [ref=e380]
+                - cell "14.1s" [ref=e384]
+              - row "EVL-0040 Cosmos DB paginated query with continuation .NET GPT-4o 85 11.7s" [ref=e385]:
+                - cell "EVL-0040" [ref=e386]
+                - cell "Cosmos DB paginated query with continuation" [ref=e387]
+                - cell ".NET" [ref=e388]
+                - cell "GPT-4o" [ref=e389]
+                - cell "85" [ref=e390]
+                - cell [ref=e391]:
+                  - img [ref=e392]
+                - cell "11.7s" [ref=e395]
+              - row "EVL-0039 Event Hubs consumer with checkpointing Java Copilot 58 16.2s" [ref=e396]:
+                - cell "EVL-0039" [ref=e397]
+                - cell "Event Hubs consumer with checkpointing" [ref=e398]
+                - cell "Java" [ref=e399]
+                - cell "Copilot" [ref=e400]
+                - cell "58" [ref=e401]
+                - cell [ref=e402]:
+                  - img [ref=e403]
+                - cell "16.2s" [ref=e407]
+              - row "EVL-0038 Service Bus topic subscription filter TypeScript Claude 3.5 94 7.9s" [ref=e408]:
+                - cell "EVL-0038" [ref=e409]
+                - cell "Service Bus topic subscription filter" [ref=e410]
+                - cell "TypeScript" [ref=e411]
+                - cell "Claude 3.5" [ref=e412]
+                - cell "94" [ref=e413]
+                - cell [ref=e414]:
+                  - img [ref=e415]
+                - cell "7.9s" [ref=e418]
+              - row "EVL-0037 DefaultAzureCredential with fallback chain Python GPT-4o 96 6.4s" [ref=e419]:
+                - cell "EVL-0037" [ref=e420]
+                - cell "DefaultAzureCredential with fallback chain" [ref=e421]
+                - cell "Python" [ref=e422]
+                - cell "GPT-4o" [ref=e423]
+                - cell "96" [ref=e424]
+                - cell [ref=e425]:
+                  - img [ref=e426]
+                - cell "6.4s" [ref=e429]
+      - generic [ref=e430]:
+        - generic [ref=e431]:
+          - img [ref=e432]
+          - heading "AI-Generated Insights" [level=3] [ref=e435]
+        - generic [ref=e436]:
+          - paragraph [ref=e437]:
+            - text: •
+            - strong [ref=e438]: Identity service prompts
+            - text: consistently achieve the highest pass rates (91%) across all models, suggesting auth patterns are well-represented in training data.
+          - paragraph [ref=e439]:
+            - text: •
+            - strong [ref=e440]: Event Hubs
+            - text: shows the lowest pass rate (68%), particularly for advanced streaming scenarios. Most failures relate to incorrect checkpoint store configuration.
+          - paragraph [ref=e441]:
+            - text: •
+            - strong [ref=e442]: Generation duration
+            - text: has decreased 29% over the last 6 runs, correlating with improved prompt specificity in recent batches.
+          - paragraph [ref=e443]:
+            - text: •
+            - strong [ref=e444]: Claude 3.5
+            - text: leads in best practices and security criteria, while GPT-4o shows stronger performance in completeness for multi-file generation tasks.
+    - contentinfo [ref=e144]:
+      - generic [ref=e146]:
+        - generic [ref=e147]:
+          - img "hyoka logo" [ref=e149]
+          - generic [ref=e156]: hyoka
+        - paragraph [ref=e157]: Evaluate AI agent output quality across any domain.
+        - paragraph [ref=e158]: © 2026 hyoka · MIT License
+  - generic [ref=e445]: "4"

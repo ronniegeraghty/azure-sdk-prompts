@@ -1,0 +1,200 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - link "hyoka logo hyoka" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img "hyoka logo" [ref=e8]
+          - generic [ref=e15]: hyoka
+        - generic [ref=e16]:
+          - link "Home" [ref=e17] [cursor=pointer]:
+            - /url: /
+          - link "How It Works" [ref=e18] [cursor=pointer]:
+            - /url: /how-it-works
+          - link "Runs" [ref=e19] [cursor=pointer]:
+            - /url: /runs
+          - link "Prompts" [ref=e20] [cursor=pointer]:
+            - /url: /prompts
+          - link "Pairwise" [ref=e21] [cursor=pointer]:
+            - /url: /pairwise
+          - link "Compare" [ref=e22] [cursor=pointer]:
+            - /url: /compare
+          - link "Dashboard" [ref=e23] [cursor=pointer]:
+            - /url: /dashboard
+          - link "Docs" [ref=e24] [cursor=pointer]:
+            - /url: /docs
+        - link "Get Started" [ref=e25] [cursor=pointer]:
+          - /url: https://github.com/ronniegeraghty/hyoka
+    - generic [ref=e1277]:
+      - link "Back to run" [ref=e1278] [cursor=pointer]:
+        - /url: /runs/20260418-005921
+        - img [ref=e1279]
+        - text: Back to run
+      - generic [ref=e1281]:
+        - generic [ref=e1282]:
+          - generic [ref=e1283]:
+            - img [ref=e1284]
+            - heading "key-vault-dp-python-crud" [level=1] [ref=e1287]
+          - generic [ref=e1288]:
+            - generic [ref=e1289]: azure-mcp/claude-opus-4.6
+            - generic [ref=e1290]: key-vault
+            - generic [ref=e1291]: python
+            - generic [ref=e1292]: basic
+        - generic [ref=e1293]:
+          - generic [ref=e1294]: "5"
+          - generic [ref=e1295]: / 5
+      - generic [ref=e1296]:
+        - generic [ref=e1297]:
+          - generic [ref=e1298]:
+            - img [ref=e1299]
+            - generic [ref=e1302]: Total
+          - text: 121.0s
+        - generic [ref=e1303]:
+          - generic [ref=e1304]:
+            - img [ref=e1305]
+            - generic [ref=e1308]: Generation
+          - text: 38.7s
+        - generic [ref=e1309]:
+          - generic [ref=e1310]:
+            - img [ref=e1311]
+            - generic [ref=e1313]: Review
+          - text: 82.1s
+        - generic [ref=e1314]:
+          - generic [ref=e1315]:
+            - img [ref=e1316]
+            - generic [ref=e1318]: Input Tokens
+          - text: 102,981
+        - generic [ref=e1319]:
+          - generic [ref=e1320]:
+            - img [ref=e1321]
+            - generic [ref=e1323]: Output Tokens
+          - text: 1,959
+        - generic [ref=e1324]:
+          - generic [ref=e1325]:
+            - img [ref=e1326]
+            - generic [ref=e1331]: Files
+          - text: "2"
+      - generic [ref=e1332]:
+        - heading "Environment" [level=3] [ref=e1333]
+        - generic [ref=e1334]:
+          - generic [ref=e1335]: "Model: claude-opus-4.6"
+          - generic [ref=e1336]: "SDK Package: azure-keyvault-secrets"
+          - generic [ref=e1337]: "Turns: 3"
+      - generic [ref=e1338]:
+        - heading "Grader Results (2)" [level=3] [ref=e1339]:
+          - img [ref=e1340]
+          - text: Grader Results (2)
+        - generic [ref=e1342]:
+          - generic [ref=e1344] [cursor=pointer]:
+            - generic [ref=e1345]:
+              - img [ref=e1346]
+              - generic [ref=e1348]: N/A
+            - generic [ref=e1349]:
+              - generic [ref=e1350]: gpt-4.1
+              - generic [ref=e1351]: Review • gpt-4.1
+            - generic [ref=e1352]: 5/5
+            - img [ref=e1353]
+          - generic [ref=e1356] [cursor=pointer]:
+            - generic [ref=e1357]:
+              - img [ref=e1358]
+              - generic [ref=e1360]: N/A
+            - generic [ref=e1361]:
+              - generic [ref=e1362]: consensus
+              - generic [ref=e1363]: Review • consensus
+            - generic [ref=e1364]: 5/5
+            - img [ref=e1365]
+      - generic [ref=e1367]:
+        - button "Session Timeline (64 events)" [ref=e1368]:
+          - heading "Session Timeline (64 events)" [level=3] [ref=e1369]:
+            - img [ref=e1370]
+            - text: Session Timeline (64 events)
+          - img [ref=e1372]
+        - generic [ref=e1375]:
+          - generic [ref=e1377]:
+            - switch "Show system events (41)" [ref=e1378]
+            - generic [ref=e1380] [cursor=pointer]: Show system events (41)
+          - generic [ref=e1381]:
+            - generic [ref=e1382] [cursor=pointer]:
+              - generic [ref=e1383]: 📝
+              - generic [ref=e1384]: Prompt
+              - img [ref=e1385]
+            - generic [ref=e1388]:
+              - generic [ref=e1389]: Content
+              - generic [ref=e1390]: "Write a script that performs all four CRUD operations on Azure Key Vault secrets: 1. Create a new secret called \"my-secret\" with value \"my-secret-value\" 2. Read the secret back and print its value 3. Update the secret to a new value \"updated-value\" 4. Delete the secret and purge it (soft-delete enabled vault) Use DefaultAzureCredential for authentication. Include proper error handling and show required pip packages."
+          - generic [ref=e1393]: Turn 1
+          - generic [ref=e1396]:
+            - generic [ref=e1397]: 💬
+            - generic [ref=e1398]: Response
+          - generic [ref=e1400] [cursor=pointer]:
+            - generic [ref=e1401]: 🤔
+            - generic [ref=e1402]: Thinking
+            - img [ref=e1403]
+          - generic [ref=e1406] [cursor=pointer]:
+            - generic [ref=e1407]: 🔧
+            - generic [ref=e1408]: report_intent
+            - img [ref=e1409]
+          - generic [ref=e1412] [cursor=pointer]:
+            - generic [ref=e1413]: 🔧
+            - generic [ref=e1414]: "Create file: /tmp/hyoka-key-vault-dp-python-crud-azure-mcp-claude-opus-4.6-3979263589/requirement…"
+            - img [ref=e1415]
+          - generic [ref=e1418] [cursor=pointer]:
+            - generic [ref=e1419]: 🔧
+            - generic [ref=e1420]: "Create file: /tmp/hyoka-key-vault-dp-python-crud-azure-mcp-claude-opus-4.6-3979263589/key_vault_c…"
+            - img [ref=e1422]
+            - img [ref=e1425]
+          - generic [ref=e1428] [cursor=pointer]:
+            - generic [ref=e1429]: 🔧
+            - generic [ref=e1430]: Tool result
+            - img [ref=e1432]
+            - img [ref=e1435]
+          - generic [ref=e1438] [cursor=pointer]:
+            - generic [ref=e1439]: 🔧
+            - generic [ref=e1440]: Tool result
+            - img [ref=e1442]
+            - img [ref=e1445]
+          - generic [ref=e1449]: Turn 2
+          - generic [ref=e1452]:
+            - generic [ref=e1453]: 💬
+            - generic [ref=e1454]: Response
+          - generic [ref=e1456] [cursor=pointer]:
+            - generic [ref=e1457]: 🔧
+            - generic [ref=e1458]: "Run command: cd /tmp/hyoka-key-vault-dp-python-crud-azure-mcp-claude-opus-4.6-3979263589 &…"
+            - img [ref=e1460]
+            - img [ref=e1463]
+          - generic [ref=e1467]: Turn 3
+          - generic [ref=e1470] [cursor=pointer]:
+            - generic [ref=e1471]: 💬
+            - generic [ref=e1472]: Response
+            - img [ref=e1473]
+      - generic [ref=e1475]:
+        - heading "Reviewer Timelines (1 reviewers)" [level=3] [ref=e1476]:
+          - img [ref=e1477]
+          - text: Reviewer Timelines (1 reviewers)
+        - button "🔍 gpt-4.1 Review 5/5" [ref=e1481]:
+          - generic [ref=e1482]: 🔍 gpt-4.1 Review
+          - generic [ref=e1483]:
+            - generic [ref=e1484]: 5/5
+            - img [ref=e1485]
+      - generic [ref=e1487]:
+        - button "Generated Files (2)" [active] [ref=e1488]:
+          - heading "Generated Files (2)" [level=3] [ref=e1489]:
+            - img [ref=e1490]
+            - text: Generated Files (2)
+          - img [ref=e1497]
+        - generic [ref=e1499]:
+          - button "key_vault_crud.py" [ref=e1501]:
+            - generic [ref=e1502]:
+              - img [ref=e1503]
+              - generic [ref=e1508]: key_vault_crud.py
+          - button "requirements.txt" [ref=e1510]:
+            - generic [ref=e1511]:
+              - img [ref=e1512]
+              - generic [ref=e1517]: requirements.txt
+    - contentinfo [ref=e144]:
+      - generic [ref=e146]:
+        - generic [ref=e147]:
+          - img "hyoka logo" [ref=e149]
+          - generic [ref=e156]: hyoka
+        - paragraph [ref=e157]: Evaluate AI agent output quality across any domain.
+        - paragraph [ref=e158]: © 2026 hyoka · MIT License
+  - generic [ref=e445]: "4"
