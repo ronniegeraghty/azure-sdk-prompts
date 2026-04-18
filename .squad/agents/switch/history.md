@@ -341,3 +341,9 @@ Both PRs approved with "LGTM ✅" comments.
 - Tank: Recommended to add `-race` to CI, coverage threshold gate (P2/P3 infra work)
 - Oracle: Recommended to write testing-guide.md (P3 documentation)
 
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md

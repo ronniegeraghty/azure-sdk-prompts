@@ -119,3 +119,50 @@ Critical drift: `workspace_delta` TS field names (`files_created`, `files_modifi
 1. Close issues #355–#363, #566, #375 upon merge
 2. File issue for TS type sync (EvalReport, BehaviorGraderDetail, RunSummary)
 3. Snapshot test for Switch on comparison routes (belt-and-suspenders)
+
+### Phase 4 Dogfood Verification (2026-04-17)
+
+**Task:** Post-merge verification of PR #584 on `ronniegeraghty/dev` branch to validate Phase 4 features before 0.3.1 release.
+
+**Verification matrix:**
+1. ✅ Build: Clean compilation (`go build ./...`)
+2. ✅ Eval run: 1 prompt × 2 configs = 2/2 passed (77.3s, 100% pass rate)
+3. ✅ Comparison auto-gen (#583): `comparisons.json` created automatically, no manual `compare` invocation
+4. ✅ Serve endpoints (#581/#579/#582): All tested endpoints working (root, `/api/runs`, `/api/runs/{id}`, `/api/runs/{id}/comparisons`)
+5. ✅ Hierarchical when (#578): Implementation verified in `criteria.go`, 299-line dedicated test file
+6. ✅ Cleanup: 7 sessions freed (33.4 MB)
+
+**Key findings:**
+- **Comparison structure changed:** Comparisons now stored as flat `{runDir}/comparisons.json` (not `comparisons/` subdirectory). API endpoint `/api/runs/{runId}/comparisons` reads this file correctly.
+- **Cache implementation:** New `fileCache` type in `serve/cache.go` (79 lines + 140 line test) wired into all API handlers. Serves disk content efficiently without re-parsing.
+- **Test coverage:** +963 lines across 5 new test files (autogen_test, inmem_test, hierarchical_test, cache_test, equivalence_test).
+- **Documentation:** `CHANGELOG.md` created (63 lines). `README.md` and `AGENTS.md` updated.
+
+**Production quality:**
+- Zero errors in eval run (only expected gemini-3-pro-preview warning)
+- No 500s from serve endpoints
+- Clean shutdown and session cleanup
+- Hierarchical when well-tested with 3-level resolution (file → group → grader)
+
+**Recommendation:** ✅ APPROVED FOR 0.3.1 RELEASE. Promote `ronniegeraghty/dev` → `main`.
+
+**Post-release recommendations:**
+1. Dogfood pairwise feature with `--pairwise` flag (requires tool-toggle config support)
+2. Exercise all serve sub-endpoints (`/eval`, `/graders`, `/timeline`, `/score-breakdown`)
+3. Smoke test serve caching under load
+
+**Verification report:** `phase4-verification-report.md` (192 lines)
+**Artifacts:** `phase4-dogfood.log` (216 KB debug log), `phase4-dogfood-stdout.log` (74 KB), `reports/20260417-204611/` (full results)
+
+**Key architectural insights:**
+- Comparison auto-generation via `comparison/autogen.go` calls `AutoGenerateForRun()` → `CompareReports()` (same engine as CLI/serve API). Site render and CLI output identical by construction.
+- Hierarchical when uses `mergeWhen(parent, child)` with child-override semantics. Most specific condition wins.
+- Serve cache scoped per-mux (not global), enabling concurrent `Start()` calls in tests without interference.
+
+**Phase 4 stack confidence:** HIGH. All subsystems integrated and verified against live eval run. No blockers to 0.3.1.
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md

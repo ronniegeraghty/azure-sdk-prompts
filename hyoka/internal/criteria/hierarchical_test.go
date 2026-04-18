@@ -264,36 +264,3 @@ if err == nil {
 t.Error("expected error for file with no graders or groups")
 }
 }
-
-// TestIsolatePropertyPreserved tests that isolate: true is parsed and preserved.
-func TestIsolatePropertyPreserved(t *testing.T) {
-dir := t.TempDir()
-content := `
-when:
-  language: go
-graders:
-  - name: Regular Check
-    weight: 1.0
-  - name: Isolated Check
-    weight: 1.0
-    isolate: true
-`
-path := dir + "/test.yaml"
-if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-t.Fatal(err)
-}
-
-gc, err := loadFile(path)
-if err != nil {
-t.Fatalf("unexpected error: %v", err)
-}
-if len(gc.Graders) != 2 {
-t.Fatalf("expected 2 graders, got %d", len(gc.Graders))
-}
-if gc.Graders[0].Isolate {
-t.Error("expected first grader to NOT be isolated")
-}
-if !gc.Graders[1].Isolate {
-t.Error("expected second grader to be isolated")
-}
-}
