@@ -5,7 +5,7 @@ import {
 import { Link } from "react-router";
 import { motion } from "motion/react";
 
-const services = ["Identity", "Storage", "Key Vault", "Databases", "Messaging", "Compute"];
+const useCases = ["Authentication", "CRUD Operations", "API Integration", "Data Processing", "Error Handling", "Async Workflows"];
 const languages = ["Go", "Python", ".NET", "Java", "JavaScript", "TypeScript"];
 
 const features = [
@@ -75,7 +75,7 @@ export function HomePage() {
       {/* Ticker */}
       <section className="border-y border-white/10 bg-white/[0.02] px-6 py-8">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3">
-          {services.map((s) => (
+          {useCases.map((s) => (
             <span key={s} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/50" style={{ fontSize: 13 }}>
               {s}
             </span>

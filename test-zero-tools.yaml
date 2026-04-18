@@ -1,0 +1,9 @@
+configs:
+  - name: test/zero-tools
+    description: "Test config with zero tools for pairwise edge case"
+    generator:
+      model: "claude-opus-4.6"
+      tools: []
+    reviewer:
+      models:
+        - "claude-opus-4.6"

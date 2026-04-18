@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router";
-import { Terminal, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { HyokaLogo } from "./ui/hyoka-logo";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -22,7 +23,7 @@ export function Navbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link to="/" className="flex items-center gap-2.5 no-underline">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
-            <Terminal className="h-4 w-4 text-emerald-400" />
+            <HyokaLogo className="text-emerald-400" size={20} />
           </div>
           <span className="text-white" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
             hyoka
