@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
-import type { RunSummary, EvalResult, EvalReport, SessionEvent, ReviewPanelEntry, GraderResult } from "../data/types";
+import type { RunSummary, EvalResult, EvalReport, SessionEvent, ReviewPanelEntry, GraderResult, ReviewedFile } from "../data/types";
 import {
   ArrowLeft, CheckCircle2, XCircle, Clock, FileCode2, Cpu,
   MessageSquare, Wrench, Terminal, ChevronDown, ChevronRight,
@@ -20,6 +20,28 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
+  );
+}
+
+function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <div
+        onClick={onChange}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+          checked ? "bg-emerald-500/30" : "bg-white/10"
+        }`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 transform rounded-full transition-transform ${
+            checked ? "translate-x-5 bg-emerald-400" : "translate-x-0.5 bg-white/40"
+          }`}
+        />
+      </div>
+      <span className="text-white/25" style={{ fontSize: 11 }}>
+        {label}
+      </span>
+    </label>
   );
 }
 
@@ -245,10 +267,13 @@ function Timeline({ events }: { events: SessionEvent[] }) {
   return (
     <div className="space-y-1.5">
       {systemCount > 0 && (
-        <label className="mb-2 flex items-center gap-2 text-white/25 select-none" style={{ fontSize: 11 }}>
-          <input type="checkbox" checked={showSystem} onChange={() => setShowSystem(!showSystem)} className="rounded" />
-          Show system events ({systemCount})
-        </label>
+        <div className="mb-3">
+          <Switch
+            checked={showSystem}
+            onChange={() => setShowSystem(!showSystem)}
+            label={`Show system events (${systemCount})`}
+          />
+        </div>
       )}
       {visible.map((step, idx) =>
         step.type === "turn_divider" ? (
@@ -301,6 +326,7 @@ export function EvalDetailPage() {
   const [expandedReviewer, setExpandedReviewer] = useState<number>(0);
   const [showTimeline, setShowTimeline] = useState(true);
   const [showFiles, setShowFiles] = useState(false);
+  const [expandedFile, setExpandedFile] = useState<string | null>(null);
 
   useEffect(() => {
     if (!runId) return;
@@ -354,6 +380,7 @@ export function EvalDetailPage() {
   const reviewPanel: ReviewPanelEntry[] = r.review_panel || [];
   const environment = r.environment;
   const generatedFiles = r.generated_files || [];
+  const reviewedFiles = r.reviewed_files || [];
   const criteria = review.scores?.criteria || [];
   const rerunCommand = r.rerunCommand || "";
   const guardrailReason = r.guardrail_abort_reason || "";
@@ -421,13 +448,14 @@ export function EvalDetailPage() {
         )}
 
         {/* Stat cards */}
-        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
           {[
             { label: "Total", value: `${durationTotal.toFixed(1)}s`, icon: Clock, color: "text-white/60" },
             { label: "Generation", value: `${durationGen.toFixed(1)}s`, icon: Cpu, color: "text-blue-400" },
             { label: "Review", value: `${durationReview.toFixed(1)}s`, icon: MessageSquare, color: "text-purple-400" },
-            { label: "Files", value: generatedFiles.length, icon: FileCode2, color: "text-emerald-400" },
-            { label: "Turns", value: envTurnCount, icon: Zap, color: "text-pink-400" },
+            { label: "Input Tokens", value: envInputTokens.toLocaleString(), icon: Zap, color: "text-emerald-400" },
+            { label: "Output Tokens", value: envOutputTokens.toLocaleString(), icon: Zap, color: "text-pink-400" },
+            { label: "Files", value: generatedFiles.length, icon: FileCode2, color: "text-amber-400" },
           ].map(s => (
             <div key={s.label} className="rounded-lg border border-white/8 bg-white/[0.03] p-3">
               <div className="mb-1 flex items-center gap-1.5">
@@ -443,14 +471,51 @@ export function EvalDetailPage() {
         {environment && (
           <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.03] p-5">
             <h3 className="mb-3 text-white" style={{ fontSize: 14 }}>Environment</h3>
-            <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2 md:grid-cols-3" style={{ fontSize: 12 }}>
+            <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2 md:grid-cols-3" style={{ fontSize: 12 }}>
               {envModel && <div><span className="text-white/30">Model:</span> <span className="text-white/60" style={mono}>{envModel}</span></div>}
-              <div><span className="text-white/30">Input Tokens:</span> <span className="text-white/60" style={mono}>{envInputTokens.toLocaleString()}</span></div>
-              <div><span className="text-white/30">Output Tokens:</span> <span className="text-white/60" style={mono}>{envOutputTokens.toLocaleString()}</span></div>
               {r.prompt_metadata?.sdk_package && (
                 <div><span className="text-white/30">SDK Package:</span> <span className="text-blue-400/70" style={mono}>{r.prompt_metadata.sdk_package}</span></div>
               )}
+              <div><span className="text-white/30">Turns:</span> <span className="text-white/60" style={mono}>{envTurnCount}</span></div>
             </div>
+
+            {/* Tools Available */}
+            {(environment.available_tools?.length ?? 0) > 0 && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="mb-2 text-white/40" style={{ fontSize: 11 }}>Available Tools</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {environment.available_tools?.map(tool => {
+                    const isSkill = environment.skills_loaded?.includes(tool) ?? false;
+                    const isMCP = environment.mcp_servers?.some(s => tool.includes(s)) ?? false;
+                    const isInvoked = environment.skills_invoked?.includes(tool) ?? false;
+                    
+                    let badge = "";
+                    let badgeColor = "";
+                    if (isSkill) {
+                      badge = "skill";
+                      badgeColor = isInvoked ? "bg-blue-500/20 text-blue-400" : "bg-blue-500/10 text-blue-400/40";
+                    } else if (isMCP) {
+                      badge = "MCP";
+                      badgeColor = "bg-purple-500/20 text-purple-400";
+                    } else {
+                      badge = "builtin";
+                      badgeColor = "bg-white/5 text-white/30";
+                    }
+
+                    return (
+                      <span
+                        key={tool}
+                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${badgeColor}`}
+                        style={{ fontSize: 10 }}
+                      >
+                        <span style={mono}>{tool}</span>
+                        <span className="opacity-60">({badge})</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -634,12 +699,36 @@ export function EvalDetailPage() {
             </button>
             {showFiles && (
               <div className="border-t border-white/8 p-5 space-y-2">
-                {generatedFiles.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-lg border border-white/5 bg-black/20 px-4 py-2">
-                    <FileCode2 className="h-3.5 w-3.5 text-emerald-400/50" />
-                    <span className="text-emerald-400/70" style={{ ...mono, fontSize: 12 }}>{f}</span>
-                  </div>
-                ))}
+                {generatedFiles.map((filePath, i) => {
+                  const reviewed = reviewedFiles.find(rf => rf.path === filePath);
+                  const isExpanded = expandedFile === filePath;
+                  
+                  return (
+                    <div key={i} className="rounded-lg border border-white/5 bg-black/20">
+                      <button
+                        onClick={() => setExpandedFile(isExpanded ? null : filePath)}
+                        className="flex w-full items-center justify-between px-4 py-2 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileCode2 className="h-3.5 w-3.5 text-emerald-400/50" />
+                          <span className="text-emerald-400/70" style={{ ...mono, fontSize: 12 }}>{filePath}</span>
+                        </div>
+                        {reviewed && (
+                          isExpanded
+                            ? <ChevronDown className="h-3.5 w-3.5 text-white/30" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-white/30" />
+                        )}
+                      </button>
+                      {reviewed && isExpanded && (
+                        <div className="border-t border-white/5 p-4">
+                          <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-white/70" style={{ ...mono, fontSize: 11, lineHeight: 1.5 }}>
+                            <code>{reviewed.content}</code>
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

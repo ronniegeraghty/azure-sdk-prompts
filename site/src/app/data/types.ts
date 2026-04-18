@@ -19,6 +19,11 @@ export interface Review {
   scores?: ReviewScores;
 }
 
+export interface ReviewedFile {
+  path: string;
+  content: string;
+}
+
 export interface ReviewPanelEntry {
   model: string;
   overall_score: number;
@@ -261,6 +266,7 @@ export interface EvalReport {
   generation_duration_seconds?: number;
   review_duration_seconds?: number;
   generated_files?: string[];
+  reviewed_files?: ReviewedFile[];
   session_events?: SessionEvent[];
   event_count?: number;
   tool_calls?: string[];
