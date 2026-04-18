@@ -347,3 +347,50 @@ Both PRs approved with "LGTM ✅" comments.
 Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
 
 Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
+
+
+## 2026-04-18: Phase 4 PR Review — #588/#589/#590 + Followup PR #591
+
+Deep code review of three Phase 4 PRs that just landed on `ronniegeraghty/dev`:
+
+- **PR #588** (Oracle, examples): Validated `example.prompt.yaml` (R41 YAML-only) and `prompt-template.prompt.md` (R33 nested properties). Both parse cleanly via `hyoka validate` (89 prompts, 12 configs, 2 criteria — all valid). One doc regression: template dropped `expected_tools` commented placeholder.
+- **PR #589** (Trinity, logo + ticker): HyokaLogo SVG missing all a11y attributes. Stray `test-zero-tools.yaml` accidentally committed at repo root (not referenced by code or config discovery).
+- **PR #590** (Trinity, eval detail redesign): Three real bugs found — Switch component is keyboard-inaccessible (regression vs prior `<input type="checkbox">`), MCP detection uses substring match (false positives), expandable file viewer has no content size cap (could lock browser on large files).
+
+**Followup PR #591 opened** against `ronniegeraghty/dev` with all six fixes:
+1. Switch → `<button role="switch">` with full keyboard handling + focus ring
+2. MCP detection → prefix match on `.`, `_`, `/` separators
+3. File viewer → 256 KiB display cap with truncation notice
+4. HyokaLogo → `role="img"` + `aria-label` + `focusable="false"`
+5. Removed stray `test-zero-tools.yaml`
+6. Restored `expected_tools` comment in template
+
+**Verification:** `go test -race ./hyoka/... -timeout 3m` ✓ all 24 packages, `npm test` ✓ 56/56 site tests, `go build ./...` ✓, `npm run build` ✓ (site rebuilt and embedded assets refreshed).
+
+**Issue comments posted:** #358, #362, #363 — verdict ✅ APPROVE-with-followups for all three. GO for closing the three feature issues once #591 lands.
+
+**Phase 4 epic #310 verdict: GO.** All three PRs ship working features. The followup issues are real (esp. Switch keyboard a11y) but small, isolated, and now fixed in #591. No blockers for promoting dev → main.
+
+**Learnings:**
+
+1. **Custom UI components frequently regress accessibility** — Trinity replaced an accessible `<input type="checkbox">` with a custom `Switch` and lost keyboard support, ARIA semantics, and focus styling all at once. Pattern: when replacing native form controls with custom components, write at least one keyboard-interaction test before merging. The follow-up #591 fix template (`<button role="switch">` + Space/Enter handler + focus ring + linked label) is reusable for future custom toggles.
+
+2. **Substring matches are bug magnets** — `tool.includes(server)` for MCP detection looks innocent but breaks the moment a builtin tool name happens to contain a server name as a substring. Prefer prefix-with-separator (`startsWith(s + ".")`) or exact match. This pattern likely exists elsewhere — worth a grep audit.
+
+3. **Renderers need size caps** — Any code that does `<pre>{userContent}</pre>` or equivalent without a size cap is a foot-gun. 256 KiB is a reasonable display cap for code; users can still get full content via the file system. Cap-with-notice > silent truncation.
+
+4. **Stray files at repo root sneak through review** — `test-zero-tools.yaml` was a pairwise scratch fixture that got `git add`-ed alongside intended changes. Code review focused on the meaningful diff and missed it. Pattern worth adding to PR description templates: "list any new files at repo root and explain why they belong there."
+
+5. **Template docs are tested by USE, not validation** — `hyoka validate` happily passed the template after the `expected_tools` placeholder was removed because the parser doesn't require any optional field. But for prompt authors discovering features by reading the template, the regression is real. Recommendation: add a smoke test that asserts the template mentions every documented Prompt field, or add a docs-completeness CI check.
+
+6. **Site asset embedding is a multi-step gotcha** — Every site/src/* edit requires `npm run build` + copy `site/dist/*` → `hyoka/internal/serve/site/`. Easy to forget; commits without the rebuild ship stale UI. Worth a make target or pre-push hook.
+
+**Next actions:**
+- Monitor PR #591 for review/merge
+- File follow-up issue: add `eval-detail-page.test.tsx` covering Switch toggling, tool badge classification, expandable file behavior + size cap, edge cases (no environment, no reviewed_files, no available_tools)
+- Optional grep audit for other `tool.includes(...)` substring-match patterns in site/
+
+**Cross-team:**
+- Coordinator/Morpheus: Phase 4 epic #310 = GO. PR #591 is the only outstanding work and it's small.
+- Trinity: When you write more custom form controls, please follow the `Switch` accessibility template in #591.
+- Oracle: Worth keeping `expected_tools` (and other optional fields like `expected_packages`) visible in the template — authors discover features by reading templates.
