@@ -1,80 +1,169 @@
 # hyoka
 
-A comprehensive evaluation tool for AI agents generating code. hyoka runs prompts through the GitHub Copilot SDK, scores generated code against extensible grader criteria (builder, complexity, prompt adherence, behavior, and AI review), and produces detailed pass/fail reports with workspace delta tracking.
+**A comprehensive evaluation tool for AI agents.** hyoka runs prompts through AI agents (GitHub Copilot SDK), scores generated code against extensible grader criteria, and produces detailed pass/fail reports with workspace delta tracking.
 
-## Quick Start
+## Installation
 
-### Prerequisites
+**Prerequisites:**
+- **Go 1.26.1+**
+- **GitHub Copilot CLI** — must be installed and authenticated ([setup guide](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli))
 
-- **Go 1.26.1+** — to build and run the tool
-- **GitHub Copilot CLI** — the SDK communicates with Copilot via the CLI in server mode. Must be installed and authenticated:
-  - Install: follow [GitHub Copilot CLI setup](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
-  - Authenticate: run `copilot` once to complete OAuth device flow, or set `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` env var
-  - Without this, the tool falls back to stub mode (no real evaluations)
-- **GitHub CLI (`gh`)** — optional but recommended for auth token management
-- **For `azure-mcp` config:** `npx` (Node.js) must be available since the Azure MCP server is launched via `npx -y @azure/mcp@latest`
-
-### Run from the repo (recommended)
-
-The repo root has a `go.work` file, so all commands run from the repo root:
+**From source (recommended for development):**
 
 ```bash
 git clone https://github.com/ronniegeraghty/hyoka.git
 cd hyoka
-
-# List prompts
-go run ./hyoka list
-
-# Run all evaluations (auto-generates trend analysis after)
-# Note: requires --all-configs if multiple configs exist
-go run ./hyoka run --all-configs
-
-# Filter by service and language
-go run ./hyoka run --service storage --language dotnet
+go run . list  # Verify installation
 ```
 
-### Install as a CLI
+**Install as a CLI:**
 
 ```bash
 go install github.com/ronniegeraghty/hyoka@latest
-
-# When run from the repo root, prompts are auto-detected
-cd hyoka
-hyoka run --service storage
-
-# Or specify the prompts path explicitly
-hyoka run --prompts ~/projects/hyoka/prompts
+hyoka version
 ```
 
-> **Smart path detection:** `hyoka` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `hyoka/` directory both work without extra flags.
+## Quick Start
 
-### Creating a `.hyoka` Project Directory
-
-To organize prompts, configs, and skills for your own evaluations, initialize a `.hyoka` project directory:
+Run your first evaluation in under 5 minutes:
 
 ```bash
-# Create a .hyoka directory with standard subdirectories
-hyoka init
+# 1. List available prompts
+go run . list --service key-vault --language python
 
-# Organize your own prompts and configs
-cd .hyoka
-# Add prompts/ configs/ criteria/ skills/
+# 2. Run a single evaluation
+go run . run \
+  --prompt-id key-vault-dp-python-crud \
+  --config baseline/claude-opus-4.6
 
-# Run evaluations against your local project
-hyoka run --service my-service --config my-config
+# 3. View results in your browser
+go run . serve
+# Open http://localhost:8080
 ```
 
-The `init` command creates:
-- `configs/` — evaluation configuration YAML files
-- `prompts/` — custom prompt library
-- `criteria/` — attribute-matched grader criteria
-- `skills/` — Copilot skills (generator and reviewer)
-- `reports/` — evaluation output (auto-added to .gitignore)
-- `.gitignore` — excludes `reports/` from version control
+**What just happened?** hyoka:
+1. Loaded the `key-vault-dp-python-crud` prompt
+2. Spawned a Copilot session with Claude Opus 4.6
+3. Generated code based on the prompt
+4. Evaluated it against 5 grader types (builder, complexity, prompt adherence, behavior, AI review)
+5. Produced a pass/fail report with detailed grading breakdown
+
+## Examples
+
+### Sample Prompt
+
+Prompts are markdown files with YAML frontmatter. Here's a minimal example:
+
+```markdown
+---
+id: key-vault-dp-python-crud
+properties:
+  service: key-vault
+  plane: data-plane
+  language: python
+  category: crud
+  difficulty: basic
+  description: Create, read, update, and delete secrets using Azure Key Vault SDK for Python
+  sdk_package: azure-keyvault-secrets
+  doc_url: https://learn.microsoft.com/python/api/overview/azure/keyvault-secrets-readme
+  created: '2025-01-15'
+  author: ronniegeraghty
+tags:
+- secrets
+- crud
+---
+
+Write a Python script that demonstrates CRUD operations for Azure Key Vault secrets. The script should:
+
+1. Create a secret with name and value
+2. Retrieve the secret value
+3. Update the secret value
+4. Delete the secret
+5. Use DefaultAzureCredential for authentication
+```
+
+**See more:** [Prompt Authoring Guide](docs/prompt-authoring.md)
+
+### Sample Config
+
+Configs define the generator model, reviewer models, and available tools:
+
+```yaml
+configs:
+  - name: baseline/claude-opus-4.6
+    description: "Claude Opus 4.6 with no MCP or skills"
+    generator:
+      model: "claude-opus-4.6"
+    reviewer:
+      models:
+        - "claude-opus-4.6"
+        - "gpt-5.3-codex"
+```
+
+**See more:** [Configuration Guide](docs/configuration.md)
+
+### Sample Criteria
+
+Criteria files define grading rules matched by prompt attributes:
+
+```yaml
+attributes:
+  service: key-vault
+  language: python
+criteria:
+  - name: SDK Package Import
+    type: code_pattern
+    pattern: 'from azure\.keyvault\.secrets import'
+    weight: 0.15
+  - name: DefaultAzureCredential Usage
+    type: code_pattern
+    pattern: 'DefaultAzureCredential\(\)'
+    weight: 0.20
+```
+
+**See more:** [Grader Configuration Schema](docs/grader-config-schema.md)
+
+## Commands
+
+hyoka provides commands for running evaluations, browsing results, and managing prompts. For complete flag documentation, see [CLI Reference](docs/cli-reference.md).
+
+| Command | Description |
+|---------|-------------|
+| `hyoka run` | Run evaluations against prompts with specified configs |
+| `hyoka list` | List prompts matching filter criteria |
+| `hyoka serve` | Launch local web UI for browsing reports |
+| `hyoka compare` | Compare evaluation results (configs, runs, or time periods) |
+| `hyoka init` | Scaffold a `.hyoka` project directory |
+| `hyoka validate` | Validate prompt frontmatter against schema |
+| `hyoka check-env` | Check for required language toolchains and tools |
+| `hyoka clean` | Remove stale session state and orphaned processes |
+
+**Filtering prompts:**
+
+```bash
+# By service
+hyoka run --service key-vault --config baseline/claude-opus-4.6
+
+# By language
+hyoka run --language python --config baseline/claude-opus-4.6
+
+# Combine filters (AND logic)
+hyoka run --service storage --language dotnet --plane data-plane \
+  --config baseline/claude-opus-4.6
+
+# Single prompt by ID
+hyoka run --prompt-id storage-dp-dotnet-auth \
+  --config baseline/claude-opus-4.6
+
+# Dry run — list matches without executing
+hyoka run --service storage --dry-run
+```
+
+**See all commands and flags:** [CLI Reference](docs/cli-reference.md)
 
 ## Safety & Guardrails
 
-hyoka includes built-in protections that keep evaluation runs safe, bounded, and predictable by default. No extra flags are needed — everything below is on unless you opt out.
+hyoka includes built-in protections that keep evaluation runs safe, bounded, and predictable by default.
 
 ### Generator Guardrails
 
@@ -83,457 +172,57 @@ Every code-generation session is automatically aborted if it exceeds any of thes
 | Limit | Default | Flag | Purpose |
 |-------|---------|------|---------|
 | Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
-| File count | 50 | `--max-files` | Prevents excessive file creation (counts new files + deleted starters, ignores starter files) |
-| Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (counts only deltas: new files or modifications to starters; supports KB, MB suffixes) |
+| File count | 50 | `--max-files` | Prevents excessive file creation (counts new files + deleted starters) |
+| Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (counts deltas only) |
 
-Prompts can override these defaults via frontmatter fields (`max_session_actions`, `max_turns`). The resolution order is: prompt frontmatter > config YAML > CLI flag > engine default.
+Prompts can override defaults via frontmatter. Resolution order: prompt frontmatter > config YAML > CLI flag > engine default.
 
-When a guardrail trips, the evaluation is marked as failed with a clear reason (e.g., `guardrail: turn count 26 exceeded limit of 25`).
+### Safety Boundaries
 
-### Safety Boundaries (No Real Azure Resources)
+By default, generators **prevent real Azure resource provisioning**. The agent uses:
+- Mock data, environment variables, and local emulators
+- Bicep/ARM/Terraform templates instead of live `az` CLI commands
+- Placeholder values like `os.Getenv("AZURE_STORAGE_CONNECTION_STRING")`
 
-By default, generators receive a system instruction that **prevents real Azure resource provisioning**. The agent will:
-- Use mock data, environment variables, and local emulators (Azurite, CosmosDB emulator)
-- Generate Bicep/ARM/Terraform templates instead of running live `az` CLI commands
-- Use placeholder values like `os.Getenv("AZURE_STORAGE_CONNECTION_STRING")`
+Use `--allow-cloud` to permit real resource provisioning.
 
-The system prompt can be customized per generator/reviewer in the config file. If not specified, defaults to zero (no additional system instruction beyond Copilot's defaults).
+### Other Protections
 
-Use `--allow-cloud` to opt out and permit real resource provisioning.
+- **Fan-out confirmation:** Prompts for confirmation when >10 evaluations would run (skip with `-y`)
+- **Process lifecycle:** Auto-terminates spawned Copilot processes on completion or interrupt (SIGTERM → SIGKILL)
+- **Smart concurrency:** Defaults to CPU core count (capped at 8); `--max-sessions` limits concurrent instances
+- **Prompt discovery:** Clear error messages with near-miss detection for misnamed files
 
-### Fan-Out Confirmation
+**See more:** [Guardrails Documentation](docs/guardrails.md)
 
-When a run would execute **more than 10 evaluations**, hyoka shows a summary and asks for confirmation before proceeding. Use `-y` / `--yes` to skip the prompt (useful in CI). If multiple configs exist and no `--config` filter is specified, `--all-configs` is required to prevent accidental full-matrix runs.
+## Contributing
 
-### Process Lifecycle
+We welcome contributions! To get started:
 
-hyoka tracks all spawned Copilot processes and terminates them on completion or interrupt (Ctrl+C). The cleanup sequence sends SIGTERM, waits up to 5 seconds, then SIGKILL — no more orphaned processes consuming resources after a run. All SDK-spawned processes are tagged with `HYOKA_SESSION=true` in their environment, enabling `hyoka clean` to find and kill orphans even from crashed runs.
+1. **Read the contributing guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
+2. **Check the architecture docs:** [docs/architecture.md](docs/architecture.md)
+3. **Browse open issues:** [GitHub Issues](https://github.com/ronniegeraghty/hyoka/issues)
 
-### Smart Concurrency
-
-Workers default to **CPU core count** (capped at 8) instead of a hardcoded 4. The `--max-sessions` flag limits total concurrent Copilot instances (default: workers × 3) to prevent resource exhaustion on shared machines.
-
-### Prompt Discovery
-
-`validate` and `run` now fail with a clear error when zero prompts are found. Near-miss detection suggests corrections for misnamed files:
-
-```
-no prompts found in ./prompts
-
-Did you mean one of these?
-  prompts/storage/data-plane/dotnet/auth-prompt.md → auth.prompt.md
-  prompts/key-vault/crud.prompt.txt → crud.prompt.md
-```
-
-## Commands
-
-| Command | Alias | Description |
-|---------|-------|-------------|
-| `hyoka run` | | Run evaluations against prompts |
-| `hyoka list` | `ls` | List prompts matching filters |
-| `hyoka init` | | Scaffold a `.hyoka` project directory |
-| `hyoka compare` | | Compare evaluation results between configs, runs, or time periods |
-| `hyoka configs` | | Show available tool configurations |
-| `hyoka validate` | | Validate prompt frontmatter against schema |
-| `hyoka check-env` | `env` | Check for required language toolchains and tools |
-| `hyoka trends` | | Generate historical trend reports with AI analysis |
-| `hyoka report` | | Re-render HTML/MD reports from existing JSON data |
-| `hyoka new-prompt` | | Scaffold a new prompt file interactively |
-| `hyoka serve` | | Launch local web UI for browsing reports (React dashboard) |
-| `hyoka plugins` | | List registered plugins |
-| `hyoka clean` | | Remove stale session state and orphaned SDK processes |
-| `hyoka version` | | Print version |
-
-### Filtering
-
-All filter flags work with `run`, `list`, and other prompt-aware commands:
+**Quick development loop:**
 
 ```bash
-# By service
-hyoka run --service storage
+# Clone and build
+git clone https://github.com/ronniegeraghty/hyoka.git
+cd hyoka
+go build .
 
-# By language
-hyoka run --language dotnet
+# Run tests
+go test -race ./hyoka/...
 
-# Combine filters (AND logic)
-hyoka run --service storage --language dotnet --plane data-plane
-
-# By category
-hyoka run --category authentication
-
-# By tags
-hyoka run --tags identity
-
-# Single prompt by ID
-hyoka run --prompt-id storage-dp-dotnet-auth
-
-# Dry run — list matches without executing
-hyoka run --service storage --dry-run
-
-# JSON output for scripting
-hyoka list --json
+# Test with a live eval (fastest feedback)
+go run . run --prompt-id key-vault-dp-python-crud \
+  --config baseline/claude-opus-4.6
 ```
 
-### Run Command Flags
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--pairwise` / `-P` | `false` | Expand each config into N+1 pairwise tool-ablation variants for regression testing |
-| `--analyze` | `true` | AI-powered trend analysis after run |
-| `--skip-trends` | `false` | Skip automatic trend analysis after run |
-| `--progress` | `auto` | Progress display mode: `auto`, `live`, `log`, `off` |
-| `--skip-tests` | `false` | Skip test generation |
-| `--skip-review` | `false` | Skip code review |
-| `--stub` | `false` | Use stub evaluator (no Copilot SDK) |
-| `--dry-run` | `false` | List matching prompts without running |
-| `--workers` | CPU cores (max 8) | Parallel evaluation workers |
-| `--max-sessions` | workers × 3 | Maximum concurrent Copilot sessions |
-| `--timeout` | `300` | Per-prompt timeout in seconds |
-| `-y` / `--yes` | `false` | Skip confirmation prompt for large runs (>10 evaluations) |
-| `--all-configs` | `false` | Required when running all configs without a `--config` filter |
-| `--config` | | Config name(s) to run — use quotes for multiple: `"name1,name2"` |
-| `--max-session-actions` | `50` | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
-| `--max-files` | `50` | Maximum generated files per evaluation before aborting |
-| `--max-output-size` | `1MB` | Maximum total output size per evaluation (supports KB, MB suffixes) |
-| `--max-session-actions` | `50` | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
-| `--allow-cloud` | `false` | Allow generated code to provision real Azure resources |
-| `--criteria-dir` | (none) | Directory with attribute-matched criteria YAML files (e.g., `criteria/`) |
-| `--strict-cleanup` | `false` | Fail run if orphaned Copilot processes remain after cleanup |
-| `--monitor-resources` | `false` | Monitor CPU and memory usage of Copilot sessions during evaluation |
-| `--session-timeout` | `600` | Maximum time in seconds for any single session phase to complete |
-| `--exclude-dirs` | | Comma-separated directories to exclude from generated_files output |
-
-### Run Command Examples
-
-```bash
-# Skip confirmation for large runs (CI-friendly)
-go run ./hyoka run --prompt-id my-prompt --config "baseline/claude-sonnet-4.5" -y
-
-# Run all prompts × all configs (requires --all-configs + -y for non-interactive)
-go run ./hyoka run --all-configs -y
-
-# Tighten guardrails for faster iteration
-go run ./hyoka run --max-session-actions 10 --max-files 20
-
-# Allow real Azure resource provisioning (use with caution)
-go run ./hyoka run --allow-cloud
-
-# Limit concurrent Copilot sessions on a shared machine
-go run ./hyoka run --max-sessions 4 --workers 2
-```
-
-### Init Command
-
-Initialize a `.hyoka` project directory with standard subdirectories:
-
-```bash
-# Create a .hyoka project directory in the current working directory
-hyoka init
-```
-
-This scaffolds:
-- `configs/` — evaluation config YAML files
-- `prompts/` — prompt library (.prompt.md files)
-- `criteria/` — attribute-matched grader criteria
-- `skills/` — Copilot skills (generator and reviewer)
-- `reports/` — evaluation output directory (added to .gitignore)
-
-Running `init` again on an existing `.hyoka` directory is safe (idempotent).
-
-### Compare Command
-
-Compare evaluation results to identify regressions and improvements across three modes:
-
-```bash
-# Config comparison — compare two configs across all shared prompts
-hyoka compare --config-a baseline/claude-sonnet-4.5 --config-b azure-mcp/claude-sonnet-4.5
-
-# Run comparison — compare results from two specific evaluation runs
-hyoka compare --run-a <run-id-1> --run-b <run-id-2>
-
-# Temporal comparison — compare a config before and after a date
-hyoka compare --config baseline/claude-opus-4.6 --since 2025-01-15
-```
-
-The compare command analyzes pass/fail deltas, score changes, and highlights regressions per prompt. Output includes:
-- Summary statistics (pass/fail counts, avg scores)
-- Per-prompt delta analysis
-- Top improvements and regressions
-- Details on failed/broken evaluations
-
-### Tools Command
-
-Manage and list tools available to the generator agent:
-
-```bash
-# List all available tools
-hyoka tools list
-
-# Add a new tool configuration
-hyoka tools add --name my-tool --description "Tool description"
-```
-
-### Validating Prompts
-
-```bash
-# Validate all prompts
-hyoka validate
-```
-
-### Tool Configurations
-
-Each config file defines **one generator model** and a **multi-model review panel**. The `configs/` directory contains configs auto-discovered via `LoadDir()`:
-
-```bash
-# List configs
-hyoka configs
-
-# Run with a specific config file
-hyoka run --config-file configs/baseline-sonnet.yaml --prompt-id storage-dp-dotnet-auth
-
-# Run all configs (default — auto-discovers configs/ directory)
-hyoka run --prompt-id storage-dp-dotnet-auth
-
-# Run with a specific config name
-hyoka run --config baseline/claude-sonnet-4.5
-
-# Run multiple configs (produces comparison data)
-# Note: multiple config names must be quoted and comma-separated
-hyoka run --config "baseline/claude-sonnet-4.5,azure-mcp/claude-sonnet-4.5"
-```
-
-> ⚠️ **Config names use the `name:` field from your YAML files**, not the filename. Multiple configs must be quoted: `--config "config1,config2"`. See [Configuration Guide](docs/configuration.md) for the full name-to-filename mapping.
-
-#### Custom Configs
-
-Create your own config YAML in the `configs/` directory. The config has two clear sections — `generator` for the code generation agent and `reviewer` for the review/grading plane:
-
-```yaml
-configs:
-  - name: my-custom-config
-    description: "My custom evaluation config"
-    generator:
-      model: "claude-sonnet-4.5"
-      tools:
-        - name: azure-keyvault-py
-          type: skill
-          source: remote
-          repo: microsoft/skills
-        - name: generator-skills
-          type: skill
-          source: local
-          path: "./skills/generator"
-        - name: azure
-          type: mcp
-          command: npx
-          args: ["-y", "@azure/mcp@latest"]
-    reviewer:
-      models:
-        - "claude-opus-4.6"
-        - "gemini-3-pro-preview"
-        - "gpt-4.1"
-      tools:
-        - name: reviewer-skills
-          type: skill
-          source: local
-          path: "./skills/reviewer"
-```
-
-Then run with: `hyoka run --config-file configs/my-custom-config.yaml`
-
-#### Skills in `tools`
-
-Skills give agents domain-specific knowledge (SDK patterns, API examples, acceptance criteria) that improve code generation and review quality. They are configured as `tools` entries with `type: skill` in the generator or reviewer section.
-
-Each skill has a `type`:
-
-| Type | Fields | Description |
-|------|--------|-------------|
-| `local` | `path` | Local directory containing a `SKILL.md` file. Supports glob patterns (e.g., `"./skills/generator/*"`) |
-| `remote` | `name`, `repo` | Skill fetched from a GitHub repository via `npx skills add` |
-
-**Example — generator with local + remote skills:**
-
-```yaml
-generator:
-  model: "claude-sonnet-4.5"
-  tools:
-    - name: azure-keyvault-py
-      type: skill
-      source: remote
-      repo: microsoft/skills
-    - name: generator-skills
-      type: skill
-      source: local
-      path: "./skills/generator"
-```
-
-**Example — reviewer with local skills:**
-
-```yaml
-reviewer:
-  models:
-    - "claude-opus-4.6"
-    - "gpt-4.1"
-  tools:
-    - name: reviewer-skills
-      type: skill
-      source: local
-      path: "./skills/reviewer"
-```
-
-> **Tip:** The [microsoft/skills](https://github.com/microsoft/skills) repo contains 132+ skills across Azure SDK scenarios. Browse the repo or run `npx skills add microsoft/skills` to see what's available.
-
-#### Using Copilot CLI Installed Plugins
-
-If you've installed skill plugins via the Copilot CLI `/plugin` commands, you can reference them directly in your config using the `plugins` field. This avoids hardcoding absolute paths.
-
-**Step 1 — Install skills in Copilot CLI:**
-
-```
-/plugin marketplace add Microsoft/skills
-/plugin install azure-sdk-java@skills
-/plugin list
-```
-
-**Step 2 — Reference in config:**
-
-```yaml
-configs:
-  - name: baseline-skills/claude-sonnet-4.5
-    description: "Baseline + Skills"
-    generator:
-      model: "claude-sonnet-4.5"
-    plugins:
-      - "azure-sdk-java@skills"
-```
-
-The `plugins` field resolves `plugin-name@marketplace` to `~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/` automatically. This is equivalent to setting `generator_skill_directories` to the full absolute path.
-
-See `configs/baseline-sonnet-skills.yaml` for a working example.
-
-See `configs/example-full.yaml` for a complete example with all options.
-
-## Adding a New Prompt
-
-Add a `.prompt.md` file to `prompts/` and run the tool — it discovers prompts automatically.
-
-```bash
-# 1. Copy the template
-cp templates/prompt-template.prompt.md \
-   prompts/<service>/<plane>/<language>/<use-case>.prompt.md
-
-# 2. Edit the file — fill in frontmatter and write your prompt
-
-# 3. Validate
-go run ./hyoka validate
-
-# 4. Commit
-git add prompts/
-git commit -m "prompt: add <service> <plane> <language> <category>"
-```
-
-## Repo Structure
-
-```
-hyoka/
-├── README.md
-├── go.work                            # Go workspace (run commands from repo root)
-├── configs/                           # Evaluation configs (one generator per file)
-│   ├── baseline-sonnet.yaml           # Baseline + Claude Sonnet 4.5
-│   ├── baseline-opus.yaml             # Baseline + Claude Opus 4.6
-│   ├── baseline-opus-skills.yaml      # Baseline + Claude Opus 4.6 + generator skills
-│   ├── baseline-codex.yaml            # Baseline + GPT Codex
-│   ├── azure-mcp-sonnet.yaml          # Azure MCP + Claude Sonnet 4.5
-│   ├── azure-mcp-opus.yaml            # Azure MCP + Claude Opus 4.6
-│   └── azure-mcp-codex.yaml           # Azure MCP + GPT Codex
-├── prompts/                           # Prompt library
-│   ├── storage/
-│   │   ├── data-plane/
-│   │   │   ├── dotnet/
-│   │   │   │   └── authentication.prompt.md
-│   │   │   └── python/
-│   │   │       └── pagination-list-blobs.prompt.md
-│   │   └── management-plane/
-│   │       └── ...
-│   └── key-vault/
-│       └── ...
-├── skills/                            # Copilot skills for eval sessions
-│   ├── generator/                     # Skills for the generator agent (install via npx skills add or type: remote)
-│   └── reviewer/                      # Skills for the review panel agents
-│       ├── code-review-comments/
-│       ├── reviewer-build/
-│       └── sdk-version-check/
-├── hyoka/                              # Go eval tool (hyoka)
-│   ├── cmd/hyoka/main.go
-│   ├── go.mod / go.sum
-│   └── internal/                      # All internal packages
-│       ├── build/                     # Language-specific build verification
-│       ├── checkenv/                  # Environment prerequisite validation
-│       ├── clean/                     # Session state & orphan process cleanup
-│       ├── config/                    # Config loading & parsing
-│       ├── criteria/                  # Tiered evaluation criteria system
-│       ├── eval/                      # Evaluation engine (generation + orchestration)
-│       ├── history/                   # Run history tracking
-│       ├── logging/                   # Structured slog logging utilities
-│       ├── manifest/                  # Dependency manifest
-│       ├── plugin/                    # Composable plugin system
-│       ├── progress/                  # Progress display (live, log, off)
-│       ├── prompt/                    # Prompt loading, filtering, validation
-│       ├── rerender/                  # Report re-rendering from JSON
-│       ├── report/                    # Report generation (JSON, HTML, Markdown)
-│       ├── review/                    # Multi-model review (PromptReviewGrader)
-│       ├── serve/                     # Local web server for report browsing
-│       ├── skills/                    # Skill fetching (local + remote)
-│       ├── trends/                    # Cross-run trend analysis
-│       ├── utils/                     # Shared utility functions
-│       └── validate/                  # Prompt schema validation
-├── reports/                           # Evaluation output
-│   └── <run-id>/
-│       ├── summary.{json,html,md}
-│       └── results/<service>/<plane>/<language>/<category>/<config>/
-│           └── report.{json,html,md}
-├── docs/                              # Documentation
-│   ├── getting-started.md
-│   ├── architecture.md
-│   ├── cli-reference.md
-│   ├── configuration.md
-│   ├── prompt-authoring.md
-│   ├── guardrails.md
-│   └── contributing.md
-└── templates/
-    └── prompt-template.prompt.md
-```
-
-## Tagging System
-
-Every prompt uses YAML frontmatter:
-
-| Field | Required | Values |
-|---|---|---|
-| `id` | ✅ | `{service}-{dp\|mp}-{lang}-{category-slug}` |
-| `service` | ✅ | `storage`, `key-vault`, `cosmos-db`, `event-hubs`, `app-configuration`, `purview`, `digital-twins`, `identity`, `resource-manager`, `service-bus` |
-| `plane` | ✅ | `data-plane`, `management-plane` |
-| `language` | ✅ | `dotnet`, `java`, `js-ts`, `python`, `go`, `rust`, `cpp` |
-| `category` | ✅ | `authentication`, `pagination`, `polling`, `retries`, `error-handling`, `crud`, `batch`, `streaming`, `auth`, `provisioning` |
-| `difficulty` | ✅ | `basic`, `intermediate`, `advanced` |
-| `description` | ✅ | What this prompt tests (1-3 sentences) |
-| `created` | ✅ | Date (YYYY-MM-DD) |
-| `author` | ✅ | GitHub username |
-| `sdk_package` | ❌ | SDK package name |
-| `doc_url` | ❌ | Library reference docs (API overview, pkg.go.dev, docs.rs) |
-| `tags` | ❌ | Free-form tags for additional filtering |
-
-## Roadmap
-
-- **Phase 1:** ✅ Prompt library, build verification, report generation with stub evaluator
-- **Phase 2:** ✅ Copilot SDK integration — live agent evaluation with code generation and criteria-based review panel
-- **Phase 3:** ✅ Tool matrix, MCP server attachment, skill loading, cross-config comparison
-- **Phase 4:** ✅ Guardrails, safety boundaries, smart concurrency, process lifecycle, prompt discovery
-- **Phase 5:** ✅ Evaluation quality (check-env, expected_tools, reviewer skills, report re-rendering)
-- **Phase 6:** Planned — Polish (embedded CLI, progress bars, web dashboard)
-
-See [CLI Reference](docs/cli-reference.md) and [Configuration Guide](docs/configuration.md) for detailed documentation.
+**See also:**
+- [Roadmap](docs/roadmap.md) — completed phases and what's planned
+- [CLI Reference](docs/cli-reference.md) — all commands and flags
+- [Configuration Guide](docs/configuration.md) — config file format and options
 
 ## License
 
