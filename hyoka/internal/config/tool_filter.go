@@ -20,6 +20,7 @@ type ToolEntry struct {
 	Source   string `yaml:"source,omitempty" json:"source,omitempty"` // "local" or "remote"
 	Path     string `yaml:"path,omitempty" json:"path,omitempty"`
 	Repo     string `yaml:"repo,omitempty" json:"repo,omitempty"`
+	Branch   string `yaml:"branch,omitempty" json:"branch,omitempty"`       // git branch for remote skills (default: repo default branch)
 	SkillDir bool   `yaml:"skill_dir,omitempty" json:"skill_dir,omitempty"` // true = path is a directory of skills, false = path is a single skill
 }
 
@@ -119,6 +120,9 @@ func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 		}
 		if entry.SkillDir && entry.Repo != "" {
 			return fmt.Errorf("config %q: tools[%d] skill_dir is only valid for local skills", configName, idx)
+		}
+		if entry.Branch != "" && entry.Repo == "" {
+			return fmt.Errorf("config %q: tools[%d] branch is only valid for remote skills", configName, idx)
 		}
 	default:
 		return fmt.Errorf("config %q: tools[%d] has unknown type %q", configName, idx, entry.Type)

@@ -962,9 +962,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Populate environment info from config and captured events.
 	// Use ResolveSkillDirs for accurate directory resolution (#291).
+	// Resolve relative to .hyoka root so paths like "./skills/generator" work.
+	proj := config.DiscoverFromCWD()
+	skillBase := ""
+	if proj.Found() {
+		skillBase = proj.Root
+	}
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, "")
+		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, skillBase)
 		if err != nil {
 			slog.Warn("Failed to resolve skill directories for report", "error", err)
 		} else {
@@ -1427,6 +1433,11 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 	// Validate skill directories for each unique config (#291).
 	// This surfaces warnings about empty/missing skill dirs during dry run.
 	validatedConfigs := make(map[string]bool)
+	validProj := config.DiscoverFromCWD()
+	validSkillBase := ""
+	if validProj.Found() {
+		validSkillBase = validProj.Root
+	}
 	for _, t := range tasks {
 		if validatedConfigs[t.Config.Name] {
 			continue
@@ -1434,7 +1445,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
 			entries := countSkillEntries(t.Config.Generator.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, "")
+			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, validSkillBase)
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
@@ -1446,7 +1457,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		}
 		if t.Config.Reviewer != nil {
 			entries := countSkillEntries(t.Config.Reviewer.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, "")
+			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, validSkillBase)
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue

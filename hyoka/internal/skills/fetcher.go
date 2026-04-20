@@ -257,22 +257,37 @@ func fetchRemoteNpx(entry config.ToolEntry, repo, baseDir string) (string, error
 // the path to a specific skill inside a subpath. Used when entry.Repo includes
 // a subpath (e.g. "microsoft/skills/.github/plugins/azure-sdk-rust/skills").
 //
+// When entry.Branch is set, the clone targets that specific branch; otherwise
+// the repo's default branch is used. Different branches get separate cache dirs.
+//
 // The final skill dir is <cacheDir>/<subpath>/<entry.Name>/ and must contain
 // SKILL.md. Subsequent runs reuse the existing clone and refresh via "git pull".
 func fetchRemoteSparse(entry config.ToolEntry, repo, subpath, baseDir string) (string, error) {
-	cacheDir := filepath.Join(baseDir, ".skills-cache", "sparse", repo)
+	branch := entry.Branch
+	// Include branch in cache path so different branches don't collide.
+	var cacheDir string
+	if branch != "" {
+		cacheDir = filepath.Join(baseDir, ".skills-cache", "sparse", repo, branch)
+	} else {
+		cacheDir = filepath.Join(baseDir, ".skills-cache", "sparse", repo)
+	}
 	skillDir := filepath.Join(cacheDir, subpath, entry.Name)
 	cloneURL := fmt.Sprintf("https://github.com/%s.git", repo)
 
 	fmt.Printf("Fetching remote skill: %s (repo: %s, subpath: %s)\n", entry.Name, repo, subpath)
-	slog.Info("Fetching remote skill (sparse)", "skill", entry.Name, "repo", repo, "subpath", subpath, "cache_dir", cacheDir)
+	slog.Info("Fetching remote skill (sparse)", "skill", entry.Name, "repo", repo, "subpath", subpath, "branch", branch, "cache_dir", cacheDir)
 
 	if _, err := os.Stat(filepath.Join(cacheDir, ".git")); err != nil {
 		// First-time clone: blobless, no checkout, then configure sparse-checkout.
 		if err := os.MkdirAll(filepath.Dir(cacheDir), 0755); err != nil {
 			return "", fmt.Errorf("creating skill cache dir: %w", err)
 		}
-		if err := runGit("", "clone", "--filter=blob:none", "--no-checkout", "--depth=1", cloneURL, cacheDir); err != nil {
+		cloneArgs := []string{"clone", "--filter=blob:none", "--no-checkout", "--depth=1"}
+		if branch != "" {
+			cloneArgs = append(cloneArgs, "--branch", branch)
+		}
+		cloneArgs = append(cloneArgs, cloneURL, cacheDir)
+		if err := runGit("", cloneArgs...); err != nil {
 			return "", fmt.Errorf("git clone %s: %w", repo, err)
 		}
 		// Non-cone mode: the subpath may start with "." (e.g. ".github/...").
