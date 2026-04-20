@@ -127,3 +127,22 @@ Surfaces touched: root/run/new-prompt commands, graders, eval, review, config, l
 
 **Learning:** sed is the right tool for Unicode-safe string replacement when edit tool can't match escape sequences like `\u2014` (em-dash). Always verify CLI help output end-to-end with `go run . --help` before pushing.
 
+
+### Session 2026-04-21 (R77 — Configurable prompt_directory, #598)
+
+**Status:** COMPLETE — PR pending push
+**Branch:** `ronniegeraghty/issue-598-configurable-prompt-dir` → `phase-6`
+
+**What:** Added top-level `prompt_directory:` YAML field to `ConfigFile`. New `ResolvePromptDirCandidates` and `PeekPromptDirectory` helpers in `internal/config/discovery.go`. Wired `run`, `validate`, `list`, `serve` to consult the config-driven path with priority: `--prompts` flag > config `prompt_directory:` > `.hyoka/prompts/` > `./prompts/` > `../prompts/`.
+
+**Backwards compatible:** field is optional; absent → identical behavior to today.
+
+**Tests:** 11 new tests in `prompt_dir_test.go` covering Load relative/absolute path resolution, LoadDir conflict detection, ResolvePromptDirCandidates ordering, PeekPromptDirectory edge cases.
+
+**Verification:** End-to-end smoke test in `.scratch-598/` confirmed default-init path, config-driven override, and `--prompts` flag-overrides-config.
+
+**Learnings:**
+- The repo's hard-coded `prompts` discovery flowed through 4 commands (`run`, `validate`, `list`, `serve`), each with slightly different ordering of "load configs vs resolve paths". `run` had to be reordered (configs first, then prompts dir). `validate`/`list`/`serve` use `PeekPromptDirectory` to extract just the field without doing strict YAML validation, so a malformed config doesn't break commands that should be tolerant of it.
+- **Concurrent worktree hazard:** Neo was running #580 in the *same* worktree (no separate `git worktree`), which kept dropping unrelated `criteria/buckets.go` and `eval/engine.go` files into my staging area. Worked around by `git restore`-ing/deleting the leftovers before each build cycle and being explicit about which files to `git add`. Future spawns should always create a worktree per agent.
+- `gopkg.in/yaml.v3` doesn't strictly validate fields when target struct only declares the keys you care about (no `KnownFields(true)`), which makes `PeekPromptDirectory` safe even on configs with extra/unknown keys.
+- The example config emitted by `hyoka init --with-examples` is **already broken** (flat `name:` instead of nested `configs:`). Pre-existing bug, unrelated to this issue — left for a separate fix.

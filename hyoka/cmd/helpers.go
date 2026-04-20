@@ -44,8 +44,15 @@ func resolvePathFlag(cmd *cobra.Command, flagName string, candidates []string) s
 }
 
 func resolvePromptsDir(cmd *cobra.Command) string {
+	return resolvePromptsDirWithConfig(cmd, "")
+}
+
+// resolvePromptsDirWithConfig is the config-aware variant of resolvePromptsDir.
+// configPromptDir, when non-empty, takes precedence over the .hyoka/prompts/
+// default but is still overridden by an explicit --prompts flag.
+func resolvePromptsDirWithConfig(cmd *cobra.Command, configPromptDir string) string {
 	proj := discoverProject()
-	candidates := config.ResolveCandidates(proj, "prompts", "./prompts", "../prompts")
+	candidates := config.ResolvePromptDirCandidates(proj, configPromptDir)
 	return resolvePathFlag(cmd, "prompts", candidates)
 }
 

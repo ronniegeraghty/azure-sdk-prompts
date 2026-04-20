@@ -6,6 +6,33 @@ hyoka uses YAML configuration files to define evaluation setups. Each config spe
 
 By default, configs are loaded from `./configs/`. Use `--config-dir` to specify a different location.
 
+## Custom Prompt Directory
+
+By default, hyoka looks for prompts in this order:
+
+1. `./.hyoka/prompts/` (created by `hyoka init`)
+2. `./prompts/` (legacy fallback)
+3. `../prompts/` (legacy fallback)
+
+You can override this by setting `prompt_directory:` at the **top level** of any config YAML file:
+
+```yaml
+prompt_directory: ../shared-prompt-library
+configs:
+  - name: baseline/claude-opus-4.6
+    generator:
+      model: claude-opus-4.6
+```
+
+Notes:
+
+- The path is resolved **relative to the config file** that contains it (so `../shared-prompt-library` from `.hyoka/configs/foo.yaml` points at `.hyoka/../shared-prompt-library`). Absolute paths are honored as-is.
+- When loading multiple config files via `--config-dir`, only one file may set `prompt_directory`; conflicting values across files are an error.
+- The `--prompts` CLI flag still wins over the config-driven value, so a one-off `--prompts ./other` takes precedence.
+- If you don't set `prompt_directory`, behavior is identical to previous releases — existing repos require no changes.
+
+Resolution priority: `--prompts` flag → `prompt_directory:` in config YAML → `.hyoka/prompts/` → `./prompts/` → `../prompts/`.
+
 ## Config Names vs Filenames
 
 The `name` field in a config is what you pass to the `--config` CLI flag. It is **not** the filename. For example, a config file called `azure-mcp-opus.yaml` might define `name: azure-mcp/claude-opus-4.6`. You'd run it with: `--config azure-mcp/claude-opus-4.6`.

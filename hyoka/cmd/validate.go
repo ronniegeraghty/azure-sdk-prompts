@@ -35,7 +35,13 @@ func validateCmd() *cobra.Command {
 		Short: "Validate prompts, configs, and criteria",
 		Long:  "Validate all prompt files against schema rules and naming conventions, validate config files, and validate criteria files.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			promptsDir = resolvePromptsDir(cmd)
+			// Peek configs for a prompt_directory override before resolving
+			// the prompts dir so `hyoka validate` honors the same override
+			// as `hyoka run`. PeekPromptDirectory is best-effort and never
+			// fails — full config validation happens later in this command.
+			configDir := resolveConfigDir(cmd)
+			configPromptDir := config.PeekPromptDirectory(configDir)
+			promptsDir = resolvePromptsDirWithConfig(cmd, configPromptDir)
 			allOK := true
 
 			// ── Validate prompts ──────────────────────────────────
@@ -60,7 +66,6 @@ func validateCmd() *cobra.Command {
 
 			// ── Validate configs ──────────────────────────────────
 			baseDir := filepath.Dir(promptsDir)
-			configDir := resolveConfigDir(cmd)
 			if _, err := os.Stat(configDir); err != nil {
 				configDir = filepath.Join(baseDir, "configs")
 			}
