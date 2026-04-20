@@ -50,7 +50,7 @@ func setupTestDocs(t *testing.T) string {
 	dir := t.TempDir()
 
 	os.WriteFile(filepath.Join(dir, "getting-started.md"), []byte("# Getting Started\n\nWelcome to hyoka."), 0644)
-	os.WriteFile(filepath.Join(dir, "architecture.md"), []byte("# Architecture\n\nOverview of the system."), 0644)
+	os.WriteFile(filepath.Join(dir, "configuration.md"), []byte("# Configuration\n\nConfiguration guide."), 0644)
 
 	return dir
 }
@@ -259,8 +259,8 @@ func TestAPIDocsEndpoint(t *testing.T) {
 			t.Errorf("expected title for slug %q", d.Slug)
 		}
 	}
-	if !slugs["getting-started"] || !slugs["architecture"] {
-		t.Errorf("expected getting-started and architecture slugs, got %v", slugs)
+	if !slugs["getting-started"] || !slugs["configuration"] {
+		t.Errorf("expected getting-started and configuration slugs, got %v", slugs)
 	}
 }
 
