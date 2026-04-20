@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
@@ -542,7 +543,5 @@ func TestValidateCommand_Integration(t *testing.T) {
 // containsFieldName checks if the error message contains the field name
 // (case-insensitive substring match).
 func containsFieldName(errMsg, field string) bool {
-	// Simple substring check — real implementation might use more sophisticated matching
-	return len(errMsg) > 0 && len(field) > 0 && 
-		(errMsg == field || len(errMsg) >= len(field))
+	return strings.Contains(strings.ToLower(errMsg), strings.ToLower(field))
 }
