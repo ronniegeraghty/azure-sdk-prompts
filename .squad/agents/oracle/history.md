@@ -222,3 +222,36 @@ Overhauled AGENTS.md to eliminate hardcoded values and replace static content wi
 
 **Decision document:** .squad/decisions/inbox/oracle-agents-md.md
 
+
+### Session 2026-04-20 (Phase 5: WI-055 README.md Restructure)
+
+**Status:** COMPLETE  
+**Issue:** #368  
+**Branch:** oracle/issue-368-readme-restructure → merged to phase-5 via trinity/issue-364  
+**Commit:** 27550ec9, merged via 5efd563e
+
+Restructured README.md from 540-line monolith to focused 6-section document (229 lines).
+
+**New structure:**
+1. **Hero section** — installation (from source + CLI) and 5-minute quick start scenario
+2. **Examples** — sample prompt (with frontmatter), config, and criteria with links to detailed docs
+3. **Commands** — brief table with descriptions, filtering examples, links to CLI reference
+4. **Safety & Guardrails** — condensed from 75+ lines to essential info, link to detailed guardrails doc
+5. **Contributing** — points to CONTRIBUTING.md, architecture docs, and quick dev loop
+6. **License** — MIT
+
+**Content removed (moved or already elsewhere):**
+- Duplicate repo tree → already in AGENTS.md (#367)
+- Inline config details → docs/configuration.md
+- Verbose flag tables → docs/cli-reference.md
+- Tagging system details → docs/prompt-authoring.md
+- Roadmap → moved to docs/roadmap.md (new file)
+
+**Key decisions:**
+- README is now an entry point that directs users to detailed docs, not a comprehensive manual
+- Examples use real prompt IDs and configs that exist in the repo
+- All commands verified to work (`go run . list`, `go run . run`, etc.)
+- Fixed command invocation: `go run .` (not `go run ./hyoka`) matches actual repo structure (main.go at root)
+
+**Coordination:** Issue #367 (AGENTS.md Overhaul) was prerequisite to avoid repo-tree duplication. Confirmed AGENTS.md already had the repo structure section before starting README work.
+
