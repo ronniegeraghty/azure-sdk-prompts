@@ -125,7 +125,9 @@ let (status, headers, body) = response.deconstruct();
 
 ## Pagination with `Pager<T>`
 
-When a service returns a pageable collection, iterate using `futures::TryStreamExt`:
+When a service function returns a `Pager<T>` type collection, iterate over the pager directly (using `futures::TryStreamExt`). `Pager<T>` automatically flattens pages into individual items via the `Page` trait — even when `T` is a response envelope like `ListBlobsResponse`, calling `try_next()` yields individual items (e.g., `BlobItem`), **not** pages. Do **not** use `into_pages()` unless you have an explicit requirement for page-level access.
+
+### Example: Listing Key Vault secrets
 
 ```rust
 use azure_security_keyvault_secrets::ResourceExt;
@@ -138,9 +140,26 @@ while let Some(secret) = pager.try_next().await? {
 }
 ```
 
-Unless explicitly instructed, prefer iterating over individual items rather than page-by-page, demonstrating the SDK's ability to handle pagination internally. Page-by-page iteration via `into_pages()` is only necessary when there is an explicit requirement for page-level access.
+### Example: Listing blobs in a container
 
-Only use `into_pages()` if you need to access page-level details or control the pagination process:
+```rust
+use futures::TryStreamExt as _;
+
+let mut pager = container_client.list_blobs(None)?;
+while let Some(blob) = pager.try_next().await? {
+    let name = blob.name.as_deref().unwrap_or("<unknown>");
+    let size = blob
+        .properties
+        .as_ref()
+        .and_then(|p| p.content_length)
+        .unwrap_or(0);
+    println!("Blob: {name} ({size} bytes)");
+}
+```
+
+Page-by-page iteration via `into_pages()` is only necessary when there is an explicit requirement for page-level access.
+
+If you MUST iterate over the pages, using `into_pages()`, make sure you handle the nested structure correctly:
 
 ```rust
 let mut pager = client.list_secret_properties(None)?.into_pages();
