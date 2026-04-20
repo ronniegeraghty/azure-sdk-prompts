@@ -2,6 +2,34 @@
 
 ## Active Decisions
 
+### Decision: PR #592 Phase-5 Fixups — CI Green + R151 Closure (2026-04-20)
+
+**Authors:** Switch (🧪), Morpheus (🏗️)  
+**Date:** 2026-04-20  
+**PR:** #592 (phase-5 → ronniegeraghty/dev)  
+**Status:** ✅ COMPLETED — Ready for Ronnie to merge  
+
+**Context:** PR #592 had a failing Go test and an unverified R151 acceptance criterion from Phase 5 vision (#364).
+
+**What was done:**
+
+1. **CI failure (TestAPIDocsEndpoint):** Switch updated `hyoka/internal/serve/serve_test.go` to use `configuration.md` instead of `architecture.md` in the test fixture. Root cause: #366 intentionally added `architecture.md` to the `internalDocs` exclusion map in `serve.go`, but the test wasn't updated. Fix preserves the original 2-doc multi-listing assertion. Commit `680ba625`.
+
+2. **R151 verification (#596):** Morpheus investigated and found:
+   - "Pass Rate by Tool with usage toggle" — ✅ shipped in #364 (`prompt-detail-page.tsx:427-493`); missed in diff review because it replaced the existing `CorrelationTable` rather than appearing as net-new.
+   - "Prompt content in collapsible section" — ❌ was NOT actually implemented despite commit `5ea25722`'s message claiming it. Morpheus added a native `<details>`/`<summary>` block at `prompt-detail-page.tsx:348-376` rendering `prompt_text` and `evaluation_criteria`. Commit `ca2810ce`.
+
+**Lockout enforced:** Trinity and Oracle were locked out of #364 artifacts (`prompt-detail-page.tsx`). Morpheus owned the implementation per strict lockout protocol. Switch was free to fix the test (lockout was scoped to #364, not #366; Switch owns tests by charter).
+
+**Process note:** The Coordinator's original prompt referenced #595 for the R151 gap; the actual issue is #596 (#595 is unrelated `useRuns` hook work). Morpheus's commit was amended (force-push) to reference #596 correctly so the auto-close on PR merge targets the right issue.
+
+**Outcome:**
+- PR #592 CI: ✅ green (Build/Vet/Test + Site Build/Test both pass on commit `ca2810ce`)
+- Issue #596: closed (completed)
+- PR #592 ready for Ronnie to merge into `dev`
+
+---
+
 ### Decision: WorkspaceDelta Test Plan for #566 (2026-04-17)
 
 **Author:** Switch 🤍  

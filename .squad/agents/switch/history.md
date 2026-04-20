@@ -510,3 +510,19 @@ Morpheus correctly fixed mocks, restored test coverage, and uncovered + fixed re
 
 **Next:** Phase 6 planning will prioritize these based on dependency graph and test coverage strategy. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
 
+### 2026-04-20 (Phase 5 Fixups — PR #592 Test Update)
+
+**Status:** ✅ COMPLETE
+
+**Issue:** #366 added `architecture.md` to `internalDocs` exclusion map in serve.go, but TestAPIDocsEndpoint fixture still referenced it.
+
+**Fix:** Updated `hyoka/internal/serve/serve_test.go` — changed fixture from architecture.md to configuration.md. Preserves the 2-doc multi-listing assertion.
+
+**Commit:** `680ba625`
+
+**Validation:** go test ./... and go vet both pass; PR #592 CI green.
+
+**Pattern:** Stale fixture vs. internalDocs exclusion. When a feature adds items to exclusion maps (serve.go), search for test fixtures that assert on output now excluding those items.
+
+**Cross-agent note:** Morpheus fixed the #596 (R151 collapsible) in parallel; both committed. PR #592 now ready for Ronnie → dev merge.
+

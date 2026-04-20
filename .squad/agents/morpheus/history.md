@@ -392,3 +392,33 @@ Duration   2.59s
 - PR #592 review comment posted
 
 **Outcome:** Phase 5 approved for v0.3.1 release. Three non-blocking follow-ups filed for Phase 6.
+
+## 2026-04-20: Phase 5 Fixups — PR #592 R151 Gap Closure + #596 Verification
+
+**Task:** Closure of R151 acceptance criteria (#596) discovered missing during Architect review.
+
+**Investigation:**
+- **Requirement 1:** "Pass Rate by Tool with usage toggle" — ✅ Already shipped in #364 (prompt-detail-page.tsx:427–493). Missed in diff review because it replaced existing CorrelationTable rather than appearing as net-new code.
+- **Requirement 2:** "Prompt content in collapsible section" — ❌ Claimed in commit 5ea25722 but NOT implemented. Code only had static div; no native `<details>`/`<summary>`.
+
+**Implementation:**
+- **File:** `site/src/app/components/prompt-detail-page.tsx`
+- **Lines:** 348–376
+- **Content:** Native `<details>`/`<summary>` rendering `prompt_text` and `evaluation_criteria`
+- **Commit:** `ca2810ce` (amended from 1c4fd50c)
+
+**Amendment Note:** Original Coordinator prompt referenced #595 (unrelated useRuns hook work); actual issue is #596. Morpheus amended commit and force-pushed to ensure auto-close on merge targets correct issue.
+
+**Validation:**
+- ✅ Site build succeeds
+- ✅ 72 site tests pass
+- ✅ PR #592 CI green (Build/Vet/Test + Site Build/Test)
+
+**Lockout Compliance:** Trinity and Oracle locked out of prompt-detail-page.tsx (#364 artifacts). Morpheus owned R151 implementation per strict lockout protocol — no violations.
+
+**Outcome:** Issue #596 closed. PR #592 ready for Ronnie → dev merge. All acceptance criteria verified complete.
+
+**Patterns Recorded:**
+1. R151 collapsible implementation via native `<details>`/`<summary>` in prompt detail page
+2. Lockout enforcement on #364: Trinity/Oracle locked out of prompt-detail-page.tsx; Morpheus alone can modify R151 artifacts on phase-5 branch
+3. Issue reference correction workflow: Amended + force-pushed commit to fix #595→#596 reference for correct auto-close on merge
