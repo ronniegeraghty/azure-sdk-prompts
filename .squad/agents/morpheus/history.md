@@ -347,3 +347,48 @@ Duration   2.59s
 **Phase 5 Outcome:** Escalation successfully resolved. All UI features verified working. Ready for rollup PR #592.
 
 **Key Learning:** Escalation works because it brings fresh perspective + mandate to fix root causes, not work around them. The difference between hiding tests and fixing them determines code quality.
+
+## 2026-04-20: Phase 5 Architectural Review — PR #592
+
+**Task:** Architectural review of PR #592 (phase-5 → ronniegeraghty/dev), separate from Playwright verification.
+
+**Review Dimensions:**
+1. **Plan alignment** — Does v0.3.1 delivery match evolution-plan.md?
+2. **Tooling consistency** — Stays within Go stdlib, Cobra, slog, Vite/React?
+3. **Architectural smells** — Coupling, abstractions, error handling?
+4. **Issue conformance** — Do implementations meet #364, #366, #367, #368, #369 requirements?
+
+**Verdict: APPROVE WITH FOLLOWUPS**
+
+**Key Findings:**
+| Finding | Severity | Action |
+|---------|----------|--------|
+| Backup test files committed (.backup) | Major | Follow-up #594 |
+| Duplicate `useRuns()` fetch pattern | Minor | Follow-up #595 |
+| `isTestValue()` heuristic edge cases | Minor | Documented |
+| R151 collapsible/toggle not visible | Minor | Follow-up #596 |
+
+**Tooling Deviation:**
+- Added `github.com/go-playground/validator/v10` for schema validation
+- **Verdict:** ACCEPTABLE — lightweight, well-maintained, enables FR-137
+
+**Per-Issue Conformance:**
+- #364 (Prompt Pages + Dashboard): ✅ Core requirements met, gaps in R151 flagged
+- #366 (Docs Page): ✅ Full conformance
+- #367 (AGENTS.md): ✅ Full conformance
+- #368 (README.md): ✅ Full conformance
+- #369 (Schema Validation): ✅ Full conformance, 547-line test suite
+
+**Follow-ups Filed:**
+- #594: Remove backup test files and README.backup
+- #595: Extract useRuns hook
+- #596: Verify R151 prompt detail improvements
+
+**Lockout Note:** Trinity and Oracle locked out on #364. If fixes needed, assign to Neo or Tank.
+
+**Artifacts:**
+- `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md` (full review)
+- `.squad/decisions/inbox/morpheus-phase-5-arch-review.md` (decision record)
+- PR #592 review comment posted
+
+**Outcome:** Phase 5 approved for v0.3.1 release. Three non-blocking follow-ups filed for Phase 6.

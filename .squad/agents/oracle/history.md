@@ -314,3 +314,15 @@ Restructured README.md from 540-line monolith to focused 6-section document (229
 **Phase 5 Outcome:** 3 issues approved and merged. 1 escalation (locked out on #364). Ready for rollup PR #592.
 
 **Key Learning:** Test workarounds damage credibility. Escalation exists for a reason.
+
+### 2026-04-20 (Phase 5 Wrap-up — Morpheus Arch Review)
+
+**Status:** Phase 5 PR #592 approved with followups for Phase 6.
+
+**For Oracle:** Three follow-up issues (#594, #595, #596) identified for Phase 6 scope:
+- #594: Remove backup test files (.backup, .test suffix)
+- #595: Unify dashboard/prompts fetch pattern (your work on #366)
+- #596: Refine `isTestValue()` heuristic (affects schema validation in #369 — your work)
+
+**Next:** Phase 6 planning will prioritize these based on dependency graph. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
+

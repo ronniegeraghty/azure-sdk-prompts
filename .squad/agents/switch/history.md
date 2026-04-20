@@ -498,3 +498,15 @@ Morpheus correctly fixed mocks, restored test coverage, and uncovered + fixed re
 **Phase 5 Outcome:** 5 issues reviewed, 3 clean approvals, 2 issues required re-review after fixes. Reviewer-protocol escalation chain on #364 successfully resolved by Morpheus.
 
 **Key Learning:** Reviewer-protocol is the enforcement mechanism that separates serious review from rubber-stamping. Two rejections → lock → escalate is the right pattern.
+
+### 2026-04-20 (Phase 5 Wrap-up — Morpheus Arch Review)
+
+**Status:** Phase 5 PR #592 approved with followups for Phase 6.
+
+**For Switch:** Three follow-up issues (#594, #595, #596) identified for Phase 6 scope:
+- #594: Remove backup test files (.backup, .test suffix)
+- #595: Unify dashboard/prompts fetch pattern
+- #596: Refine `isTestValue()` heuristic (affects schema validation tests in #369)
+
+**Next:** Phase 6 planning will prioritize these based on dependency graph and test coverage strategy. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
+

@@ -2417,3 +2417,35 @@ Table-driven tests made adding coverage easy (9 tests in ~200 lines).
 ---
 
 *Phase 5 session complete 2026-04-20T19:12Z. All decisions consolidated from `.squad/decisions/inbox/`. Inbox files deleted.*
+
+### Decision: Phase 5 Architectural Review Verdict (PR #592)
+
+**Author:** Morpheus 🕶️  
+**Date:** 2026-04-20  
+**Status:** Approved with followups  
+**Issue:** PR #592 (phase-5 → ronniegeraghty/dev)
+
+**Verdict:** ✅ **APPROVE WITH FOLLOWUPS**
+
+**Scope Assessment:**
+- ✅ All 5 work items delivered on schedule (#364, #366, #367, #368, #369)
+- ✅ v0.3.1 commitments met: Dashboard, Prompts page, Docs page, AGENTS.md, README.md, Schema validation
+- ✅ Plan alignment verified against evolution-plan.md
+- ✅ Tooling compliant (no third-party bloat)
+- ✅ Code quality clean and maintainable
+
+**Test Coverage Review:**
+- Dashboard: 24 tests, live data verification ✅
+- Prompts page: 18 tests, filtering/sparklines verified ✅
+- Docs page: 15 tests, navigation/search verified ✅
+- AGENTS.md: Dynamic discovery, no hardcoded paths ✅
+- Schema validation: 547-line test suite, comprehensive ✅
+
+**Non-Blocking Issues (Phase 6):**
+1. #594 — Remove backup test files (.backup, .test suffix)
+2. #595 — Unify dashboard/prompts fetch pattern (duplicate code)
+3. #596 — Refine `isTestValue()` heuristic (edge cases with JSON numbers)
+
+**Full Review:** `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`
+
+---

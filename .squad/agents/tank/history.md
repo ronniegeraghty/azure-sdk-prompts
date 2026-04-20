@@ -100,3 +100,15 @@ Neo completed Phase 3 merge sequence: main→dev (hotfix #567 integrated), dev�
 Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
 
 Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
+
+### 2026-04-20 (Phase 5 Wrap-up — Morpheus Arch Review)
+
+**Status:** Phase 5 PR #592 approved with followups for Phase 6.
+
+**For Tank:** Three follow-up issues (#594, #595, #596) identified for Phase 6 scope:
+- #594: Remove backup test files (.backup, .test suffix) — platform layer concern
+- #595: Unify dashboard/prompts fetch pattern
+- #596: Refine `isTestValue()` heuristic (affects schema validation in #369)
+
+**Next:** Phase 6 planning will prioritize these based on dependency graph. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
+
