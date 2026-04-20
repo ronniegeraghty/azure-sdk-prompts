@@ -347,6 +347,33 @@ export function PromptDetailPage() {
           )}
         </div>
 
+        {/* Prompt Content */}
+        {(promptInfo?.prompt_text || promptInfo?.evaluation_criteria) && (
+          <details className="mb-8 rounded-xl border border-white/8 bg-white/[0.03]">
+            <summary className="cursor-pointer px-5 py-4 text-white/60 transition hover:text-white/80" style={{ fontSize: 13 }}>
+              Prompt Content & Evaluation Criteria
+            </summary>
+            <div className="border-t border-white/8 px-5 py-4 space-y-4">
+              {promptInfo.prompt_text && (
+                <div>
+                  <h3 className="mb-2 text-white/50" style={{ fontSize: 12 }}>PROMPT TEXT</h3>
+                  <pre className="overflow-x-auto rounded-lg bg-black/30 p-4 text-white/70" style={{ ...mono, fontSize: 12, lineHeight: 1.6 }}>
+                    {promptInfo.prompt_text}
+                  </pre>
+                </div>
+              )}
+              {promptInfo.evaluation_criteria && (
+                <div>
+                  <h3 className="mb-2 text-white/50" style={{ fontSize: 12 }}>EVALUATION CRITERIA</h3>
+                  <pre className="overflow-x-auto rounded-lg bg-black/30 p-4 text-white/70" style={{ ...mono, fontSize: 12, lineHeight: 1.6 }}>
+                    {promptInfo.evaluation_criteria}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+
         {/* Summary cards */}
         <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
