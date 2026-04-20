@@ -47,15 +47,24 @@ export function Navbar() {
           ))}
         </div>
 
-        <a
-          href="https://github.com/ronniegeraghty/hyoka"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-emerald-400 no-underline transition-colors hover:bg-emerald-500/20 md:block"
-          style={{ fontSize: 14 }}
-        >
-          Get Started
-        </a>
+        <div className="hidden items-center gap-2 md:flex">
+          <Link
+            to="/docs"
+            className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-emerald-400 no-underline transition-colors hover:bg-emerald-500/20"
+            style={{ fontSize: 14 }}
+          >
+            Get Started
+          </Link>
+          <a
+            href="https://github.com/ronniegeraghty/hyoka"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-white/15 px-4 py-2 text-white/60 no-underline transition-colors hover:bg-white/5 hover:text-white/80"
+            style={{ fontSize: 14 }}
+          >
+            GitHub
+          </a>
+        </div>
 
         <button className="text-white/60 md:hidden" onClick={() => setOpen(!open)} aria-label={open ? "Close menu" : "Open menu"}>
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

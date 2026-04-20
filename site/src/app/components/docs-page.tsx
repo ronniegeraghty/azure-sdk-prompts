@@ -1,11 +1,19 @@
-import { useState, useEffect } from "react";
-import { Book, ChevronRight, Loader2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Book, ChevronRight, Loader2, Search } from "lucide-react";
 import { fetchDocs, fetchDoc } from "../data/api";
 import type { DocEntry } from "../data/types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
+
+// Sidebar grouping configuration
+const docGroups = [
+  { label: "Getting Started", slugs: ["getting-started"] },
+  { label: "CLI Reference", slugs: ["cli-reference"] },
+  { label: "Configuration", slugs: ["configuration", "grader-config-schema", "tool-filter-schema", "starter-files"] },
+  { label: "Concepts", slugs: ["guardrails", "prompt-authoring", "roadmap"] },
+];
 
 export function DocsPage() {
   const [docs, setDocs] = useState<DocEntry[]>([]);
@@ -15,6 +23,7 @@ export function DocsPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingContent, setLoadingContent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
     fetchDocs()
@@ -40,6 +49,42 @@ export function DocsPage() {
       .catch(e => setContent(`Error loading document: ${e.message}`))
       .finally(() => setLoadingContent(false));
   }, [active]);
+
+  // Filter docs based on search query
+  const filteredDocs = useMemo(() => {
+    if (!searchQuery.trim()) return docs;
+    const query = searchQuery.toLowerCase();
+    return docs.filter(d => 
+      d.title.toLowerCase().includes(query) || 
+      d.slug.toLowerCase().includes(query)
+    );
+  }, [docs, searchQuery]);
+
+  // Group filtered docs by category
+  const groupedDocs = useMemo(() => {
+    const grouped: Record<string, DocEntry[]> = {};
+    const ungrouped: DocEntry[] = [];
+
+    docGroups.forEach(group => {
+      grouped[group.label] = [];
+    });
+
+    filteredDocs.forEach(doc => {
+      let foundGroup = false;
+      for (const group of docGroups) {
+        if (group.slugs.includes(doc.slug)) {
+          grouped[group.label].push(doc);
+          foundGroup = true;
+          break;
+        }
+      }
+      if (!foundGroup) {
+        ungrouped.push(doc);
+      }
+    });
+
+    return { grouped, ungrouped };
+  }, [filteredDocs]);
 
   if (loadingList) {
     return (
@@ -68,21 +113,81 @@ export function DocsPage() {
           <h2 className="mb-4 text-white/30" style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>
             Documentation
           </h2>
-          <nav className="flex gap-1 overflow-x-auto md:flex-col">
-            {docs.map((d) => (
-              <button
-                key={d.slug}
-                onClick={() => setActive(d.slug)}
-                className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-left transition ${
-                  active === d.slug ? "bg-emerald-500/10 text-emerald-400" : "text-white/50 hover:bg-white/5 hover:text-white/70"
-                }`}
-                style={{ fontSize: 14 }}
-              >
-                <Book className="h-4 w-4 flex-shrink-0" />
-                {d.title}
-                {active === d.slug && <ChevronRight className="ml-auto hidden h-3 w-3 md:block" />}
-              </button>
-            ))}
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+            <input
+              type="text"
+              placeholder="Search docs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-white/80 placeholder-white/30 transition focus:border-emerald-500/30 focus:bg-white/8 focus:outline-none"
+              style={{ fontSize: 14 }}
+            />
+          </div>
+
+          {/* Grouped Navigation */}
+          <nav className="flex gap-4 overflow-x-auto md:flex-col">
+            {filteredDocs.length === 0 && searchQuery && (
+              <p className="py-4 text-center text-white/40" style={{ fontSize: 13 }}>
+                No results found
+              </p>
+            )}
+
+            {docGroups.map(group => {
+              const groupDocs = groupedDocs.grouped[group.label];
+              if (!groupDocs || groupDocs.length === 0) return null;
+
+              return (
+                <div key={group.label} className="mb-4">
+                  <h3 className="mb-2 px-3 text-white/40" style={{ fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                    {group.label}
+                  </h3>
+                  <div className="flex flex-col gap-0.5">
+                    {groupDocs.map((d) => (
+                      <button
+                        key={d.slug}
+                        onClick={() => setActive(d.slug)}
+                        className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-left transition ${
+                          active === d.slug ? "bg-emerald-500/10 text-emerald-400" : "text-white/50 hover:bg-white/5 hover:text-white/70"
+                        }`}
+                        style={{ fontSize: 14 }}
+                      >
+                        <Book className="h-4 w-4 flex-shrink-0" />
+                        {d.title}
+                        {active === d.slug && <ChevronRight className="ml-auto hidden h-3 w-3 md:block" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Ungrouped docs (if any) */}
+            {groupedDocs.ungrouped.length > 0 && (
+              <div className="mb-4">
+                <h3 className="mb-2 px-3 text-white/40" style={{ fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Other
+                </h3>
+                <div className="flex flex-col gap-0.5">
+                  {groupedDocs.ungrouped.map((d) => (
+                    <button
+                      key={d.slug}
+                      onClick={() => setActive(d.slug)}
+                      className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-left transition ${
+                        active === d.slug ? "bg-emerald-500/10 text-emerald-400" : "text-white/50 hover:bg-white/5 hover:text-white/70"
+                      }`}
+                      style={{ fontSize: 14 }}
+                    >
+                      <Book className="h-4 w-4 flex-shrink-0" />
+                      {d.title}
+                      {active === d.slug && <ChevronRight className="ml-auto hidden h-3 w-3 md:block" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </nav>
         </aside>
 
