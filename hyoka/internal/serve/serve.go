@@ -63,7 +63,10 @@ type DocInfo struct {
 }
 
 // internalDocs lists documentation files that should be excluded from the API.
-var internalDocs = map[string]bool{}
+// Developer docs (architecture, contributing) belong in the repo, not the user-facing site.
+var internalDocs = map[string]bool{
+	"architecture": true,
+}
 
 // Start launches a local HTTP server for browsing reports.
 func Start(opts Options) error {
