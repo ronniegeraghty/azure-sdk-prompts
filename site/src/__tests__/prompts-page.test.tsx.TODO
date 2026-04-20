@@ -5,12 +5,12 @@ import { MemoryRouter } from "react-router";
 import { PromptsPage } from "../app/components/prompts-page";
 
 // Mock the API module
-vi.mock("../app/api", () => ({
-  getPrompts: vi.fn(),
-  getEvaluations: vi.fn(),
+vi.mock("../app/data/api", () => ({
+  fetchPrompts: vi.fn(),
+  fetchRuns: vi.fn(),
 }));
 
-import { getPrompts, getEvaluations } from "../app/api";
+import { fetchPrompts, fetchRuns } from "../app/data/api";
 
 describe("PromptsPage - R150 Improvements", () => {
   beforeEach(() => {
@@ -19,8 +19,8 @@ describe("PromptsPage - R150 Improvements", () => {
 
   describe("'only show prompts with evals' filter", () => {
     it("renders the 'with evals' filter toggle", async () => {
-      vi.mocked(getPrompts).mockResolvedValue([]);
-      vi.mocked(getEvaluations).mockResolvedValue([]);
+      vi.mocked(fetchPrompts).mockResolvedValue([]);
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       render(
         <MemoryRouter>
@@ -34,12 +34,12 @@ describe("PromptsPage - R150 Improvements", () => {
     });
 
     it("filters to show only prompts with evaluations by default", async () => {
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-1", name: "Test Prompt 1", service: "identity", language: "python", plane: "data-plane" },
         { id: "prompt-2", name: "Test Prompt 2", service: "key-vault", language: "dotnet", plane: "data-plane" },
         { id: "prompt-3", name: "Test Prompt 3", service: "storage", language: "java", plane: "data-plane" },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([
+      vi.mocked(fetchRuns).mockResolvedValue([
         { promptId: "prompt-1", configName: "baseline", score: 85 },
         { promptId: "prompt-2", configName: "baseline", score: 92 },
         // prompt-3 has no evaluations
@@ -60,12 +60,12 @@ describe("PromptsPage - R150 Improvements", () => {
 
     it("shows all prompts when 'with evals' filter is toggled off", async () => {
       const user = userEvent.setup();
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-1", name: "Test Prompt 1" },
         { id: "prompt-2", name: "Test Prompt 2" },
         { id: "prompt-3", name: "Test Prompt 3" },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([
+      vi.mocked(fetchRuns).mockResolvedValue([
         { promptId: "prompt-1", configName: "baseline", score: 85 },
       ]);
 
@@ -88,8 +88,8 @@ describe("PromptsPage - R150 Improvements", () => {
 
   describe("ordering controls", () => {
     it("renders ordering dropdown with all options", async () => {
-      vi.mocked(getPrompts).mockResolvedValue([]);
-      vi.mocked(getEvaluations).mockResolvedValue([]);
+      vi.mocked(fetchPrompts).mockResolvedValue([]);
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       render(
         <MemoryRouter>
@@ -111,12 +111,12 @@ describe("PromptsPage - R150 Improvements", () => {
 
     it("orders prompts by most recently evaluated when selected", async () => {
       const user = userEvent.setup();
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-1", name: "Alpha Prompt" },
         { id: "prompt-2", name: "Beta Prompt" },
         { id: "prompt-3", name: "Gamma Prompt" },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([
+      vi.mocked(fetchRuns).mockResolvedValue([
         { promptId: "prompt-1", timestamp: "2025-04-15T10:00:00Z" },
         { promptId: "prompt-2", timestamp: "2025-04-18T14:00:00Z" },
         { promptId: "prompt-3", timestamp: "2025-04-17T09:00:00Z" },
@@ -140,12 +140,12 @@ describe("PromptsPage - R150 Improvements", () => {
 
     it("orders prompts alphabetically when selected", async () => {
       const user = userEvent.setup();
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-2", name: "Zulu Prompt" },
         { id: "prompt-1", name: "Alpha Prompt" },
         { id: "prompt-3", name: "Mike Prompt" },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([]);
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       render(
         <MemoryRouter>
@@ -165,12 +165,12 @@ describe("PromptsPage - R150 Improvements", () => {
 
     it("orders prompts by best performing when selected", async () => {
       const user = userEvent.setup();
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-1", name: "Low Score Prompt" },
         { id: "prompt-2", name: "High Score Prompt" },
         { id: "prompt-3", name: "Mid Score Prompt" },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([
+      vi.mocked(fetchRuns).mockResolvedValue([
         { promptId: "prompt-1", score: 65 },
         { promptId: "prompt-2", score: 95 },
         { promptId: "prompt-3", score: 80 },
@@ -195,10 +195,10 @@ describe("PromptsPage - R150 Improvements", () => {
 
   describe("sparkline charts", () => {
     it("renders readable sparkline charts for prompts with multiple evaluations", async () => {
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-1", name: "Test Prompt" },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([
+      vi.mocked(fetchRuns).mockResolvedValue([
         { promptId: "prompt-1", score: 70, timestamp: "2025-04-10T10:00:00Z" },
         { promptId: "prompt-1", score: 75, timestamp: "2025-04-11T10:00:00Z" },
         { promptId: "prompt-1", score: 80, timestamp: "2025-04-12T10:00:00Z" },
@@ -221,10 +221,10 @@ describe("PromptsPage - R150 Improvements", () => {
 
   describe("eval count and tags prominence", () => {
     it("displays eval count prominently for each prompt", async () => {
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-1", name: "Test Prompt", tags: ["auth", "crud"] },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([
+      vi.mocked(fetchRuns).mockResolvedValue([
         { promptId: "prompt-1", score: 85 },
         { promptId: "prompt-1", score: 90 },
         { promptId: "prompt-1", score: 88 },
@@ -242,10 +242,10 @@ describe("PromptsPage - R150 Improvements", () => {
     });
 
     it("displays tags as prominent badges", async () => {
-      vi.mocked(getPrompts).mockResolvedValue([
+      vi.mocked(fetchPrompts).mockResolvedValue([
         { id: "prompt-1", name: "Test Prompt", tags: ["auth", "pagination", "crud"] },
       ]);
-      vi.mocked(getEvaluations).mockResolvedValue([]);
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       render(
         <MemoryRouter>
