@@ -427,9 +427,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 		// Build common grader input shared by all grader types.
 		graderInput := graders.GraderInput{
-			WorkspacePath:  genWs.Dir,
-			OriginalPrompt: task.Prompt.PromptText,
-			EvalCriteria:   e.mergedCriteria(task.Prompt, props),
+			WorkspacePath:       genWs.Dir,
+			OriginalPrompt:      task.Prompt.PromptText,
+			EvalCriteria:        e.mergedCriteria(task.Prompt, props),
+			EvalCriteriaBuckets: e.reviewBuckets(task.Prompt, props),
 		}
 		if task.Prompt.ReferenceAnswer != "" {
 			graderInput.ReferenceDir = task.Prompt.ReferenceAnswer

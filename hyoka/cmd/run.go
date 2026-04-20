@@ -61,6 +61,8 @@ type runFlags struct {
 	maxTurns int
 	// Pre-flight model check (#264)
 	checkModels bool
+	// Review session splitting (#580)
+	reviewMode string
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -112,6 +114,8 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().BoolVarP(&f.pairwiseMode, "pairwise", "P", false, "Expand each config into N+1 pairwise tool-ablation variants")
 
 	cmd.Flags().BoolVar(&f.checkModels, "check-models", false, "Pre-flight check that all configured models (generator + reviewer) are available before starting evaluations")
+	// Review session splitting (#580)
+	cmd.Flags().StringVar(&f.reviewMode, "review-mode", "combined", "How review criteria are bucketed across reviewer sessions: combined (default, single session per panel model) or isolated (one session per grader/group marked isolate: true)")
 }
 
 func buildFilter(f *runFlags) prompt.Filter {
@@ -282,6 +286,13 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("invalid --session-timeout %q: %w", f.sessionTimeout, err)
 			}
 
+			// Validate --review-mode (#580). Empty string is treated as combined.
+			switch f.reviewMode {
+			case "", "combined", "isolated":
+			default:
+				return fmt.Errorf("invalid --review-mode %q: must be \"combined\" or \"isolated\"", f.reviewMode)
+			}
+
 			// Create a real Copilot SDK evaluator
 			sdkEval := eval.NewCopilotPromptRunner(eval.PromptRunnerOptions{
 				AllowCloud:        f.allowCloud,
@@ -397,6 +408,7 @@ func runCmd() *cobra.Command {
 				StrictCleanup:     f.strictCleanup,
 				AllowCloud:        f.allowCloud,
 				CriteriaDir:       f.criteriaDir,
+				ReviewMode:        f.reviewMode,
 				ExcludeDirs:       excludeDirs,
 				SessionTimeout:    sessionTimeout,
 				CheckModels:       f.checkModels,

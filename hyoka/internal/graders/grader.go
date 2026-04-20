@@ -37,6 +37,22 @@ type GraderInput struct {
 	OriginalPrompt string // Original prompt text sent to the generator
 	ReferenceDir   string // Directory containing reference answers
 	EvalCriteria   string // Merged evaluation criteria text
+
+	// EvalCriteriaBuckets carries per-bucket criteria when --review-mode
+	// isolated produces multiple buckets. When non-empty and length > 1,
+	// review-aware graders should run one Copilot session per bucket
+	// instead of using the single EvalCriteria string. Length 0 or 1
+	// means use the legacy single-session path (combined mode).
+	EvalCriteriaBuckets []ReviewBucket
+}
+
+// ReviewBucket is a graders-package mirror of criteria.ReviewBucket / review.Bucket.
+// It carries already-rendered criteria text plus a stable name so the engine
+// can pass bucket data through GraderInput without forcing graders to import
+// criteria (which would create a layering issue) or review (cycle).
+type ReviewBucket struct {
+	Name     string
+	Criteria string
 }
 
 // ActionEvent represents a single agent action from the session log.

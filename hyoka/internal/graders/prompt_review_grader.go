@@ -77,13 +77,29 @@ if g.LastReviewWorkDir != "" {
 }
 
 func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, workDir string, result GraderResult) (GraderResult, error) {
-models := g.panelReviewer.Models()
-slog.Debug("Review grader starting panel", "models", models)
+	models := g.panelReviewer.Models()
+	slog.Debug("Review grader starting panel", "models", models)
 
-panel, consolidated, err := g.panelReviewer.ReviewPanel(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, input.EvalCriteria)
-if err != nil {
-	return result, fmt.Errorf("review panel failed: %w", err)
-}
+	var (
+		panel        []review.ReviewResult
+		consolidated *review.ReviewResult
+		err          error
+	)
+	if len(input.EvalCriteriaBuckets) > 1 {
+		slog.Info("Review grader using bucketed panel review", "bucket_count", len(input.EvalCriteriaBuckets))
+		panel, consolidated, err = g.panelReviewer.ReviewPanelBuckets(
+			ctx, input.OriginalPrompt, workDir, input.ReferenceDir, toReviewBuckets(input.EvalCriteriaBuckets),
+		)
+	} else {
+		criteria := input.EvalCriteria
+		if criteria == "" && len(input.EvalCriteriaBuckets) == 1 {
+			criteria = input.EvalCriteriaBuckets[0].Criteria
+		}
+		panel, consolidated, err = g.panelReviewer.ReviewPanel(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, criteria)
+	}
+	if err != nil {
+		return result, fmt.Errorf("review panel failed: %w", err)
+	}
 
 g.LastPanel = panel
 g.LastConsolidated = consolidated
@@ -127,12 +143,30 @@ return result, nil
 }
 
 func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput, workDir string, result GraderResult) (GraderResult, error) {
-slog.Debug("Review grader starting single review")
+	slog.Debug("Review grader starting single review")
 
-reviewResult, err := g.reviewer.Review(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, input.EvalCriteria)
-if err != nil {
-	return result, fmt.Errorf("review failed: %w", err)
-}
+	var (
+		reviewResult *review.ReviewResult
+		err          error
+	)
+	if len(input.EvalCriteriaBuckets) > 1 {
+		if mb, ok := g.reviewer.(review.MultiBucketReviewer); ok {
+			slog.Info("Review grader using bucketed single review", "bucket_count", len(input.EvalCriteriaBuckets))
+			reviewResult, err = mb.ReviewBuckets(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, toReviewBuckets(input.EvalCriteriaBuckets))
+		} else {
+			slog.Warn("Reviewer does not support buckets; collapsing to combined criteria")
+			reviewResult, err = g.reviewer.Review(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, joinCriteria(input.EvalCriteriaBuckets))
+		}
+	} else {
+		criteria := input.EvalCriteria
+		if criteria == "" && len(input.EvalCriteriaBuckets) == 1 {
+			criteria = input.EvalCriteriaBuckets[0].Criteria
+		}
+		reviewResult, err = g.reviewer.Review(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, criteria)
+	}
+	if err != nil {
+		return result, fmt.Errorf("review failed: %w", err)
+	}
 
 g.LastConsolidated = reviewResult
 
@@ -155,6 +189,35 @@ for _, c := range reviewResult.Scores.Criteria {
 }
 result.ReviewDetails = details
 return result, nil
+}
+
+// toReviewBuckets converts grader-package buckets to review-package buckets.
+func toReviewBuckets(buckets []ReviewBucket) []review.Bucket {
+	out := make([]review.Bucket, 0, len(buckets))
+	for _, b := range buckets {
+		out = append(out, review.Bucket{Name: b.Name, Criteria: b.Criteria})
+	}
+	return out
+}
+
+// joinCriteria concatenates bucket criteria into a single string for reviewers
+// that do not implement MultiBucketReviewer (degraded path).
+func joinCriteria(buckets []ReviewBucket) string {
+	parts := make([]string, 0, len(buckets))
+	for _, b := range buckets {
+		if b.Criteria == "" {
+			continue
+		}
+		parts = append(parts, b.Criteria)
+	}
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += "\n\n"
+		}
+		out += p
+	}
+	return out
 }
 
 // criteriaScore converts a ReviewResult to a 0.0–1.0 score.
