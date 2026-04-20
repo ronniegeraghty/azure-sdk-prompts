@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// GeneratorConfig holds all configuration for the code generation agent.
+// GeneratorConfig holds all configuration for the generator agent.
 type GeneratorConfig struct {
 	Model         string      `yaml:"model,omitempty" json:"model,omitempty"`
 	Models        []string    `yaml:"models,omitempty" json:"models,omitempty"`

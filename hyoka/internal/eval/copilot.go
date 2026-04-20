@@ -51,7 +51,7 @@ type PromptRunnerOptions struct {
 	GitHubToken string
 	// CLIPath overrides the Copilot CLI executable path.
 	CLIPath string
-	// AllowCloud permits generated code to provision real cloud resources (#36).
+	// AllowCloud permits agent output to provision real cloud resources (#36).
 	AllowCloud bool
 	// MaxSessionActions limits the total number of actions (reasoning, message,
 	// tool execution start) during generation. When reached, the session context
@@ -753,8 +753,8 @@ func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir
 			"without deploying them. All code must be runnable in a local-only, offline environment."
 	}
 
-	// Instruct the agent to use available skills before generating code.
-	// Without this hint, models tend to go straight to code generation
+	// Instruct the agent to use available skills before producing output.
+	// Without this hint, models tend to go straight to producing output
 	// and never invoke the skill tool, even when skills are loaded.
 	// Only add if there are actual skills, not just empty directories (#291).
 	if tool.CountSkills(skillDirs) > 0 {
@@ -762,7 +762,7 @@ func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir
 			"You have Azure SDK skills available. BEFORE writing any code, invoke the relevant skill " +
 			"using the skill tool to get SDK-specific patterns, API examples, and acceptance criteria. " +
 			"Also read the skill's reference files (acceptance-criteria.md, examples.md) for detailed guidance. " +
-			"Then use that information to generate correct, modern Azure SDK code."
+			"Then use that information to produce correct, modern Azure SDK output."
 	}
 
 	sc := &copilot.SessionConfig{

@@ -22,7 +22,7 @@
 //   - Prefer binding to 127.0.0.1 via a reverse proxy or SSH tunnel rather
 //     than exposing the port directly.
 //   - Treat the reports directory as sensitive: it may contain prompt text,
-//     generated code, and evaluation output that reveal internal grading
+//     agent output, and evaluation results that reveal internal grading
 //     rubrics or proprietary prompts.
 //   - Do not run `hyoka serve` on an untrusted network without first placing
 //     an authenticating proxy (nginx, caddy) in front of it.

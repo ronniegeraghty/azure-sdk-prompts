@@ -97,7 +97,7 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().IntVar(&f.maxFiles, "max-files", 50, "Maximum generated files per evaluation before aborting")
 	cmd.Flags().StringVar(&f.maxOutputSize, "max-output-size", "1MB", "Maximum total output size per evaluation (e.g., 1MB, 512KB)")
 	// Generator safety (#36)
-	cmd.Flags().BoolVar(&f.allowCloud, "allow-cloud", false, "Allow generated code to provision real Azure resources (disables safety boundaries)")
+	cmd.Flags().BoolVar(&f.allowCloud, "allow-cloud", false, "Allow agent output to provision real Azure resources (disables safety boundaries)")
 	cmd.Flags().Bool("sandbox", true, "Enforce safety boundaries preventing real Azure resource provisioning (default, opposite of --allow-cloud)")
 	cmd.Flags().MarkHidden("sandbox") // sandbox is the default; --allow-cloud is the opt-out
 	// Resource monitoring (#45)

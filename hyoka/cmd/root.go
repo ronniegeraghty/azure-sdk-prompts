@@ -26,8 +26,8 @@ func rootCmd() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:   "hyoka",
-		Short: "Azure SDK Prompt Evaluation Tool \u2014 test AI agent code generation quality",
-		Long:  "A tool for evaluating AI agent quality by running prompts through the Copilot SDK, grading results with pluggable graders, and generating reports.",
+		Short: "Azure SDK Prompt Evaluation Tool \u2014 test AI agent output quality",
+		Long:  "A tool for evaluating AI agent output by running prompts through the Copilot SDK, grading results with pluggable graders, and generating reports.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			closer, err := logging.Setup(logging.Options{
 				Level:    logLevel,

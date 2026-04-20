@@ -6,14 +6,14 @@ import (
 )
 
 // BuildReviewPrompt constructs a structured review prompt for the LLM-as-judge.
-// It includes the original prompt, generated code files, optional reference answer,
+// It includes the original prompt, agent output files, optional reference answer,
 // and evaluation criteria. The reviewer evaluates ONLY against the provided criteria
 // — no general rubric is injected.
 func BuildReviewPrompt(originalPrompt string, generatedFiles map[string]string, referenceFiles map[string]string, evaluationCriteria string) string {
 	var b strings.Builder
 
 	b.WriteString("You are evaluating another AI agent's work. The agent was given the prompt below ")
-	b.WriteString("and asked to produce code. Review the generated code against the original prompt ")
+	b.WriteString("and asked to produce output. Review the agent output against the original prompt ")
 	b.WriteString("and the evaluation criteria provided.\n\n")
 
 	b.WriteString("## Original Prompt\n\n")

@@ -110,7 +110,7 @@ type EngineOptions struct {
 	// Pluggable graders (#136)
 	GradersDir string // Directory containing grader config YAML files.
 	// Generator safety (#36)
-	AllowCloud bool // Allow generated code to provision real Azure resources.
+	AllowCloud bool // Allow agent output to provision real Azure resources.
 	// Directory exclusion (#63)
 	ExcludeDirs []string // Directories to exclude from generated_files output.
 	// Pre-flight model availability check (#264).

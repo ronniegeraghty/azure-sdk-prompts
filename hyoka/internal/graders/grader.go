@@ -13,7 +13,7 @@ type WorkspaceDelta = workspace.WorkspaceDelta
 
 // Grader is the core evaluation abstraction. Each grader is a single-concern
 // evaluator (file check, build verification, LLM review, etc.) that scores
-// one aspect of agent-generated code.
+// one aspect of agent output.
 type Grader interface {
 // Kind returns the grader type identifier (e.g., "file", "program", "prompt").
 Kind() string
