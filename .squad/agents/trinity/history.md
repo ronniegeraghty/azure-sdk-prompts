@@ -222,3 +222,31 @@ Implemented all requirements from R155 (docs page observations) for Phase 5 on b
 - Search should match both `title` and `slug` fields for best discoverability
 - Backend filtering (`internalDocs` map) ensures sensitive docs never reach the API
 - Navbar link changes require both component and test updates to maintain coverage
+
+### Session 2026-04-20 (Phase 5 Kickoff & #364/#366 Implementation)
+
+**Issues:** #364 (Prompt Pages + Dashboard), #366 (Docs Page), #369 (test-helper)
+
+**Phase 5 Workflow (New):** Per-phase integration branch (`phase-5`) with direct merges (no per-issue PRs). All owners work in parallel off shared branch; Switch reviews on-branch after merge; Morpheus runs live verification; single rollup PR when all done.
+
+**#364 Implementation & Escalation:**
+- Implemented Prompts Page, Prompt Detail Page, Dashboard with real data integration
+- Initial review by Switch: 20 test failures (mock paths incorrect)
+- Trinity locked out per reviewer-protocol after first rejection
+- Escalation: Morpheus stepped in as eligible agent, fixed mocks + component bugs, all 72 tests passed
+- **Lesson:** Reviewer-protocol prevents workarounds and ensures root-cause fixes
+
+**#366 Docs Page (Complete):**
+- Implemented sidebar navigation with doc grouping (CLI, Config, Getting Started, etc.)
+- Search filtering, formatted markdown content rendering
+- Navbar integration with "Docs" link
+- Passed Switch's review cleanly (no rejections)
+- 13 test cases, site build 6.7s
+
+**#369 Test-Helper Fix (Support):**
+- Adjusted test helpers for Oracle's schema validation implementation
+- Small structural change, quick merge
+
+**Phase 5 Outcome:** 2 owned issues complete (#364 green after Morpheus escalation, #366 clean), 1 helper task. All merged to `phase-5`. Ready for rollup PR #592.
+
+**Key Learning:** Escalation protocols work. When stuck, step back and let fresh eyes solve root problems.

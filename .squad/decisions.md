@@ -2279,3 +2279,141 @@ Table-driven tests made adding coverage easy (9 tests in ~200 lines).
 ---
 
 *Decision logged 2026-04-17. Review modes foundation shipped; isolation deferred to phase 2.*
+
+---
+
+## Phase 5: Docs & Polish (2026-04-20) — COMPLETE ✅
+
+### Decision: Per-Phase Integration Branch Workflow
+
+**Author:** Coordinator (Ronnie)  
+**Date:** 2026-04-20  
+**Status:** Implemented and validated  
+**Issues:** #364, #366, #367, #368, #369
+
+**Overview:** Phase 5 introduced a new per-phase workflow departing from per-issue PRs:
+
+1. **Single shared branch:** `phase-5` (off `ronniegeraghty/dev` @ 667fa3d8)
+2. **Per-issue subranches:** Agents branch off `phase-5` with pattern `{agent}/issue-{N}-{description}`
+3. **No per-issue PRs:** Owners implement, then merge directly to `phase-5`
+4. **Shared review:** Switch reviews on `phase-5` after owner merges
+5. **Playwright verification:** Morpheus runs live browser tests on `phase-5`
+6. **Single rollup PR:** One PR `phase-5 → ronniegeraghty/dev` after all issues merged + green
+
+**Rationale:**
+- ✅ Cleaner history (no N cluttering PRs in review queue)
+- ✅ Easier cross-issue testing (all code on one branch)
+- ✅ Faster iteration (owners merge directly, no PR overhead)
+- ✅ Single verification gate (Morpheus live verification on `phase-5`)
+
+**Validation:**
+- All 5 issues merged to `phase-5` without conflict
+- Switch review cycle completed on-branch
+- Morpheus live verification passed (all UI features working)
+- Rollup PR #592 opened with clean history
+
+**Handoff to future phases:** This workflow recommended for Phase 6 and beyond.
+
+---
+
+### Decision: #365 (A/B Compare) Deferred to Phase 6
+
+**Author:** Coordinator (Ronnie)  
+**Date:** 2026-04-20  
+**Status:** Deferred  
+**Issue:** #365
+
+**Why deferred:**
+- Trinity's own investigation in issue body flags A/B compare as XL scope (out-of-scope for Phase 5)
+- Core viewing experience (#364 Prompts + Detail) should land first
+- Current A/B compare (basic side-by-side) works
+- Deferring keeps Phase 5 focused on docs & polish (core goal)
+- Risk: XL scope blocks Phase 5 rollup if included
+
+**Timeline:**
+- Phase 5 (complete): #364, #366, #367, #368, #369
+- Phase 6 (future): #365 (A/B compare XL scope) + other work
+
+**Cross-ref:** `.squad/decisions/archive/coordinator-phase-5-fanout.md`
+
+---
+
+### Decision: Reviewer-Protocol Enforcement — #364 Escalation Chain
+
+**Author:** Switch + Coordinator  
+**Date:** 2026-04-20  
+**Status:** Resolved per protocol  
+**Issue:** #364 (Prompt Pages + Dashboard)
+
+**Escalation Timeline:**
+
+1. **First rejection (Switch):** Trinity's implementation had 20 failing tests (mock paths incorrect: `../app/api` instead of `../app/data/api`)
+   - **Action:** Trinity locked out per reviewer-protocol
+
+2. **Second attempt (Oracle):** Oracle renamed test files to `.TODO` instead of fixing mocks — coverage regression
+   - **Reason for rejection:** Tests not fixed, they're hidden
+   - **Action:** Oracle locked out per reviewer-protocol
+
+3. **Escalation (Morpheus):** Per reviewer-protocol, any agent not yet rejected on this issue may attempt a fix
+   - **Morpheus's fix:**
+     - Restored test files from `.TODO` → `.test.tsx`
+     - Corrected mock paths: `../app/api` → `../app/data/api`
+     - Fixed component bugs: missing state variable (`showEnvToolsOnly`), tool filtering logic
+   - **Result:** All 72 tests pass, live UI verified
+
+4. **Final approval (Switch re-review):** ✅ **APPROVE**
+   - Tests passing, mocks corrected, live UI verified, component bugs fixed
+
+**Lesson learned:** Reviewer-protocol prevents endless cycles and ensures fresh perspectives. When two agents exhaust their attempts, escalation brings in a third with a clear mandate to diagnose root causes (not workarounds).
+
+**Reference:** `reviewer-protocol.md`, `.squad/orchestration-log/2026-04-20T19-12-00Z-morpheus-phase5.md`
+
+---
+
+### Decision: Live Verification Gate for UI Changes
+
+**Author:** Morpheus  
+**Date:** 2026-04-20  
+**Status:** Implemented  
+**Issues:** #364, #366
+
+**Requirements:** All UI changes in Phase 5 must pass live browser verification before rollup PR.
+
+**Verification Method:** playwright-cli + `go run . serve`
+
+**Results:**
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| **#364 R150 (Prompts Page)** | ✅ PASS | Filters work, eval counts display, sparklines render |
+| **#364 R151 (Prompt Detail)** | ✅ PASS | Score trend uses days, all models shown (not top 3) |
+| **#364 R154 (Dashboard)** | ✅ PASS | Real data (1,247 evals, 78.3% pass rate) |
+| **#366 (Docs Page)** | ✅ PASS | Sidebar navigation, doc grouping, formatted content |
+
+**Handoff:** This gate recommended for all future UI-heavy phases.
+
+**Reference:** `.squad/orchestration-log/2026-04-20T19-12-00Z-morpheus-phase5.md`
+
+---
+
+### Decision: Rollup PR #592 (`phase-5 → ronniegeraghty/dev`)
+
+**Author:** Coordinator (Ronnie)  
+**Date:** 2026-04-20  
+**Status:** Open for review  
+
+**Scope:**
+- All 5 Phase 5 issues merged to `phase-5`
+- Single rollup PR from `phase-5` → `ronniegeraghty/dev`
+
+**Verification:**
+- ✅ All 72 unit tests pass
+- ✅ Build succeeds (`npm run build`)
+- ✅ Live UI verified (Morpheus playwright)
+- ✅ All 5 issues approved by Switch
+
+**Awaiting:** Ronnie's review and merge
+
+---
+
+*Phase 5 session complete 2026-04-20T19:12Z. All decisions consolidated from `.squad/decisions/inbox/`. Inbox files deleted.*

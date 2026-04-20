@@ -298,3 +298,52 @@ Executed full Phase 4 re-verification using newly-installed playwright-cli (@pla
 - `.squad/decisions/inbox/morpheus-phase5-live-verification.md`
 - Commits: 4ee54be9, 6747086e
 
+
+### Session 2026-04-20 (Phase 5: Escalation & Live Verification)
+
+**Issues:** #364 (test-mock fix escalation), #366 (live verification)
+
+**Escalation Context:**
+- Trinity and Oracle both locked out on #364 (reviewer-protocol: 2 rejections each)
+- Trinity's initial implementation: 20 test failures (mock paths incorrect)
+- Oracle's attempt: renamed test files to `.TODO` instead of fixing (coverage regression)
+- Morpheus stepped in as eligible agent (not previously rejected on #364)
+
+**#364 Test-Mock Fix & Component Repairs:**
+
+Branch: `morpheus/issue-364-fix-test-mocks`
+
+**Root Cause Analysis:**
+- Mock paths: `../app/api` (incorrect) vs `../app/data/api` (correct, matches component imports)
+- Test files: Oracle had renamed to `.TODO` (trying to hide the problem)
+- Component bugs: Missing state variable (`showEnvToolsOnly`), incomplete tool filtering logic
+
+**Fix Implementation:**
+1. Restored test files: `.TODO` → `.test.tsx`
+2. Corrected mock paths: `../app/api` → `../app/data/api`
+3. Verified mock data structures:
+   - PromptInfo: 18 fields (id, service, plane, language, category, difficulty, etc.)
+   - RunSummary: nested structure (run_id, timestamp, results[], etc.)
+   - Mocks match real API types (not over-simplified)
+4. Fixed component bugs: state variable, tool filtering logic
+
+**Results:**
+```
+Test Files  12 passed (12)
+     Tests  72 passed (72)
+Duration   2.59s
+```
+
+**Live Browser Verification (playwright-cli):**
+
+**#364 Requirements:**
+- ✅ **R150 (Prompts Page):** Filters work, eval counts display, sparklines render
+- ✅ **R151 (Prompt Detail):** Score trend uses days (not eval count), all models shown (not top 3)
+- ✅ **R154 (Dashboard):** Real data (1,247 evals, 78.3% pass rate, 6 models tested)
+
+**#366 Requirements:**
+- ✅ **Docs Page:** Sidebar navigation, doc grouping, formatted content rendering
+
+**Phase 5 Outcome:** Escalation successfully resolved. All UI features verified working. Ready for rollup PR #592.
+
+**Key Learning:** Escalation works because it brings fresh perspective + mandate to fix root causes, not work around them. The difference between hiding tests and fixing them determines code quality.

@@ -54,3 +54,40 @@ Initial setup complete.
 Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
 
 Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
+
+### Session 2026-04-20 (Phase 5 Coordination & Orchestration)
+
+**Role:** Coordinator (Ronnie's session managing Phase 5)
+
+**Phase 5 Mission:** Docs & Polish on new per-phase integration branch workflow
+
+**Workflow Innovation:**
+- Departed from per-issue PRs
+- Introduced shared `phase-5` integration branch (off `ronniegeraghty/dev`)
+- Owners work in parallel, merge directly (no per-issue PRs)
+- Shared review on-branch (Switch)
+- Live verification gate (Morpheus)
+- Single rollup PR when all done
+
+**Issues Scheduled:**
+- Wave 1: #364, #367, #369 + TDD tests
+- Wave 2: #366, #368
+- Deferred: #365 (A/B compare, XL scope, Phase 6)
+
+**Execution Summary:**
+- All 5 issues delivered to `phase-5`
+- One escalation (Trinity/Oracle locked out on #364, Morpheus rescued)
+- Switch review cycle: 3 clean approvals, 2 re-reviews
+- Morpheus live verification: All UI features working
+- Rollup PR #592 opened
+
+**Outcomes:**
+- ✅ 5 issues approved and merged to `phase-5`
+- ✅ Reviewer-protocol enforcement successful
+- ✅ Live verification gate established
+- ✅ Per-phase workflow validated
+- ⏸️ #365 deferred to Phase 6 (scope management)
+
+**Phase 5 Status:** COMPLETE. Rollup PR #592 open for Ronnie's review.
+
+**Key Learning:** Per-phase workflow with shared integration branch + live verification gate significantly accelerates delivery compared to per-issue PRs. Reviewer-protocol escalation chain worked as designed: locked agents step back, escalation brings fresh eyes, root causes fixed instead of worked around.

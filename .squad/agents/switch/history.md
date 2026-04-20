@@ -454,3 +454,47 @@ Morpheus correctly fixed mocks, restored test coverage, and uncovered + fixed re
 
 **Decision:** `.squad/decisions/inbox/switch-final-364-approve.md`  
 **Commit:** `4ee54be9` (merged to phase-5)
+
+### Session 2026-04-20 (Phase 5: TDD Testing & Reviews)
+
+**Issues:** #364, #366, #367, #368, #369 (5 total reviews)
+
+**Phase 5 Workflow:** Pre-written TDD tests for all issues. Review all merges to shared `phase-5` branch. Enforce reviewer-protocol strictly.
+
+**TDD Test Suites Pre-Written:**
+- #364: Dashboard, Prompts Page, Prompt Detail (3 test files, 72 total tests)
+- #369: Schema Validation (1 test file)
+- Others: sanity checks built into implementations
+
+**Review Cycle Summary:**
+
+| Issue | Review 1 | Review 2 | Review 3 | Status |
+|-------|----------|----------|----------|--------|
+| #364 | ❌ REJECT (mock paths) | ❌ REJECT (coverage hidden) | ✅ APPROVE (Morpheus fix) | Merged |
+| #366 | ✅ APPROVE | — | — | Merged |
+| #367 | ✅ APPROVE | — | — | Merged |
+| #368 | ✅ APPROVE | — | — | Merged |
+| #369 | ❌ REJECT (incomplete schema) | ✅ APPROVE (re-review) | — | Merged |
+
+**Critical Reviews:**
+
+1. **#364 First Rejection:** 20 tests failed due to incorrect mock paths (`../app/api` → `../app/data/api`)
+   - Locked Trinity per reviewer-protocol
+
+2. **#364 Second Rejection:** Oracle renamed test files to `.TODO` instead of fixing mocks
+   - Coverage regression — tests not fixed, hidden
+   - Locked Oracle per reviewer-protocol
+
+3. **#364 Final Approval (After Morpheus Fix):**
+   - All 72 tests pass
+   - Mock paths corrected, mocks match real API types
+   - Component bugs fixed (state variable, tool filtering)
+   - Live verification confirmed UI works
+
+4. **#369 Rejection:** Schema definitions incomplete (missing 3 fields on PromptInfo)
+   - Locked Oracle after first rejection
+   - Oracle re-reviewed with Trinity's help: ✅ APPROVE
+
+**Phase 5 Outcome:** 5 issues reviewed, 3 clean approvals, 2 issues required re-review after fixes. Reviewer-protocol escalation chain on #364 successfully resolved by Morpheus.
+
+**Key Learning:** Reviewer-protocol is the enforcement mechanism that separates serious review from rubber-stamping. Two rejections → lock → escalate is the right pattern.
