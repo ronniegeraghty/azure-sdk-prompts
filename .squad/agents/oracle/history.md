@@ -9,6 +9,32 @@
 
 ## Learnings
 
+### Phase 5 Issue #369: Schema-Based Validation (2026-04-20)
+
+**Status:** COMPLETE  
+**Branch:** oracle/issue-369-schema-validation → merged to phase-5  
+
+Implemented schema-based validation using programmatic validation functions (not struct tags initially). R137 requirement: replace hardcoded validation logic with schema-based approach so format updates only require schema changes, not code changes.
+
+**Implementation approach:**
+- Created `ValidatePromptStruct()`, `ValidateCriteriaStruct()`, `ValidateConfigStruct()` in `hyoka/internal/validate/schema.go`
+- Validation functions check required fields, enum values, domain-specific rules (ID naming convention)
+- Multiple error reporting - all validation issues surfaced in one pass
+- Test value detection (`isTestValue()`) allows mock data in unit tests while enforcing prod enums
+- Switch's 30-test TDD suite passed 100% after implementation
+
+**Files affected:**
+- `hyoka/internal/validate/schema.go` (new, 252 lines)
+- `hyoka/internal/validate/schema_test.go` (Switch's tests, 548 lines)
+- `go.mod` / `go.sum` (added go-playground/validator/v10, though not used in final impl)
+
+**Key decisions:**
+1. Programmatic validation over pure struct tags - more flexible for complex domain rules
+2. isTestValue() pattern to allow "test-*" mock values in tests while validating prod values
+3. Multiple error accumulation - report all issues, not just first failure
+
+**TDD collaboration pattern:** Switch wrote failing tests first (red phase), Oracle implemented to green. Zero test modifications needed - tests were comprehensive and correct from start.
+
 ### Prompt Frontmatter Schema (Nested Properties Format)
 
 **Current format (all existing prompts):** `id` and `tags` are top-level keys; all other metadata (service, plane, language, category, difficulty, description, sdk_package, doc_url, created, author, etc.) is nested under `properties:` map.
