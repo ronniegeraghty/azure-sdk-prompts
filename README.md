@@ -1,6 +1,6 @@
 # hyoka
 
-**A comprehensive evaluation tool for AI agents.** hyoka runs prompts through AI agents (GitHub Copilot SDK), scores generated code against extensible grader criteria, and produces detailed pass/fail reports with workspace delta tracking.
+**A comprehensive evaluation tool for AI agents.** hyoka runs prompts through AI agents (GitHub Copilot SDK), scores generated outputs against extensible grader criteria, and produces detailed pass/fail reports with workspace delta tracking.
 
 ## Installation
 
@@ -44,7 +44,7 @@ go run . serve
 **What just happened?** hyoka:
 1. Loaded the `key-vault-dp-python-crud` prompt
 2. Spawned a Copilot session with Claude Opus 4.6
-3. Generated code based on the prompt
+3. Generated output based on the prompt
 4. Evaluated it against 5 grader types (builder, complexity, prompt adherence, behavior, AI review)
 5. Produced a pass/fail report with detailed grading breakdown
 
@@ -156,7 +156,7 @@ hyoka run --prompt-id storage-dp-dotnet-auth \
   --config baseline/claude-opus-4.6
 
 # Dry run — list matches without executing
-hyoka run --service storage --dry-run
+hyoka run --service storage --config baseline/claude-opus-4.6 --dry-run
 ```
 
 **See all commands and flags:** [CLI Reference](docs/cli-reference.md)
@@ -167,7 +167,7 @@ hyoka includes built-in protections that keep evaluation runs safe, bounded, and
 
 ### Generator Guardrails
 
-Every code-generation session is automatically aborted if it exceeds any of these limits:
+Every evaluation session is automatically aborted if it exceeds any of these limits:
 
 | Limit | Default | Flag | Purpose |
 |-------|---------|------|---------|
@@ -179,7 +179,7 @@ Prompts can override defaults via frontmatter. Resolution order: prompt frontmat
 
 ### Safety Boundaries
 
-By default, generators **prevent real Azure resource provisioning**. The agent uses:
+By default, generators **prevent real Azure resource provisioning**. Agents use:
 - Mock data, environment variables, and local emulators
 - Bicep/ARM/Terraform templates instead of live `az` CLI commands
 - Placeholder values like `os.Getenv("AZURE_STORAGE_CONNECTION_STRING")`
@@ -212,7 +212,10 @@ cd hyoka
 go build .
 
 # Run tests
-go test -race ./hyoka/...
+go test -race ./...
+
+# Test site (frontend)
+cd site && npm test
 
 # Test with a live eval (fastest feedback)
 go run . run --prompt-id key-vault-dp-python-crud \
