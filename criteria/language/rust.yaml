@@ -95,8 +95,9 @@ graders:
       Code follows Rust naming conventions: snake_case for functions
       and variables, CamelCase for types and traits,
       SCREAMING_SNAKE_CASE for constants. Uses use statements for
-      imports rather than fully-qualified inline paths. Code is
-      organized into functions, not a single monolithic main().
+      imports rather than fully-qualified inline paths.
+      Code is formatted with rustfmt and all clippy lint errors and warnings
+      are addressed.
   - name: Ownership and Borrowing
     weight: 1.0
     prompt: >
