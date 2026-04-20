@@ -414,12 +414,74 @@ export function PromptDetailPage() {
               baseline={correlations.overallRate}
               showDuration
             />
-            <CorrelationTable
-              title="Pass Rate by Tool Used"
-              icon={Wrench}
-              data={correlations.byTool}
-              baseline={correlations.overallRate}
-            />
+            
+            {/* Tool usage with toggle */}
+            <div className="rounded-xl border border-white/8 bg-white/[0.03] p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-white/40" />
+                  <h3 className="text-white" style={{ fontSize: 14 }}>Pass Rate by Tool Used</h3>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 transition hover:bg-white/10">
+                  <input
+                    type="checkbox"
+                    checked={showEnvToolsOnly}
+                    onChange={e => setShowEnvToolsOnly(e.target.checked)}
+                    className="h-3 w-3 accent-emerald-500"
+                  />
+                  <span className="text-white/60" style={{ fontSize: 11 }}>Env tools only</span>
+                </label>
+              </div>
+              
+              {(showEnvToolsOnly ? correlations.byToolEnv : correlations.byToolAll).length > 0 ? (
+                <>
+                  <p className="mb-4 text-white/25" style={{ fontSize: 11 }}>
+                    How this prompt's pass rate changes based on which tools are used.
+                    {showEnvToolsOnly && " (Excluding standard CLI tools like bash, view, create, edit.)"}
+                    {" "}Overall baseline: <span style={mono}>{correlations.overallRate}%</span>
+                  </p>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="w-full" style={{ fontSize: 12 }}>
+                      <thead>
+                        <tr className="border-b border-white/8">
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Tool</th>
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Evals</th>
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Pass Rate</th>
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>vs Baseline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(showEnvToolsOnly ? correlations.byToolEnv : correlations.byToolAll).map(d => {
+                          const rateColor = d.rate >= 80 ? "text-emerald-400" : d.rate >= 60 ? "text-amber-400" : "text-red-400";
+                          return (
+                            <tr key={d.name} className="border-b border-white/5 transition hover:bg-white/[0.02]">
+                              <td className="px-3 py-2.5 text-white/70" style={{ ...mono, fontSize: 11 }}>{d.name}</td>
+                              <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{d.total}</td>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/10">
+                                    <div className={`h-full rounded-full ${d.rate >= 80 ? "bg-emerald-500" : d.rate >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.rate}%` }} />
+                                  </div>
+                                  <span className={rateColor} style={{ ...mono, fontSize: 11 }}>{d.rate}%</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <DeltaIndicator rate={d.rate} baseline={correlations.overallRate} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-32 items-center justify-center text-white/30" style={{ fontSize: 13 }}>
+                  {showEnvToolsOnly ? "No environment tools detected" : "No tool usage data"}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
