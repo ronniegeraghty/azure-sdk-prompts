@@ -3,13 +3,66 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { PromptDetailPage } from "../app/components/prompt-detail-page";
+import type { PromptInfo } from "../app/data/api";
+import type { RunSummary } from "../app/data/types";
 
-vi.mock("../app/api", () => ({
-  getPromptById: vi.fn(),
-  getEvaluationsForPrompt: vi.fn(),
+// Mock the correct API module
+vi.mock("../app/data/api", () => ({
+  fetchPrompt: vi.fn(),
+  fetchRuns: vi.fn(),
 }));
 
-import { getPromptById, getEvaluationsForPrompt } from "../app/api";
+import { fetchPrompt, fetchRuns } from "../app/data/api";
+
+// Mock data helpers
+const mockPromptInfo = (id: string, partial: Partial<PromptInfo> = {}): PromptInfo => ({
+  id,
+  service: "identity",
+  plane: "data-plane",
+  language: "python",
+  category: "auth",
+  difficulty: "beginner",
+  description: "Test prompt",
+  sdk_package: "azure-identity",
+  doc_url: "",
+  tags: [],
+  created: "2025-01-01T00:00:00Z",
+  author: "test",
+  prompt_text: "Generate a Python script that uses DefaultAzureCredential...",
+  evaluation_criteria: "Code must compile and follow best practices",
+  file_path: "/prompts/test.md",
+  ...partial
+});
+
+const mockRunForPrompt = (promptId: string, configName: string, score: number, timestamp: string, tools: string[] = []): RunSummary => ({
+  run_id: `run-${promptId}-${configName}`,
+  timestamp,
+  total_evaluations: 1,
+  passed: score >= 70 ? 1 : 0,
+  failed: score < 70 ? 1 : 0,
+  errors: 0,
+  duration_seconds: 10,
+  results: [{
+    prompt_id: promptId,
+    config_name: configName,
+    success: score >= 70,
+    review: {
+      overall_score: score,
+      max_score: 100,
+      summary: "Test review"
+    },
+    duration_seconds: 10,
+    generated_files: tools.length > 0 ? ["test.py"] : undefined,
+    prompt_metadata: {
+      service: "identity",
+      plane: "data-plane",
+      language: "python",
+      category: "auth",
+      difficulty: "beginner",
+      tags: []
+    }
+  }]
+});
 
 describe("PromptDetailPage - R151 Improvements", () => {
   beforeEach(() => {
@@ -18,12 +71,12 @@ describe("PromptDetailPage - R151 Improvements", () => {
 
   describe("prompt content collapsible section", () => {
     it("renders prompt content in a collapsible section", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "identity-dp-python-default-credential",
-        name: "Identity Default Credential",
-        content: "Generate a Python script that uses DefaultAzureCredential to authenticate...",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([]);
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("identity-dp-python-default-credential", {
+          prompt_text: "Generate a Python script that uses DefaultAzureCredential to authenticate...",
+        })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       render(
         <MemoryRouter initialEntries={["/prompts/identity-dp-python-default-credential"]}>
@@ -41,12 +94,10 @@ describe("PromptDetailPage - R151 Improvements", () => {
       const user = userEvent.setup();
       const promptContent = "Generate a Python script that uses DefaultAzureCredential to authenticate with Azure Key Vault and retrieve a secret.";
 
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-        content: promptContent,
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([]);
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("test-prompt", { prompt_text: promptContent })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       render(
         <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
@@ -65,15 +116,15 @@ describe("PromptDetailPage - R151 Improvements", () => {
 
   describe("labeled badges instead of colored dots", () => {
     it("displays labeled badges for prompt metadata", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-        service: "identity",
-        language: "python",
-        plane: "data-plane",
-        difficulty: "beginner",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([]);
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("test-prompt", {
+          service: "identity",
+          language: "python",
+          plane: "data-plane",
+          difficulty: "beginner",
+        })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       render(
         <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
@@ -94,12 +145,10 @@ describe("PromptDetailPage - R151 Improvements", () => {
     });
 
     it("does not use colored dots for metadata display", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-        service: "key-vault",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([]);
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("test-prompt", { service: "key-vault" })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
 
       const { container } = render(
         <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
@@ -121,15 +170,12 @@ describe("PromptDetailPage - R151 Improvements", () => {
 
   describe("score trend chart", () => {
     it("uses days on x-axis instead of evaluation count", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([
-        { timestamp: "2025-04-15T10:00:00Z", score: 70 },
-        { timestamp: "2025-04-16T10:00:00Z", score: 75 },
-        { timestamp: "2025-04-17T10:00:00Z", score: 80 },
-        { timestamp: "2025-04-18T10:00:00Z", score: 85 },
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 70, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 75, "2025-04-16T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 80, "2025-04-17T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 85, "2025-04-18T10:00:00Z"),
       ]);
 
       render(
@@ -147,14 +193,11 @@ describe("PromptDetailPage - R151 Improvements", () => {
     });
 
     it("shows only average score line", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([
-        { timestamp: "2025-04-15T10:00:00Z", score: 70 },
-        { timestamp: "2025-04-16T10:00:00Z", score: 75 },
-        { timestamp: "2025-04-17T10:00:00Z", score: 80 },
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 70, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 75, "2025-04-16T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 80, "2025-04-17T10:00:00Z"),
       ]);
 
       const { container } = render(
@@ -175,17 +218,14 @@ describe("PromptDetailPage - R151 Improvements", () => {
 
   describe("pass rate by model", () => {
     it("shows ALL models, not just top 3", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([
-        { model: "claude-opus-4.6", score: 95 },
-        { model: "claude-sonnet-4.5", score: 88 },
-        { model: "gpt-5.3-codex", score: 85 },
-        { model: "claude-haiku-4.5", score: 80 },
-        { model: "gpt-5.2", score: 78 },
-        { model: "gpt-5-mini", score: 72 },
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 95, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-sonnet-4.5", 88, "2025-04-15T11:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/gpt-5.3-codex", 85, "2025-04-15T12:00:00Z"),
+        mockRunForPrompt("test-prompt", "azure-mcp/claude-haiku-4.5", 80, "2025-04-15T13:00:00Z"),
+        mockRunForPrompt("test-prompt", "azure-mcp/gpt-5.2", 78, "2025-04-15T14:00:00Z"),
+        mockRunForPrompt("test-prompt", "azure-mcp/gpt-5-mini", 72, "2025-04-15T15:00:00Z"),
       ]);
 
       render(
@@ -206,19 +246,16 @@ describe("PromptDetailPage - R151 Improvements", () => {
     });
 
     it("does not truncate model list to top 3", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([
-        { model: "model-1", score: 95 },
-        { model: "model-2", score: 88 },
-        { model: "model-3", score: 85 },
-        { model: "model-4", score: 80 },
-        { model: "model-5", score: 78 },
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "config/model-1", 95, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-2", 88, "2025-04-15T11:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-3", 85, "2025-04-15T12:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-4", 80, "2025-04-15T13:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-5", 78, "2025-04-15T14:00:00Z"),
       ]);
 
-      const { container } = render(
+      render(
         <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
           <Routes>
             <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
@@ -238,12 +275,10 @@ describe("PromptDetailPage - R151 Improvements", () => {
 
   describe("pass rate by tool", () => {
     it("shows environment tools, not bash/view/create", async () => {
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([
-        { tools: ["bash", "view", "create", "azure-cli", "dotnet", "mcp-azure-resources"] },
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "azure-mcp/claude-opus-4.6", 85, "2025-04-15T10:00:00Z", 
+          ["bash", "view", "create", "azure-cli", "dotnet", "mcp-azure-resources"]),
       ]);
 
       render(
@@ -268,12 +303,9 @@ describe("PromptDetailPage - R151 Improvements", () => {
 
     it("includes a toggle to show/hide tool usage", async () => {
       const user = userEvent.setup();
-      vi.mocked(getPromptById).mockResolvedValue({
-        id: "test-prompt",
-        name: "Test Prompt",
-      });
-      vi.mocked(getEvaluationsForPrompt).mockResolvedValue([
-        { tools: ["azure-cli", "gh"] },
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "azure-mcp/claude-opus-4.6", 85, "2025-04-15T10:00:00Z", ["azure-cli", "gh"]),
       ]);
 
       render(

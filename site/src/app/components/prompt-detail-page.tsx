@@ -176,6 +176,7 @@ export function PromptDetailPage() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEnvToolsOnly, setShowEnvToolsOnly] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,9 +247,17 @@ export function PromptDetailPage() {
       return model ? [model] : [r.config_name];
     });
 
-    const byTool = computeGrouped(evalsWithContext, (r) => {
+    const byToolAll = computeGrouped(evalsWithContext, (r) => {
       const tools = (r as unknown as { tool_calls?: string[] }).tool_calls;
       return tools && tools.length > 0 ? [...new Set(tools)] : [];
+    });
+
+    // Filter to environment tools only (exclude standard CLI tools)
+    const standardTools = new Set(["bash", "view", "create", "edit", "grep", "glob"]);
+    const byToolEnv = computeGrouped(evalsWithContext, (r) => {
+      const tools = (r as unknown as { tool_calls?: string[] }).tool_calls;
+      if (!tools || tools.length === 0) return [];
+      return [...new Set(tools)].filter(t => !standardTools.has(t));
     });
 
     const overallRate = passRate;
@@ -258,7 +267,7 @@ export function PromptDetailPage() {
 
     return {
       history: { prompt_id: decodedId, total_runs: totalRuns, passed, pass_rate: passRate, avg_duration_seconds: avgDuration, entries, configs },
-      correlations: { byModel, byTool, overallRate, overallAvgScore },
+      correlations: { byModel, byToolAll, byToolEnv, overallRate, overallAvgScore },
     };
   }, [runs, decodedId]);
 
