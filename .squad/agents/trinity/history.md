@@ -179,3 +179,46 @@ Implemented all three requirements (R150, R151, R154) for Phase 5 on branch `tri
 - R151: PromptDetailPage improvements ✅
 - R154: DashboardPage with real data ✅
 - All Switch's test assertions passing ✅
+
+### Session 2026-04-20 (Issue #366 — Docs Page Improvements)
+
+Implemented all requirements from R155 (docs page observations) for Phase 5 on branch `trinity/issue-366-docs-page`.
+
+**Requirements completed:**
+
+1. **Search functionality** — Added live search input to docs sidebar. Filters docs by title/slug as user types. Shows "No results found" message when query has no matches.
+
+2. **Sidebar groupings** — Organized docs into logical sections:
+   - Getting Started (getting-started)
+   - CLI Reference (cli-reference)
+   - Configuration (configuration, grader-config-schema, tool-filter-schema, starter-files)
+   - Concepts (guardrails, prompt-authoring, roadmap)
+
+3. **Removed developer docs** — Added `architecture.md` to `internalDocs` map in `serve.go` so it's filtered from the API. Developer docs belong in the repo, not the user-facing site.
+
+4. **Fixed navbar buttons:**
+   - "Get Started" now links to `/docs` (previously linked to GitHub repo)
+   - Added separate "GitHub" button for repo access
+   - Both buttons styled consistently with the design system
+
+5. **Code block rendering** — Already consistent via ReactMarkdown component customization (no changes needed).
+
+**Testing:**
+- Created comprehensive DocsPage test suite: 13 tests, all passing
+  - Loading states, error states, grouping logic
+  - Search filtering (including edge cases like no results)
+  - Doc selection, navigation, active highlighting
+  - Markdown rendering (headings, code blocks)
+  - Verification that architecture.md is excluded
+- Updated navbar tests for new button structure: 5 tests, all passing
+- Site build: ✅ 6.7s (expected chunk size warning)
+
+**Commits:**
+- 438d41e7: feat(#366): Improve docs page with search, grouping, and nav updates
+- 2c76be3f: Merge #366 into phase-5
+
+**Patterns learned:**
+- `useMemo` for derived state (filtered/grouped docs) avoids unnecessary recalculations
+- Search should match both `title` and `slug` fields for best discoverability
+- Backend filtering (`internalDocs` map) ensures sensitive docs never reach the API
+- Navbar link changes require both component and test updates to maintain coverage
