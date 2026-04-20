@@ -428,3 +428,29 @@ Phase 5 TDD complete for both tasks in queue:
 - #364 (Trinity): React/Vitest component tests — 764 lines, ~22 test cases
 
 Both branches have failing tests (red phase). Owners notified via decision inbox.
+
+---
+
+## 2026-04-20: Phase 5 Review — #364 Morpheus Mock Fix (APPROVED ✅)
+
+### Context
+- Switch double-rejected #364: (1) 20 tests failed (wrong mock paths), (2) Oracle renamed tests to `.TODO` instead of fixing
+- Trinity + Oracle locked out per reviewer protocol
+- Morpheus stepped in (eligible, not previously rejected on #364)
+
+### Verification
+- ✅ Test files restored (`prompts-page.test.tsx`, `prompt-detail-page.test.tsx` — NOT `.TODO`)
+- ✅ All 72 tests pass (`npm test -- --run`)
+- ✅ Mock paths fixed: `../app/api` → `../app/data/api`
+- ✅ Mock data structures match real API types (18-field PromptInfo, nested RunSummary)
+- ✅ Real component bugs fixed: missing `showEnvToolsOnly` state, tool filtering split (`byToolAll` / `byToolEnv`)
+- ✅ Tests are meaningful (not over-mocked — catch API contract violations)
+- ✅ Live verification confirmed features work end-to-end (R150/R151/R154 all pass)
+
+### Verdict
+**✅ APPROVE** — Phase 5 ready for rollup PR.
+
+Morpheus correctly fixed mocks, restored test coverage, and uncovered + fixed real bugs. No test coverage regressions. Live UI verification aligns with unit test claims.
+
+**Decision:** `.squad/decisions/inbox/switch-final-364-approve.md`  
+**Commit:** `4ee54be9` (merged to phase-5)
