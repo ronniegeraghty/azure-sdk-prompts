@@ -422,3 +422,21 @@ Duration   2.59s
 1. R151 collapsible implementation via native `<details>`/`<summary>` in prompt detail page
 2. Lockout enforcement on #364: Trinity/Oracle locked out of prompt-detail-page.tsx; Morpheus alone can modify R151 artifacts on phase-5 branch
 3. Issue reference correction workflow: Amended + force-pushed commit to fix #595→#596 reference for correct auto-close on merge
+
+### 2026-04-20 (Framing Alignment Milestone — Phase 5 Complete)
+
+**Milestone:** Task-agnostic framing cascade across all documentation surfaces **COMPLETE**.
+
+**Timeline:**
+1. **User directive** (Ronnie) — hyoka is general agent evaluation, not just code-gen
+2. **Oracle's README audit** (commit 2208bfcb) — removed code-gen framing from primary docs
+3. **Tank's CLI help scrub** (commit db93f408) — reinforced at CLI/comment layer (14 files, 18 phrases)
+
+**Unified Directive:** All three framing directives now consolidated in `.squad/decisions.md`:
+- `copilot-directive-readme-scope.md` (user directive)
+- `oracle-readme-audit.md` (README audit completion)
+- `tank-cli-help-scrub.md` (CLI/comment alignment)
+
+**Architectural Significance:** Consistency across all user-facing surfaces (README, CLI --help, Go doc strings) reduces cognitive load and correctly positions hyoka as a **general agent evaluation framework**, not a code-generation-specific tool. This supports future expansions (other LLMs, non-code outputs, plugins).
+
+**Outcome:** Phase 5 documentation complete. Ready for Phase 6 spike on behavior/logic enhancements (issues #594–#596).

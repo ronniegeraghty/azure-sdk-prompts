@@ -112,3 +112,18 @@ Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026
 
 **Next:** Phase 6 planning will prioritize these based on dependency graph. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
 
+### Session 2026-04-20 (CLI Help Scrub — Issue #364)
+
+**Status:** COMPLETE (commit db93f408, pushed to phase-5, CI PASS)
+
+Scrubbed code-gen-specific framing from CLI help text and Go doc comments per Oracle's README audit (2208bfcb). Replaced 18 instances across 14 files:
+- `code generation quality` → `output quality`
+- `generated code` → `agent output`
+- `generating code` → `producing output`
+
+Surfaces touched: root/run/new-prompt commands, graders, eval, review, config, logging, trends, serve packages.
+
+**CI:** Build, Vet, Test + Site Build — all PASS.
+
+**Learning:** sed is the right tool for Unicode-safe string replacement when edit tool can't match escape sequences like `\u2014` (em-dash). Always verify CLI help output end-to-end with `go run . --help` before pushing.
+

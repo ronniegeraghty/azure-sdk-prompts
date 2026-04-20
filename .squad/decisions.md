@@ -2477,3 +2477,109 @@ Table-driven tests made adding coverage easy (9 tests in ~200 lines).
 **Full Review:** `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`
 
 ---
+
+---
+
+### Decision: Copilot CLI Directive — Task-Agnostic Framing (User)
+
+**Author:** Ronnie Geraghty (via Copilot)  
+**Date:** 2026-04-20T20:59:25Z  
+**Status:** Captured for team memory  
+
+**What:** hyoka is NOT specific to code-generation evals. The README and other docs must not frame it that way — it's a general AI agent evaluation tool that supports many task types. Plus: README commands must actually work as documented; documentation describes the project, not the other way around.
+
+**Why:** User request — captured for team memory
+
+**Impact:** Cascading directive across all documentation layers (README → CLI help → Go doc comments).
+
+---
+
+### Decision: Oracle — README.md Audit and Fix (Phase 5)
+
+**Author:** Oracle 🔮  
+**Date:** 2026-04-20  
+**Status:** Complete  
+**Branch:** phase-5  
+**Commit:** 9931af2c
+
+**Directives Completed:**
+
+1. **Command Verification** ✅
+   - All commands tested and working:
+     - `go run . list --service key-vault --language python` ✅
+     - `go run . run --prompt-id key-vault-dp-python-crud --config baseline/claude-opus-4.6` ✅
+     - `go run . serve` ✅
+     - `go run . validate` ✅
+     - `go run . check-env` ✅
+     - `go run . clean --dry-run` ✅
+     - `go test -race ./...` ✅
+     - `cd site && npm test` ✅
+
+2. **Framing Changes** ✅ (task-agnostic language)
+   - "scores generated code" → "scores generated outputs"
+   - "Generated code based on" → "Generated output based on"
+   - "Every code-generation session" → "Every evaluation session"
+   - "The agent uses" → "Agents use"
+
+3. **Command Corrections**
+   - Line 159: Added required `--config` flag to dry-run example
+   - Line 215: Updated Go test path to `./...` (conventional)
+   - Lines 217–218: Added site test coverage, removed deprecated `--run` flag
+
+**CI Status:** PR #592 (phase-5 → ronniegeraghty/dev): ✅ All checks passed
+
+**Key Insight:** Example prompts can mention code (specific examples), but tool FRAMING must be task-agnostic. hyoka evaluates AI agent outputs generally.
+
+---
+
+### Decision: Tank — CLI Help & Doc Comment Scrub (#364)
+
+**Author:** Tank 📡  
+**Date:** 2026-04-20  
+**Status:** Complete  
+**Issue:** #364 (phase-5)  
+**Commit:** db93f408  
+**Branch:** phase-5  
+**PR:** #592  
+**CI Status:** ✅ PASS (Build, Vet, Test + Site Build)
+
+**What Changed:**
+
+Removed code-generation-specific framing from CLI help text and Go doc comments to align with README task-agnostic positioning (Oracle's README audit, commit 2208bfcb).
+
+**Files touched (14):**
+- `hyoka/cmd/root.go` (Short/Long help)
+- `hyoka/cmd/run.go` (--allow-cloud flag)
+- `hyoka/cmd/new_prompt.go` (template text)
+- `hyoka/internal/graders/grader.go` (package doc)
+- `hyoka/internal/graders/prompt_grader.go` (BuildPrompt, Grade doc)
+- `hyoka/internal/trends/analysis.go` (system prompt)
+- `hyoka/internal/logging/logging.go` (GeneratorLogger doc)
+- `hyoka/internal/config/config.go` (GeneratorConfig doc)
+- `hyoka/internal/serve/serve.go` (operator guidance comment)
+- `hyoka/internal/review/event_collector.go` (consolidation prompt)
+- `hyoka/internal/review/prompt.go` (BuildReviewPrompt doc + text)
+- `hyoka/internal/eval/engine.go` (AllowCloud comment)
+- `hyoka/internal/eval/copilot.go` (AllowCloud, skill hint comments)
+- `hyoka/internal/eval/workspace.go` (codeFileExts comment)
+
+**Phrase replacements (18 instances):**
+- `code generation quality` → `output quality`
+- `generated code` → `agent output`
+- `generating code` → `producing output`
+- `agent-generated code` → `agent output`
+- `code quality evaluator` → `output quality evaluator`
+
+**Verification:**
+- ✅ Build: `go build ./...` — PASS
+- ✅ Tests: `go test ./...` — PASS
+- ✅ CLI help: reads naturally
+- ✅ CI: All checks PASS on PR #592
+
+**Scope Rules Followed:**
+- ONLY edited comment text and CLI strings
+- NO function/type/package/file renames
+- NO behavior changes
+- NO test changes
+
+---

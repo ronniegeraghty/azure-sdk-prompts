@@ -372,3 +372,15 @@ Restructured README.md from 540-line monolith to focused 6-section document (229
 
 **Next:** Phase 6 planning will prioritize these based on dependency graph. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
 
+### 2026-04-20 (CLI Help & Doc Comment Framing Alignment — Tank #364)
+
+**Status:** COMPLETE  
+**Commit:** db93f408  
+
+Your README audit (commit 2208bfcb) established task-agnostic framing. Tank completed the alignment at the CLI/code-comment layer: 14 files, 18 phrase replacements, same "code generation" → "agent output" framing. This ensures consistency across all documentation surfaces (README, CLI --help, Go doc comments). All 3 framing directives now unified:
+- Ronnie's user directive (task-agnostic framing)
+- Oracle's README audit (removed code-gen framing)
+- Tank's CLI help scrub (reinforced at help/comment layer)
+
+**Decision documented:** `.squad/decisions.md` (3 entries merged from inbox: copilot-directive-readme-scope, oracle-readme-audit, tank-cli-help-scrub)
+
