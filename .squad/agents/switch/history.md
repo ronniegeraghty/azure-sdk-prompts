@@ -396,3 +396,35 @@ Deep code review of three Phase 4 PRs that just landed on `ronniegeraghty/dev`:
 - Oracle: Worth keeping `expected_tools` (and other optional fields like `expected_packages`) visible in the template — authors discover features by reading templates.
 
 **2026-04-18 — Morpheus Phase 4 Verification:** Accessibility compliance confirmed (semantic HTML, ARIA roles, a11y snapshots). No Switch a11y issues found during re-verification.
+
+## 2025-04-20: Phase 5 TDD — #364 Prompt Pages + Dashboard
+
+### Task: Failing tests for #364 (Trinity owner)
+
+**Branch:** `trinity/issue-364-prompt-pages-dashboard`
+
+Wrote comprehensive Vitest tests for frontend improvements per R150, R151, R154:
+
+**Test files created:**
+- `site/src/__tests__/prompts-page.test.tsx` (R150 — 7 test cases)
+- `site/src/__tests__/prompt-detail-page.test.tsx` (R151 — 7 test cases)
+- `site/src/__tests__/dashboard-page.test.tsx` (R154 — updated with 8 new cases)
+
+**Coverage:**
+- Prompts page: "with evals" filter, ordering (recent/alpha/best/worst), sparklines, prominent badges
+- Prompt detail: collapsible content, labeled badges (no colored dots), ALL models shown, env tools only, usage toggle
+- Dashboard: real data from API, calculated metrics, recent evals table, empty states
+
+All tests fail (red phase) — missing `../app/api` module and component implementations.
+
+Pushed to Trinity's branch. Left decision inbox note. Trinity will implement (green phase).
+
+---
+
+## Summary
+
+Phase 5 TDD complete for both tasks in queue:
+- #369 (Oracle): Go struct validation tests — 548 lines, 8 test functions
+- #364 (Trinity): React/Vitest component tests — 764 lines, ~22 test cases
+
+Both branches have failing tests (red phase). Owners notified via decision inbox.
