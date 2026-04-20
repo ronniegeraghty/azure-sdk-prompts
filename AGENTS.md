@@ -8,33 +8,9 @@ hyoka is a Go CLI tool that evaluates AI agents generating code. It uses GitHub 
 
 ```
 hyoka/              # Go source (module: github.com/ronniegeraghty/hyoka)
-  main.go           # CLI entry point (13 lines, delegates to cmd.Execute())
-  cmd/              # Cobra commands (root, run, list, compare, init, validate, etc.)
-  internal/         # All packages
-    build/          # Language-specific build verification
-    checkenv/       # Environment prerequisite validation
-    clean/          # Session state & orphan process cleanup (#62, #70)
-    comparison/     # Config/run/temporal comparison logic
-    config/         # Config loading & parsing
-    criteria/       # Tiered evaluation criteria system (#30)
-    eval/           # Evaluation engine (generation + review orchestration)
-    graders/        # Grader registry (6 types: builder, complexity, etc.)
-    history/        # Run history tracking
-    logging/        # Structured slog logging utilities
-    manifest/       # Dependency manifest
-    pairwise/       # Tool-ablation pairwise expansion
-    plugin/         # Composable plugin system (#50)
-    progress/       # Progress display (live, log, off)
-    prompt/         # Prompt loading, filtering, validation
-    rerender/       # Report re-rendering from JSON
-    report/         # Report generation (JSON, HTML, Markdown)
-    review/         # Multi-model review (PromptReviewGrader)
-    serve/          # Local web server for report browsing (#20)
-    skills/         # Skill fetching (local + remote)
-    tools/          # Tool-related utilities and registry
-    trends/         # Cross-run trend analysis
-    utils/          # Shared utility functions
-    validate/       # Prompt schema validation
+  main.go
+  cmd/              # CLI commands
+  internal/         # All packages (19 modules)
 .hyoka/             # Project directory (created by hyoka init)
   configs/          # Evaluation configs
   prompts/          # Prompt library
@@ -49,11 +25,20 @@ reports/            # Generated evaluation output (gitignored)
 docs/               # Design docs and getting started guide
 ```
 
+To see a complete package inventory with descriptions, run:
+
+```bash
+# List all internal packages
+go list ./hyoka/internal/...
+
+# Or inspect the directory
+ls -la hyoka/internal/
+```
+
 ## Build & Test
 
 ```bash
 # Build (from repo root)
-cd /home/rgeraghty/projects/hyoka
 go build ./hyoka/...
 
 # Run tests
@@ -78,19 +63,18 @@ Go version: 1.26.1+ required. Module path: `github.com/ronniegeraghty/hyoka`.
 
 Config YAML files live in `configs/`. The `--config` flag takes the `name:` field from **inside** the YAML file, **NOT** the filename.
 
+To discover available configs:
+
+```bash
+# List all available configs
+go run ./hyoka configs
+
+# Or inspect the configs directory directly
+ls configs/ | grep -E '\.ya?ml$'
+for f in configs/*.yaml; do echo "File: $f"; grep '^name:' "$f"; done
+```
+
 Example: `configs/azure-mcp-opus.yaml` contains `name: azure-mcp/claude-opus-4.6` → use `--config azure-mcp/claude-opus-4.6`
-
-**All current config names:**
-
-| Config name (`--config` value)       | File                          |
-|--------------------------------------|-------------------------------|
-| `baseline/claude-sonnet-4.5`        | `baseline-sonnet.yaml`        |
-| `baseline/claude-opus-4.6`          | `baseline-opus.yaml`          |
-| `baseline-skills/claude-opus-4.6`   | `baseline-opus-skills.yaml`   |
-| `baseline/gpt-5.3-codex`            | `baseline-codex.yaml`         |
-| `azure-mcp/claude-opus-4.6`         | `azure-mcp-opus.yaml`         |
-| `azure-mcp/claude-sonnet-4.5`       | `azure-mcp-sonnet.yaml`       |
-| `azure-mcp/gpt-5.3-codex`           | `azure-mcp-codex.yaml`        |
 
 ### Prompt ID Patterns
 
@@ -184,34 +168,33 @@ go run ./hyoka serve
 
 - **Branch naming**: `{username}/issue-{N}-{short-description}`
 - **Commit trailers**: Always include `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`
-- **Git identity**: Use `ronniegeraghty` account (not EMU). Set:
+- **Git identity**: Configure your GitHub account:
   ```
-  git config user.name "ronniegeraghty"
-  git config user.email "ronniegeraghty@users.noreply.github.com"
+  git config user.name "{your-github-username}"
+  git config user.email "{your-github-email}"
   ```
-- **Push auth**: Run `gh auth switch --user ronniegeraghty` before pushing
+- **Push auth**: Use `gh auth switch` to select your account before pushing
 
 ## Coding Conventions
 
-- **Go standard library preferred** — use `log/slog` for logging, `net/http` for HTTP, etc.
+**Quick Reference (critical conventions):**
+- **Go standard library preferred** — use `log/slog` for logging, `net/http` for HTTP
 - **CLI framework**: `github.com/spf13/cobra`
 - **Config format**: YAML with `gopkg.in/yaml.v3`
-- **No third-party logging** — use `log/slog` (Go 1.21+)
-- **User-facing output** goes to stdout/stderr directly (progress bars, results)
-- **Diagnostic logging** goes through slog
 - **Error handling**: Return errors up the call stack; don't log-and-return
+
+For detailed patterns and conventions, refer to:
+- **Logging**: See `logging-conventions` skill
+- **Error handling**: See `error-handling` skill
+- **Testing patterns**: See `testing-patterns` skill
+- **Go best practices**: See `golang-patterns` skill
 
 ## Key Architectural Patterns
 
+For comprehensive architectural documentation, see [`docs/architecture.md`](docs/architecture.md).
+
+Quick overview:
 - **Multi-model review panel**: Multiple LLMs review generated code independently, then a consolidator merges scores
 - **Config-driven evaluation**: Each YAML config defines a generator model, reviewer models, skills, and MCP servers
 - **Prompt frontmatter**: Prompts have YAML frontmatter with `id`, `service`, `language`, `plane`, `category`, `difficulty`
 - **Guardrails**: Turn limits (25), file limits (50), output size limits (1 MB)
-
-## Board Integration
-
-Issues are tracked on Azure/projects/424. When starting work:
-1. Set Status → In Progress
-2. Set Squad Member → Copilot
-3. Create branch, implement, push, open PR
-4. Set Status → Done when merged
