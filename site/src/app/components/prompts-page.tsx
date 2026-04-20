@@ -2,10 +2,12 @@ import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router";
 import { fetchPrompts, fetchRuns, type PromptInfo } from "../data/api";
 import type { RunSummary } from "../data/types";
-import { Search, ChevronRight, Loader2 } from "lucide-react";
+import { Search, ChevronRight, Loader2, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { motion } from "motion/react";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
+
+type SortBy = "recent" | "alphabetical" | "best" | "worst";
 
 interface PromptWithStats {
   prompt_id: string;
@@ -20,6 +22,8 @@ interface PromptWithStats {
   };
   evalCount: number;
   passRate: number;
+  lastEvaluated?: string;
+  recentScores: number[];
 }
 
 export function PromptsPage() {
@@ -31,6 +35,8 @@ export function PromptsPage() {
   const [filterLang, setFilterLang] = useState("all");
   const [filterDifficulty, setFilterDifficulty] = useState("all");
   const [filterPlane, setFilterPlane] = useState("all");
+  const [onlyWithEvals, setOnlyWithEvals] = useState(true);
+  const [sortBy, setSortBy] = useState<SortBy>("recent");
 
   useEffect(() => {
     let cancelled = false;
@@ -40,33 +46,68 @@ export function PromptsPage() {
         if (cancelled) return;
 
         // Compute eval stats per prompt from runs
-        const promptStats = new Map<string, { evals: number; passed: number }>();
-        for (const run of runs) {
+        const promptStats = new Map<string, { 
+          evals: number; 
+          passed: number; 
+          lastEvaluated: string;
+          recentScores: number[];
+        }>();
+        
+        // Sort runs by timestamp to get recent scores in order
+        const sortedRuns = [...runs].sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+
+        for (const run of sortedRuns) {
           for (const result of run.results || []) {
             const key = result.prompt_id;
-            const stats = promptStats.get(key) || { evals: 0, passed: 0 };
+            const stats = promptStats.get(key) || { 
+              evals: 0, 
+              passed: 0,
+              lastEvaluated: run.timestamp,
+              recentScores: []
+            };
             stats.evals++;
             if (result.success) stats.passed++;
+            
+            // Track recent scores (last 10) for sparkline
+            if (stats.recentScores.length < 10) {
+              const score = result.review?.overall_score ?? 0;
+              const maxScore = result.review?.max_score ?? 100;
+              const normalizedScore = maxScore > 0 ? (score / maxScore) * 100 : 0;
+              stats.recentScores.push(normalizedScore);
+            }
+            
+            // Update last evaluated if this run is more recent
+            if (new Date(run.timestamp) > new Date(stats.lastEvaluated)) {
+              stats.lastEvaluated = run.timestamp;
+            }
+            
             promptStats.set(key, stats);
           }
         }
 
-        const merged: PromptWithStats[] = prompts.map((p: PromptInfo) => ({
-          prompt_id: p.id,
-          metadata: {
-            service: p.service,
-            language: p.language,
-            difficulty: p.difficulty,
-            plane: p.plane,
-            tags: p.tags || [],
-            category: p.category,
-            sdk_package: p.sdk_package,
-          },
-          evalCount: promptStats.get(p.id)?.evals || 0,
-          passRate: promptStats.get(p.id)?.evals
-            ? Math.round((promptStats.get(p.id)!.passed / promptStats.get(p.id)!.evals) * 100)
-            : 0,
-        }));
+        const merged: PromptWithStats[] = prompts.map((p: PromptInfo) => {
+          const stats = promptStats.get(p.id);
+          return {
+            prompt_id: p.id,
+            metadata: {
+              service: p.service,
+              language: p.language,
+              difficulty: p.difficulty,
+              plane: p.plane,
+              tags: p.tags || [],
+              category: p.category,
+              sdk_package: p.sdk_package,
+            },
+            evalCount: stats?.evals || 0,
+            passRate: stats?.evals
+              ? Math.round((stats.passed / stats.evals) * 100)
+              : 0,
+            lastEvaluated: stats?.lastEvaluated,
+            recentScores: stats?.recentScores || [],
+          };
+        });
 
         setAllPrompts(merged);
       } catch (e) {
@@ -82,14 +123,40 @@ export function PromptsPage() {
   const services = useMemo(() => [...new Set(allPrompts.map(p => p.metadata.service))].sort(), [allPrompts]);
   const langs = useMemo(() => [...new Set(allPrompts.map(p => p.metadata.language))].sort(), [allPrompts]);
 
-  const filtered = allPrompts.filter(p => {
-    if (search && !p.prompt_id.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterService !== "all" && p.metadata.service !== filterService) return false;
-    if (filterLang !== "all" && p.metadata.language !== filterLang) return false;
-    if (filterDifficulty !== "all" && p.metadata.difficulty !== filterDifficulty) return false;
-    if (filterPlane !== "all" && p.metadata.plane !== filterPlane) return false;
-    return true;
-  });
+  // Filter prompts
+  const filtered = useMemo(() => {
+    let result = allPrompts.filter(p => {
+      if (onlyWithEvals && p.evalCount === 0) return false;
+      if (search && !p.prompt_id.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterService !== "all" && p.metadata.service !== filterService) return false;
+      if (filterLang !== "all" && p.metadata.language !== filterLang) return false;
+      if (filterDifficulty !== "all" && p.metadata.difficulty !== filterDifficulty) return false;
+      if (filterPlane !== "all" && p.metadata.plane !== filterPlane) return false;
+      return true;
+    });
+
+    // Apply sorting
+    switch (sortBy) {
+      case "recent":
+        result.sort((a, b) => {
+          if (!a.lastEvaluated) return 1;
+          if (!b.lastEvaluated) return -1;
+          return new Date(b.lastEvaluated).getTime() - new Date(a.lastEvaluated).getTime();
+        });
+        break;
+      case "alphabetical":
+        result.sort((a, b) => a.prompt_id.localeCompare(b.prompt_id));
+        break;
+      case "best":
+        result.sort((a, b) => b.passRate - a.passRate);
+        break;
+      case "worst":
+        result.sort((a, b) => a.passRate - b.passRate);
+        break;
+    }
+
+    return result;
+  }, [allPrompts, search, filterService, filterLang, filterDifficulty, filterPlane, onlyWithEvals, sortBy]);
 
   if (loading) {
     return (
@@ -122,8 +189,9 @@ export function PromptsPage() {
         </div>
 
         {/* Search & Filters */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
+        <div className="mb-6 space-y-4">
+          {/* Search bar */}
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
             <input
               type="text"
@@ -134,40 +202,66 @@ export function PromptsPage() {
               style={{ fontSize: 13 }}
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+
+          {/* Filter controls */}
+          <div className="flex flex-wrap items-center gap-3">
             <select value={filterService} onChange={e => setFilterService(e.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70" style={{ fontSize: 12 }}>
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70 outline-none focus:border-emerald-500/30" style={{ fontSize: 12 }}>
               <option value="all">All Services</option>
               {services.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <select value={filterLang} onChange={e => setFilterLang(e.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70" style={{ fontSize: 12 }}>
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70 outline-none focus:border-emerald-500/30" style={{ fontSize: 12 }}>
               <option value="all">All Languages</option>
               {langs.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
             <select value={filterDifficulty} onChange={e => setFilterDifficulty(e.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70" style={{ fontSize: 12 }}>
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70 outline-none focus:border-emerald-500/30" style={{ fontSize: 12 }}>
               <option value="all">All Difficulty</option>
               <option value="basic">Basic</option>
               <option value="intermediate">Intermediate</option>
               <option value="advanced">Advanced</option>
             </select>
             <select value={filterPlane} onChange={e => setFilterPlane(e.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70" style={{ fontSize: 12 }}>
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70 outline-none focus:border-emerald-500/30" style={{ fontSize: 12 }}>
               <option value="all">All Planes</option>
               <option value="data-plane">Data Plane</option>
               <option value="management-plane">Management Plane</option>
             </select>
+            
+            <div className="ml-auto flex items-center gap-3">
+              {/* Only show with evals toggle */}
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 transition hover:bg-white/10">
+                <input
+                  type="checkbox"
+                  checked={onlyWithEvals}
+                  onChange={e => setOnlyWithEvals(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-emerald-500"
+                />
+                <span className="text-white/70" style={{ fontSize: 12 }}>Only show with evals</span>
+              </label>
+
+              {/* Sort dropdown */}
+              <select value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/70 outline-none focus:border-emerald-500/30" style={{ fontSize: 12 }}>
+                <option value="recent">Most Recently Evaluated</option>
+                <option value="alphabetical">Alphabetically</option>
+                <option value="best">Best Performing</option>
+                <option value="worst">Worst Performing</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <p className="mb-4 text-white/30" style={{ fontSize: 12 }}>{filtered.length} prompts found</p>
+        <p className="mb-4 text-white/30" style={{ fontSize: 12 }}>
+          {filtered.length} prompt{filtered.length === 1 ? '' : 's'} found
+          {onlyWithEvals && ` (${allPrompts.filter(p => p.evalCount === 0).length} hidden without evals)`}
+        </p>
 
         {/* Prompt grid */}
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p, i) => {
             const rateColor = p.passRate >= 80 ? "text-emerald-400" : p.passRate >= 60 ? "text-amber-400" : "text-red-400";
-            const rateBg = p.passRate >= 80 ? "bg-emerald-500/10" : p.passRate >= 60 ? "bg-amber-500/10" : "bg-red-500/10";
             const diffColor = p.metadata.difficulty === "basic" ? "bg-emerald-500/10 text-emerald-400/70" :
               p.metadata.difficulty === "intermediate" ? "bg-amber-500/10 text-amber-400/70" : "bg-red-500/10 text-red-400/70";
 
@@ -182,34 +276,65 @@ export function PromptsPage() {
                   to={`/prompts/${encodeURIComponent(p.prompt_id)}`}
                   className="group block rounded-xl border border-white/8 bg-white/[0.03] p-4 no-underline transition hover:border-emerald-500/20 hover:bg-white/[0.05]"
                 >
-                  <div className="mb-3 flex items-start justify-between">
+                  <div className="mb-3 flex items-start justify-between gap-2">
                     <span className="text-emerald-400/80" style={{ ...mono, fontSize: 12 }}>
                       {p.prompt_id}
                     </span>
-                    <ChevronRight className="h-3.5 w-3.5 text-white/15 transition group-hover:text-emerald-400" />
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/15 transition group-hover:text-emerald-400" />
                   </div>
 
                   <div className="mb-3 flex flex-wrap gap-1.5">
                     <span className="rounded-md bg-white/5 px-2 py-0.5 text-white/50" style={{ fontSize: 10 }}>{p.metadata.service}</span>
                     <span className="rounded-md bg-white/5 px-2 py-0.5 text-white/50" style={{ fontSize: 10 }}>{p.metadata.language}</span>
                     <span className={`rounded-md px-2 py-0.5 ${diffColor}`} style={{ fontSize: 10 }}>{p.metadata.difficulty}</span>
-                    <span className="rounded-md bg-white/5 px-2 py-0.5 text-white/40" style={{ fontSize: 10 }}>{p.metadata.plane}</span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/30" style={{ fontSize: 11 }}>{p.evalCount} evals</span>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/10">
-                        <div className={`h-full rounded-full ${p.passRate >= 80 ? "bg-emerald-500" : p.passRate >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${p.passRate}%` }} />
-                      </div>
-                      <span className={rateColor} style={{ ...mono, fontSize: 12 }}>{p.passRate}%</span>
+                  {/* Tags - more prominent */}
+                  {p.metadata.tags.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-1">
+                      {p.metadata.tags.slice(0, 5).map(t => (
+                        <span key={t} className="rounded bg-white/[0.06] px-2 py-0.5 text-white/40" style={{ fontSize: 10 }}>{t}</span>
+                      ))}
                     </div>
+                  )}
+
+                  {/* Pass rate with sparkline */}
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className={rateColor} style={{ ...mono, fontSize: 13, fontWeight: 600 }}>{p.passRate}%</span>
+                      {p.passRate >= 80 ? (
+                        <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                      ) : p.passRate < 60 ? (
+                        <TrendingDown className="h-3.5 w-3.5 text-red-400" />
+                      ) : null}
+                    </div>
+                    
+                    {/* Mini sparkline if we have score data */}
+                    {p.recentScores.length > 0 && (
+                      <svg width="60" height="20" className="opacity-50">
+                        <polyline
+                          fill="none"
+                          stroke={p.passRate >= 80 ? "#34d399" : p.passRate >= 60 ? "#fbbf24" : "#f87171"}
+                          strokeWidth="1.5"
+                          points={p.recentScores.map((score, idx) => {
+                            const x = (idx / Math.max(p.recentScores.length - 1, 1)) * 60;
+                            const y = 20 - (score / 100) * 18;
+                            return `${x},${y}`;
+                          }).join(' ')}
+                        />
+                      </svg>
+                    )}
                   </div>
 
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {p.metadata.tags.slice(0, 3).map(t => (
-                      <span key={t} className="rounded bg-white/[0.04] px-1.5 py-0.5 text-white/25" style={{ fontSize: 9 }}>{t}</span>
-                    ))}
+                  {/* Eval count - more prominent */}
+                  <div className="flex items-center gap-1.5 text-white/40">
+                    <Clock className="h-3 w-3" />
+                    <span style={{ fontSize: 11 }}>{p.evalCount} evaluation{p.evalCount === 1 ? '' : 's'}</span>
+                    {p.lastEvaluated && (
+                      <span className="text-white/20" style={{ fontSize: 10 }}>
+                        · {new Date(p.lastEvaluated).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </Link>
               </motion.div>
