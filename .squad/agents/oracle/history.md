@@ -171,3 +171,28 @@ Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero
 Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
 
 **2026-04-18 — Morpheus Phase 4 Verification:** Playwright-cli now established as standard for UI verification. Oracle's playwright-cli skill complete and validated across full feature set. Skill ready for team use.
+
+### Session 2026-04-20 (Phase 5: WI-054 AGENTS.md Overhaul)
+
+**Status:** COMPLETE  
+**PR:** #367 merged into phase-5 (commit 068cd77c)  
+**Branch:** oracle/issue-367-agents-md-overhaul  
+**Merge Commit:** `Merge #367: AGENTS.md Overhaul into phase-5`
+
+Overhauled AGENTS.md to eliminate hardcoded values and replace static content with dynamic discovery patterns and pointers to living documentation.
+
+**Key changes:**
+1. Repository Structure: Simplified 3-level tree → 2-level tree. Added dynamic discovery commands (`go list ./hyoka/internal/...`, `ls -la`).
+2. Removed absolute path `cd /home/rgeraghty/projects/hyoka` from Build & Test (now project-relative).
+3. Removed hardcoded git username `ronniegeraghty` → template pattern `{your-github-username}`.
+4. Replaced static config table (7 entries) with dynamic discovery: `go run ./hyoka configs` + directory grep pattern.
+5. Replaced inline coding convention descriptions with pointers to skills (logging-conventions, error-handling, testing-patterns, golang-patterns).
+6. Added pointer to `docs/architecture.md` for comprehensive architectural docs.
+7. Removed Board Integration section (references external Azure DevOps system).
+
+**Why:** Makes AGENTS.md self-maintaining and accessible to all contributors (not hardcoded for one person).
+
+**Testing:** All discovery commands validated, all referenced skills/docs verified to exist.
+
+**Decision document:** .squad/decisions/inbox/oracle-agents-md.md
+
