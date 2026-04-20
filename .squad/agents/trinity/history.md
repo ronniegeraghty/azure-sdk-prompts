@@ -115,3 +115,39 @@ Completed the logo design requirement (R143) that was missed in PR #570.
 **Pattern learned:** Always check acceptance criteria against merged PRs. PR #570 claimed to close #362 but only addressed 3 of 4 requirements. The logo requirement (R143) was overlooked and remained incomplete.
 
 **2026-04-18 — Morpheus Phase 4 Verification:** All eval detail features (6 stat cards, environment section, expandable sections, grader results) verified with browser automation. Ready for Phase 4 epic #310 closure. No Trinity action required.
+
+### Session 2026-04-20 (Issue #364 — Prompt Pages + Dashboard)
+
+Implemented all three requirements (R150, R151, R154) for Phase 5 on branch `trinity/issue-364-prompt-pages-dashboard`.
+
+**R150 — Prompts Page Improvements:**
+- **"Only show with evals" filter** (default on): Checkbox toggle that hides prompts with zero evaluations
+- **Ordering options:** Most Recently Evaluated, Alphabetically, Best/Worst Performing via dropdown
+- **Functional filters:** Service, Language, Difficulty, Plane all work and update count display
+- **Readable sparklines:** SVG polyline charts showing recent score trends (last 10 evals), properly scaled 0-100
+- **Prominent eval count and tags:** Tags shown first with better styling, eval count with last evaluated date
+
+**R151 — Prompt Detail Improvements:**
+- **Collapsible prompt content:** FileText icon button expands to show `prompt_text` and `evaluation_criteria` in monospace pre blocks
+- **Labeled badges:** Changed from plain badges to structured "Field: Value" format (e.g., "Service: identity")
+- **Score trend by day:** X-axis shows dates (MMM DD format), only average score line displayed (removed pass rate overlay)
+- **All models shown:** Removed limit parameter from CorrelationTable — shows ALL models in Pass Rate by Model section
+- **Tool usage toggle:** "Env tools only" checkbox filters out standard CLI tools (bash/view/create/edit) from Pass Rate by Tool. Two data sources: `byToolAll` and `byToolEnv`. Toggle switches between them.
+
+**R154 — Dashboard Real Data:**
+- **Replaced all mock data** with computed metrics from `fetchRuns()` API
+- **Aggregated stats:** Total evals (sum of run.total_evaluations), pass rate (total passed / total evals), avg duration (sum of run.duration_seconds / run count), models count (distinct config names)
+- **Pass rate breakdowns:** By service and by language, computed from `result.prompt_metadata.service` and `.language`
+- **Duration trend:** Last 10 runs (sorted by timestamp), showing generation and review duration lines (removed "build" line)
+- **Recent evaluations table:** Last 10 individual evals with runId, prompt, language, config, score, pass/fail, duration
+- **Removed radar chart:** As noted in R154, radar won't work — replaced with amber-bordered note about AI-generated insights placeholder
+- **Real last updated timestamp:** From most recent run.timestamp, displayed with Calendar icon
+
+**Build status:** `npm run build` passes (6.6s, expected chunk size warning). Tests have pre-existing failures in 3 test files (`dashboard-page.test.tsx`, `prompt-detail-page.test.tsx`, `prompts-page.test.tsx`) — they import from wrong path `../app/api` instead of `../app/data/api`. Per TDD workflow, Switch 🤍 will write failing tests on this branch for the new features.
+
+**Commits:**
+- c0a5c8f7: Implement R150 (prompts page improvements)
+- 65fa846c: Implement R151 (prompt detail improvements)
+- da6502e7: Implement R154 (dashboard real data)
+
+**Next steps:** Wait for Switch 🤍 to add tests, implement until they pass, then merge directly into `phase-5` (no PR, per Phase 5 workflow).
