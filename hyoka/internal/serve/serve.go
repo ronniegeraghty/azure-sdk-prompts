@@ -22,7 +22,7 @@
 //   - Prefer binding to 127.0.0.1 via a reverse proxy or SSH tunnel rather
 //     than exposing the port directly.
 //   - Treat the reports directory as sensitive: it may contain prompt text,
-//     generated code, and evaluation output that reveal internal grading
+//     agent output, and evaluation results that reveal internal grading
 //     rubrics or proprietary prompts.
 //   - Do not run `hyoka serve` on an untrusted network without first placing
 //     an authenticating proxy (nginx, caddy) in front of it.
@@ -63,7 +63,10 @@ type DocInfo struct {
 }
 
 // internalDocs lists documentation files that should be excluded from the API.
-var internalDocs = map[string]bool{}
+// Developer docs (architecture, contributing) belong in the repo, not the user-facing site.
+var internalDocs = map[string]bool{
+	"architecture": true,
+}
 
 // Start launches a local HTTP server for browsing reports.
 func Start(opts Options) error {

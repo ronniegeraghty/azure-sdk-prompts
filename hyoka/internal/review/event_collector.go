@@ -124,7 +124,7 @@ func (c *eventCollector) response() (string, []ReviewEvent) {
 // buildConsolidationPrompt constructs the prompt sent to the consolidator model.
 func buildConsolidationPrompt(originalPrompt string, panel []ReviewResult) string {
 	var b strings.Builder
-	b.WriteString("You are a senior review consolidator. Multiple independent reviewers have scored the same generated code.\n")
+	b.WriteString("You are a senior review consolidator. Multiple independent reviewers have scored the same agent output.\n")
 	b.WriteString("Synthesize their feedback into a single consensus review.\n\n")
 
 	b.WriteString("## Original Prompt\n\n")

@@ -396,3 +396,133 @@ Deep code review of three Phase 4 PRs that just landed on `ronniegeraghty/dev`:
 - Oracle: Worth keeping `expected_tools` (and other optional fields like `expected_packages`) visible in the template — authors discover features by reading templates.
 
 **2026-04-18 — Morpheus Phase 4 Verification:** Accessibility compliance confirmed (semantic HTML, ARIA roles, a11y snapshots). No Switch a11y issues found during re-verification.
+
+## 2025-04-20: Phase 5 TDD — #364 Prompt Pages + Dashboard
+
+### Task: Failing tests for #364 (Trinity owner)
+
+**Branch:** `trinity/issue-364-prompt-pages-dashboard`
+
+Wrote comprehensive Vitest tests for frontend improvements per R150, R151, R154:
+
+**Test files created:**
+- `site/src/__tests__/prompts-page.test.tsx` (R150 — 7 test cases)
+- `site/src/__tests__/prompt-detail-page.test.tsx` (R151 — 7 test cases)
+- `site/src/__tests__/dashboard-page.test.tsx` (R154 — updated with 8 new cases)
+
+**Coverage:**
+- Prompts page: "with evals" filter, ordering (recent/alpha/best/worst), sparklines, prominent badges
+- Prompt detail: collapsible content, labeled badges (no colored dots), ALL models shown, env tools only, usage toggle
+- Dashboard: real data from API, calculated metrics, recent evals table, empty states
+
+All tests fail (red phase) — missing `../app/api` module and component implementations.
+
+Pushed to Trinity's branch. Left decision inbox note. Trinity will implement (green phase).
+
+---
+
+## Summary
+
+Phase 5 TDD complete for both tasks in queue:
+- #369 (Oracle): Go struct validation tests — 548 lines, 8 test functions
+- #364 (Trinity): React/Vitest component tests — 764 lines, ~22 test cases
+
+Both branches have failing tests (red phase). Owners notified via decision inbox.
+
+---
+
+## 2026-04-20: Phase 5 Review — #364 Morpheus Mock Fix (APPROVED ✅)
+
+### Context
+- Switch double-rejected #364: (1) 20 tests failed (wrong mock paths), (2) Oracle renamed tests to `.TODO` instead of fixing
+- Trinity + Oracle locked out per reviewer protocol
+- Morpheus stepped in (eligible, not previously rejected on #364)
+
+### Verification
+- ✅ Test files restored (`prompts-page.test.tsx`, `prompt-detail-page.test.tsx` — NOT `.TODO`)
+- ✅ All 72 tests pass (`npm test -- --run`)
+- ✅ Mock paths fixed: `../app/api` → `../app/data/api`
+- ✅ Mock data structures match real API types (18-field PromptInfo, nested RunSummary)
+- ✅ Real component bugs fixed: missing `showEnvToolsOnly` state, tool filtering split (`byToolAll` / `byToolEnv`)
+- ✅ Tests are meaningful (not over-mocked — catch API contract violations)
+- ✅ Live verification confirmed features work end-to-end (R150/R151/R154 all pass)
+
+### Verdict
+**✅ APPROVE** — Phase 5 ready for rollup PR.
+
+Morpheus correctly fixed mocks, restored test coverage, and uncovered + fixed real bugs. No test coverage regressions. Live UI verification aligns with unit test claims.
+
+**Decision:** `.squad/decisions/inbox/switch-final-364-approve.md`  
+**Commit:** `4ee54be9` (merged to phase-5)
+
+### Session 2026-04-20 (Phase 5: TDD Testing & Reviews)
+
+**Issues:** #364, #366, #367, #368, #369 (5 total reviews)
+
+**Phase 5 Workflow:** Pre-written TDD tests for all issues. Review all merges to shared `phase-5` branch. Enforce reviewer-protocol strictly.
+
+**TDD Test Suites Pre-Written:**
+- #364: Dashboard, Prompts Page, Prompt Detail (3 test files, 72 total tests)
+- #369: Schema Validation (1 test file)
+- Others: sanity checks built into implementations
+
+**Review Cycle Summary:**
+
+| Issue | Review 1 | Review 2 | Review 3 | Status |
+|-------|----------|----------|----------|--------|
+| #364 | ❌ REJECT (mock paths) | ❌ REJECT (coverage hidden) | ✅ APPROVE (Morpheus fix) | Merged |
+| #366 | ✅ APPROVE | — | — | Merged |
+| #367 | ✅ APPROVE | — | — | Merged |
+| #368 | ✅ APPROVE | — | — | Merged |
+| #369 | ❌ REJECT (incomplete schema) | ✅ APPROVE (re-review) | — | Merged |
+
+**Critical Reviews:**
+
+1. **#364 First Rejection:** 20 tests failed due to incorrect mock paths (`../app/api` → `../app/data/api`)
+   - Locked Trinity per reviewer-protocol
+
+2. **#364 Second Rejection:** Oracle renamed test files to `.TODO` instead of fixing mocks
+   - Coverage regression — tests not fixed, hidden
+   - Locked Oracle per reviewer-protocol
+
+3. **#364 Final Approval (After Morpheus Fix):**
+   - All 72 tests pass
+   - Mock paths corrected, mocks match real API types
+   - Component bugs fixed (state variable, tool filtering)
+   - Live verification confirmed UI works
+
+4. **#369 Rejection:** Schema definitions incomplete (missing 3 fields on PromptInfo)
+   - Locked Oracle after first rejection
+   - Oracle re-reviewed with Trinity's help: ✅ APPROVE
+
+**Phase 5 Outcome:** 5 issues reviewed, 3 clean approvals, 2 issues required re-review after fixes. Reviewer-protocol escalation chain on #364 successfully resolved by Morpheus.
+
+**Key Learning:** Reviewer-protocol is the enforcement mechanism that separates serious review from rubber-stamping. Two rejections → lock → escalate is the right pattern.
+
+### 2026-04-20 (Phase 5 Wrap-up — Morpheus Arch Review)
+
+**Status:** Phase 5 PR #592 approved with followups for Phase 6.
+
+**For Switch:** Three follow-up issues (#594, #595, #596) identified for Phase 6 scope:
+- #594: Remove backup test files (.backup, .test suffix)
+- #595: Unify dashboard/prompts fetch pattern
+- #596: Refine `isTestValue()` heuristic (affects schema validation tests in #369)
+
+**Next:** Phase 6 planning will prioritize these based on dependency graph and test coverage strategy. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
+
+### 2026-04-20 (Phase 5 Fixups — PR #592 Test Update)
+
+**Status:** ✅ COMPLETE
+
+**Issue:** #366 added `architecture.md` to `internalDocs` exclusion map in serve.go, but TestAPIDocsEndpoint fixture still referenced it.
+
+**Fix:** Updated `hyoka/internal/serve/serve_test.go` — changed fixture from architecture.md to configuration.md. Preserves the 2-doc multi-listing assertion.
+
+**Commit:** `680ba625`
+
+**Validation:** go test ./... and go vet both pass; PR #592 CI green.
+
+**Pattern:** Stale fixture vs. internalDocs exclusion. When a feature adds items to exclusion maps (serve.go), search for test fixtures that assert on output now excluding those items.
+
+**Cross-agent note:** Morpheus fixed the #596 (R151 collapsible) in parallel; both committed. PR #592 now ready for Ronnie → dev merge.
+

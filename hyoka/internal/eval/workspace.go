@@ -333,7 +333,7 @@ func ValidateWorkspaceContainment(dir string, preSnapshot map[string]bool) []str
 	return escaped
 }
 
-// codeFileExts lists extensions that indicate generated code files.
+// codeFileExts lists extensions that indicate output files.
 var codeFileExts = map[string]bool{
 	".py": true, ".cs": true, ".java": true, ".go": true, ".rs": true,
 	".ts": true, ".js": true, ".cpp": true, ".c": true, ".h": true,

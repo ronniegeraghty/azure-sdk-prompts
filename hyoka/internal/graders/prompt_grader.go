@@ -84,7 +84,7 @@ func NewPromptGrader(name string, cfg map[string]any) (*PromptGrader, error) {
 func (pg *PromptGrader) BuildPrompt(workspaceFiles map[string]string) string {
 	var b strings.Builder
 
-	b.WriteString("You are a code quality evaluator. Score the following code on a scale of 0 to ")
+	b.WriteString("You are an output quality evaluator. Score the following output on a scale of 0 to ")
 	fmt.Fprintf(&b, "%d based on the rubric below.\n\n", pg.MaxScore)
 
 	b.WriteString("## Rubric\n\n")
@@ -147,7 +147,7 @@ func NormalizeScore(rawScore, maxScore int) float64 {
 }
 
 // Grade runs the LLM review and returns a normalized result.
-// workDir is the directory of generated code to evaluate.
+// workDir is the directory containing agent output to evaluate.
 func (pg *PromptGrader) Grade(ctx context.Context, workDir string) (*PromptGradeResult, error) {
 	if pg.Caller == nil {
 		return nil, fmt.Errorf("prompt grader %q: no LLM caller configured", pg.Name)

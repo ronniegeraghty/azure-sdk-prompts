@@ -72,7 +72,7 @@ func WithTurn(l *slog.Logger, turn int) *slog.Logger {
 	return l.With("turn", turn)
 }
 
-// GeneratorLogger returns a logger for the code generation agent.
+// GeneratorLogger returns a logger for the generator agent.
 func GeneratorLogger(prompt, config, model string, worker int) *slog.Logger {
 	return slog.With(
 		"prompt", prompt,

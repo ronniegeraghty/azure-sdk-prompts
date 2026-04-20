@@ -1,0 +1,328 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { userEvent } from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router";
+import { PromptDetailPage } from "../app/components/prompt-detail-page";
+import type { PromptInfo } from "../app/data/api";
+import type { RunSummary } from "../app/data/types";
+
+// Mock the correct API module
+vi.mock("../app/data/api", () => ({
+  fetchPrompt: vi.fn(),
+  fetchRuns: vi.fn(),
+}));
+
+import { fetchPrompt, fetchRuns } from "../app/data/api";
+
+// Mock data helpers
+const mockPromptInfo = (id: string, partial: Partial<PromptInfo> = {}): PromptInfo => ({
+  id,
+  service: "identity",
+  plane: "data-plane",
+  language: "python",
+  category: "auth",
+  difficulty: "beginner",
+  description: "Test prompt",
+  sdk_package: "azure-identity",
+  doc_url: "",
+  tags: [],
+  created: "2025-01-01T00:00:00Z",
+  author: "test",
+  prompt_text: "Generate a Python script that uses DefaultAzureCredential...",
+  evaluation_criteria: "Code must compile and follow best practices",
+  file_path: "/prompts/test.md",
+  ...partial
+});
+
+const mockRunForPrompt = (promptId: string, configName: string, score: number, timestamp: string, tools: string[] = []): RunSummary => ({
+  run_id: `run-${promptId}-${configName}`,
+  timestamp,
+  total_evaluations: 1,
+  passed: score >= 70 ? 1 : 0,
+  failed: score < 70 ? 1 : 0,
+  errors: 0,
+  duration_seconds: 10,
+  results: [{
+    prompt_id: promptId,
+    config_name: configName,
+    success: score >= 70,
+    review: {
+      overall_score: score,
+      max_score: 100,
+      summary: "Test review"
+    },
+    duration_seconds: 10,
+    generated_files: tools.length > 0 ? ["test.py"] : undefined,
+    prompt_metadata: {
+      service: "identity",
+      plane: "data-plane",
+      language: "python",
+      category: "auth",
+      difficulty: "beginner",
+      tags: []
+    }
+  }]
+});
+
+describe("PromptDetailPage - R151 Improvements", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("prompt content collapsible section", () => {
+    it("renders prompt content in a collapsible section", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("identity-dp-python-default-credential", {
+          prompt_text: "Generate a Python script that uses DefaultAzureCredential to authenticate...",
+        })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/identity-dp-python-default-credential"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      const collapsibleTrigger = await screen.findByRole("button", { name: /prompt content/i });
+      expect(collapsibleTrigger).toBeInTheDocument();
+    });
+
+    it("expands to show prompt content when clicked", async () => {
+      const user = userEvent.setup();
+      const promptContent = "Generate a Python script that uses DefaultAzureCredential to authenticate with Azure Key Vault and retrieve a secret.";
+
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("test-prompt", { prompt_text: promptContent })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      const collapsibleTrigger = await screen.findByRole("button", { name: /prompt content/i });
+      await user.click(collapsibleTrigger);
+
+      expect(await screen.findByText(promptContent)).toBeInTheDocument();
+    });
+  });
+
+  describe("labeled badges instead of colored dots", () => {
+    it("displays labeled badges for prompt metadata", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("test-prompt", {
+          service: "identity",
+          language: "python",
+          plane: "data-plane",
+          difficulty: "beginner",
+        })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByText(/identity/i)).toBeInTheDocument();
+      expect(screen.getByText(/python/i)).toBeInTheDocument();
+      expect(screen.getByText(/data-plane/i)).toBeInTheDocument();
+      expect(screen.getByText(/beginner/i)).toBeInTheDocument();
+
+      // Should be badges, not just colored dots
+      const serviceBadge = screen.getByText(/identity/i);
+      expect(serviceBadge).toHaveClass(/badge|pill|label/);
+    });
+
+    it("does not use colored dots for metadata display", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(
+        mockPromptInfo("test-prompt", { service: "key-vault" })
+      );
+      vi.mocked(fetchRuns).mockResolvedValue([]);
+
+      const { container } = render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/key-vault/i)).toBeInTheDocument();
+      });
+
+      // Should not have dot/circle elements for metadata
+      const coloredDots = container.querySelectorAll('[class*="dot"], [class*="circle"]');
+      expect(coloredDots.length).toBe(0);
+    });
+  });
+
+  describe("score trend chart", () => {
+    it("uses days on x-axis instead of evaluation count", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 70, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 75, "2025-04-16T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 80, "2025-04-17T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 85, "2025-04-18T10:00:00Z"),
+      ]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      // X-axis should show dates, not eval numbers
+      await waitFor(() => {
+        expect(screen.getByText(/Apr 15|04\/15/)).toBeInTheDocument();
+      });
+    });
+
+    it("shows only average score line", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 70, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 75, "2025-04-16T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 80, "2025-04-17T10:00:00Z"),
+      ]);
+
+      const { container } = render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        const lines = container.querySelectorAll('[class*="recharts-line"]');
+        // Should have exactly 1 line (average score), not multiple
+        expect(lines.length).toBe(1);
+      });
+    });
+  });
+
+  describe("pass rate by model", () => {
+    it("shows ALL models, not just top 3", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "baseline/claude-opus-4.6", 95, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/claude-sonnet-4.5", 88, "2025-04-15T11:00:00Z"),
+        mockRunForPrompt("test-prompt", "baseline/gpt-5.3-codex", 85, "2025-04-15T12:00:00Z"),
+        mockRunForPrompt("test-prompt", "azure-mcp/claude-haiku-4.5", 80, "2025-04-15T13:00:00Z"),
+        mockRunForPrompt("test-prompt", "azure-mcp/gpt-5.2", 78, "2025-04-15T14:00:00Z"),
+        mockRunForPrompt("test-prompt", "azure-mcp/gpt-5-mini", 72, "2025-04-15T15:00:00Z"),
+      ]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      // All 6 models should be visible
+      expect(await screen.findByText(/claude-opus-4\.6/i)).toBeInTheDocument();
+      expect(screen.getByText(/claude-sonnet-4\.5/i)).toBeInTheDocument();
+      expect(screen.getByText(/gpt-5\.3-codex/i)).toBeInTheDocument();
+      expect(screen.getByText(/claude-haiku-4\.5/i)).toBeInTheDocument();
+      expect(screen.getByText(/gpt-5\.2/i)).toBeInTheDocument();
+      expect(screen.getByText(/gpt-5-mini/i)).toBeInTheDocument();
+    });
+
+    it("does not truncate model list to top 3", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "config/model-1", 95, "2025-04-15T10:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-2", 88, "2025-04-15T11:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-3", 85, "2025-04-15T12:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-4", 80, "2025-04-15T13:00:00Z"),
+        mockRunForPrompt("test-prompt", "config/model-5", 78, "2025-04-15T14:00:00Z"),
+      ]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/model-4/i)).toBeInTheDocument();
+        expect(screen.getByText(/model-5/i)).toBeInTheDocument();
+      });
+
+      // Should NOT have "Show more" or "View all" button
+      expect(screen.queryByText(/show more|view all/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("pass rate by tool", () => {
+    it("shows environment tools, not bash/view/create", async () => {
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "azure-mcp/claude-opus-4.6", 85, "2025-04-15T10:00:00Z", 
+          ["bash", "view", "create", "azure-cli", "dotnet", "mcp-azure-resources"]),
+      ]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      // Environment tools should be shown
+      expect(await screen.findByText(/azure-cli/i)).toBeInTheDocument();
+      expect(screen.getByText(/dotnet/i)).toBeInTheDocument();
+      expect(screen.getByText(/mcp-azure-resources/i)).toBeInTheDocument();
+
+      // Basic tools should NOT be shown in pass rate section
+      const passRateSection = screen.getByTestId("pass-rate-by-tool");
+      expect(passRateSection).not.toHaveTextContent(/bash/);
+      expect(passRateSection).not.toHaveTextContent(/view/);
+      expect(passRateSection).not.toHaveTextContent(/create/);
+    });
+
+    it("includes a toggle to show/hide tool usage", async () => {
+      const user = userEvent.setup();
+      vi.mocked(fetchPrompt).mockResolvedValue(mockPromptInfo("test-prompt"));
+      vi.mocked(fetchRuns).mockResolvedValue([
+        mockRunForPrompt("test-prompt", "azure-mcp/claude-opus-4.6", 85, "2025-04-15T10:00:00Z", ["azure-cli", "gh"]),
+      ]);
+
+      render(
+        <MemoryRouter initialEntries={["/prompts/test-prompt"]}>
+          <Routes>
+            <Route path="/prompts/:promptId" element={<PromptDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      const usageToggle = await screen.findByLabelText(/show tool usage/i);
+      expect(usageToggle).toBeInTheDocument();
+
+      await user.click(usageToggle);
+
+      // Usage data should appear when toggled
+      expect(screen.getByText(/used in \d+ evaluations/i)).toBeInTheDocument();
+    });
+  });
+});

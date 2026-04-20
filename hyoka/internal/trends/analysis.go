@@ -50,7 +50,7 @@ session, err := client.CreateSession(ctx, &copilot.SessionConfig{
 Model: "gpt-4.1",
 SystemMessage: &copilot.SystemMessageConfig{
 Mode:    "append",
-Content: "You are an expert at analyzing AI agent tool usage and its impact on code generation quality. Focus on how tool availability affects output. Be concise and actionable.",
+Content: "You are an expert at analyzing AI agent tool usage and its impact on output quality. Focus on how tool availability affects output. Be concise and actionable.",
 },
 ConfigDir:           configDir,
 OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
