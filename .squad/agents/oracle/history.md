@@ -2,12 +2,58 @@
 
 ## Project Context
 
-- **Project:** hyoka — Go evaluation tool for AI-generated Azure SDK code, powered by Copilot SDK and multi-model review panels.
+- **Project:** hyoka — Go evaluation tool for AI agent outputs, powered by Copilot SDK and multi-model review panels.
 - **Stack:** Go 1.26.1+, GitHub Copilot CLI/SDK, MCP servers
 - **User:** Ronnie Geraghty
 - **My domain:** Docs — docs/, README.md, AGENTS.md, CHANGELOG.md, inline documentation
 
 ## Learnings
+
+### Phase 5 README Audit (2026-04-20)
+
+**Status:** COMPLETE  
+**Branch:** phase-5  
+**Commit:** 9931af2c
+
+Audited README.md for command accuracy and task-agnostic framing per Ronnie's directives.
+
+**Command verification approach:**
+1. Cross-checked all documented commands against `--help` output
+2. Verified all referenced paths (prompts, configs, docs) exist on disk
+3. Ran representative subset locally to confirm commands work as written
+4. Fixed commands that didn't match CLI reality
+
+**Fixes applied:**
+- Added required `--config` flag to dry-run example (CLI enforces this)
+- Updated `go test -race ./hyoka/...` → `./...` (both work, latter is conventional)
+- Added `cd site && npm test` to dev loop (72 passing tests)
+- Removed deprecated `--run` flag from npm test (deprecated in npm v9+)
+
+**Framing changes:**
+- "scores generated code" → "scores generated outputs"
+- "Generated code based on" → "Generated output based on"
+- "Every code-generation session" → "Every evaluation session"
+- "The agent uses" → "Agents use" (general, not singular)
+
+**Key insight:** Example prompts can mention code (they're specific examples), but the tool's FRAMING must be task-agnostic. hyoka evaluates AI agent outputs generally, not just code.
+
+**Verification method:** Ran all documented commands to verify they work:
+- `go run . list --service key-vault --language python` ✅
+- `go run . validate` ✅
+- `go run . check-env` ✅
+- `go run . clean --dry-run` ✅
+- `go test -race ./...` ✅
+- `cd site && npm test` ✅
+
+**Testing patterns learned:**
+- Always test commands verbatim from docs before committing
+- Flags like `--config` are often required even when docs suggest they're optional
+- npm flag deprecations (like `--run`) break silently — need to verify with latest npm
+- Site has robust test suite (72 tests) — should be included in dev workflow docs
+
+**CI outcome:** PR #592 green (2 checks passed, 22s + 42s)
+
+**Decision doc:** Created `.squad/decisions/inbox/oracle-readme-audit.md` for Switch's review of tone consistency across CLI help text.
 
 ### Phase 5 Issue #369: Schema-Based Validation (2026-04-20)
 
