@@ -1,9 +1,22 @@
-import { Link } from "react-router";
-import { useState, useEffect } from "react";
+import { Link, useSearchParams } from "react-router";
+import { useState, useEffect, useMemo } from "react";
 import { fetchRuns } from "../data/api";
 import type { RunSummary } from "../data/types";
-import { CheckCircle2, XCircle, AlertTriangle, Clock, ChevronRight, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, Clock, ChevronRight, Loader2, X } from "lucide-react";
 import { motion } from "motion/react";
+import { MultiSelectFilter } from "./ui/multi-select-filter";
+import {
+  EMPTY_FILTERS,
+  STATUS_LABEL,
+  activeFilterCount,
+  applyFilters,
+  applyFiltersToSearchParams,
+  buildCatalog,
+  filtersFromSearchParams,
+  hasActiveFilters,
+  type RunFilters,
+  type RunStatus,
+} from "../lib/run-filters";
 
 function formatDuration(s: number | undefined | null): string {
   if (s == null || isNaN(s)) return "N/A";
@@ -31,6 +44,7 @@ export function RunsPage() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     fetchRuns()
@@ -38,6 +52,24 @@ export function RunsPage() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  // Filters live in the URL so reload + share preserves state.
+  const filters: RunFilters = useMemo(
+    () => filtersFromSearchParams(searchParams),
+    [searchParams],
+  );
+  const catalog = useMemo(() => buildCatalog(runs), [runs]);
+  const filteredRuns = useMemo(() => applyFilters(runs, filters), [runs, filters]);
+
+  function updateFilters(next: RunFilters) {
+    const params = new URLSearchParams(searchParams);
+    applyFiltersToSearchParams(params, next);
+    setSearchParams(params, { replace: true });
+  }
+
+  function resetFilters() {
+    updateFilters(EMPTY_FILTERS);
+  }
 
   if (loading) {
     return (
@@ -75,8 +107,32 @@ export function RunsPage() {
             <p className="text-white/40">No runs found.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {runs.map((run, i) => {
+          <>
+            <FilterBar
+              catalog={catalog}
+              filters={filters}
+              onChange={updateFilters}
+              onReset={resetFilters}
+              filteredCount={filteredRuns.length}
+              totalCount={runs.length}
+            />
+            {filteredRuns.length === 0 ? (
+              <div
+                role="status"
+                className="rounded-xl border border-white/8 bg-white/[0.03] p-8 text-center"
+              >
+                <p className="mb-2 text-white/60">No runs match the current filters.</p>
+                <button
+                  onClick={resetFilters}
+                  className="text-emerald-400 hover:text-emerald-300"
+                  style={{ fontSize: 13 }}
+                >
+                  Reset filters
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredRuns.map((run, i) => {
               const passed = run.passed ?? 0;
               const total = run.total_evaluations ?? 0;
               const rate = total > 0 ? ((passed / total) * 100).toFixed(1) : "0.0";
@@ -140,8 +196,78 @@ export function RunsPage() {
                 </motion.div>
               );
             })}
-          </div>
+              </div>
+            )}
+          </>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface FilterBarProps {
+  catalog: ReturnType<typeof buildCatalog>;
+  filters: RunFilters;
+  onChange: (next: RunFilters) => void;
+  onReset: () => void;
+  filteredCount: number;
+  totalCount: number;
+}
+
+function FilterBar({
+  catalog,
+  filters,
+  onChange,
+  onReset,
+  filteredCount,
+  totalCount,
+}: FilterBarProps) {
+  const active = hasActiveFilters(filters);
+  const count = activeFilterCount(filters);
+  return (
+    <div className="mb-5 rounded-xl border border-white/8 bg-white/[0.02] p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <MultiSelectFilter
+          label="Config"
+          options={catalog.configs.map((c) => ({ value: c, label: c }))}
+          selected={filters.configs}
+          onChange={(configs) => onChange({ ...filters, configs })}
+        />
+        <MultiSelectFilter
+          label="Language"
+          options={catalog.languages.map((l) => ({ value: l, label: l }))}
+          selected={filters.languages}
+          onChange={(languages) => onChange({ ...filters, languages })}
+        />
+        <MultiSelectFilter
+          label="Status"
+          options={catalog.statuses.map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
+          selected={filters.statuses}
+          onChange={(values) =>
+            onChange({ ...filters, statuses: values as RunStatus[] })
+          }
+        />
+
+        <div className="ml-auto flex items-center gap-3">
+          <span
+            className="text-white/40"
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
+          >
+            {active ? `${filteredCount} of ${totalCount}` : `${totalCount} runs`}
+          </span>
+          {active && (
+            <button
+              type="button"
+              onClick={onReset}
+              aria-label="Reset filters"
+              className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/70 transition hover:border-white/20 hover:text-white"
+              style={{ fontSize: 12 }}
+            >
+              <X className="h-3 w-3" />
+              Reset{count > 0 ? ` (${count})` : ""}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
