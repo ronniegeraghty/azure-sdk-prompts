@@ -1,0 +1,66 @@
+# Example: Hierarchical `when` syntax demonstrating all levels
+#
+# This file demonstrates the three levels at which `when` conditions can be applied:
+#
+# 1. FILE-LEVEL when:  Condition applied to ALL graders in the file
+# 2. GROUP-LEVEL when: Condition applied to a group of graders
+# 3. GRADER-LEVEL when: Condition applied to individual graders
+#
+# When multiple levels are present, they are AND-ed together:
+# A grader applies only if ALL applicable `when` conditions match.
+#
+# This helps organize criteria for complex scenarios (e.g., Python prompts
+# with different requirements for async vs sync code, or storage prompts
+# with different patterns for read vs write operations).
+
+# FILE-LEVEL when: applies to ALL graders unless overridden
+when:
+  language: python
+
+# FILE-LEVEL graders: inherit the `language: python` condition
+graders:
+  - name: "File-Level Grader (All Python)"
+    weight: 1.0
+    prompt: >
+      This grader applies to all Python prompts because it inherits
+      the file-level `when: language: python` condition.
+
+  - name: "Sync Code Grader"
+    weight: 1.0
+    # GRADER-LEVEL when: restricts this grader to specific prompts
+    when:
+      category: sync-operations
+    prompt: >
+      This grader applies only to Python prompts with
+      `category: sync-operations` (file-level + grader-level conditions).
+
+  - name: "Async Code Grader"
+    weight: 1.0
+    # GRADER-LEVEL when: restricts this grader to specific prompts
+    when:
+      category: async-operations
+    prompt: >
+      This grader applies only to Python prompts with
+      `category: async-operations` (file-level + grader-level conditions).
+
+---
+# GROUP-LEVEL when: demonstrate a new group of graders with different conditions
+when:
+  language: rust
+
+# GROUP-LEVEL graders: all inherit the `language: rust` condition
+graders:
+  - name: "Crate Selection"
+    weight: 1.0
+    prompt: >
+      Uses official Azure SDK crates (azure_*, not third-party).
+      Applies to all Rust prompts.
+
+  - name: "Async Runtime"
+    weight: 1.0
+    # GRADER-LEVEL when: only for prompts that explicitly require async
+    when:
+      requires_async: "true"
+    prompt: >
+      Code uses #[tokio::main] or equivalent async runtime.
+      Applies only to Rust prompts with `requires_async: true`.

@@ -452,3 +452,56 @@ Tank executed the conversion in commit d111c964 (28 replacements in docs/getting
 
 **Decision captured:** `.squad/decisions.md` — "Routing Note (Informal): Future Docs Work"
 
+
+### WI-058: Post-Architecture Examples & Samples Review (2026-04-21)
+
+**Status:** COMPLETE  
+**Branch:** squad/370-examples-post-arch-review → PR #617 → phase-6  
+**Issue:** #370
+
+Completed comprehensive audit of examples/ directory to ensure all reflect post-Phase-3 architecture.
+
+**Audit Requirements (All ✅):**
+
+1. **R1 — Unified tools system:** Verified all example configs use new `tools:` block (no legacy `mcp_servers:`)
+   - example-full.yaml: shows MCP + local skills + remote skills
+   - example-generator-skills.yaml: demonstrates skill_dir patterns
+   - example-remote-skill.yaml: demonstrates whole-repo + subpath fetching
+   - Result: ALL configs compliant, no legacy patterns found
+
+2. **R2 — Prompt-level graders:** Created new example demonstrating `graders:` frontmatter
+   - New file: `examples/prompts/graders-frontmatter-example.prompt.md`
+   - Shows multiple grader kinds (prompt_review, file)
+   - Demonstrates weight/gate/when fields
+
+3. **R3 — Hierarchical when syntax:** Created comprehensive example
+   - New file: `examples/criteria/hierarchical-when-example.yaml`
+   - Demonstrates file-level when (applies to all graders in file)
+   - Demonstrates group-level when (new section with different when)
+   - Demonstrates grader-level when (individual grader overrides)
+   - Clear comments showing AND semantics of multiple when levels
+
+4. **R4 — Examples documentation:** Created comprehensive README
+   - New file: `examples/README.md` (5.7KB)
+   - Directory structure explanation
+   - Links to all example files with descriptions
+   - Architecture pattern explanations with YAML examples
+   - Running examples section (validate, run, list)
+   - Adding new examples guidelines
+
+**Validation Results:**
+- ✅ All 89 prompts valid (including new graders-frontmatter-example)
+- ✅ All 12 configs valid
+- ✅ All 2 criteria files valid (+ hierarchical-when-example)
+- ✅ All tests pass: `go test -race ./... -timeout 5m`
+
+**Files Added:**
+- examples/README.md
+- examples/criteria/hierarchical-when-example.yaml
+- examples/prompts/graders-frontmatter-example.prompt.md
+
+**Documentation Updated:**
+- CHANGELOG.md: Added entry under Unreleased section
+
+**Key Insight:** The examples directory now functions as both a validation suite and a teaching tool. Each example directly reflects the current architecture, removing drift risk.
+
