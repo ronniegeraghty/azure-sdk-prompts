@@ -273,3 +273,39 @@ Design:
 Added optional top-level `group` frontmatter field. Backwards compatible (empty = ungrouped). Kebab-case validation: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, max 64 chars. Enforced in both `validate.ValidatePromptStruct` (struct path) and `validate.validatePrompt` (CLI path — these two paths exist in parallel; remember to keep them in sync). Propagated to reports via `EvalReport.PromptMeta["group"]` (no schema bump). Tests in `prompt/group_test.go` and `validate/group_test.go`. Site work deferred to Trinity (#600). Decision: `.squad/decisions/inbox/neo-issue-599-group-property.md`.
 
 **Note:** parser.go, types.go, validate.go in this codebase are not gofmt-clean (no leading whitespace on body code). Resisted the urge to gofmt — kept PR diff focused on the issue. If we ever decide to gofmt the codebase, do it as a separate PR.
+### Session 2026-04-21 (#597 — WI-027 Tool Versioning & Custom Fetcher)
+
+**Status:** COMPLETE
+**Branch:** `ronniegeraghty/issue-597-tool-versioning`
+**PR:** (filed against phase-6)
+
+Built on WI-026 (#334) cache infrastructure. Added pluggable `tool.Fetcher`
+interface in `internal/config/tool/`, process-wide `DefaultRegistry` preloaded
+with the existing npx behavior wrapped as `npxFetcher`, and a
+`tool_version_override` map at the ConfigFile level.
+
+**Key files:**
+- `hyoka/internal/config/tool/fetcher.go` (new) — Fetcher interface, Registry,
+  npxFetcher, ValidateFetchers
+- `hyoka/internal/config/tool/resolve.go` — FetchRemote rewritten to dispatch
+  through the registry (one-line lookup + delegation)
+- `hyoka/internal/config/tool/entry.go` — added `Version` field
+- `hyoka/internal/config/config.go` — `ToolVersionOverride map`,
+  `ApplyVersionOverrides()`, called from `Load`; LoadDir merges with
+  conflict-detection
+- `hyoka/cmd/run.go` — `tool.ValidateFetchers` pre-flight before session start
+- Tests: `fetcher_test.go` (registry, custom fetcher runtime invocation,
+  error propagation, version path); `version_override_test.go` (per-entry
+  precedence, idempotency, YAML parse)
+- `docs/configuration.md` — new "Tool Versioning & Custom Fetchers" section
+
+**#587-trap guard:** `TestCustomFetcherInvokedAtRuntime` registers a real
+mock against the real DefaultRegistry, calls ResolveSkills, asserts call
+count == 1 and the version the fetcher saw matches what was configured.
+Wiring is observable, not just parseable.
+
+**Backward compat:** zero behavior change without explicit config. Default
+fetcher matches every remote skill same as before; only diff is cache path
+now segments by version (`.skills-cache/default/...`).
+
+**Tests:** `go test -race ./hyoka/... -timeout 3m` clean. Vet clean.

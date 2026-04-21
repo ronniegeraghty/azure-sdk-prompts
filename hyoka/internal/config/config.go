@@ -160,8 +160,42 @@ type ConfigFile struct {
 	// discovery (.hyoka/prompts → ./prompts → ../prompts). When set in a
 	// config YAML loaded from disk, relative paths are resolved against the
 	// containing config file's directory by Load/LoadDir.
-	PromptDirectory string       `yaml:"prompt_directory,omitempty" json:"prompt_directory,omitempty"`
-	Configs         []ToolConfig `yaml:"configs"`
+	PromptDirectory string `yaml:"prompt_directory,omitempty" json:"prompt_directory,omitempty"`
+	// ToolVersionOverride pins specific tool entries (matched by Entry.Name)
+	// to a given version. The version is forwarded to the registered Fetcher
+	// (for the default npx fetcher, it becomes a git ref). Per-entry
+	// `version:` set directly on a tool entry takes precedence over this map.
+	// Empty map (or absent field) means "no overrides" — fetcher defaults
+	// are used everywhere.
+	ToolVersionOverride map[string]string `yaml:"tool_version_override,omitempty" json:"tool_version_override,omitempty"`
+	Configs             []ToolConfig      `yaml:"configs"`
+}
+
+// ApplyVersionOverrides applies cf.ToolVersionOverride to every tool entry
+// in every config (Generator and Reviewer). Entries with a non-empty
+// Version field are left untouched (per-entry pin wins). Idempotent.
+func (cf *ConfigFile) ApplyVersionOverrides() {
+	if cf == nil || len(cf.ToolVersionOverride) == 0 {
+		return
+	}
+	apply := func(entries []ToolEntry) {
+		for i := range entries {
+			if entries[i].Version != "" {
+				continue
+			}
+			if v, ok := cf.ToolVersionOverride[entries[i].Name]; ok && v != "" {
+				entries[i].Version = v
+			}
+		}
+	}
+	for i := range cf.Configs {
+		if cf.Configs[i].Generator != nil {
+			apply(cf.Configs[i].Generator.Tools)
+		}
+		if cf.Configs[i].Reviewer != nil {
+			apply(cf.Configs[i].Reviewer.Tools)
+		}
+	}
 }
 
 // Load reads and parses a configuration file from the given path.
@@ -178,6 +212,7 @@ func Load(path string) (*ConfigFile, error) {
 	if err := cfg.ExpandPlugins(resolvePluginsDir()); err != nil {
 		return nil, fmt.Errorf("expanding plugins: %w", err)
 	}
+	cfg.ApplyVersionOverrides()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -228,6 +263,17 @@ func LoadDir(dir string) (*ConfigFile, error) {
 			nameSource[c.Name] = e.Name()
 		}
 		merged.Configs = append(merged.Configs, cf.Configs...)
+		// Merge tool_version_override maps. Conflicting values across files
+		// are an error — silently last-write-wins would be a footgun.
+		for k, v := range cf.ToolVersionOverride {
+			if merged.ToolVersionOverride == nil {
+				merged.ToolVersionOverride = make(map[string]string)
+			}
+			if existing, ok := merged.ToolVersionOverride[k]; ok && existing != v {
+				return nil, fmt.Errorf("conflicting tool_version_override for %q: %q vs %q (in %s)", k, existing, v, e.Name())
+			}
+			merged.ToolVersionOverride[k] = v
+		}
 	}
 
 	if len(merged.Configs) == 0 {

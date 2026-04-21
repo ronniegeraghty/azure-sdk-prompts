@@ -1,10 +1,10 @@
 package tool
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -16,7 +16,7 @@ import (
 //   - source: local, skill_dir: false → path points to a single skill (must contain SKILL.md)
 //   - source: local, skill_dir: true  → path is a directory of skills (subdirs contain SKILL.md)
 //   - source: local with glob         → each glob match is treated as a single skill directory
-//   - source: remote                  → fetches from GitHub repo via "npx skills add"
+//   - source: remote                  → dispatched to the registered Fetcher (default: npx)
 func ResolveSkills(entries []Entry, baseDir string) ([]string, error) {
 	var dirs []string
 	for _, entry := range entries {
@@ -159,37 +159,24 @@ func resolveSkillDir(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-// FetchRemote fetches a remote skill from a GitHub repo using npx skills add.
-// Returns the directory where the skill was installed.
+// FetchRemote fetches a remote skill via the registered Fetcher (default: npx).
+// Returns the directory where the skill was installed. The fetcher is chosen
+// from DefaultRegistry; users can register custom fetchers via Register to
+// override or extend this behavior. Honors entry.Version (which may have been
+// set by ApplyVersionOverrides) and falls back to the fetcher's default when
+// empty.
 func FetchRemote(entry Entry, baseDir string) (string, error) {
-	// Determine install directory: use a skills cache dir under baseDir
-	installDir := filepath.Join(baseDir, ".skills-cache", entry.Repo)
-	if entry.Name != "" {
-		installDir = filepath.Join(installDir, entry.Name)
+	f := LookupFetcher(entry)
+	if f == nil {
+		return "", fmt.Errorf("no fetcher registered for remote skill %q (repo=%q)", entry.Name, entry.Repo)
 	}
-
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return "", fmt.Errorf("creating skill install dir: %w", err)
+	res, err := f.Fetch(context.Background(), FetchRequest{
+		Entry:   entry,
+		BaseDir: baseDir,
+		Version: entry.Version,
+	})
+	if err != nil {
+		return "", err
 	}
-
-	// Use npx skills add to fetch the skill
-	args := []string{"skills", "add", entry.Repo, "--directory", installDir}
-	if entry.Name != "" {
-		args = append(args, "--name", entry.Name)
-	}
-
-	fmt.Printf("Fetching remote skill: %s (repo: %s)\n", entry.Name, entry.Repo)
-	slog.Info("Fetching remote skill", "skill", entry.Name, "repo", entry.Repo)
-	cmd := exec.Command("npx", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("npx skills add: %w", err)
-	}
-
-	abs, absErr := filepath.Abs(installDir)
-	if absErr != nil {
-		slog.Warn("Failed to resolve absolute install path", "path", installDir, "error", absErr)
-	}
-	return abs, nil
+	return res.Dir, nil
 }
