@@ -29,6 +29,44 @@ func TestIsValidGroupName(t *testing.T) {
 		{"slash/group", false},
 		{strings.Repeat("a", 65), false},
 		{strings.Repeat("a", 64), true},
+		// Boundary conditions (#608 polish):
+		{strings.Repeat("a", 63), true},                    // one under max
+		{"ab" + strings.Repeat("-c", 31), true},            // 64-char hyphenated
+		{"ab" + strings.Repeat("-c", 31) + "d", false},     // 65-char hyphenated
+		{" ", false},                                       // whitespace only
+		{"   ", false},                                     // multi whitespace
+		{"\t", false},                                      // tab
+		{"\n", false},                                      // newline
+		{"a\nb", false},                                    // embedded newline
+		{"leading space", false},
+		{" leading-space", false},                          // leading actual space
+		{"trailing-space ", false},
+		{"-", false},                                       // hyphen only
+		{"--", false},                                      // only hyphens
+		{"a-", false},                                      // trailing hyphen after letter
+		{"-a", false},                                      // leading hyphen before letter
+		{"a--b", false},                                    // consecutive hyphens mid
+		{"a---b", false},                                   // triple consecutive hyphens
+		{"a-b-c-d-e-f", true},                              // many single hyphens
+		{"a1", true},                                       // letter + digit
+		{"a-1", true},                                      // letter-digit segment
+		{"a-1b", true},                                     // mixed alphanumeric segment
+		{"1", false},                                       // single digit
+		{"1a", false},                                      // starts with digit
+		{"0-abc", false},                                   // starts with digit + hyphen
+		{"abc.def", false},                                 // dot separator
+		{"abc_def", false},                                 // underscore
+		{"abc+def", false},                                 // plus
+		{"abc def", false},                                 // internal space
+		{"abc@def", false},                                 // at sign
+		{"abc#def", false},                                 // hash
+		{"abc!def", false},                                 // bang
+		{"ABC", false},                                     // all uppercase
+		{"aBc", false},                                     // mixed case
+		{"ñoño", false},                                    // non-ASCII lowercase
+		{"café", false},                                    // accented lowercase
+		{"emoji🙂", false},                                  // emoji
+		{"null\x00byte", false},                            // embedded null
 	}
 	for _, c := range cases {
 		if got := IsValidGroupName(c.in); got != c.want {
