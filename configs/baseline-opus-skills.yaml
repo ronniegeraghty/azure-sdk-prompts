@@ -17,7 +17,7 @@ configs:
         - name: azure-storage-blob-rust
           type: skill
           source: remote
-          repo: "microsoft/skills/.github/plugins/azure-sdk-rust/azure-storage-blob-rust/skills"
+          repo: "microsoft/skills/.github/plugins/azure-sdk-rust/skills"
     reviewer:
       models:
         - "claude-opus-4.6"

@@ -26,10 +26,3 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/reviewer"
-    plugins:
-      - "azure-sdk-rust@skills"
-      - "azure-sdk-python@skills"
-      - "azure-sdk-js@skills"
-      - "azure-sdk-java@skills"
-      - "azure-sdk-go@skills"
-      - "heaths/azsdk-samples-mcp"

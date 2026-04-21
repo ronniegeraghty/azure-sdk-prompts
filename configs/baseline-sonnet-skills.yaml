@@ -13,10 +13,6 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/generator"
-        - name: azure-storage-blob-rust
-          type: skill
-          source: remote
-          repo: "microsoft/skills/.github/plugins/azure-sdk-rust/azure-storage-blob-rust/skills"
     reviewer:
       models:
         - "claude-opus-4.6"
@@ -28,9 +24,3 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/reviewer"
-    plugins:
-      - "azure-sdk-java@skills"
-      - "azure-sdk-python@skills"
-      - "azure-sdk-dotnet@skills"
-      - "azure-sdk-typescript@skills"
-      - "azure-sdk-rust@skills"
