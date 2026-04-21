@@ -17,7 +17,7 @@ import (
 //   - source: local, skill_dir: true  → path is a directory of skills (subdirs contain SKILL.md)
 //   - source: local with glob         → each glob match is treated as a single skill directory
 //   - source: remote                  → dispatched to the registered Fetcher (default: npx)
-func ResolveSkills(entries []Entry, baseDir string) ([]string, error) {
+func ResolveSkills(ctx context.Context, entries []Entry, baseDir string) ([]string, error) {
 	var dirs []string
 	for _, entry := range entries {
 		if entry.ResolvedType() != TypeSkill {
@@ -32,7 +32,7 @@ func ResolveSkills(entries []Entry, baseDir string) ([]string, error) {
 			slog.Debug("Resolved local skill", "path", entry.Path, "skill_dir", entry.SkillDir, "resolved_count", len(resolved))
 			dirs = append(dirs, resolved...)
 		case SourceRemote:
-			dir, err := FetchRemote(entry, baseDir)
+			dir, err := FetchRemote(ctx, entry, baseDir)
 			if err != nil {
 				return nil, fmt.Errorf("fetching remote skill %s/%s: %w", entry.Repo, entry.Name, err)
 			}
@@ -164,13 +164,14 @@ func resolveSkillDir(dir string) ([]string, error) {
 // from DefaultRegistry; users can register custom fetchers via Register to
 // override or extend this behavior. Honors entry.Version (which may have been
 // set by ApplyVersionOverrides) and falls back to the fetcher's default when
-// empty.
-func FetchRemote(entry Entry, baseDir string) (string, error) {
+// empty. The provided context is passed to the fetcher so cancellation and
+// deadlines propagate into any HTTP/exec work it performs.
+func FetchRemote(ctx context.Context, entry Entry, baseDir string) (string, error) {
 	f := LookupFetcher(entry)
 	if f == nil {
 		return "", fmt.Errorf("no fetcher registered for remote skill %q (repo=%q)", entry.Name, entry.Repo)
 	}
-	res, err := f.Fetch(context.Background(), FetchRequest{
+	res, err := f.Fetch(ctx, FetchRequest{
 		Entry:   entry,
 		BaseDir: baseDir,
 		Version: entry.Version,

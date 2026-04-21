@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"sync"
 )
 
@@ -157,20 +156,19 @@ func Register(f Fetcher) error { return DefaultRegistry.Register(f) }
 // the default registry.
 func LookupFetcher(entry Entry) Fetcher { return DefaultRegistry.Lookup(entry) }
 
-// ValidateFetchers checks that every remote skill entry across the given
-// configs has a registered fetcher willing to handle it. Returns the first
+// ValidateFetchers checks that every remote skill entry in the given slice
+// has a registered fetcher willing to handle it. Returns the first
 // missing-fetcher error encountered. Intended to be called by the eval
 // engine before any session starts so users get a fast, clear failure
-// instead of a mid-eval surprise.
-func ValidateFetchers(configs [][]Entry) error {
-	for _, entries := range configs {
-		for _, e := range entries {
-			if e.ResolvedType() != TypeSkill || e.SkillSource() != SourceRemote {
-				continue
-			}
-			if LookupFetcher(e) == nil {
-				return fmt.Errorf("no fetcher registered for remote skill %q (repo=%q)", e.Name, e.Repo)
-			}
+// instead of a mid-eval surprise. Non-remote and non-skill entries are
+// ignored.
+func ValidateFetchers(entries []Entry) error {
+	for _, e := range entries {
+		if e.ResolvedType() != TypeSkill || e.SkillSource() != SourceRemote {
+			continue
+		}
+		if LookupFetcher(e) == nil {
+			return fmt.Errorf("no fetcher registered for remote skill %q (repo=%q)", e.Name, e.Repo)
 		}
 	}
 	return nil
@@ -220,7 +218,6 @@ func (npxFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, err
 		args = append(args, "--name", entry.Name)
 	}
 
-	fmt.Printf("Fetching remote skill: %s (repo: %s, version: %s)\n", entry.Name, entry.Repo, versionSegment)
 	slog.Info("Fetching remote skill", "skill", entry.Name, "repo", entry.Repo, "version", versionSegment, "fetcher", defaultFetcherName)
 
 	cmd := exec.CommandContext(ctx, "npx", args...)
@@ -236,12 +233,4 @@ func (npxFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, err
 		abs = installDir
 	}
 	return FetchResult{Dir: abs, Version: versionSegment}, nil
-}
-
-// SortedFetcherNames returns registered fetcher names sorted alphabetically.
-// Useful for stable diagnostic output.
-func SortedFetcherNames() []string {
-	names := DefaultRegistry.Names()
-	sort.Strings(names)
-	return names
 }

@@ -250,7 +250,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Use ResolveSkillDirs for accurate directory resolution (#291).
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		resolved, err := tool.ResolveSkills(task.Config.Generator.Tools, "")
+		resolved, err := tool.ResolveSkills(ctx, task.Config.Generator.Tools, "")
 		if err != nil {
 			slog.Warn("Failed to resolve skill directories for report", "error", err)
 		} else {

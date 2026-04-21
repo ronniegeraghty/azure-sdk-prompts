@@ -140,7 +140,7 @@ func TestCustomFetcherInvokedAtRuntime(t *testing.T) {
 	}
 	t.Cleanup(func() { DefaultRegistry.Unregister(mock.name) })
 
-	dirs, err := ResolveSkills([]Entry{
+	dirs, err := ResolveSkills(context.Background(), []Entry{
 		{Type: TypeSkill, Source: SourceRemote, Repo: "acme/widgets", Name: "widget", Version: "v1.2.3"},
 	}, t.TempDir())
 	if err != nil {
@@ -172,7 +172,7 @@ func TestCustomFetcherErrorPropagates(t *testing.T) {
 	}
 	t.Cleanup(func() { DefaultRegistry.Unregister(mock.name) })
 
-	_, err := ResolveSkills([]Entry{
+	_, err := ResolveSkills(context.Background(), []Entry{
 		{Type: TypeSkill, Source: SourceRemote, Repo: "acme/fail", Name: "x"},
 	}, t.TempDir())
 	if err == nil || !strings.Contains(err.Error(), "mock fetch failure") {
@@ -182,24 +182,39 @@ func TestCustomFetcherErrorPropagates(t *testing.T) {
 
 func TestValidateFetchers(t *testing.T) {
 	// Local skills and non-skill entries always pass — fetcher unrelated.
-	if err := ValidateFetchers([][]Entry{{
+	if err := ValidateFetchers([]Entry{
 		{Type: TypeSkill, Source: SourceLocal, Path: "/tmp/x"},
 		{Type: TypeMCP, Name: "mcp"},
-	}}); err != nil {
+	}); err != nil {
 		t.Errorf("local-only validation: %v", err)
 	}
 	// Remote skill is OK because the default npx fetcher always matches.
-	if err := ValidateFetchers([][]Entry{{
+	if err := ValidateFetchers([]Entry{
 		{Type: TypeSkill, Source: SourceRemote, Repo: "acme/x"},
-	}}); err != nil {
+	}); err != nil {
 		t.Errorf("remote with default fetcher: %v", err)
+	}
+	// No-fetcher branch: temporarily unregister the default npx fetcher so
+	// nothing in the registry matches a remote skill. ValidateFetchers must
+	// surface a clear error rather than silently passing.
+	DefaultRegistry.Unregister(defaultFetcherName)
+	t.Cleanup(func() { _ = DefaultRegistry.Register(&npxFetcher{}) })
+	err := ValidateFetchers([]Entry{
+		{Type: TypeSkill, Source: SourceRemote, Repo: "acme/orphan", Name: "x"},
+	})
+	if err == nil {
+		t.Fatal("expected error when no fetcher is registered for a remote skill")
+	}
+	if !strings.Contains(err.Error(), "no fetcher registered") ||
+		!strings.Contains(err.Error(), "acme/orphan") {
+		t.Errorf("error does not identify missing-fetcher cause or repo: %v", err)
 	}
 }
 
-// TestNpxFetcher_VersionInPath verifies that the default fetcher writes
-// different versions to different cache subdirectories — so toggling a
-// version override doesn't poison the cache.
-func TestNpxFetcher_VersionInPath(t *testing.T) {
+// TestNpxFetcher_CanFetchAndName verifies the default fetcher's interface
+// contract: it accepts remote skills, rejects local/non-skill entries, and
+// reports the canonical name used by the registry.
+func TestNpxFetcher_CanFetchAndName(t *testing.T) {
 	f := npxFetcher{}
 	if !f.CanFetch(Entry{Type: TypeSkill, Source: SourceRemote, Repo: "x/y"}) {
 		t.Fatal("npx must accept remote skill")
@@ -213,4 +228,54 @@ func TestNpxFetcher_VersionInPath(t *testing.T) {
 	if f.Name() != defaultFetcherName {
 		t.Errorf("name mismatch: %q", f.Name())
 	}
+}
+
+// TestFetchRemote_ContextPropagates verifies that the ctx passed to
+// FetchRemote reaches the fetcher's Fetch method — guards against silently
+// discarding the caller's cancellation/deadline.
+func TestFetchRemote_ContextPropagates(t *testing.T) {
+	type ctxKey string
+	const key ctxKey = "probe"
+
+	var seen context.Context
+	mock := &ctxProbeFetcher{
+		name:      "ctx-probe",
+		matchRepo: "acme/ctx",
+		onFetch:   func(c context.Context) { seen = c },
+		dir:       t.TempDir(),
+	}
+	if err := DefaultRegistry.Register(mock); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	t.Cleanup(func() { DefaultRegistry.Unregister(mock.name) })
+
+	ctx := context.WithValue(context.Background(), key, "hit")
+	if _, err := FetchRemote(ctx, Entry{Type: TypeSkill, Source: SourceRemote, Repo: "acme/ctx", Name: "x"}, t.TempDir()); err != nil {
+		t.Fatalf("FetchRemote: %v", err)
+	}
+	if seen == nil {
+		t.Fatal("fetcher was never called")
+	}
+	if v, _ := seen.Value(key).(string); v != "hit" {
+		t.Errorf("ctx value did not propagate to fetcher; got %q", v)
+	}
+}
+
+// ctxProbeFetcher captures the ctx its Fetch method is invoked with.
+type ctxProbeFetcher struct {
+	name      string
+	matchRepo string
+	onFetch   func(context.Context)
+	dir       string
+}
+
+func (c *ctxProbeFetcher) Name() string { return c.name }
+func (c *ctxProbeFetcher) CanFetch(e Entry) bool {
+	return e.ResolvedType() == TypeSkill && e.SkillSource() == SourceRemote && e.Repo == c.matchRepo
+}
+func (c *ctxProbeFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, error) {
+	if c.onFetch != nil {
+		c.onFetch(ctx)
+	}
+	return FetchResult{Dir: c.dir, Version: req.Version}, nil
 }

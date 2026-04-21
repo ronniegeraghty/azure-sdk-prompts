@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestBuildSessionConfig_EmptyToolsIsNil(t *testing.T) {
 			ExcludedTools: []string{},
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if sc.AvailableTools != nil {
 		t.Errorf("expected AvailableTools nil (all tools), got %v", sc.AvailableTools)
 	}
@@ -33,7 +34,7 @@ func TestBuildSessionConfig_NilAvailableToolsIsNil(t *testing.T) {
 		Name:      "test",
 		Generator: &config.GeneratorConfig{Model: "gpt-4"},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if sc.AvailableTools != nil {
 		t.Errorf("expected AvailableTools nil, got %v", sc.AvailableTools)
 	}
@@ -56,7 +57,7 @@ func TestBuildSessionConfig_PopulatedAvailableToolsPreserved(t *testing.T) {
 			ExcludedTools: []string{"web_fetch"},
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if len(sc.AvailableTools) != 3 {
 		t.Errorf("expected 3 AvailableTools, got %d", len(sc.AvailableTools))
 	}
@@ -68,7 +69,7 @@ func TestBuildSessionConfig_PopulatedAvailableToolsPreserved(t *testing.T) {
 func TestBuildSessionConfig_WorkingDirectory(t *testing.T) {
 	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
-	sc := e.buildSessionConfig(cfg, "/workspace/eval-123", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/eval-123", "", nil)
 	if sc.WorkingDirectory != "/workspace/eval-123" {
 		t.Errorf("expected WorkingDirectory '/workspace/eval-123', got %q", sc.WorkingDirectory)
 	}
@@ -77,7 +78,7 @@ func TestBuildSessionConfig_WorkingDirectory(t *testing.T) {
 func TestBuildSessionConfig_ConfigDir(t *testing.T) {
 	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
-	sc := e.buildSessionConfig(cfg, "/workspace/eval-123", "/isolated/config", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/eval-123", "/isolated/config", nil)
 	if sc.ConfigDir != "/isolated/config" {
 		t.Errorf("expected ConfigDir '/isolated/config', got %q", sc.ConfigDir)
 	}
@@ -86,7 +87,7 @@ func TestBuildSessionConfig_ConfigDir(t *testing.T) {
 func TestBuildSessionConfig_PermissionHandler(t *testing.T) {
 	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if sc.OnPermissionRequest == nil {
 		t.Error("expected OnPermissionRequest to be set (ApproveAll)")
 	}
@@ -108,7 +109,7 @@ func TestBuildSessionConfig_MCPServers(t *testing.T) {
 			},
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if len(sc.MCPServers) != 1 {
 		t.Errorf("expected 1 MCP server, got %d", len(sc.MCPServers))
 	}
@@ -138,13 +139,13 @@ func TestBuildSessionConfig_ToolEntryResolution(t *testing.T) {
 	}
 
 	// Python prompt should get all 3 tools
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", map[string]string{"language": "python", "service": "identity"})
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", map[string]string{"language": "python", "service": "identity"})
 	if len(sc.AvailableTools) != 3 {
 		t.Fatalf("expected 3 AvailableTools for python, got %d: %v", len(sc.AvailableTools), sc.AvailableTools)
 	}
 
 	// Dotnet prompt should get only 2 tools (azure_mcp excluded)
-	sc = e.buildSessionConfig(cfg, "/workspace/test", "", map[string]string{"language": "dotnet"})
+	sc = e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", map[string]string{"language": "dotnet"})
 	if len(sc.AvailableTools) != 2 {
 		t.Fatalf("expected 2 AvailableTools for dotnet, got %d: %v", len(sc.AvailableTools), sc.AvailableTools)
 	}
@@ -166,7 +167,7 @@ func TestBuildSessionConfig_ToolEntryAllConditionalNoneMatch(t *testing.T) {
 			},
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", map[string]string{"language": "dotnet"})
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", map[string]string{"language": "dotnet"})
 	if sc.AvailableTools != nil {
 		t.Errorf("expected nil AvailableTools when no tools match, got %v", sc.AvailableTools)
 	}
@@ -182,7 +183,7 @@ func TestBuildSessionConfig_ExcludedToolsWithToolEntries(t *testing.T) {
 			ExcludedTools: []string{"web_fetch"},
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if len(sc.AvailableTools) != 2 {
 		t.Errorf("expected 2 AvailableTools, got %d", len(sc.AvailableTools))
 	}
@@ -249,7 +250,7 @@ func TestBuildSessionConfig_CustomSystemPrompt(t *testing.T) {
 			SystemPrompt: "You are a helpful code generator.",
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", map[string]string{"language": "python"})
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", map[string]string{"language": "python"})
 
 	if sc.Model != "gpt-4" {
 		t.Errorf("expected model 'gpt-4', got %q", sc.Model)
@@ -265,7 +266,7 @@ func TestBuildSessionConfig_EmptySystemPrompt(t *testing.T) {
 			Model: "gpt-4",
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", map[string]string{})
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", map[string]string{})
 
 	if sc.Model != "gpt-4" {
 		t.Errorf("expected model 'gpt-4', got %q", sc.Model)
@@ -339,7 +340,7 @@ configs:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			props := mergePromptProperties(tt.prompt)
-			sc := e.buildSessionConfig(cfg, "/workspace/test", "", props)
+			sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", props)
 
 			if len(sc.AvailableTools) != len(tt.wantAvail) {
 				t.Fatalf("AvailableTools: got %v, want %v", sc.AvailableTools, tt.wantAvail)
@@ -375,7 +376,7 @@ func TestIntegration_DuplicateToolEntries(t *testing.T) {
 			},
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", map[string]string{"language": "python"})
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", map[string]string{"language": "python"})
 	if len(sc.AvailableTools) != 2 {
 		t.Fatalf("expected 2 tools after dedup, got %d: %v", len(sc.AvailableTools), sc.AvailableTools)
 	}
@@ -393,7 +394,7 @@ func TestBuildSessionConfig_SystemPromptSet(t *testing.T) {
 			SystemPrompt: "You are a helpful Azure SDK assistant.",
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if sc.SystemMessage == nil {
 		t.Fatal("expected SystemMessage to be set when generator.system_prompt is configured")
 	}
@@ -415,7 +416,7 @@ func TestBuildSessionConfig_SystemPromptEmpty(t *testing.T) {
 		Name:      "test",
 		Generator: &config.GeneratorConfig{Model: "gpt-4"},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	// With allowCloud=false (default), safety boundaries are appended even without system_prompt.
 	if sc.SystemMessage == nil {
 		t.Fatal("expected SystemMessage with safety boundaries when allowCloud=false")
@@ -434,7 +435,7 @@ func TestBuildSessionConfig_AllowCloudSkipsSafetyBoundaries(t *testing.T) {
 			SystemPrompt: "You are a helpful Azure SDK assistant.",
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if sc.SystemMessage == nil {
 		t.Fatal("expected SystemMessage to be set when generator.system_prompt is configured")
 	}
@@ -452,7 +453,7 @@ func TestBuildSessionConfig_AllowCloudNoSystemPrompt(t *testing.T) {
 		Name:      "test",
 		Generator: &config.GeneratorConfig{Model: "gpt-4"},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if sc.SystemMessage != nil {
 		t.Errorf("expected SystemMessage nil when allowCloud=true and no system_prompt, got %+v", sc.SystemMessage)
 	}
@@ -504,7 +505,7 @@ func TestBuildSessionConfig_RemoteMCP(t *testing.T) {
 			},
 		},
 	}
-	sc := e.buildSessionConfig(cfg, "/workspace/test", "", nil)
+	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/test", "", nil)
 	if len(sc.MCPServers) != 1 {
 		t.Fatalf("expected 1 MCP server, got %d", len(sc.MCPServers))
 	}

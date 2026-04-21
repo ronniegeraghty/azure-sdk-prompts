@@ -258,13 +258,13 @@ func runCmd() *cobra.Command {
 
 			// Pre-flight: every remote skill needs a registered Fetcher.
 			// Failing here gives a fast, clear error before any session starts.
-			var allEntries [][]tool.Entry
+			var allEntries []tool.Entry
 			for _, c := range configs {
 				if c.Generator != nil {
-					allEntries = append(allEntries, c.Generator.Tools)
+					allEntries = append(allEntries, c.Generator.Tools...)
 				}
 				if c.Reviewer != nil {
-					allEntries = append(allEntries, c.Reviewer.Tools)
+					allEntries = append(allEntries, c.Reviewer.Tools...)
 				}
 			}
 			if err := tool.ValidateFetchers(allEntries); err != nil {

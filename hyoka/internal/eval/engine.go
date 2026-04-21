@@ -494,7 +494,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	if e.opts.DryRun {
-		return e.dryRun(tasks)
+		return e.dryRun(ctx, tasks)
 	}
 
 	// Resource monitor (#45) — opt-in via --monitor-resources.
@@ -762,7 +762,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	return summary, nil
 }
 
-func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
+func (e *Engine) dryRun(ctx context.Context, tasks []EvalTask) (*report.RunSummary, error) {
 	summary := &report.RunSummary{
 		RunID:        "dry-run",
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
@@ -792,7 +792,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
 			entries := countSkillEntries(t.Config.Generator.Tools)
-			resolved, err := tool.ResolveSkills(t.Config.Generator.Tools, "")
+			resolved, err := tool.ResolveSkills(ctx, t.Config.Generator.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
@@ -804,7 +804,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		}
 		if t.Config.Reviewer != nil {
 			entries := countSkillEntries(t.Config.Reviewer.Tools)
-			resolved, err := tool.ResolveSkills(t.Config.Reviewer.Tools, "")
+			resolved, err := tool.ResolveSkills(ctx, t.Config.Reviewer.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue
