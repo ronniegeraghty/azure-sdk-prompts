@@ -231,3 +231,59 @@ The "approve with nits" lane is the right call when (a) acceptance criteria all 
 **Pattern captured:** When re-implementing dead-flagged feature (#580 ↔ #587), wiring-layer integration tests (Engine/cmd plumbing) required as gating, not optional. Tank fixed; re-reviewed ✅ APPROVE.
 
 **Status:** Phase 6 Round-1 test batch complete. All PRs ready to merge pending Coordinator's embedded-asset refresh (completed, a1a3c95d).
+
+## 2026-04-21 — PR #609 Review (MultiSelectFilter tests, Trinity, phase-6)
+
+**Verdict:** ⚠️ APPROVE WITH NOTES
+
+- Tests: 122/122 green; 3 new tests in `multi-select-filter.test.tsx` (outside-click, Escape, empty-options).
+- Quality good: correct event names (`mousedown` matches listener), ARIA-role queries, no sleep anti-patterns, no portal leaks, double-assertion on empty case.
+- Non-blocking gaps flagged for follow-up: toggle/onChange behavior untested (highest-value miss for a "MultiSelect" component), summary-text branches untested, `aria-expanded`/`aria-selected` not asserted, no click-inside-stays-open counterpart. Keyboard listbox nav is a product gap to route to Trinity, not a test gap.
+- Recommendation: land for targeted regression coverage; file follow-up for state/aria coverage.
+
+## PR #610 test-quality review — ✅ APPROVE (2026-04-21)
+
+**Branch:** ronniegeraghty/issue-608-606-group-tests (Tank — group property follow-up tests for #606/#608)
+**Tests:** `go test -race ./hyoka/... -timeout 3m` → all 24 packages green.
+
+**Files reviewed:**
+- `hyoka/internal/eval/engine_group_wiring_test.go` (new, 93 LOC, 2 subtests)
+- `hyoka/internal/prompt/group_json_test.go` (new, 86 LOC, 4 subtests)
+- `hyoka/internal/validate/group_test.go` (+38 boundary rows)
+
+**Verdict — wiring test passes the #587-trap bar:** Uses real `engine.Run` + `StubRunner` flowing through actual wiring point `engine_eval.go:78-80`. Asserts on observable runtime payload `r.PromptMeta["group"]`. Failure message points at the file:line so a future regression gets a pointed error. Negative case (empty Group → key absent) covers the conditional branch.
+
+**Verdict — regex boundary rows comprehensive:** 35+ rows covering lengths (63/64/65 plain + hyphenated), whitespace classes, hyphen edge cases (only/double/triple/leading/trailing/many-single positive), digits, case, special chars (`.` `_` `+` `@` `#` `!` space), unicode (ñoño, café, emoji), embedded null byte.
+
+**Verdict — omitempty round-trip covers both paths:** empty omitted; populated round-trips; absent unmarshals empty; explicit-empty-on-remarshal still omitted.
+
+**Posted as comment** (gh blocked --approve since I am the PR author due to coordinator setup; verdict body still leads with ✅ per protocol).
+
+## 2026 PR #612 review — Neo fetcher polish (#605/#608)
+
+**Verdict:** ✅ APPROVE (posted as comment — gh refuses self-approve on bot-owned PR)
+
+- Verified `go build ./hyoka/...` + `go test -race ./hyoka/... -timeout 3m` both green.
+- `TestValidateFetchers` no-fetcher branch genuinely exercises the empty-registry path (unregisters `npxFetcher`, asserts error + substring match on repo name, restores via Cleanup).
+- Rename `TestNpxFetcher_VersionInPath` → `TestNpxFetcher_CanFetchAndName` is a correctness fix — old name didn't match body.
+- `TestFetchRemote_ContextPropagates` uses `context.WithValue` + unique key to prove the *same* ctx reaches `Fetch` (stronger than #587 non-nil pattern). Suggested non-blocking follow-up: cancellation variant.
+- `[][]Entry → []Entry` signature change: grep confirms zero stragglers; `cmd/run.go` correctly flattens with `append(..., Tools...)`.
+- All ctx threading sites (`ResolveSkills`, `FetchRemote`, `buildSessionConfig`, `Engine.dryRun`) updated, all test files updated.
+
+## 2026-04-21 — PR #611 review (Morpheus: site-embed Makefile + CI freshness gate)
+
+**Verdict:** ✅ APPROVE (posted as comment — `gh pr review --approve` rejected because branch was authored under same `ronniegeraghty` identity).
+
+**Tested in worktree** `/home/rgeraghty/projects/hyoka-review-611-switch`:
+- `make site-install` → `make site-embed` × 2 → `git status` clean both runs. Idempotent. ✅
+- `make verify-embed` clean → exit 0.
+- Drift simulation: appended a real code line to `site/src/main.tsx` → `verify-embed` exit 1 with clear actionable error. ✅
+- Comment-only edit to `App.tsx` correctly produced byte-identical bundle (Vite strips comments) → no false-fail. ✅
+- `.github/workflows/ci.yml` untouched. ✅
+
+**Non-blocking findings logged on the PR:**
+1. `git diff --quiet -- EMBED_DIR` misses untracked file additions — if Vite ever starts emitting a new root-level artifact, verify-embed could false-pass. Suggested `git status --porcelain -- EMBED_DIR` instead.
+2. `rm -rf $(EMBED_DIR)/assets` only cleans `assets/` — stale root-level files (e.g. removed `manifest.json`) would persist undetected.
+3. No `concurrency:` group on the workflow.
+
+All three are theoretical given current Vite output (only `index.html` + `assets/`). Worth a follow-up issue, not a blocker.

@@ -167,3 +167,20 @@ Surfaces touched: root/run/new-prompt commands, graders, eval, review, config, l
 **Implication for future:** Wiring-layer regression tests (integration through engine.Run with stubs) now standard pattern for any flag-driven feature work — cheapest defense against "tests pass, behavior gone" failure mode.
 
 **Status:** PR #603 approved. Phase 6 Round-1 test batch complete.
+
+### Session 2026-04-21 (Phase 6 #608 — PR #606 Group Property Polish)
+
+**Status:** COMPLETE — PR #610 → phase-6
+**Branch:** `ronniegeraghty/issue-608-606-group-tests`
+
+**What:** Three test-only additions closing coverage gaps Morpheus called out on PR #606 (group frontmatter property):
+
+1. **Observable-wiring test** (`hyoka/internal/eval/engine_group_wiring_test.go`) — runs `engine.Run` with `StubRunner`, asserts prompt's `Group` reaches `EvalReport.PromptMeta["group"]` at engine_eval.go:78-80. Covers propagation + empty-omitted case. #587-trap pattern.
+2. **Regex boundary rows** (added to `hyoka/internal/validate/group_test.go`) — ~35 new rows: 63/64/65-char limits including hyphenated forms, whitespace variants, hyphen-only, consecutive hyphens, digit-only segments, special chars, non-ASCII, emoji, null bytes.
+3. **JSON omitempty round-trip** (`hyoka/internal/prompt/group_json_test.go`) — verifies `json:"group,omitempty"` on `prompt.Prompt.Group`: absent when empty, round-trips when set, cleared-group remarshal still omits.
+
+**Verification:** `go test -race -timeout 3m ./hyoka/...` → all packages PASS.
+
+**Learnings:**
+- The #587-trap observable-wiring pattern is straightforward to apply at engine.Run level — `StubRunner` + asserting on `summary.Results[0].PromptMeta` exercises the real metadata-build code path without any generator/reviewer stubbing gymnastics. Reuse this recipe for any future "frontmatter field → report" wiring check.
+- When adding boundary rows to an existing anonymous-struct table test, keeping rows terse (one-liners with trailing comments) scales better than refactoring to named rows — the existing tight style was fine for ~55 rows total.

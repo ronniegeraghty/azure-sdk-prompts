@@ -124,3 +124,31 @@ This is exact failure mode of #587: tests pass, runtime behavior absent.
 **Outcome:** Tank reassigned + implemented fix (16 tests, 22 subtests). Switch re-reviewed ✅ APPROVE. Commit 04579b47.
 
 **Status:** #603 approved pending merge. Neo locked per protocol; Tank's wiring tests land in PR.
+
+## 2026-04-21: #608 — PR #605 Fetcher Polish (PR #612)
+
+**Branch:** `ronniegeraghty/issue-608-605-fetcher-polish` (off phase-6)
+**Worktree:** `/home/rgeraghty/projects/hyoka-608-605-fetcher-polish`
+**PR:** #612 (targets phase-6)
+
+Six review follow-ups from PR #605, all in one focused commit:
+
+1. `TestValidateFetchers` — added no-fetcher branch. Trick: the default npx fetcher accepts every remote skill, so the error path was unreachable from tests. Solution: `DefaultRegistry.Unregister(defaultFetcherName)` with `t.Cleanup` re-registration. Asserts error string names the offending repo.
+2. Renamed `TestNpxFetcher_VersionInPath` → `TestNpxFetcher_CanFetchAndName`. The old name described behavior the body never asserted.
+3. Deleted `SortedFetcherNames` (zero callers).
+4. `FetchRemote(ctx, entry, baseDir)` and `ResolveSkills(ctx, entries, baseDir)` — threaded ctx through the eval engine (`dryRun`, `runSingleEval`, `buildSessionConfig`). New `TestFetchRemote_ContextPropagates` uses a probe fetcher that captures the ctx and asserts caller-set values survive. Guards against silent regression to `context.Background()`.
+5. `npxFetcher.Fetch`: removed the `fmt.Printf` that duplicated the `slog.Info` line.
+6. `ValidateFetchers([][]Entry)` → `ValidateFetchers([]Entry)`. Flat slice; call site in `cmd/run.go` now appends instead of double-nesting.
+
+**Lessons:**
+- **Unreachable error paths want a test seam, not new API.** Temporarily unregistering the default fetcher hit the branch without exporting a hook.
+- **Thread ctx in one commit.** Adding ctx to `FetchRemote` alone would have been dishonest — `ResolveSkills` would still have called `context.Background()` and the plumbing would stop one level up. Signature changes that touch transitive callers are cheaper done together.
+- **Signature-change tests:** adding a test that asserts ctx propagation (not just that the ctx parameter exists) converts "the caller passes ctx" into "the callee receives ctx" — the same wiring-layer discipline #603 required.
+
+## 2026-04-22 — PR #611 architectural review (sub for Morpheus)
+
+✅ APPROVE (posted as comment — self-approval blocked on shared `ronniegeraghty` account; Morpheus authored, Squad reviewer-author isolation triggered substitution).
+
+PR #611 closes #608's systemic embedded-asset-freshness item with two layers: `Makefile` (`site-install`/`site-build`/`site-embed`/`verify-embed`) + `.github/workflows/site-embed-freshness.yml` (CI gate running `make verify-embed` on site-touching PRs). Verified against `.squad/skills/embedded-asset-freshness/SKILL.md` — implements exactly the two Phase-7 candidates the skill called out (make target + CI hash-diff). `site-embed` correctly avoided a `make build` umbrella that would shadow `go build`. README:222-223 makes the target discoverable. Triggers (PR `**`, push `main`/`phase-6`/`ronniegeraghty/dev`) and paths filter both correct.
+
+Non-blocking follow-ups noted: (1) `ci.yml`'s `site-build-and-test` job already does `npm ci && npm run build` — `verify-embed` could fold in there to remove duplicate ~1-2 min of work; trade-off is losing the discrete PR status check; (2) prune `phase-6` from push triggers post-merge; (3) add `concurrency:` group.

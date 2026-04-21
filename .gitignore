@@ -47,3 +47,6 @@ site/dist/
 
 # Playwright MCP snapshots
 .playwright-mcp/
+
+# Local Playwright debug artifacts
+.morpheus-screenshots/

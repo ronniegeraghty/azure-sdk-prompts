@@ -297,3 +297,54 @@ None of the six Phase 6 PRs touched `hyoka/internal/serve/site/`. Last commit to
 **Live Verification:** 8 Playwright screenshots at 1600×1000 — all UI features rendering, no layout regressions.
 
 **Status:** Phase 6 Round-1 architectural review complete. All PRs approved and ready to merge.
+
+## #608 — Embedded asset freshness automation (2025)
+
+PR #611 → phase-6. Closes #608. Systemic follow-up to the #607 rollup catch.
+
+**Two layers of defense shipped:**
+
+1. **Makefile** (new, top-level) with `site-embed` (idempotent build+copy), `verify-embed` (rebuild + `git diff --exit-code`), `site-install`, `site-build`, `help`. README dev loop now documents `make site-embed`.
+2. **CI workflow** `.github/workflows/site-embed-freshness.yml` — runs `make verify-embed` on PRs touching `site/**`, `hyoka/internal/serve/site/**`, `embed.go`, or the Makefile. Hash-diff approach per the skill's preference: rebuild on PR branch, fail if bundle diverges from committed tree. Catches "forgot to commit the rebuild" precisely.
+
+**Local verification:** idempotent confirmed (clean tree → no diff after `make site-embed`); stale-detection confirmed (side-effect probe in `main.tsx` → `make verify-embed` exits non-zero with readable diff summary); revert + `go build ./hyoka/...` green. Existing `ci.yml` untouched.
+
+**Lesson:** the skill called out both fixes as Phase-7 candidates — we landed both in one PR because they're complementary (Makefile makes the local fix trivial, CI makes the oversight impossible). Tree-shaking gotcha during testing: a probe that only adds an unused `export const` gets minified away, so the embed bundle looked unchanged. Used a side-effectful `console.log(...)` instead to force a real content-hash change. Worth remembering for any future "does this source edit actually reach the bundle" debugging.
+
+## 2026-04-21 — PR #610 architectural review (Tank: #606 group property polish)
+
+**Verdict:** ✅ APPROVE (posted as comment — gh blocked self-approval since PR author is ronniegeraghty)
+
+**Scope:** Test-only PR adding 3 files (217 LOC, 0 deletions): `engine_group_wiring_test.go`, `prompt/group_json_test.go`, `validate/group_test.go` boundary rows.
+
+**Findings:**
+- Wiring point correct — confirmed `engine_eval.go:78-80` is the live `if task.Prompt.Group != "" { evalReport.PromptMeta["group"] = ... }` block.
+- Pattern matches #603/#605 observable-wiring style: `StubRunner` + `quietOpts(EngineOptions{...})` + full `engine.Run` + assert on runtime `PromptMeta` payload. Doc comment explicitly names wiring file:line and the #587 regression class.
+- JSON omitempty hedge is load-bearing — without `omitempty`, ungrouped prompts grow silent `"group":""` keys breaking downstream "is grouped?" checks.
+- Regex boundary table additions are non-redundant (length 63/64/65, hyphen-position, leading-digit, non-ASCII, control bytes, whitespace variants).
+- All tests green locally (`go test ./hyoka/internal/{eval,prompt,validate}/ -run Group`).
+
+**No follow-ups, no architectural concerns. Ready for phase-6.**
+
+## 2026-04-21 — PR #612 Architectural Review: ✅ APPROVE
+
+**PR:** #612 (Neo) — fetcher cleanups, ctx threading, signature flatten, dead code removal. Phase 6 polish off #605.
+
+**Verdict:** APPROVE. Three changes, three clean wins:
+1. **Ctx propagation:** Verified end-to-end chain `Engine.Run → dryRun/runSingleEval → buildSessionConfig → ResolveSkills → FetchRemote → Fetcher.Fetch → exec.CommandContext`. All 4 ResolveSkills call sites thread real engine ctx; no `context.Background()` smuggling left in touched paths. `TestFetchRemote_ContextPropagates` probe-fetcher test pins the behavior — silent regression to `context.Background()` will fail loudly.
+2. **Signature flatten `[][]Entry` → `[]Entry`:** Inner grouping was vestigial; validator iterated flat; error attribution via repo name not via slice index. cmd/run.go call site cleaner as single concat. No semantic loss.
+3. **Dead `SortedFetcherNames`:** Zero callers in tree (grep confirmed, no reflection surface). `sort` import drops cleanly.
+
+**Bonus cleanups all good:** `fmt.Printf` removal from npxFetcher (slog.Info is single source of truth), test rename from misleading name, no-fetcher TestValidateFetchers branch closes the #605 review gap.
+
+**Pre-existing follow-up (out of PR scope):** `runSingleEval` only resolves Generator.Tools for the report, not Reviewer.Tools. Not a regression — runtime never resolves reviewer skills outside dryRun preview. Worth a future ticket if reviewer-side remote skills land.
+
+**Build/test:** `go test ./hyoka/internal/config/tool/... ./hyoka/internal/eval/... ./hyoka/cmd/...` — all green on pr-612 against phase-6.
+
+## 2026-04 — PR #609 Review (Trinity, MultiSelectFilter tests, issue #608)
+
+✅ APPROVE (posted as comment — gh blocks self-approve on own PR account).
+
+Test-only PR adding 3 vitest cases to `site/src/__tests__/multi-select-filter.test.tsx`: outside-mousedown close, Escape close, empty-options rendering. Tests respect the controlled-primitive boundary (`selected`/`onChange` props), don't leak into URL persistence concerns (correctly owned by run-filters.ts per D-2026-04-21), and use accessible-name selectors that lock in the a11y contract (`aria-haspopup`/`aria-expanded`/`aria-label`).
+
+Notable: `fireEvent.mouseDown` (not click) deliberately matches the component's `mousedown` document listener, with explanatory comment — prevents future regressions where someone "fixes" a test by switching to userEvent.click and silently breaks outside-click. Patterns established here (role+aria-label queries, match listener event types, first-class empty-state assertions) are the right defaults for future filter components — no fight expected when Compare-page filter bar reuses this primitive in Phase 6.
