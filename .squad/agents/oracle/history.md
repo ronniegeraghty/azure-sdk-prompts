@@ -384,3 +384,47 @@ Your README audit (commit 2208bfcb) established task-agnostic framing. Tank comp
 
 **Decision documented:** `.squad/decisions.md` (3 entries merged from inbox: copilot-directive-readme-scope, oracle-readme-audit, tank-cli-help-scrub)
 
+
+### Phase 6 Comprehensive Documentation Audit (2026-04-21)
+
+**Status:** COMPLETE  
+**Branch:** phase-6  
+**Commits:** b5c4782c, 0db8f454, 904b1a04
+
+Comprehensive pre-merge audit of ALL documentation on `phase-6` branch before PR #607 merge to ronniegeraghty/dev. Verified every command shown in docs actually works.
+
+**Scope:** 18 files audited (README, AGENTS, CHANGELOG, CONTRIBUTING, all docs/, skills/)
+**Commands tested:** 17 different commands with various flags
+
+**Critical fixes:**
+1. **Command pattern error** — All docs incorrectly used `go run ./hyoka` when correct is `go run .` (main.go in repo root, not hyoka/ subdir). Fixed 47 instances across 4 files. This was a regression from Phase 5 where I documented this exact learning but new Phase 6 changes reintroduced the error.
+2. **Version drift** — Updated docs to show `hyoka version dev` (not `0.2.0`)
+3. **Deprecated command** — Marked `hyoka configs` as deprecated in cli-reference.md
+4. **Duplicate entry** — Removed duplicate "hyoka list" line in architecture.md
+
+**Testing methodology:**
+- Ran every single command shown in docs (with --dry-run or --help where applicable)
+- Verified all flags exist and match documented behavior
+- Tested filters (--service, --language, --plane, --category)
+- Tested guardrails (--max-session-actions, --max-files, --max-output-size)
+- Confirmed deprecated commands still work but show deprecation warnings
+- Verified site tests (133 tests, up from 72 in Phase 5)
+- Verified make site-embed workflow
+
+**Key findings:**
+- `--check-models` and `--review-mode` flags still exist (not removed as task description suggested)
+- All Phase 6 features correctly documented (serve embed, compare redesign)
+- No stale .ai-team/ references found (all .squad/)
+- All config names match filenames correctly documented
+- Prompt frontmatter format documentation accurate
+
+**Verification approach:**
+1. Read every doc file start to finish
+2. Extract every command shown
+3. Run it (or closest dry-run equivalent)
+4. If output contradicts docs → fix docs
+5. Cross-check flags against --help output
+
+**Result:** 3 commits pushed to phase-6, all CI checks should pass on PR #607.
+
+**Lesson reinforced:** The `go run .` vs `go run ./hyoka` distinction is subtle but critical — Go looks for main.go relative to the dot. Since go.work exists at repo root, `go run .` is correct. This should be memorialized as a docs-standards pattern.
