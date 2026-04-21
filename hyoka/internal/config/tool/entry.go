@@ -25,6 +25,12 @@ type Entry struct {
 	Path     string `yaml:"path,omitempty" json:"path,omitempty"`
 	Repo     string `yaml:"repo,omitempty" json:"repo,omitempty"`
 	SkillDir bool   `yaml:"skill_dir,omitempty" json:"skill_dir,omitempty"` // true = path is a directory of skills, false = path is a single skill
+	// Version pins a remote skill to a specific git ref (branch, tag, or
+	// commit). Empty means "default" (whatever the fetcher's default is —
+	// for the npx fetcher, that's the repo's default branch). Can be set on
+	// the entry directly or via tool_version_override at the top of a
+	// config file.
+	Version string `yaml:"version,omitempty" json:"version,omitempty"`
 }
 
 // ResolvedType returns the normalized entry type ("tool" by default).

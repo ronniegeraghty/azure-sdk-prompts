@@ -10,6 +10,7 @@ import (
 
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
@@ -254,6 +255,21 @@ func runCmd() *cobra.Command {
 
 			// Resolve relative skill_directories in configs to absolute paths
 			resolveConfigSkillDirs(configs, f.prompts)
+
+			// Pre-flight: every remote skill needs a registered Fetcher.
+			// Failing here gives a fast, clear error before any session starts.
+			var allEntries [][]tool.Entry
+			for _, c := range configs {
+				if c.Generator != nil {
+					allEntries = append(allEntries, c.Generator.Tools)
+				}
+				if c.Reviewer != nil {
+					allEntries = append(allEntries, c.Reviewer.Tools)
+				}
+			}
+			if err := tool.ValidateFetchers(allEntries); err != nil {
+				return fmt.Errorf("tool fetcher validation: %w", err)
+			}
 
 			// Install declared skills and plugins (npx skills add)
 			if err := config.InstallSkillsAndPlugins(configs); err != nil {

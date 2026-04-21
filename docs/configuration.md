@@ -301,6 +301,67 @@ max_turns: 40             # Allow more back-and-forth turns
 
 Prompts with unset limit fields fall through to config > CLI > default, ensuring backward compatibility.
 
+## Tool Versioning & Custom Fetchers
+
+Remote skills (and other future remote tools) are pinned and fetched through hyoka's pluggable **Fetcher** system. By default, hyoka uses an `npx skills add`-backed fetcher that follows the repo's default branch.
+
+### Pinning versions
+
+Use `tool_version_override` at the top of any config file to pin tools by `name`:
+
+```yaml
+tool_version_override:
+  azure-sdk-java: "v1.4.2"      # git tag
+  copilot-knowledge: "main"      # branch
+  azsdk-samples: "abc123def"     # commit SHA
+
+configs:
+  - name: baseline/sonnet
+    generator:
+      model: claude-sonnet-4.5
+      tools:
+        - name: azure-sdk-java
+          type: skill
+          source: remote
+          repo: Azure/azure-sdk-skills
+        - name: pinned-by-entry
+          type: skill
+          source: remote
+          repo: x/y
+          version: "v2.0.0"      # per-entry version always wins
+```
+
+**Resolution order:** per-entry `version:` field > `tool_version_override` map > fetcher default (latest).
+
+The version is forwarded to the fetcher; the default `npx` fetcher appends it as a git ref (`repo@version`) and caches each version under a separate directory (`.skills-cache/<version>/<repo>/<name>/`) so toggling pins doesn't poison the cache.
+
+`tool_version_override` maps are scoped to the config file they live in. Conflicting values across files in a directory load are an error.
+
+### Custom fetchers
+
+The `tool.Fetcher` interface (in `hyoka/internal/config/tool/`) lets embedders register additional fetchers — useful for internal mirror caches, alternate package managers, or custom version-pinning rules:
+
+```go
+import "github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+
+type artifactoryFetcher struct{ /* ... */ }
+
+func (artifactoryFetcher) Name() string { return "artifactory" }
+func (artifactoryFetcher) CanFetch(e tool.Entry) bool {
+    return e.ResolvedType() == tool.TypeSkill && e.Source == "remote" &&
+           strings.HasPrefix(e.Repo, "internal/")
+}
+func (artifactoryFetcher) Fetch(ctx context.Context, req tool.FetchRequest) (tool.FetchResult, error) {
+    // download from internal Artifactory, return FetchResult{Dir, Version}
+}
+
+func init() { _ = tool.Register(artifactoryFetcher{}) }
+```
+
+**Lookup order:** custom fetchers are consulted before the built-in `npx` default; the first whose `CanFetch` returns true wins. This means custom fetchers can shadow the default for specific entries while leaving everything else on the default path.
+
+Hyoka calls `tool.ValidateFetchers(...)` at the start of every run, so any remote skill without a matching registered fetcher fails fast — before a session is spawned.
+
 ## Multiple Config Files
 
 Place multiple `.yaml` files in the config directory. All are loaded automatically. Use `--config <name>` to select specific configs, or `--all-configs` to run all.
