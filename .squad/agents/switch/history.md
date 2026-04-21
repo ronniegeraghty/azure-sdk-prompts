@@ -526,3 +526,103 @@ Morpheus correctly fixed mocks, restored test coverage, and uncovered + fixed re
 
 **Cross-agent note:** Morpheus fixed the #596 (R151 collapsible) in parallel; both committed. PR #592 now ready for Ronnie → dev merge.
 
+
+
+### 2026-04-21 (PR #604 Review — APPROVE WITH NITS ⚠️)
+
+**Issue:** #600 — Run-level filter system on site (Trinity, Phase 6 round 2)
+**PR:** #604 → `phase-6`
+**Verdict:** ⚠️ APPROVE WITH NITS → merge
+
+#### Verification
+
+- `git worktree add ../hyoka-pr604 origin/ronniegeraghty/issue-600-site-filters`
+- `cd site && npm install && npx vitest run` → **119/119 pass** (matches PR claim)
+- Read `lib/run-filters.ts`, `multi-select-filter.tsx`, `runs-page.tsx`, both new test files
+
+#### What's solidly tested
+
+`run-filters.ts` (16 tests): status precedence all 3 branches, OR-within / AND-across, the subtle "any eval per dimension matches at run-level" semantic, URL round-trip + unknown-status rejection + missing-`results` tolerance. `runs-page.tsx` (5 new DOM tests): filter bar render, filter→reset cycle, no-matches empty state, URL hydration via `MemoryRouter initialEntries`.
+
+#### Nits filed (non-blocking)
+
+`MultiSelectFilter` has live wiring with zero coverage: outside-click close, Escape close, toggle-off (the component's inline `toggle()` does NOT delegate to the unit-tested `toggleValue`), "No options" branch, and there's no component-level URL **write** round-trip test. The primitive is intended for reuse on prompts/dashboard but has no dedicated test file.
+
+#### Why not reject
+
+The gaps are dropdown UX micro-behaviors, not data-correctness paths. Filter model where bugs would silently corrupt output is well-covered. Trinity put heavy logic in pure functions → test density landed in the right place.
+
+#### Learning
+
+The "approve with nits" lane is the right call when (a) acceptance criteria all have at least one pinning test, (b) data-correctness paths are well covered, and (c) the gaps are in UX wiring whose breakage would be visually obvious. Reserve hard reject for #587/#603-class regressions where silent backend routing breaks. The nit list is itself the artifact — a follow-up issue tagged `tests` can pick up the MultiSelectFilter dedicated test file before the primitive gets reused on prompts/dashboard pages.
+
+### 2026-04-21 (PR #606 Review — APPROVE WITH NITS ⚠️)
+
+**Issue:** #599 — `group` property in prompt frontmatter (Neo, R102)
+**PR:** #606 commit `d6f6900d` → `phase-6`
+**Verdict:** ⚠️ APPROVE WITH NITS — non-blocking
+
+#### What was verified
+
+- Full `-race` suite green (24 packages, 3m timeout).
+- Coverage: validate 81.7%, prompt 92.6%, eval 54.5% — no regression.
+- Live `go run . validate` against the existing prompt library: all 89 prompts pass unchanged (backward compat).
+- Adversarial injection: prompt with `group: Bad_Group!` produces clean `invalid group "..."; must be kebab-case ...` error from CLI validate path — no parser panic.
+- Regex coverage matches all categories Ronnie listed (uppercase, leading digit, leading/trailing/double hyphen, special chars, empty, > 64).
+
+#### Nits filed (non-blocking)
+
+1. No unit test for `engine_eval.go:78-80` propagation to `PromptMeta["group"]`. Three lines, but they are the entire bridge to Trinity's #600 site filter consumption. A two-row table test would lock the contract.
+2. Regex test table doesn't explicitly include `a1` or `auth-2`. Transitively covered by `abc123-def` and `auth-flows-v2` — adding explicit rows is documentation, not behavior.
+3. No `json.Marshal` round-trip asserting `group,omitempty` actually omits when empty (the json-tag claim in PR description is unverified by tests).
+
+#### Learnings
+
+1. **"Three trivial lines = the entire user-visible contract" pattern.** The `engine_eval.go` propagation is 3 lines but it's the only path by which Trinity's #600 site filter and the whole point of issue #599 reaches the report JSON. Trivial code can be load-bearing — coverage gaps on bridge code matter more than coverage gaps on logic. Don't reject for it alone, but always nit it.
+2. **Regex test tables benefit from explicit "boundary" rows even when transitively covered.** `abc123-def` proves the regex handles letter+digit. `a1` proves the *minimum-viable* letter+digit case. The latter is more debuggable when something breaks. Cheap to add, high signal in failure mode.
+3. **Adversarial integration test pattern works for new validation rules:** drop a malformed prompt into the live tree, run the CLI, grep the error message. Catches "validation runs but error doesn't surface to user" — a class of bug unit tests can miss.
+
+## 2026-04-21 — PR #605 Review (Neo's #597 tool versioning)
+
+**Verdict:** ⚠️ APPROVE WITH NITS — comment posted ([#issuecomment-4285214970](https://github.com/ronniegeraghty/hyoka/pull/605#issuecomment-4285214970))
+
+**Suite:** `go test -race ./hyoka/... -timeout 3m` → all 24 packages pass, EXIT 0.
+
+**Headline guard `TestCustomFetcherInvokedAtRuntime` is real:** registers a mock against the production `DefaultRegistry`, calls `ResolveSkills` (the actual prod path used by `cmd/run.go` → `InstallSkillsAndPlugins`), asserts call count == 1 + version `v1.2.3` propagated + repo intact + returned dir. Clears the #587/#603 bar.
+
+**Solid coverage:** custom-fetcher dispatch (happy + error), default-last ordering (`TestRegistry_DefaultStaysLast`), full per-entry-vs-map precedence matrix, YAML round-trip, backward compat (`NoMapNoOp`), registry hygiene (duplicate/nil/empty rejection).
+
+**Nits filed (non-blocking, fast-follow):**
+1. `TestValidateFetchers` only tests success — the `LookupFetcher(e) == nil` failure branch (the *whole point* of pre-flight) has zero coverage. Easy fix: unregister `npx` in test, expect wrapped error.
+2. `TestNpxFetcher_VersionInPath` is misnamed — only asserts `CanFetch`/`Name`, never checks the `<version>` cache-segment path or the `repo@version` arg munging. The user-visible "toggling pins doesn't poison cache" behavior is untested. Suggest factoring path-build out of `Fetch` for unit testability.
+3. `LoadDir` conflict-detection branch (`"conflicting tool_version_override for %q"`) untested.
+4. Two-custom-fetchers-same-entry ordering not asserted.
+
+**Lesson reinforced:** the #587 trap isn't only "is the runtime path tested?" — it's also "is the *failure* mode of pre-flight validation tested?" Pre-flight checks that only test success ship green when they no-op silently. Watch for this pattern in future PRs that add `Validate*` functions.
+
+## 2026-04-21 — Phase 6 Rollup Review (PR #607)
+
+**Status:** ✅ APPROVE WITH NOTES
+**PR:** #607 (phase-6 → ronniegeraghty/dev, epic #312)
+**Scope:** Integration-level review — 6 sub-PRs (#601–#606) already ✅✅ per-PR.
+
+**Test results on integrated phase-6 branch:**
+- `go test -race ./hyoka/... -timeout 3m -count=1` → **24/24 packages green**
+- `cd site && npm test` → **14 files / 119 vitest cases green**
+- `go build ./hyoka/...` → clean
+- `go run . validate` → 12 configs, 25 graders, all valid
+- `go run . run ... --dry-run` (key-vault-dp-python-crud × baseline/claude-opus-4.6) → resolves, no panic
+
+**Feature-interaction probes:**
+1. **#606 ↔ #604:** `Prompt.Group` → `PromptMeta["group"]` wiring confirmed at `engine_eval.go:79`. Filter system can consume via `EvalReport.PromptMeta`.
+2. **#603 ↔ #605:** #587-trap guard intact — `slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate...")` at `engine.go:282`, runtime-asserted in `engine_reviewbuckets_test.go:150`. Rebase/merge did NOT break the trap.
+3. **#602 ↔ #606:** `prompt_directory` config and `group` frontmatter field are orthogonal (config-layer vs frontmatter-layer); no interaction issue. Parser handles both; validate succeeds on full prompt library.
+
+**Non-blocking follow-ups (from per-PR reviews, still open):**
+- MultiSelectFilter component has no direct unit test (logic lib `run-filters.ts` is tested at 16 cases; component rendering is covered only via integration with runs page).
+- No explicit unit test asserts `PromptMeta["group"]` round-trip through EvalReport JSON (covered transitively by engine tests but not pinned).
+- No cross-feature test exercises "custom fetcher + isolated review mode" — orthogonal code paths (tool-fetch happens pre-generation, review-mode post-generation), so low regression risk, but a combined integration test would be worth filing as a follow-up.
+
+**Live eval skipped:** Dry-run covered startup/config resolution. Full live eval requires Copilot credentials and 5-10 min runtime; not necessary to gate the rollup given all unit+integration tests are green and dry-run resolves cleanly.
+
+**Verdict:** APPROVE WITH NOTES — rollup is test-green, integration holds, no regressions. Follow-up tests listed above can land on `dev` post-merge.
