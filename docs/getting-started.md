@@ -25,16 +25,15 @@ export COPILOT_GITHUB_TOKEN="your-token"
 
 Without Copilot auth, the tool falls back to **stub mode** (no real agent evaluations).
 
-## 1. Clone and Verify
+## 1. Clone and Install
 
 ```bash
 git clone https://github.com/ronniegeraghty/hyoka.git
 cd hyoka
+go install ./...
 ```
 
-The repo uses a `go.work` file, so all commands run from the repo root — no need to `cd hyoka/`.
-
-Verify the setup:
+Verify the installation:
 
 ```bash
 hyoka version
@@ -42,7 +41,7 @@ hyoka version
 
 Expected output:
 ```
-hyoka version dev
+hyoka version v0.x.x
 ```
 
 Check your environment:
@@ -64,15 +63,6 @@ hyoka list --service storage
 
 # JSON output (for scripting)
 hyoka list --json
-```
-
-Expected output:
-```
-Found 79 prompt(s):
-
-  storage-dp-dotnet-auth         storage/data-plane/dotnet [authentication]
-                                 Can the docs help a developer authenticate to Azure Blob Storage...
-  ...
 ```
 
 ## 3. Run Your First Evaluation

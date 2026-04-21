@@ -338,3 +338,30 @@ Idempotence verified, `go build ./hyoka/...` clean, `go test -race ./hyoka/... -
 **Verdict:** ✅ APPROVE. Posted as `--comment` (gh refused `--approve` because PR was opened under same gh account — author/reviewer isolation hit again, same as Neo on #614). Author of record is Morpheus.
 
 **Learning:** When reviewing your own past nits, always test the ACTUAL gate semantics, not just the surface change — porcelain works, but `verify-embed`'s site-embed dependency means in-tree manual stray files get pruned before the check. The realistic CI failure mode (untracked output of a rebuild) still trips correctly.
+
+### 2026-04-21 — PR #607 Final Test Review (HEAD 25675461)
+
+**Context**: Final review of phase-6 → ronniegeraghty/dev merge at HEAD 25675461, post-Tank main-sync and Neo dev-merge.
+
+**Findings**:
+1. **3 Disabled Tests** (all commented-out, not t.Skip):
+   - `resolve_test.go:198` — `TestParseRepoSpec`: function `parseRepoSpec` doesn't exist in phase-6
+   - `tool_filter_test.go:314` — `TestValidateToolEntry_BranchOnRemote`: `Branch` field not in schema
+   - `tool_filter_test.go:322` — `TestValidateToolEntry_BranchOnLocal`: `Branch` field not in schema
+   - **Pattern**: Tests commented (not skipped) with TODO/inline comments. Correct approach — would fail to compile if uncommented.
+
+2. **Full Test Suite**: 20 packages, all passing with `-race`. Merge-touched packages (`internal/eval`, `internal/config/tool`) fully covered.
+
+3. **Installation Path**: `go install ./...` → `/home/rgeraghty/go/bin/hyoka` works. Docs' `hyoka run` examples verified functional.
+
+4. **CI Status**: All 3 checks green at HEAD 25675461.
+
+**Verdict**: ✅ APPROVE. No test regressions. Disabled tests are legitimate (reference non-existent code).
+
+**Learning**: When reviewing merge commits, check for:
+- Commented-out tests vs `t.Skip()` — commented tests are cleaner (don't run, don't bloat output)
+- TODO comments on disabled tests — essential for future tracking
+- Compileability — if a test references missing functions/fields, commenting is correct (uncommenting would break build)
+- Test package alignment with merge-touched files — always run tests for changed packages with `-race`
+
+**Review posted**: https://github.com/ronniegeraghty/hyoka/pull/607#issuecomment-<id>
