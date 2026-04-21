@@ -262,3 +262,24 @@ Implemented all requirements from R155 (docs page observations) for Phase 5 on b
 
 **Next:** Phase 6 planning will prioritize these based on dependency graph. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
 
+
+### Session 2026-04-20 (Phase 6 — Issue #365 Compare Page Redesign)
+
+**Branch:** `ronniegeraghty/issue-365-compare-redesign` → **PR #601** (target `phase-6`)
+
+**What shipped:**
+- Replaced static A vs B compare page with N-way group-based comparison tool inspired by devex-reviews.
+- New pure-function lib `site/src/app/lib/comparison-groups.ts` — model, catalog extraction from real eval data, filter logic (OR-within-dimension, AND-across-dimensions, empty=match-all), metric computation (pass rate / avg score / per-service / per-language / score-distribution histogram), localStorage persistence with shape validation.
+- New `group-builder.tsx` component — chip-cluster multi-select per dimension, color picker, match-count badge, collapse/expand, remove.
+- Rewrote `comparison-page.tsx` — two-column layout with groups + chart toggles on left, summary cards + configurable charts (6 chart types) on right. Edge-case banners for 0/1/empty/uneven groups.
+- Tests: 21 lib tests + 10 page tests. Full suite 99/99 green; build 6.13s.
+
+## Learnings
+
+- **Worktree discipline matters more than I thought.** The shared workdir was concurrently checked out to issue-598 by another agent (saw uncommitted .go files I didn't write); my untracked files got clobbered mid-session. Recovered by spinning up an isolated worktree at `~/projects/hyoka-365` via `git worktree add`. **Rule for Phase 6 going forward: if you suspect anyone else is working in the same root, create a worktree first.** Saved into agent-collaboration consideration.
+- **jsdom in this project doesn't expose a working `localStorage`.** Some node `--localstorage-file` flag interaction breaks both `.clear()` and `.removeItem()`. Pattern that works: install a per-test in-memory shim via `Object.defineProperty(window, "localStorage", { value: shim, configurable: true, writable: true })` in `beforeEach`. Production code is untouched — `safeLocalStorage()` falls back to a shim when `window.localStorage` is missing, which is the same defensive pattern.
+- **Recharts per-bar coloring requires `<Cell>`, not `fill` on `<Bar>`.** Tried `<Bar dataKey="value" fill={d.color}>` first — doesn't work because Bar only accepts a single fill. Correct pattern: `<Bar><Cell fill={d.color}/>...</Bar>`. For grouped breakdowns (multiple series), one `<Bar fill={...}>` per group is fine and gives a free legend.
+- **Pure-function lib + thin React orchestrator is a force multiplier for testing.** 21 fast lib tests covering all the comparison semantics (filter ANDs/ORs, score-bin boundaries, persistence round-trips, malformed-data tolerance) without ever rendering a component. The page tests are then free to focus on user-visible behavior, not arithmetic.
+- **Empty-state messaging deserves design time.** Five distinct edge cases: 0 groups, 1 group, all-empty, partial-empty, uneven counts. Each gets its own banner with appropriate severity color (sky / amber / grey). This is the difference between a tool that "works" and one users trust.
+- **Skill captured:** `.squad/skills/group-based-comparison-ui/SKILL.md` documents the pattern for any future N-way comparison UI in this codebase.
+- **Decision filed:** `.squad/decisions/inbox/trinity-issue-365-compare.md` for Scribe.
