@@ -287,10 +287,8 @@ func runCmd() *cobra.Command {
 			}
 
 			// Validate --review-mode (#580). Empty string is treated as combined.
-			switch f.reviewMode {
-			case "", "combined", "isolated":
-			default:
-				return fmt.Errorf("invalid --review-mode %q: must be \"combined\" or \"isolated\"", f.reviewMode)
+			if err := validateReviewMode(f.reviewMode); err != nil {
+				return err
 			}
 
 			// Create a real Copilot SDK evaluator
