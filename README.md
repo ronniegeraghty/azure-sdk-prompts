@@ -217,6 +217,11 @@ go test -race ./...
 # Test site (frontend)
 cd site && npm test
 
+# Rebuild the site AND refresh the embedded bundle that `hyoka serve` ships.
+# Required whenever you change anything under site/src/** — a CI check
+# (site-embed-freshness) will fail the PR otherwise.
+make site-embed
+
 # Test with a live eval (fastest feedback)
 go run ./hyoka run --prompt-id key-vault-dp-python-crud \
   --config baseline/claude-opus-4.6
