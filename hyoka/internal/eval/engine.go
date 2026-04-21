@@ -107,6 +107,11 @@ type EngineOptions struct {
 	MonitorResources bool
 	// Tiered criteria (#30)
 	CriteriaDir string // Directory containing attribute-matched criteria YAML files.
+	// Review session splitting (#580). When "isolated", graders/groups marked
+	// with isolate: true are reviewed in their own Copilot session per panel
+	// model. Empty string or "combined" preserves legacy single-session
+	// behavior. Validated at the CLI layer.
+	ReviewMode string
 	// Pluggable graders (#136)
 	GradersDir string // Directory containing grader config YAML files.
 	// Generator safety (#36)
@@ -258,6 +263,31 @@ func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) strin
 		return p.EvaluationCriteria
 	}
 	return merged
+}
+
+// reviewBuckets builds the set of review buckets for a prompt under the
+// configured ReviewMode. In combined mode (default) it returns one bucket
+// containing all matched graders + prompt criteria — byte-identical to the
+// legacy single-criteria path. In isolated mode it returns one bucket per
+// isolated grader/group plus a shared "combined" bucket for the rest. When
+// isolated mode is requested but nothing is marked isolate, it logs a warning
+// so the flag is observably no-op rather than silently dead.
+func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string) []graders.ReviewBucket {
+	mode := e.opts.ReviewMode
+	if mode == "" {
+		mode = criteria.ReviewModeCombined
+	}
+	matched := criteria.MatchingGradersWithIsolation(e.graderConfigs, props)
+	if mode == criteria.ReviewModeIsolated && !criteria.HasIsolation(matched) {
+		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
+			"prompt_id", p.ID)
+	}
+	cb := criteria.BuildReviewBuckets(matched, p.EvaluationCriteria, mode)
+	out := make([]graders.ReviewBucket, 0, len(cb))
+	for _, b := range cb {
+		out = append(out, graders.ReviewBucket{Name: b.Name, Criteria: b.FormatCriteria()})
+	}
+	return out
 }
 
 // EvalTask represents a single prompt+config evaluation to run.

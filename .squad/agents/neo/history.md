@@ -243,3 +243,24 @@ Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026
 
 **Next:** Phase 6 planning will prioritize these based on dependency graph. Morpheus's review is in `.squad/reviews/phase-5-arch-review-2026-04-20T200455Z.md`.
 
+
+### 2026-04-20: Issue #580 — Review Session Splitting (PR #603)
+
+**Status:** PR #603 open against `phase-6`.
+
+Re-implemented `--review-mode isolated` after the dead-flag revert (PR #587 nuked PR #578 because the flag had no runtime effect). This time the flag actually splits Copilot review sessions.
+
+Design:
+- `criteria.GraderEntry.Isolate` + `criteria.GraderGroup.Isolate` (group wins over per-grader)
+- `criteria.BuildReviewBuckets` returns 1 bucket (combined, default) or N buckets (isolated mode)
+- `review.MultiBucketReviewer` + `MultiBucketPanelReviewer` interfaces; `PanelReviewer.ReviewPanelBuckets` runs `bucket_count × panel_model_count` sessions
+- `mergeBucketResults` prefixes per-bucket criterion names with `[bucket-name]` so deterministic any-fail voting across panel models stays unambiguous
+- Engine warns via slog when isolated mode is requested but nothing is marked — no silent dead flag
+- Combined mode is byte-identical to today (single string path preserved when `len(buckets) ≤ 1`)
+
+## Learnings
+
+- **Commit early and often when other agents may be active.** Mid-task another agent's worktree operation appeared to swap the branch in my main repo path, dumping all my unstaged edits to existing files. Untracked files survived; tracked-edit losses cost ~30 minutes to re-apply. Now: every passing test boundary → commit.
+- **Heredoc/create tools occasionally drop content silently.** Always verify with `ls -la` / `grep` after non-trivial writes.
+- **Cross-package type duplication is sometimes the right call.** `Bucket` lives in `criteria`, `review`, and `graders` because `graders → review` already exists and the engine builds buckets from `criteria`. Centralizing would create a cycle. Document the duplication and convert at boundaries.
+- **Make resurrected dead flags observably alive.** Adding a `slog.Warn` when `--review-mode isolated` is requested but no graders are marked is the cheap insurance against the same regression that killed PR #578 (flag wired but no runtime effect).
