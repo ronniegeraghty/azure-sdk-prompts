@@ -2786,3 +2786,137 @@ Blocker status: **None.**
 ✅ **APPROVE** — Phase 6 is architecturally sound. Module boundaries clean, Go conventions held, test coverage strong (26%), embed pipeline production-grade. Observable-wiring-tests pattern is a Phase 6 win preventing #587-class regressions.
 
 ---
+
+### Decision: docs/ Uses Installed-Binary Command Form
+
+**Date:** 2026-04-21  
+**Proposed by:** Tank (per user directive)  
+**Status:** Accepted
+
+#### Context
+
+Documentation in `docs/` has historically mixed command forms:
+- `go run . <command>` (source-dev form)
+- `hyoka <command>` (installed-binary form)
+
+This creates confusion because:
+1. `docs/` is for end users who installed hyoka via `go install` or a release binary
+2. Source-dev commands change when the repo structure changes (e.g., `go run .` vs `go run ./hyoka` depending on where `main.go` lives)
+3. Contributors building from source have `CONTRIBUTING.md` which explicitly covers the source-dev workflow
+
+#### Decision
+
+**All command examples in `docs/` (recursive) MUST use installed-binary form.**
+
+| ✅ Correct (docs/) | ❌ Wrong (docs/) |
+|---|---|
+| `hyoka list` | `go run . list` |
+| `hyoka run --config baseline` | `go run . run --config baseline` |
+| `hyoka validate` | `go run ./hyoka validate` |
+
+**Exceptions:**
+- `CONTRIBUTING.md` — explicitly for contributors, uses source-dev commands
+- `README.md` (root) — mixed audience, can show both forms (but clearly labeled)
+- Clearly-marked "Building from source" sections in docs can show `go run .` IF they also note that the rest of the doc assumes installed binary
+
+#### Rationale
+
+1. **Target audience:** `docs/` is for users, not contributors
+2. **Stability:** Installed-binary form is immune to internal restructures (e.g., PR #300 moved `main.go` to root, breaking old `go run ./hyoka` examples)
+3. **Consistency:** User-facing docs should all use the same command form
+
+#### Implementation
+
+Applied in commit d111c964 (phase-6 branch):
+- Replaced all 28 occurrences of `go run . ` with `hyoka ` in `docs/getting-started.md`
+- Verified no other docs files had `go run` commands
+
+---
+
+### User Directive: Documentation Uses Installed-Binary Command Form (2026-04-21T22:58Z)
+
+**By:** Ronnie (via Copilot)
+
+**What:** Documentation files in `docs/` MUST use the installed-binary command form (`hyoka run`, `hyoka list`, `hyoka validate`, etc.) and NOT the run-from-source form (`go run .` or `go run ./hyoka`). Docs are for end users who installed the tool, not for contributors building from source. Source-dev commands belong in CONTRIBUTING.md or a clearly-marked "Building from source" section, not in the user-facing `docs/` directory.
+
+**Why:** User request — captured for team memory. Avoids future Phase-N regressions where the source-path itself drifts (e.g., `go run .` vs `go run ./hyoka` depending on where `main.go` lives).
+
+**Implementation note:** Decision merged above.
+
+---
+
+### Decision: PR #607 Merge Conflict Resolution Strategy
+
+**Date:** 2026-04-22  
+**Decider:** Neo 💊  
+**Status:** Implemented  
+**PR:** #607 (`phase-6 → ronniegeraghty/dev`)
+
+#### Context
+
+Tank merged `origin/main` into BOTH `ronniegeraghty/dev` and `phase-6` independently. Both merges resolved the same 9 conflicts, but the manual resolutions diverged. PR #607 became DIRTY/CONFLICTING when trying to merge phase-6 into dev.
+
+#### Problem
+
+When two branches independently merge the same upstream and resolve conflicts differently, a future merge between those branches conflicts AGAIN on the same files — even though both sides already "resolved" them once.
+
+#### Decision
+
+**Strategy:** Merge `dev` INTO `phase-6` (not the other way) to make phase-6 a strict superset of dev. This makes PR #607's diff just the phase-6-unique commits.
+
+**Conflict resolution rules:**
+1. **Architectural work wins:** phase-6's pluggable Fetcher abstraction (Issue #597, PR #605) with `context.Context` support is more extensible than dev's direct npx implementation → kept phase-6
+2. **Correct paths win:** README.md used `go run ./hyoka` (dev) not `go run .` (phase-6 incorrect) → kept dev
+3. **Cleaner style wins:** Test comment style (cosmetic) → kept phase-6's cleaner version
+
+#### Key Technical Call
+
+**Kept phase-6's `context.Context` threading through `ResolveSkills` and `FetchRemote`:**
+- Enables cancellation/deadline propagation into HTTP/exec work
+- Part of #597's pluggable fetcher architecture
+- Regression to dev's signature would lose this capability
+- Tests in PR #608 (commit 04579b47) assert ctx propagation end-to-end
+
+#### Alternatives Considered
+
+1. **Merge phase-6 into dev instead:** Would have required reversing PR #607's direction; no technical benefit
+2. **Take dev's direct npx implementation:** Would lose #597's extensibility work (custom fetchers, version overrides)
+3. **Cherry-pick individual commits:** Higher merge conflict risk; doesn't solve the underlying divergence
+
+#### Verification
+
+- ✅ `go build ./...` — clean
+- ✅ `go test -race ./... -timeout 5m` — all 24 packages pass
+- ✅ PR #607: `mergeable: MERGEABLE`, `state: OPEN`, `mergeStateStatus: UNSTABLE` (CI running)
+
+#### Consequences
+
+**Positive:**
+- PR #607 now clean and ready to merge after CI passes
+- phase-6's architectural work (pluggable fetchers) preserved
+- Future merges between these branches won't re-conflict on these files
+
+**Negative:**
+- None identified
+
+#### Lessons for Team
+
+**Multi-merge divergence pattern:** When two branches merge the same upstream independently, expect re-conflicts when merging those branches together. Resolution requires understanding semantic intent, not blind "ours"/"theirs" picks.
+
+**Context propagation:** When adding `context.Context` parameters, thread through ALL callers to the entry point. Half-measures (signature without plumbing) are dishonest.
+
+#### Related
+
+- Issue #597: Custom tool fetchers with version override
+- PR #605: Fetcher abstraction implementation
+- PR #608: Fetcher polish (ctx threading tests)
+- PR #607: phase-6 → dev merge (now clean)
+
+---
+
+### Routing Note (Informal): Future Docs Work
+
+**Date:** 2026-04-21  
+**Note:** Future docs work should route to Oracle by default, not Tank. Oracle has specialized expertise in documentation, tone, and user-facing accuracy. Tank focuses on CLI/platform.
+
+---

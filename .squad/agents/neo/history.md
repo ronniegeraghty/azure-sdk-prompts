@@ -183,3 +183,109 @@ Reviewed Morpheus's systemic follow-up to my #611 nits: site-embed-freshness CI 
 **Follow-up I named (non-blocking):** the embedded-asset-freshness skill's "refresh procedure" prose (~line 57) is now stale — points at manual `rm -rf assets && cp -r` instead of `make site-embed`/`make verify-embed`. Hygiene PR for someone, separate from this.
 
 **Pattern reinforced:** when a reviewer flags 3 nits and the author addresses 2 plus documents the third's tradeoff in-source, that's the right shape — don't relitigate the documented one unless a new fact emerges. The cost of the duplication (~2min CI minutes per site PR) is real but bounded; the signal-clarity benefit (named required check) is durable.
+
+## 2026-04-22 — PR #607 Merge Conflict Resolution
+
+**Mission:** Resolve conflicting main-merge divergence between phase-6 and ronniegeraghty/dev
+
+**Context:** Tank merged `origin/main` into BOTH `ronniegeraghty/dev` and `phase-6` independently (commits on different days). Both merges resolved the same 9 conflicts but with divergent resolutions. PR #607 (`phase-6 → ronniegeraghty/dev`) became DIRTY/CONFLICTING because the two branches now had different versions of the same post-merge state.
+
+**Strategy:** Merge `dev` INTO `phase-6` to make phase-6 a strict superset of dev. After this, PR #607's diff is just the phase-6-unique commits (clean, no conflicts).
+
+**Conflicting files (6 total):**
+1. `README.md` — Installation command path
+2. `hyoka/internal/config/tool/resolve.go` — ResolveSkills/FetchRemote signatures
+3. `hyoka/internal/config/tool/resolve_test.go` — Comment style
+4. `hyoka/internal/config/tool_filter_test.go` — Comment style
+5. `hyoka/internal/eval/copilot.go` — ResolveSkills call site
+6. `hyoka/internal/eval/engine.go` — dryRun signature + 3 ResolveSkills call sites
+
+**Resolution approach:**
+- **README.md**: Took dev version (`go run ./hyoka`) — correct for current module structure
+- **resolve.go**: Kept phase-6 HEAD — pluggable Fetcher pattern with `context.Context` support vs dev's direct npx implementation. Phase-6's approach is more extensible (registrable custom fetchers, ctx propagation for cancellation/deadlines).
+- **Test files**: Kept phase-6 comment style (cleaner, no branch-specific mentions in final state)
+- **eval files**: Kept phase-6 signatures — `ResolveSkills(ctx context.Context, ...)` and `FetchRemote(ctx context.Context, ...)` for proper cancellation propagation
+
+**Key architectural decision:** Phase-6's Fetcher abstraction (Issue #597, PR #605) is load-bearing work that dev didn't have. The context.Context parameter threads cancellation/deadlines into any HTTP/exec work the fetcher performs. Regression to dev's signature would lose this capability.
+
+**Verification:**
+- `go build ./...` — ✅ clean
+- `go test -race ./... -timeout 5m` — ✅ all 24 packages pass
+- PR #607 status post-push:
+  - state: OPEN
+  - mergeable: MERGEABLE ✅ (clean!)
+  - mergeStateStatus: UNSTABLE (CI running, expected)
+  - headRefOid: 25675461c8476ecae45e770ebf2063ce229b860b
+
+**Commit:** `25675461` "Merge ronniegeraghty/dev into phase-6: align main-merge conflict resolutions"
+
+**Outcome:** PR #607 now clean. All conflicts resolved by keeping phase-6's architectural work (pluggable fetchers + ctx) while taking dev's correct README path.
+
+## Learnings
+
+### Multi-merge divergence pattern (PR #607)
+
+When two branches independently merge the same upstream and resolve conflicts differently, a future merge between those branches will conflict AGAIN on the same files — even though both sides already "resolved" them once. The resolution is to understand which side has the load-bearing architectural work and keep that, not blindly take "ours" or "theirs".
+
+**Pattern:**
+1. Branch A merges upstream → resolves conflicts with approach X
+2. Branch B merges same upstream → resolves same conflicts with approach Y
+3. Later: Branch A merges Branch B → conflicts re-appear because X ≠ Y
+
+**Resolution strategy:**
+- Understand the semantic intent of each side's resolution
+- If one side has newer/better architectural work (e.g., phase-6's Fetcher abstraction), keep that
+- If the diff is cosmetic (comment style), pick whichever is cleaner
+- Test thoroughly — the merge must compile and pass all tests
+
+**Why this happened in #607:** Tank did the merges on different days, with different context. Each merge was individually correct for its branch at that moment. The divergence wasn't visible until we tried to merge the two branches together.
+
+### Context propagation is load-bearing
+
+When adding `context.Context` parameters to a call chain, don't stop halfway. Thread it through ALL callers until it reaches the entry point (e.g., `cmd/run.go` where the CLI gets a ctx from the runtime). Half-measures (signature changes without plumbing) are dishonest — tests that assert ctx propagation (not just that the parameter exists) catch regressions where someone reverts to `context.Background()`.
+
+**Reusable for:** Future ctx-threading work, cancellation/timeout plumbing, HTTP request tracing.
+
+---
+
+## Session 2026-04-21T23:22:02Z: PR #607 Conflict Resolution (Multi-Branch Sync)
+
+**Status:** COMPLETE  
+**Branch:** phase-6 (commit 25675461)  
+**PR:** #607 (phase-6 → ronniegeraghty/dev)
+
+### Context
+
+Tank executed independent main-merge on dev branch (commit 8bfc4da2). Simultaneously, someone executed main-merge on phase-6 branch (commit 10f4c3f3). Both merges resolved the same 9 conflicts, but resolutions diverged:
+- Tank's dev: direct npx skill fetching
+- phase-6: pluggable Fetcher abstraction with context.Context threading
+
+Result: PR #607 became DIRTY/CONFLICTING.
+
+### Resolution
+
+**Commit:** 25675461 "Merge ronniegeraghty/dev into phase-6: align main-merge conflict resolutions"
+
+**Strategy:** Merge dev → phase-6 (make phase-6 superset). Then resolve 6 file conflicts using semantic rules:
+1. **Architectural wins:** kept phase-6's context.Context threading (Issue #597, PR #605)
+2. **Correct paths:** adopted dev's fixed README.md path (`go run .` vs `go run ./hyoka`)
+3. **Cleaner style:** kept phase-6's cosmetic improvements
+
+**Result:** PR #607 transitioned to CLEAN/MERGEABLE. Build + tests all pass (-race, 24 packages).
+
+### Key Technical Decision
+
+Kept phase-6's `context.Context` threading through `ResolveSkills()` and `FetchRemote()`:
+- Enables cancellation/deadline propagation
+- Core architecture improvement for #597 (custom fetchers)
+- Tests in PR #608 (commit 04579b47) assert propagation end-to-end
+- Would be lost if we reverted to dev's direct npx approach
+
+### Cross-Agent Coordination
+
+Tank did the dev merge independently. Neo then resolved the downstream PR #607 conflict. This is a valid pattern: split the work (Tank owns one branch, Neo owns the resolution merge), but requires semantic conflict resolution, not blind tool picks.
+
+See Tank's orchestration log: `.squad/orchestration-log/2026-04-21T23-22-02Z-tank.md`
+
+**Decision captured:** `.squad/decisions.md` ("Decision: PR #607 Merge Conflict Resolution Strategy")
+

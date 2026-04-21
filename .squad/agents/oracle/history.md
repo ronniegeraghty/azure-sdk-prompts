@@ -428,3 +428,27 @@ Comprehensive pre-merge audit of ALL documentation on `phase-6` branch before PR
 **Result:** 3 commits pushed to phase-6, all CI checks should pass on PR #607.
 
 **Lesson reinforced:** The `go run .` vs `go run ./hyoka` distinction is subtle but critical — Go looks for main.go relative to the dot. Since go.work exists at repo root, `go run .` is correct. This should be memorialized as a docs-standards pattern.
+
+---
+
+## Session 2026-04-21T23:22:02Z: User Directive — Docs Installed-Binary Command Form
+
+**Status:** NOTED (routing guidance for future)  
+**Date:** 2026-04-21
+
+### Directive
+
+User Ronnie requested that all examples in `docs/` use installed-binary command form (`hyoka run`, `hyoka list`, etc.), never source-dev form (`go run .` or `go run ./hyoka`).
+
+**Rationale:** docs/ is for end users who installed the tool, not contributors. Source-dev commands belong in CONTRIBUTING.md only.
+
+### Implementation
+
+Tank executed the conversion in commit d111c964 (28 replacements in docs/getting-started.md). Decision captured in `.squad/decisions.md` as "docs/ Uses Installed-Binary Command Form" + formal user directive.
+
+### Routing Note for Future Sessions
+
+**Future docs work should route to Oracle by default,** not Tank. Oracle has specialized expertise in documentation accuracy, user-facing tone, and cross-file consistency. Tank should focus on CLI/platform work.
+
+**Decision captured:** `.squad/decisions.md` — "Routing Note (Informal): Future Docs Work"
+

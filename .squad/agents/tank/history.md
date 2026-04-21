@@ -247,3 +247,40 @@ Surfaces touched: root/run/new-prompt commands, graders, eval, review, config, l
 - If main adds a new field to a shared struct, hand-port it even if paths differ. Build errors guide you to all update spots.
 - Use sed for bulk test fixes when pattern is uniform: `sed -i 's/old_pattern/new_pattern/g'`
 
+
+---
+
+## Session 2026-04-21T23:22:02Z: Main Sync and Docs Installed-Binary
+
+**Status:** COMPLETE (Part A, Part B via Neo)  
+**Branch:** ronniegeraghty/dev (commit 8bfc4da2)  
+**User request:** Pull main into dev; switch docs/ to installed-binary command form
+
+### Part A: Merge origin/main into dev
+
+**Commit:** 8bfc4da2 "Merge main into ronniegeraghty/dev: pull in 12 missing commits from main"
+
+- Resolved 9 merge conflicts independently
+- Kept dev's modern structure and call signatures
+- Result: dev 13 commits ahead of main
+- Build ✅ Tests ✅
+
+### Part B: Docs installed-binary conversion
+
+**Commit:** d111c964 "docs: switch docs/ examples to installed-binary command form"
+
+- 28 occurrences of `go run . ` → `hyoka ` in docs/getting-started.md
+- Verified no other docs files had source-dev commands
+- Rationale: docs/ is for users (installed binary), not contributors
+- Source-dev commands live in CONTRIBUTING.md
+
+### Cross-Agent Coordination
+
+Neo performed Part C: resolved PR #607 conflict by merging dev into phase-6. Tank's independent dev merge diverged from phase-6's simultaneous merge on the same 9 conflicts. Neo's resolution kept phase-6's pluggable Fetcher + context.Context threading (architectural win) while adopting dev's corrected documentation paths.
+
+**Key learning:** Multi-branch independent merges of the same upstream produce divergent resolutions. Resolution requires semantic understanding, not tool automation.
+
+See Neo's orchestration log: `.squad/orchestration-log/2026-04-21T23-22-02Z-neo.md`
+
+**Decisions captured:** `.squad/decisions.md` — docs installed-binary directive + PR #607 strategy
+
