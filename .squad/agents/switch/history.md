@@ -21,6 +21,20 @@ Agent Switch initialized as Tester for hyoka. Guardrail defaults: max turns 25, 
 
 **Key Pattern:** "Shared core" claims validated by DeepEqual on wire-format-roundtripped structs.
 
+### Phase 6 CLI Invocation Convention (2026-04-21)
+
+**Note:** As of Phase 5, main.go was moved to repo root. All test setup and example code should use:
+```bash
+go run . <command>     # ✅ CORRECT
+```
+
+NOT:
+```bash
+go run ./hyoka ...     # ❌ STALE (Phase 5 regression)
+```
+
+Oracle audited phase-6 docs and found 47 stale references — fixed in commits b5c4782c–874bedf9. Test harnesses and CI scripts should follow this convention going forward.
+
 ## Recent Sessions
 
 ## 2026-04-20: Phase 5 Review — #364 Morpheus Mock Fix (APPROVED ✅)

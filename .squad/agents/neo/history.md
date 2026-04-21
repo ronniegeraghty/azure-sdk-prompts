@@ -22,6 +22,20 @@ Agent Neo initialized as Core Engine architect. Charter: evaluation pipeline, re
 
 **Key pattern:** Wiring-layer regression tests (integration via engine.Run with stubs) are mandatory for flag-driven feature work. Unit tests alone insufficient.
 
+### Phase 6 CLI Invocation Convention (2026-04-21)
+
+**Note:** As of Phase 5, main.go was moved to repo root. All documentation should use:
+```bash
+go run . <command>     # ✅ CORRECT
+```
+
+NOT:
+```bash
+go run ./hyoka ...     # ❌ STALE
+```
+
+Oracle discovered 47 stale references during phase-6 docs audit (fixed in commits b5c4782c–874bedf9). All team members should use `go run .` going forward when writing code, tests, or documentation. This applies to examples in doc files, shell scripts, and test setup code.
+
 ## Recent Sessions
 
 

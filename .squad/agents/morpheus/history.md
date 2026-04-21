@@ -22,6 +22,20 @@ Agent Morpheus initialized as Architect for hyoka. Charter: architecture reviews
 
 **Key pattern:** Live verification gate (Playwright + manual smoke tests) gates every phase PR merge. Zero regressions caught post-deployment due to this gate.
 
+### Phase 6 CLI Invocation Convention (2026-04-21)
+
+**Note:** As of Phase 5, main.go was moved to repo root. All documentation and examples should use:
+```bash
+go run . <command>     # ✅ CORRECT
+```
+
+NOT:
+```bash
+go run ./hyoka ...     # ❌ STALE (Phase 5 regression)
+```
+
+Oracle discovered 47 stale references during phase-6 docs audit — all fixed in commits b5c4782c–874bedf9 on phase-6 branch. When writing dogfood docs or architecture notes, use `go run .` going forward.
+
 ## Recent Sessions
 
 ## 2026-04-20: Fixed #364 Test Mocks + Live Verification

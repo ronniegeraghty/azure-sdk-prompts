@@ -22,6 +22,20 @@ Agent Trinity initialized as Site / UI architect. Charter: frontend components, 
 
 **Key pattern:** URL persistence via useSearchParams; pure-function lib pattern for filter logic; Recharts integration via composition.
 
+### Phase 6 CLI Invocation Convention (2026-04-21)
+
+**Note:** As of Phase 5, main.go was moved to repo root. Any site docs that reference `hyoka` commands should use:
+```bash
+go run . <command>     # ✅ CORRECT
+```
+
+NOT:
+```bash
+go run ./hyoka ...     # ❌ STALE (Phase 5 regression)
+```
+
+Oracle found 47 stale references in phase-6 docs and fixed them (commits b5c4782c–874bedf9). When writing docs related to CLI interaction or getting-started guides, use `go run .` going forward.
+
 ## Recent Sessions
 
 ### Session 2026-04-21 (#600 — R146/R147 Run-Level Filter System)

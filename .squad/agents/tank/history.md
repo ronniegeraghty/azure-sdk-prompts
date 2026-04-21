@@ -26,6 +26,20 @@ Agent Tank initialized as Platform Dev for hyoka. Owns CLI, config, build, repor
 
 Initial setup complete. Platform is well-structured. Quick wins: fix stale path, plan main.go refactor.
 
+### Phase 6 CLI Invocation Convention (2026-04-21)
+
+**Note:** As of Phase 5, main.go was moved to repo root. All examples should use:
+```bash
+go run . <command>     # ✅ CORRECT
+```
+
+NOT:
+```bash
+go run ./hyoka ...     # ❌ STALE (Phase 5 regression)
+```
+
+Oracle audited phase-6 docs and found 47 stale references across 4 files — fixed in commits b5c4782c–874bedf9. Tank should ensure all new examples follow the `go run .` pattern in feature work, CLI help text, and test setup.
+
 ### Session 2026-04-04T00-05 (Morpheus Evolution Plan)
 
 Evolution plan assigns you Phase 0 CI pipeline (P0), main.go split, YAML prompts, session limits, .hyoka directory. Read `.squad/decisions.md` for full plan. Also assigned: config validation, duplicate detection, stale path fixes.
