@@ -855,7 +855,6 @@ configs:
     limits:
       max_turns: 10
       max_files: 20
-      max_output_size: 524288
       max_session_actions: 30
 `)
 	cfg, err := Parse(data)
@@ -871,9 +870,6 @@ configs:
 	}
 	if lim.MaxFiles != 20 {
 		t.Errorf("MaxFiles: expected 20, got %d", lim.MaxFiles)
-	}
-	if lim.MaxOutputSize != 524288 {
-		t.Errorf("MaxOutputSize: expected 524288, got %d", lim.MaxOutputSize)
 	}
 	if lim.MaxSessionActions != 30 {
 		t.Errorf("MaxSessionActions: expected 30, got %d", lim.MaxSessionActions)
@@ -919,9 +915,6 @@ configs:
 	if lim.MaxFiles != 0 {
 		t.Errorf("MaxFiles: expected 0, got %d", lim.MaxFiles)
 	}
-	if lim.MaxOutputSize != 0 {
-		t.Errorf("MaxOutputSize: expected 0, got %d", lim.MaxOutputSize)
-	}
 	if lim.MaxSessionActions != 0 {
 		t.Errorf("MaxSessionActions: expected 0, got %d", lim.MaxSessionActions)
 	}
@@ -954,22 +947,6 @@ func TestValidateRejectsNegativeMaxFiles(t *testing.T) {
 		t.Fatal("expected error for negative max_files")
 	}
 	want := `config "neg": limits.max_files must not be negative`
-	if err.Error() != want {
-		t.Errorf("got %q, want %q", err.Error(), want)
-	}
-}
-
-func TestValidateRejectsNegativeMaxOutputSize(t *testing.T) {
-	cf := &ConfigFile{
-		Configs: []ToolConfig{
-			{Name: "neg", Generator: &GeneratorConfig{Model: "gpt-4"}, Limits: &SessionLimits{MaxOutputSize: -1024}},
-		},
-	}
-	err := cf.Validate()
-	if err == nil {
-		t.Fatal("expected error for negative max_output_size")
-	}
-	want := `config "neg": limits.max_output_size must not be negative`
 	if err.Error() != want {
 		t.Errorf("got %q, want %q", err.Error(), want)
 	}

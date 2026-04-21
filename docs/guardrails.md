@@ -10,7 +10,6 @@ These limits apply per-evaluation and abort the run if exceeded:
 |-----------|---------|------|-------------|
 | Max Session Actions | 50 | `--max-session-actions` | Maximum actions (reasoning, response, or tool call) per Copilot session. |
 | Max Files | 50 | `--max-files` | Maximum files generated. Prevents agents from creating excessive output. |
-| Max Output Size | 1 MB | `--max-output-size` | Total size of all generated files. Accepts `KB`, `MB`, `GB` suffixes. |
 
 When a guardrail triggers:
 - The evaluation is marked as **failed**

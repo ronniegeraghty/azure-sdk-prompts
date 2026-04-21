@@ -37,7 +37,6 @@ expected string
 {"max-session-actions", "50"},
 {"max-turns", "0"},
 {"max-files", "50"},
-{"max-output-size", "1MB"},
 {"criteria-dir", ""},
 }
 
@@ -91,7 +90,6 @@ cmd.SilenceUsage = true
 args := []string{
 "--max-session-actions", "10",
 "--max-files", "20",
-"--max-output-size", "512KB",
 "--workers", "4",
 "--monitor-resources",
 "--strict-cleanup",
@@ -107,7 +105,6 @@ expected string
 }{
 {"max-session-actions", "10"},
 {"max-files", "20"},
-{"max-output-size", "512KB"},
 {"workers", "4"},
 }
 for _, tt := range intTests {
@@ -144,42 +141,6 @@ continue
 }
 if val != tt.expected {
 t.Errorf("flag %q: expected %v, got %v", tt.flag, tt.expected, val)
-}
-}
-}
-
-func TestParseByteSizeValid(t *testing.T) {
-tests := []struct {
-input    string
-expected int64
-}{
-{"1MB", 1048576},
-{"1mb", 1048576},
-{"512KB", 524288},
-{"512kb", 524288},
-{"100", 100},
-{"2MB", 2097152},
-{"1024KB", 1048576},
-}
-
-for _, tt := range tests {
-got, err := parseByteSize(tt.input)
-if err != nil {
-t.Errorf("parseByteSize(%q): unexpected error: %v", tt.input, err)
-continue
-}
-if got != tt.expected {
-t.Errorf("parseByteSize(%q): expected %d, got %d", tt.input, tt.expected, got)
-}
-}
-}
-
-func TestParseByteSizeInvalid(t *testing.T) {
-invalid := []string{"", "abc", "1TB", "MB"}
-for _, input := range invalid {
-_, err := parseByteSize(input)
-if err == nil {
-t.Errorf("parseByteSize(%q): expected error, got none", input)
 }
 }
 }

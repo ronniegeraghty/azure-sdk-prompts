@@ -85,7 +85,6 @@ hyoka run --config baseline --dry-run
 |------|---------|-------------|
 | `--max-turns` | 25 | Maximum assistant turns per generation |
 | `--max-files` | 50 | Maximum generated files per evaluation |
-| `--max-output-size` | 1MB | Maximum total output size (e.g., `512KB`, `2MB`) |
 | `--max-session-actions` | 50 | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
 
 #### Criteria Flags

@@ -174,7 +174,7 @@ Every evaluation session is automatically aborted if it exceeds any of these lim
 |-------|---------|------|---------|
 | Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
 | File count | 50 | `--max-files` | Prevents excessive file creation (counts new files + deleted starters) |
-| Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (counts deltas only) |
+| Output size | — | — | Removed in #566 — review no longer inlines file contents and review-side caps prevent runaway memory |
 
 Prompts can override defaults via frontmatter. Resolution order: prompt frontmatter > config YAML > CLI flag > engine default.
 

@@ -48,10 +48,9 @@ type ReviewerConfig struct {
 // SessionLimits configures per-config guardrail limits for evaluation sessions.
 // Zero values are ignored and fall back to engine-level defaults.
 type SessionLimits struct {
-	MaxTurns          int   `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
-	MaxFiles          int   `yaml:"max_files,omitempty" json:"max_files,omitempty"`
-	MaxOutputSize     int64 `yaml:"max_output_size,omitempty" json:"max_output_size,omitempty"`
-	MaxSessionActions int   `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
+	MaxTurns          int `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
+	MaxFiles          int `yaml:"max_files,omitempty" json:"max_files,omitempty"`
+	MaxSessionActions int `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
 }
 
 // ToolConfig represents a single evaluation configuration.
@@ -361,9 +360,6 @@ func (cf *ConfigFile) Validate() error {
 			}
 			if c.Limits.MaxFiles < 0 {
 				return fmt.Errorf("config %q: limits.max_files must not be negative", c.Name)
-			}
-			if c.Limits.MaxOutputSize < 0 {
-				return fmt.Errorf("config %q: limits.max_output_size must not be negative", c.Name)
 			}
 			if c.Limits.MaxSessionActions < 0 {
 				return fmt.Errorf("config %q: limits.max_session_actions must not be negative", c.Name)

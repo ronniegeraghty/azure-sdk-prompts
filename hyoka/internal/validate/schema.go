@@ -179,9 +179,6 @@ func ValidateConfigStruct(tc *config.ToolConfig) error {
 		if tc.Limits.MaxFiles < 0 {
 			errors = append(errors, "limits.max_files must be at least 0")
 		}
-		if tc.Limits.MaxOutputSize < 0 {
-			errors = append(errors, "limits.max_output_size must be at least 0")
-		}
 		if tc.Limits.MaxSessionActions < 0 {
 			errors = append(errors, "limits.max_session_actions must be at least 0")
 		}

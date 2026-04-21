@@ -198,7 +198,7 @@ hyoka run --service identity --language python \
 
 ```bash
 # Tighter limits for faster iteration
-hyoka run --max-session-actions 10 --max-files 20 --max-output-size 512KB
+hyoka run --max-session-actions 10 --max-files 20
 
 # Allow real Azure resource provisioning
 hyoka run --allow-cloud

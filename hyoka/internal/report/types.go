@@ -311,10 +311,11 @@ type EvalReport struct {
 	FailureReason      string                `json:"failure_reason,omitempty"` // human-readable explanation of failure
 	IsStub             bool                  `json:"is_stub,omitempty"`
 	RerunCommand       string                `json:"rerunCommand,omitempty"`
-	// Generator guardrails (#35)
+	// Generator guardrails (#35) — Phase 3.5 (#566) dropped the byte-size
+	// cap entirely; MaxFiles, MaxTurns, and MaxSessionActions remain as hard
+	// fails that set GuardrailAbortReason.
 	GuardrailMaxTurns          int    `json:"guardrail_max_turns,omitempty"`
 	GuardrailMaxFiles          int    `json:"guardrail_max_files,omitempty"`
-	GuardrailMaxOutputSize     int64  `json:"guardrail_max_output_size,omitempty"`
 	GuardrailMaxSessionActions int    `json:"guardrail_max_session_actions,omitempty"`
 	GuardrailAbortReason       string `json:"guardrail_abort_reason,omitempty"`
 	// Action limit soft cap — generation stopped but review proceeds with partial results
