@@ -287,3 +287,40 @@ The "approve with nits" lane is the right call when (a) acceptance criteria all 
 3. No `concurrency:` group on the workflow.
 
 All three are theoretical given current Vite output (only `index.html` + `assets/`). Worth a follow-up issue, not a blocker.
+
+## 2026-04-21 — PR #613 review (MultiSelectFilter follow-up tests)
+
+**Verdict:** ✅ APPROVE (posted as PR review comment — self-approve blocked)
+
+Trinity's follow-up to my #609 review. All four deferred gaps closed:
+- Toggle/onChange (3 tests including controlled-state Wrapper with `toHaveBeenNthCalledWith` for sequential transitions)
+- Summary branches (5 tests, all paths)
+- ARIA (`aria-expanded` dynamic toggle + `aria-selected` per option)
+- Inside-click (counterpart to outside-click, listbox stays mounted)
+
+**Quality high points:**
+- Real `userEvent.setup()` + `await user.click()` for actions under test
+- Exact-payload assertions (`toHaveBeenCalledWith(["a","b"])`)
+- `toHaveBeenNthCalledWith(1..4, …)` validates each transition, not just final state
+- `fireEvent.mouseDown` retained for outside-click — correct, matches component's `mousedown` listener
+
+**Behavioral observation validated:** Single-select renders `selected[0]` (value, not label) — confirmed in component source. Test locks current behavior with explicit `// Note:` comment. Right call as regression guard; likely worth a separate product issue (UX wants label).
+
+**Guardrails:** component untouched (single-file diff +232 LOC), 133/133 pass clean, MultiSelectFilter 3→14 as advertised.
+
+
+## 2025-01 — PR #614 review (site-embed freshness CI hardening; Morpheus, follow-up to #611)
+
+Reviewed test/CI correctness for the three nits I'd raised on #611. All three resolved cleanly:
+
+1. **`git status --porcelain`** replaces `git diff --quiet`. Verified by direct test: `touch hyoka/internal/serve/site/zzz-test-stray.txt` → porcelain emits `??` line → gate trips. Note: `make verify-embed` re-runs `site-embed` which wipes `EMBED_DIR/*`, so manually-injected strays get pruned before the check — but the realistic CI scenario (source change emits new asset filename, dev forgets to commit) does trip the gate after rebuild.
+2. **`rm -rf $(EMBED_DIR)/*`** replaces `rm -rf $(EMBED_DIR)/assets`. PR comment grounds against vite output shape.
+3. **`concurrency:`** added with standard `${{ github.workflow }}-${{ github.ref }}` + `cancel-in-progress: true`.
+
+Idempotence verified, `go build ./hyoka/...` clean, `go test -race ./hyoka/... -timeout 3m` green (20 packages). `phase-6` removed from push triggers with clear comment. Duplication comment is honest (names the cost ~1-2 min/run, explains the trade-off).
+
+**Non-blocking nit filed:** `EMBED_DIR := hyoka/internal/serve/site` is safe at parse time, but `make EMBED_DIR= site-embed` would expand to `rm -rf /*`. Suggested an `ifeq ($(strip $(EMBED_DIR)),)... $(error ...)` guard. Pre-existing risk, defer to follow-up.
+
+**Verdict:** ✅ APPROVE. Posted as `--comment` (gh refused `--approve` because PR was opened under same gh account — author/reviewer isolation hit again, same as Neo on #614). Author of record is Morpheus.
+
+**Learning:** When reviewing your own past nits, always test the ACTUAL gate semantics, not just the surface change — porcelain works, but `verify-embed`'s site-embed dependency means in-tree manual stray files get pruned before the check. The realistic CI failure mode (untracked output of a rebuild) still trips correctly.

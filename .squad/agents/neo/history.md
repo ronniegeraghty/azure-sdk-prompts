@@ -152,3 +152,20 @@ Six review follow-ups from PR #605, all in one focused commit:
 PR #611 closes #608's systemic embedded-asset-freshness item with two layers: `Makefile` (`site-install`/`site-build`/`site-embed`/`verify-embed`) + `.github/workflows/site-embed-freshness.yml` (CI gate running `make verify-embed` on site-touching PRs). Verified against `.squad/skills/embedded-asset-freshness/SKILL.md` — implements exactly the two Phase-7 candidates the skill called out (make target + CI hash-diff). `site-embed` correctly avoided a `make build` umbrella that would shadow `go build`. README:222-223 makes the target discoverable. Triggers (PR `**`, push `main`/`phase-6`/`ronniegeraghty/dev`) and paths filter both correct.
 
 Non-blocking follow-ups noted: (1) `ci.yml`'s `site-build-and-test` job already does `npm ci && npm run build` — `verify-embed` could fold in there to remove duplicate ~1-2 min of work; trade-off is losing the discrete PR status check; (2) prune `phase-6` from push triggers post-merge; (3) add `concurrency:` group.
+
+## 2026-04-21 — PR #614 architectural review (substituting for Morpheus)
+
+Reviewed Morpheus's systemic follow-up to my #611 nits: site-embed-freshness CI hardening (concurrency, untracked detection, wholesale prune, phase-6 trigger removal). Substituted on author/reviewer isolation.
+
+**Verdict:** ✅ Approve with notes (posted as `--comment` — `--approve` blocked because Ronnie's gh account = PR author from GitHub's view; verdict explicit in body).
+
+**Key calls:**
+- **Keep-the-duplication decision:** agreed. Discrete required check name ("Verify embedded site bundle is fresh") gives reviewers a louder gateable signal than burying inside `site-build-and-test`. Cost is ~1–2min parallel; documentation invites future reconsideration. Sufficient — next reviewer won't re-litigate.
+- **`git status --porcelain` vs `git diff --quiet`:** strictly more correct (catches untracked new asset filenames from vite content-hashing). Residual gap: `.gitignore`'d files in EMBED_DIR are invisible to both old and new check — combined with `//go:embed all:site` (the `all:` prefix embeds dotfiles/underscore-files), a gitignored file would silently ship. Pre-existing, not a regression. Defense-in-depth fix would be `--ignored` flag, but not worth it now.
+- **`rm -rf $(EMBED_DIR)/*`:** aligned with skill intent. Wholesale prune handles future vite outputs (favicons/manifests) without Makefile edits. Assumption (no hand-maintained files in EMBED_DIR) is verifiable from tree and load-bearing-explicit in comment.
+- **Push triggers (`main` + `ronniegeraghty/dev`):** correct for now. Inline comment self-explains the phase-6 removal and the future-pruning pattern.
+- **Concurrency key (`workflow-ref`):** correctly disambiguates PR runs (unique `refs/pull/N/merge`) from branch pushes (`refs/heads/<branch>`); cross-PR isolation preserved; cancel-in-progress correctly limited to same-ref pushes.
+
+**Follow-up I named (non-blocking):** the embedded-asset-freshness skill's "refresh procedure" prose (~line 57) is now stale — points at manual `rm -rf assets && cp -r` instead of `make site-embed`/`make verify-embed`. Hygiene PR for someone, separate from this.
+
+**Pattern reinforced:** when a reviewer flags 3 nits and the author addresses 2 plus documents the third's tradeoff in-source, that's the right shape — don't relitigate the documented one unless a new fact emerges. The cost of the duplication (~2min CI minutes per site PR) is real but bounded; the signal-clarity benefit (named required check) is durable.

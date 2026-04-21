@@ -348,3 +348,45 @@ PR #611 → phase-6. Closes #608. Systemic follow-up to the #607 rollup catch.
 Test-only PR adding 3 vitest cases to `site/src/__tests__/multi-select-filter.test.tsx`: outside-mousedown close, Escape close, empty-options rendering. Tests respect the controlled-primitive boundary (`selected`/`onChange` props), don't leak into URL persistence concerns (correctly owned by run-filters.ts per D-2026-04-21), and use accessible-name selectors that lock in the a11y contract (`aria-haspopup`/`aria-expanded`/`aria-label`).
 
 Notable: `fireEvent.mouseDown` (not click) deliberately matches the component's `mousedown` document listener, with explanatory comment — prevents future regressions where someone "fixes" a test by switching to userEvent.click and silently breaks outside-click. Patterns established here (role+aria-label queries, match listener event types, first-class empty-state assertions) are the right defaults for future filter components — no fight expected when Compare-page filter bar reuses this primitive in Phase 6.
+
+## 2026-04-22 — PR #613 Architectural Review (Trinity, MultiSelectFilter follow-up tests)
+
+**Verdict:** ⚠️ APPROVE WITH NOTES (posted as comment — gh blocked self-approval since Ronnie is PR author).
+
+**Scope:** 232-line test-only addition (`site/src/__tests__/multi-select-filter.test.tsx`), +11 tests covering the four deferred gaps: toggle/onChange, summary text, ARIA, inside-click. Component untouched. 133/133 green locally (`npm test -- --run` → 3.28s).
+
+**Architectural findings:**
+
+1. **Controlled-primitive boundary (D-2026-04-21) reinforced.** Tests touch the `(selected, onChange)` contract only — no `useSearchParams`, no router, no serialization. The `Wrapper` test (local `useState`) mirrors how `<FilterBar>` in `runs-page.tsx` actually wires the primitive. URL persistence stays exclusively in `run-filters.ts`. The boundary is now load-bearing in the test suite — a regression that smuggled URL state into the component would break these tests for the right reason.
+
+2. **Value-vs-label observation is a real UX bug, not architecture.** Confirmed at `multi-select-filter.tsx:57`: `selected.length === 1 ? selected[0] : ...` renders the raw value, inconsistent with the option list (line 110, uses `opt.label`) and with the multi-selected branch. Trinity made the right call locking in current behavior with a comment rather than silently fixing in a tests-only PR. **Recommended Trinity file a separate issue** — fix is one line (`options.find(o => o.value === selected[0])?.label ?? selected[0]`) but deserves its own PR + visual confirmation.
+
+3. **PR #609 patterns held.** Accessible-role queries (`getByRole("button"|"listbox"|"option")`), event-type-matched listener tests (`mousedown` for outside-click, `keyDown` on document for Escape), attribute-based ARIA assertions. The `Wrapper` idiom for multi-toggle is new but appropriate — tests real consumer wiring vs. asserting onChange args in isolation.
+
+4. **Compare-page scalability confirmed.** Property-based test surface = portable. Compare-page filter bar can swap `OPTIONS`/`label`, reuse the `Wrapper` template. Test cost per new consumer is near-zero.
+
+**Pattern to remember:** When a test PR locks in current behavior that the author flagged as suspect, the architectural correctness is *separating* the lock-in from the fix. Trinity's inline comment ("Note: the component renders selected[0] (the value), not the label.") is the audit trail. This is the right discipline — a tests-only PR should never silently change behavior.
+
+## 2026-04-21 — PR #614 (authored): site-embed freshness CI hardening
+
+**Branch:** issue-608 follow-up worktree → **PR #614** (target `phase-6`, squash-merged at `e0b72c63`)
+
+Systemic follow-up to my own PR #611 addressing all three of Neo's nits + the duplicate-work question. Two-file diff: `Makefile` + `.github/workflows/site-embed-freshness.yml`.
+
+**Changes:**
+1. **`git status --porcelain` replaces `git diff --quiet`** in `verify-embed`. Catches new untracked asset filenames (the realistic scenario: vite content-hashing emits `assets/index-<hash>.js` with a fresh name on rebuild, and the dev forgets to `git add`).
+2. **`rm -rf $(EMBED_DIR)/*` replaces `rm -rf $(EMBED_DIR)/assets`** in `site-embed`. Wholesale prune handles future vite outputs (favicons, manifests) without Makefile edits. Assumption ("no hand-maintained files in EMBED_DIR") is verifiable from tree and load-bearing-explicit in comment.
+3. **`concurrency:` group** added on `site-embed-freshness.yml` — `${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`. Standard pattern; correctly disambiguates PR runs (unique `refs/pull/N/merge`) from branch pushes.
+4. **`phase-6` removed from push triggers** with self-explanatory inline comment naming the future-pruning pattern.
+
+**Duplicate-work decision (with Neo):** Kept `verify-embed` discrete from `site-build-and-test` rather than fold them. Cost ~1–2 min/run is real but bounded; named-required-check signal-clarity ("Verify embedded site bundle is fresh") gives reviewers a louder gateable signal than burying inside a generic build job. Trade documented in PR body and in-source so the next reviewer doesn't re-litigate.
+
+**Reviews:**
+- Switch (test): ✅ APPROVE — verified porcelain catches the realistic CI failure mode; idempotence confirmed; `go build ./hyoka/...` clean; `go test -race ./hyoka/...` green across 20 packages.
+- Neo (arch, subbing for me on author-isolation): ⚠️ APPROVE WITH NOTES — concurrency key correctness validated; `--ignored` blind-spot named (N4 in resolved decision); skill-prose-stale named (N3).
+
+**Author-isolation hit again:** gh `--approve` blocked because Ronnie's gh account = PR author from GitHub's view. Both reviews posted as `--comment` with verdict explicit in body. Same isolation pattern as Neo on #611.
+
+**Non-blocking nits filed as N2/N3/N4** in `2026-04-21-phase6-polish-nits-resolved.md`: Makefile `EMBED_DIR` empty-string guard (Switch), skill prose stale (Neo), `.gitignore` blind spot (Neo). N2 + N4 are pre-existing risks #614 made visible but did NOT introduce.
+
+**Pattern reinforced:** When a reviewer flags 3 nits and you address 2 plus document the third's tradeoff in-source, that's the right shape. Don't relitigate the documented one unless a new fact emerges.

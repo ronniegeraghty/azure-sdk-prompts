@@ -69,3 +69,23 @@ Added three `MultiSelectFilter` component tests flagged by Switch on PR #604:
 122/122 site tests green. No production code changes.
 
 **Note:** `site/node_modules` did not exist in the worktree; `npm install` required before first test run. Normal for fresh worktrees.
+
+### Session 2026-04-21 (#608 Round 3 — PR #613 — MultiSelectFilter follow-up tests)
+
+**Branch:** issue-608 follow-up worktree → **PR #613** (target `phase-6`, squash-merged at `d05855df`)
+
+Closed all four deferred test gaps Switch flagged on PR #609. Test-only diff, +232 LOC in `site/src/__tests__/multi-select-filter.test.tsx`, +11 tests (122 → 133 site total, all green in 3.28s).
+
+**Coverage added:**
+- **Toggle / onChange (3 tests):** Real `userEvent.setup()` + `await user.click()`. Controlled-state `Wrapper` (local `useState`) mirrors how `<FilterBar>` in `runs-page.tsx` actually wires the primitive. `toHaveBeenNthCalledWith(1..4, …)` validates each transition, not just final state. Exact-payload assertions (`toHaveBeenCalledWith(["a","b"])`).
+- **Summary text (5 tests):** All branches — empty (renders placeholder), single, two, multi-overflow ("+N more").
+- **ARIA (2 tests):** `aria-expanded` toggles dynamically open/closed; `aria-selected` per `option`.
+- **Inside-click (1 test):** Counterpart to #609's outside-click — listbox stays mounted on inside-click. Component untouched.
+
+**Behavioral lock-in (deliberate, not a bug-introduction):** Single-select summary at `multi-select-filter.tsx:57` renders `selected[0]` (the raw value, e.g. `"a"`), NOT the matching `opt.label`. Inconsistent with the option list and the multi-selected branch. **Test asserts current behavior with an explicit `// Note:` comment** rather than silently fixing in a tests-only PR. Filed as N1 in `2026-04-21-phase6-polish-nits-resolved.md` — own this as a separate one-line product PR with visual confirmation.
+
+**Reviews:**
+- Switch (test): ✅ APPROVE — confirmed real userEvent, exact-payload assertions, sequential-transition validation, mouseDown retained for outside-click.
+- Morpheus (arch): ⚠️ APPROVE WITH NOTES — controlled-primitive boundary (D-2026-04-21) reinforced; Wrapper idiom appropriate; pattern portable to Compare-page filter bar at near-zero per-consumer cost.
+
+**Pattern reinforced:** A tests-only PR should never silently change behavior. Locking in suspect behavior with an inline `// Note:` is the audit trail; the fix goes in a separate PR.
