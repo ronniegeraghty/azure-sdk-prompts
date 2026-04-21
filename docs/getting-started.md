@@ -42,7 +42,7 @@ go run . version
 
 Expected output:
 ```
-hyoka version 0.2.0
+hyoka version dev
 ```
 
 Check your environment:

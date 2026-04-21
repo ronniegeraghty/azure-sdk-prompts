@@ -163,7 +163,9 @@ hyoka tools
 hyoka plugins
 ```
 
-### `hyoka configs`
+### `hyoka configs` (deprecated)
+
+**Deprecated:** Use `hyoka list` instead, which shows configs alongside prompts and criteria.
 
 List and describe available configurations.
 
