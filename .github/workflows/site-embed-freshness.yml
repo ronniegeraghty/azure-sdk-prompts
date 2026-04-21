@@ -1,0 +1,44 @@
+name: Site Embed Freshness
+
+# Enforces that hyoka/internal/serve/site/ (the go:embed'd bundle) is kept
+# in sync with site/src/**. Rebuilds the site on the PR branch and fails if
+# the committed embedded tree differs from a fresh build.
+#
+# See .squad/skills/embedded-asset-freshness/SKILL.md.
+
+on:
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'site/**'
+      - 'hyoka/internal/serve/site/**'
+      - 'hyoka/internal/serve/embed.go'
+      - 'Makefile'
+      - '.github/workflows/site-embed-freshness.yml'
+  push:
+    branches:
+      - main
+      - phase-6
+      - ronniegeraghty/dev
+
+jobs:
+  verify-embedded-bundle:
+    name: Verify embedded site bundle is fresh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        run: make site-install
+
+      - name: Verify embedded bundle matches fresh build
+        run: make verify-embed
