@@ -45,14 +45,14 @@ go build ./hyoka/...
 go test ./hyoka/...
 
 # Run the CLI
-go run ./hyoka <command>
+go run . <command>
 
 # Common commands
-go run ./hyoka list
-go run ./hyoka run --all-configs
-go run ./hyoka validate
-go run ./hyoka check-env
-go run ./hyoka clean
+go run . list
+go run . run --all-configs
+go run . validate
+go run . check-env
+go run . clean
 ```
 
 Go version: 1.26.1+ required. Module path: `github.com/ronniegeraghty/hyoka`.
@@ -67,7 +67,7 @@ To discover available configs:
 
 ```bash
 # List all available configs
-go run ./hyoka configs
+go run . configs
 
 # Or inspect the configs directory directly
 ls configs/ | grep -E '\.ya?ml$'
@@ -88,15 +88,15 @@ Example: `configs/azure-mcp-opus.yaml` contains `name: azure-mcp/claude-opus-4.6
 
 ```bash
 # Single prompt, single config:
-go run ./hyoka run --prompt-id identity-dp-python-default-credential \
+go run . run --prompt-id identity-dp-python-default-credential \
   --config baseline/claude-opus-4.6
 
 # Single prompt, multiple configs (MUST quote comma-separated values):
-go run ./hyoka run --prompt-id identity-dp-python-default-credential \
+go run . run --prompt-id identity-dp-python-default-credential \
   --config "baseline/claude-opus-4.6,azure-mcp/claude-opus-4.6"
 
 # Filter by service + language (runs ALL matching prompts):
-go run ./hyoka run --service key-vault --language python \
+go run . run --service key-vault --language python \
   --config "baseline/claude-opus-4.6,azure-mcp/claude-opus-4.6"
 
 # Full debug logging with log file:

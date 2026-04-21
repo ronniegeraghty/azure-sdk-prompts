@@ -37,7 +37,7 @@ The repo uses a `go.work` file, so all commands run from the repo root — no ne
 Verify the setup:
 
 ```bash
-go run ./hyoka version
+go run . version
 ```
 
 Expected output:
@@ -48,7 +48,7 @@ hyoka version 0.2.0
 Check your environment:
 
 ```bash
-go run ./hyoka check-env
+go run . check-env
 ```
 
 This reports which language toolchains and tools are available.
@@ -57,13 +57,13 @@ This reports which language toolchains and tools are available.
 
 ```bash
 # List all prompts
-go run ./hyoka list
+go run . list
 
 # Filter by service
-go run ./hyoka list --service storage
+go run . list --service storage
 
 # JSON output (for scripting)
-go run ./hyoka list --json
+go run . list --json
 ```
 
 Expected output:
@@ -80,7 +80,7 @@ Found 79 prompt(s):
 Start with a single prompt to keep it quick:
 
 ```bash
-go run ./hyoka run \
+go run . run \
   --prompt-id storage-dp-dotnet-auth \
   --config baseline
 ```
@@ -88,7 +88,7 @@ go run ./hyoka run \
 Or use **stub mode** to test the pipeline without Copilot:
 
 ```bash
-go run ./hyoka run \
+go run . run \
   --prompt-id storage-dp-dotnet-auth \
   --stub
 ```
@@ -119,7 +119,7 @@ Reports are generated in `reports/<run-id>/`:
 
 ```bash
 # Browse reports in the web dashboard
-go run ./hyoka serve
+go run . serve
 
 # Or view the JSON summary directly
 cat reports/<run-id>/summary.json | python3 -m json.tool
@@ -139,7 +139,7 @@ Individual reports at `reports/<run-id>/results/.../report.json` contain the ful
 After multiple runs, generate trend reports:
 
 ```bash
-go run ./hyoka trends
+go run . trends
 ```
 
 This scans all past runs and produces:
@@ -151,7 +151,7 @@ This scans all past runs and produces:
 Open the trend report:
 
 ```bash
-go run ./hyoka trends --open
+go run . trends --open
 ```
 
 ## 6. Create a New Prompt
@@ -159,7 +159,7 @@ go run ./hyoka trends --open
 Use the interactive scaffolder:
 
 ```bash
-go run ./hyoka new-prompt
+go run . new-prompt
 ```
 
 Or copy the template manually:
@@ -172,7 +172,7 @@ cp templates/prompt-template.prompt.md \
 Validate after editing:
 
 ```bash
-go run ./hyoka validate
+go run . validate
 ```
 
 ## Common Workflows
@@ -181,23 +181,23 @@ go run ./hyoka validate
 
 ```bash
 # All prompts × all configs (requires --all-configs since multiple configs exist)
-go run ./hyoka run --all-configs
+go run . run --all-configs
 
 # Skip confirmation prompt for CI
-go run ./hyoka run --all-configs -y
+go run . run --all-configs -y
 ```
 
 ### Run with specific configs
 
 ```bash
 # Just baseline
-go run ./hyoka run --config baseline
+go run . run --config baseline
 
 # Both configs for one service
-go run ./hyoka run --service storage
+go run . run --service storage
 
 # Run with multiple configs (compare baseline vs azure-mcp):
-go run ./hyoka run --service identity --language python \
+go run . run --service identity --language python \
   --config "baseline/claude-opus-4.6,azure-mcp/claude-opus-4.6" \
   --log-level debug --log-file hyoka-debug.log
 ```
@@ -208,42 +208,42 @@ go run ./hyoka run --service identity --language python \
 
 ```bash
 # Tighter limits for faster iteration
-go run ./hyoka run --max-session-actions 10 --max-files 20 --max-output-size 512KB
+go run . run --max-session-actions 10 --max-files 20 --max-output-size 512KB
 
 # Allow real Azure resource provisioning
-go run ./hyoka run --allow-cloud
+go run . run --allow-cloud
 
 # Limit concurrent sessions on a shared machine
-go run ./hyoka run --max-sessions 4 --workers 2
+go run . run --max-sessions 4 --workers 2
 ```
 
 ### Useful Flag Combos
 
 ```bash
 # Debug + log file (keeps terminal clean, logs to file)
-go run ./hyoka run --config baseline --log-level debug --log-file hyoka-debug.log
+go run . run --config baseline --log-level debug --log-file hyoka-debug.log
 
 # Monitor resource usage during evaluation
-go run ./hyoka run --config baseline --monitor-resources
+go run . run --config baseline --monitor-resources
 
 # Skip review for quick generation iteration
-go run ./hyoka run --config baseline --skip-review
+go run . run --config baseline --skip-review
 
 # Dry run to preview what would be evaluated
-go run ./hyoka run --service storage --dry-run
+go run . run --service storage --dry-run
 ```
 
 ### Re-render reports after template changes
 
 ```bash
-go run ./hyoka report --all
+go run . report --all
 ```
 
 ### Skip AI analysis for faster iteration
 
 ```bash
-go run ./hyoka run --skip-trends
-go run ./hyoka trends --no-analyze
+go run . run --skip-trends
+go run . trends --no-analyze
 ```
 
 ## Guardrails & Safety
@@ -284,7 +284,7 @@ If `validate` or `run` finds zero prompts, it scans for near-miss filenames and 
 Start the built-in report viewer:
 
 ```bash
-go run ./hyoka serve
+go run . serve
 ```
 
 This launches a local web server at `http://localhost:8080` with a dashboard for browsing all evaluation runs and their reports.

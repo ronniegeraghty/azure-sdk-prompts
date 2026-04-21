@@ -22,7 +22,7 @@ go mod download
 go build ./hyoka/...
 
 # Run the CLI
-go run ./hyoka <command>
+go run . <command>
 ```
 
 ## Running tests
@@ -67,7 +67,7 @@ go fmt ./hyoka/...
 For the fastest feedback loop, run a single prompt against a single config:
 
 ```bash
-go run ./hyoka run --prompt-id key-vault-dp-python-crud \
+go run . run --prompt-id key-vault-dp-python-crud \
   --config baseline/claude-opus-4.6 \
   --log-level debug --log-file hyoka-debug.log
 ```
@@ -75,13 +75,13 @@ go run ./hyoka run --prompt-id key-vault-dp-python-crud \
 Python prompts finish quickest (5–10 minutes). After each run, clean up orphaned sessions:
 
 ```bash
-go run ./hyoka clean
+go run . clean
 ```
 
 Browse results locally:
 
 ```bash
-go run ./hyoka serve
+go run . serve
 # Open http://localhost:8080
 ```
 

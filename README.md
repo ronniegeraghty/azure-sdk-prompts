@@ -13,7 +13,7 @@
 ```bash
 git clone https://github.com/ronniegeraghty/hyoka.git
 cd hyoka
-go run ./hyoka list  # Verify installation
+go run . list  # Verify installation
 ```
 
 **Install as a CLI:**
@@ -29,15 +29,15 @@ Run your first evaluation in under 5 minutes:
 
 ```bash
 # 1. List available prompts
-go run ./hyoka list --service key-vault --language python
+go run . list --service key-vault --language python
 
 # 2. Run a single evaluation
-go run ./hyoka run \
+go run . run \
   --prompt-id key-vault-dp-python-crud \
   --config baseline/claude-opus-4.6
 
 # 3. View results in your browser
-go run ./hyoka serve
+go run . serve
 # Open http://localhost:8080
 ```
 
@@ -223,7 +223,7 @@ cd site && npm test
 make site-embed
 
 # Test with a live eval (fastest feedback)
-go run ./hyoka run --prompt-id key-vault-dp-python-crud \
+go run . run --prompt-id key-vault-dp-python-crud \
   --config baseline/claude-opus-4.6
 ```
 
