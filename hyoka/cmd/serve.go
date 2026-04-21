@@ -30,8 +30,13 @@ func serveCmd() *cobra.Command {
 			}
 			docsDir = resolvePathFlag(cmd, "docs-dir",
 				config.ResolveCandidates(proj, "docs", "./docs", "../docs"))
+			// Honor a config-driven prompt_directory override (#598). Best
+			// effort: use Peek so a malformed config doesn't break `serve`.
+			configDir := resolvePathFlag(cmd, "config-dir",
+				config.ResolveCandidates(proj, "configs", "./configs", "../configs"))
+			configPromptDir := config.PeekPromptDirectory(configDir)
 			promptsDir = resolvePathFlag(cmd, "prompts",
-				config.ResolveCandidates(proj, "prompts", "./prompts", "../prompts"))
+				config.ResolvePromptDirCandidates(proj, configPromptDir))
 
 			fmt.Printf("Listening on http://localhost:%d\n", port)
 			return serve.Start(serve.Options{

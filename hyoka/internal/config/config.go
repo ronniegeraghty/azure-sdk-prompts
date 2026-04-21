@@ -156,7 +156,12 @@ func (tc *ToolConfig) EffectiveGeneratorSkills() []ToolEntry {
 
 // ConfigFile represents the top-level config file structure.
 type ConfigFile struct {
-	Configs []ToolConfig `yaml:"configs"`
+	// PromptDirectory is an optional path that overrides the default prompt
+	// discovery (.hyoka/prompts → ./prompts → ../prompts). When set in a
+	// config YAML loaded from disk, relative paths are resolved against the
+	// containing config file's directory by Load/LoadDir.
+	PromptDirectory string       `yaml:"prompt_directory,omitempty" json:"prompt_directory,omitempty"`
+	Configs         []ToolConfig `yaml:"configs"`
 }
 
 // Load reads and parses a configuration file from the given path.
@@ -176,6 +181,11 @@ func Load(path string) (*ConfigFile, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	// Resolve a relative prompt_directory against the config file's directory
+	// so a config that sits under .hyoka/configs/ can reference ../my-prompts.
+	if cfg.PromptDirectory != "" && !filepath.IsAbs(cfg.PromptDirectory) {
+		cfg.PromptDirectory = filepath.Join(filepath.Dir(path), cfg.PromptDirectory)
+	}
 	return cfg, nil
 }
 
@@ -190,6 +200,7 @@ func LoadDir(dir string) (*ConfigFile, error) {
 
 	merged := &ConfigFile{}
 	nameSource := make(map[string]string) // config name → source filename
+	var promptDirSource string             // filename that first set prompt_directory
 	for _, e := range entries {
 		if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
 			continue
@@ -197,6 +208,18 @@ func LoadDir(dir string) (*ConfigFile, error) {
 		cf, err := Load(filepath.Join(dir, e.Name()))
 		if err != nil {
 			return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
+		}
+		if cf.PromptDirectory != "" {
+			if merged.PromptDirectory == "" {
+				merged.PromptDirectory = cf.PromptDirectory
+				promptDirSource = e.Name()
+			} else if merged.PromptDirectory != cf.PromptDirectory {
+				return nil, fmt.Errorf(
+					"conflicting prompt_directory: %q in %s vs %q in %s",
+					merged.PromptDirectory, promptDirSource,
+					cf.PromptDirectory, e.Name(),
+				)
+			}
 		}
 		for _, c := range cf.Configs {
 			if prev, ok := nameSource[c.Name]; ok {

@@ -160,13 +160,14 @@ func runCmd() *cobra.Command {
 			}
 
 			// Resolve all paths first, before any loading
-			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
 			f.criteriaDir = resolveCriteriaDir(cmd)
 			f.configFile = resolveConfigFile(cmd)
 			configDir := resolveConfigDir(cmd)
 
-			// Load config(s)
+			// Load config(s) before resolving the prompts directory so that a
+			// config-driven `prompt_directory:` override can take precedence
+			// over the default .hyoka/prompts/ → ./prompts fallback.
 			var cfgFile *config.ConfigFile
 			if cmd.Flags().Changed("config-file") {
 				var err error
@@ -181,6 +182,8 @@ func runCmd() *cobra.Command {
 					return fmt.Errorf("loading configs from %s: %w", configDir, err)
 				}
 			}
+
+			f.prompts = resolvePromptsDirWithConfig(cmd, cfgFile.PromptDirectory)
 
 			// ── Load all resources ──────────────────────────────────
 			// Get selected configs

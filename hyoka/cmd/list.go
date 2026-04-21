@@ -22,7 +22,20 @@ func listCmd() *cobra.Command {
 		Short:   "List prompts, configs, and criteria",
 		Long:    "List prompts matching the given filters alongside available configs and criteria.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f.prompts = resolvePromptsDir(cmd)
+			// Honor a config-driven prompt_directory override (#598). Load
+			// configs first so the override is available when resolving the
+			// prompts directory; fall back to the standard chain on errors.
+			configDir := resolveConfigDir(cmd)
+			var configs []config.ToolConfig
+			var configPromptDir string
+			if cfgFile, err := config.LoadDir(configDir); err == nil {
+				configs = cfgFile.Configs
+				configPromptDir = cfgFile.PromptDirectory
+			} else {
+				configPromptDir = config.PeekPromptDirectory(configDir)
+			}
+
+			f.prompts = resolvePromptsDirWithConfig(cmd, configPromptDir)
 
 			prompts, err := prompt.LoadPrompts(f.prompts)
 			if err != nil {
@@ -31,13 +44,6 @@ func listCmd() *cobra.Command {
 
 			filter := buildFilter(f)
 			filtered := prompt.FilterPrompts(prompts, filter)
-
-			// Load configs
-			configDir := resolveConfigDir(cmd)
-			var configs []config.ToolConfig
-			if cfgFile, err := config.LoadDir(configDir); err == nil {
-				configs = cfgFile.Configs
-			}
 
 			// Load criteria
 			baseDir := filepath.Dir(f.prompts)
