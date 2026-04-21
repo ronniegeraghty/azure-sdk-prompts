@@ -283,3 +283,17 @@ Implemented all requirements from R155 (docs page observations) for Phase 5 on b
 - **Empty-state messaging deserves design time.** Five distinct edge cases: 0 groups, 1 group, all-empty, partial-empty, uneven counts. Each gets its own banner with appropriate severity color (sky / amber / grey). This is the difference between a tool that "works" and one users trust.
 - **Skill captured:** `.squad/skills/group-based-comparison-ui/SKILL.md` documents the pattern for any future N-way comparison UI in this codebase.
 - **Decision filed:** `.squad/decisions/inbox/trinity-issue-365-compare.md` for Scribe.
+
+### Session 2026-04-21 (#600 — R146/R147 Run-Level Filter System)
+
+Built the filter UI for the runs page. PR targets `phase-6` from worktree `hyoka-600`.
+
+- **Run-level filtering, not eval-level.** The runs page lists runs; flattening it into eval cards would change its identity. So a run matches when each active filter dimension finds at least one matching eval inside it. The run-detail page still does its own per-eval filtering — that's the right surface for that.
+- **Filter semantics inherited from `group-based-comparison-ui`.** OR within a dimension, AND across dimensions, empty = match-all. Documenting this once in the skill saves re-litigating it per page.
+- **Status precedence: errors > failing > passing.** A run with both errors and failures is `errors` only. This avoids double-counting in the Status filter and matches how users think ("show me the broken runs").
+- **URL is the source of truth, not React state.** `useSearchParams` + `setSearchParams(..., { replace: true })` so reload/share both work and history doesn't fill up with intermediate filter states. Keys: `config`, `lang`, `status` (comma-joined).
+- **Reusable `MultiSelectFilter` primitive** at `components/ui/multi-select-filter.tsx` — outside-click + Escape close, ARIA listbox roles, "N selected" summary when >1. Other pages (prompts, dashboard) can adopt without copying state machinery.
+- **Pure-function lib pattern again.** All matching logic in `lib/run-filters.ts`. 16 lib tests + extended runs-page DOM tests = 25 total new tests. Lib tests run in milliseconds with no React tree.
+- **Catalog built from real data.** `buildCatalog` walks every run's `results[]` and only surfaces statuses that actually appear. No phantom filter chips.
+- **Tests gotcha:** When asserting filter results in the DOM, the timestamp text (`Mar 28, 2026`) is the most stable identifier per card — `run_id` doesn't appear in the run card UI.
+- **Decision filed:** `.squad/decisions/inbox/trinity-issue-600-filters.md`.
