@@ -2710,3 +2710,79 @@ Removed code-generation-specific framing from CLI help text and Go doc comments 
 - NO test changes
 
 ---
+
+### Decision: Phase 6 Rollup — PR #607 Final Architectural Review (2026-04-21)
+
+**Author:** Morpheus 🕶️  
+**Date:** 2026-04-21  
+**PR:** #607 (phase-6 → ronniegeraghty/dev)  
+**Status:** ✅ APPROVE  
+**Review Posted:** https://github.com/ronniegeraghty/hyoka/pull/607#pullrequestreview  
+
+**Scope:** Final architectural gate for Phase 6 rollup — integration of all six stretch-goal PRs:
+- Comparison UI (#601)
+- Prompt directory config (#602)
+- Review session splitting (#603)
+- Filter system (#604)
+- Tool versioning (#605)
+- Group frontmatter (#606)
+
+**Module Boundary Integrity:**
+All six features integrate cleanly to their natural layers. No cross-contamination, no architectural violations.
+- Comparison UI → `site/` components
+- Prompt config → `config/` loading
+- Review session splitting → `criteria/buckets.go` + `review/buckets.go`
+- Filters → `site/` filters + URL state
+- Tool versioning → `config/tool/` fetcher abstraction
+- Group frontmatter → `prompt/` parser + validation
+
+**Isolation Design Soundness:**
+`criteria/buckets.go` + `review/buckets.go` pairing honors single-responsibility:
+- `criteria/` slices work into buckets
+- `review/` executes bucket slices
+- `MultiBucketReviewer` interface keeps engine decoupled
+
+**Go Conventions Compliance:**
+- Error wrapping: all new `fmt.Errorf` calls use `%w`
+- Logging: slog-only discipline held (zero `log.Printf`/`log.Print` in `internal/`)
+- Package boundaries: no circular deps, correct interface flow
+
+**Test Coverage:**
+- +2092 test lines (~26% of 7852-line changeset)
+- 1712 Go test functions total
+- 133 site tests (up from 122)
+- `go test -race ./hyoka/...` all 24 packages pass
+
+**Key Advancement: Observable Wiring Tests Pattern**
+PRs #603 and #605 established anti-#587-trap discipline:
+1. Register real mocks against real registries
+2. Invoke real entry points with flag variations
+3. Assert on internal call counts + payload propagation
+
+Prevents "config parses but never executes" class regressions. Pattern documented in `.squad/skills/observable-wiring-tests/` for team reuse.
+
+**Embed Pipeline Integrity:**
+PR #614 (round 3) hardened site-embed CI gate:
+- `git status --porcelain` catches untracked files
+- `rm -rf $(EMBED_DIR)/*` wholesale prune
+- Concurrency guards prevent race conditions
+- Verified: embedded bundle matches source
+
+**Residual Nits (N1–N4) — Non-Blocking:**
+- N1: UX bug with clear fix, owned by Trinity
+- N2: Pre-existing Makefile risk, not introduced by Phase 6
+- N3: Doc hygiene, no runtime impact
+- N4: Pre-existing `.gitignore` edge case, optional
+
+Blocker status: **None.**
+
+**Review Stats:**
+- Files changed: 78 (+7852/-2210)
+- Build: `go build ./hyoka/...` ✅
+- Tests: all pass ✅
+- Race: clean ✅
+
+**Verdict:**
+✅ **APPROVE** — Phase 6 is architecturally sound. Module boundaries clean, Go conventions held, test coverage strong (26%), embed pipeline production-grade. Observable-wiring-tests pattern is a Phase 6 win preventing #587-class regressions.
+
+---
