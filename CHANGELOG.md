@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Review session bucketing (Phase 6)** — reviewers now organize results by criteria buckets for improved multi-criterion grading
 - **Embedded asset freshness policy** — site/dist must be rebuilt and committed whenever site/src changes
 - **Installed-binary documentation form** — all documentation updated to use `hyoka` command form instead of `go run` for clarity
+- **Post-architecture examples audit (WI-058)** — new examples demonstrating hierarchical `when:` syntax, prompt-level `graders:` frontmatter, and overall examples documentation (examples/README.md)
 
 ### Changed
 
