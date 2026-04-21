@@ -7,7 +7,9 @@ graders:
       Cargo.toml uses official azure_* crates (azure_core, azure_identity,
       azure_storage_blob, azure_key_vault_secrets, azure_cosmos, etc.)
       published by the Azure SDK team. Must NOT use unofficial legacy
-      crates such as azure_storage_blobs (plural).
+      crates such as azure_storage_blobs (plural) or azure_storage. In general,
+      the crates beginning with the azure_ prefix at version 0.21.0 should never 
+      be used because they are obsolete.
   - name: TokenCredential Authentication
     weight: 1.0
     prompt: >
@@ -93,8 +95,9 @@ graders:
       Code follows Rust naming conventions: snake_case for functions
       and variables, CamelCase for types and traits,
       SCREAMING_SNAKE_CASE for constants. Uses use statements for
-      imports rather than fully-qualified inline paths. Code is
-      organized into functions, not a single monolithic main().
+      imports rather than fully-qualified inline paths.
+      Code is formatted with rustfmt and all clippy lint errors and warnings
+      are addressed.
   - name: Ownership and Borrowing
     weight: 1.0
     prompt: >
@@ -108,7 +111,4 @@ graders:
     prompt: >
       Code does not contain hardcoded secrets, API keys, connection
       strings, or credentials. Sensitive values like endpoints are
-      read from environment variables or configuration. No PII is
-      leaked through Debug implementations; SafeDebug from azure_core
-      is preferred over derive(Debug) for types containing sensitive
-      data.
+      read from environment variables or configuration.
