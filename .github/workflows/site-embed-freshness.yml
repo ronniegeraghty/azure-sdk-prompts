@@ -5,6 +5,14 @@ name: Site Embed Freshness
 # the committed embedded tree differs from a fresh build.
 #
 # See .squad/skills/embedded-asset-freshness/SKILL.md.
+#
+# Deliberate duplication note: this workflow's `npm ci && npm run build`
+# overlaps with ci.yml's `site-build-and-test` job (~1–2 min/run). The
+# duplication is intentional — keeping freshness as a discrete required
+# check gives a clear, named status on PRs ("Verify embedded site bundle is
+# fresh") that reviewers can gate on without reading into a generic site
+# CI job. Reconsider folding into ci.yml only if CI minute pressure
+# materially outweighs the signal clarity.
 
 on:
   pull_request:
@@ -17,10 +25,16 @@ on:
       - 'Makefile'
       - '.github/workflows/site-embed-freshness.yml'
   push:
+    # phase-6 was a temporary integration branch and was removed once it
+    # merged into ronniegeraghty/dev. Add it back only if a similar
+    # short-lived integration line is reopened.
     branches:
       - main
-      - phase-6
       - ronniegeraghty/dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify-embedded-bundle:
