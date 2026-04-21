@@ -19,6 +19,13 @@ MaxTurns          int               `yaml:"max_turns" json:"max_turns,omitempty"
 ExpectedPkgs      []string          `yaml:"expected_packages" json:"expected_packages,omitempty"`
 ExpectedTools     []string          `yaml:"expected_tools" json:"expected_tools,omitempty"`
 
+// Group is an optional logical grouping label used by reports/site to
+// cluster related prompt evaluations (e.g., "crud-operations",
+// "auth-flows"). Empty string means ungrouped. Validation rules:
+// kebab-case (lowercase ASCII letters/digits/hyphens), 1-64 chars,
+// must start with a letter, no leading/trailing/consecutive hyphens.
+Group string `yaml:"group" json:"group,omitempty"`
+
 // Properties holds all metadata string fields (service, language, plane, etc.).
 // Keys must be snake_case.
 Properties map[string]string `yaml:"properties" json:"properties"`

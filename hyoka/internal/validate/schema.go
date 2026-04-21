@@ -3,12 +3,28 @@ package validate
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
+
+// groupNamePattern enforces kebab-case group names: must start with a
+// lowercase letter, may contain lowercase letters, digits, and single
+// hyphens, must end with a letter or digit.
+var groupNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
+
+// IsValidGroupName reports whether s is a valid group name per #599.
+// Empty string is treated as "ungrouped" — callers should only invoke
+// this when the field is non-empty.
+func IsValidGroupName(s string) bool {
+	if len(s) == 0 || len(s) > 64 {
+		return false
+	}
+	return groupNamePattern.MatchString(s)
+}
 
 // ValidatePromptStruct validates a prompt struct against schema rules.
 func ValidatePromptStruct(p *prompt.Prompt) error {
@@ -64,6 +80,11 @@ func ValidatePromptStruct(p *prompt.Prompt) error {
 	difficulty := p.Difficulty()
 	if difficulty != "" && !isTestValue(difficulty) && !isValidDifficulty(difficulty) {
 		return fmt.Errorf("prompt validation failed: invalid difficulty %q; must be one of: basic, intermediate, advanced", difficulty)
+	}
+
+	// Optional group field (#599). Empty string = ungrouped (valid).
+	if p.Group != "" && !IsValidGroupName(p.Group) {
+		return fmt.Errorf("prompt validation failed: invalid group %q; must be kebab-case (lowercase letters/digits/hyphens, start with a letter, no leading/trailing/consecutive hyphens, max 64 chars)", p.Group)
 	}
 
 	// Validate ID naming convention (only if all required parts are present and not test values)
