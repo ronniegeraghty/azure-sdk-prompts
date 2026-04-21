@@ -390,3 +390,65 @@ Systemic follow-up to my own PR #611 addressing all three of Neo's nits + the du
 **Non-blocking nits filed as N2/N3/N4** in `2026-04-21-phase6-polish-nits-resolved.md`: Makefile `EMBED_DIR` empty-string guard (Switch), skill prose stale (Neo), `.gitignore` blind spot (Neo). N2 + N4 are pre-existing risks #614 made visible but did NOT introduce.
 
 **Pattern reinforced:** When a reviewer flags 3 nits and you address 2 plus document the third's tradeoff in-source, that's the right shape. Don't relitigate the documented one unless a new fact emerges.
+
+## 2026-04-21 — PR #607 Final Architectural Review (Phase 6 → dev Rollup)
+
+**PR:** #607 (`phase-6` → `ronniegeraghty/dev`), rollup of six Phase 6 sub-PRs (#601, #602, #603, #604, #605, #606) plus round-3 polish (#613, #614)
+**Verdict:** ✅ **APPROVE**
+**Requested by:** Ronnie (final gate before merge to dev)
+
+**Scope:** 78 files changed (+7852, -2210). Holistic architectural review of all Phase 6 Stretch Goals (#312).
+
+### What I reviewed
+
+1. **Module boundaries:** Six feature streams (comparison UI, prompt directory config, review session splitting, filter system, tool versioning, group frontmatter) integrated cleanly. Each touches its natural layer: `config/` for YAML, `eval/` for orchestration, `internal/review/` + `internal/criteria/` for bucket mechanics, `site/` for UI. No cross-contamination.
+
+2. **Isolation design soundness:** `criteria/buckets.go` + `review/buckets.go` pairing honors SRP. The `MultiBucketReviewer` interface decouples engine from bucketing internals. Clean separation of concerns.
+
+3. **Observable wiring tests (#603, #605):** After #587 dead-flag trap, proactive integration tests that flip runtime flags and assert internal call counts prevent silent regressions. Pattern documented in `.squad/skills/observable-wiring-tests/` — reusable across the codebase.
+
+4. **Tool fetcher abstraction (#605):** `tool.Fetcher` interface extends the right seam. Configs can override version resolution without touching registry or eval engine. Dependency injection done correctly.
+
+### Go conventions check
+
+- ✅ Error wrapping consistent: all new `fmt.Errorf` calls use `%w` for wrapped errors
+- ✅ slog everywhere: zero `log.Printf`/`log.Print` calls in `hyoka/internal/`
+- ✅ Package boundaries respected: no circular deps, interfaces flow down correctly (`review/` → `graders/` → `eval/`)
+
+### Test coverage
+
+- **+2092 test lines** (+26% of total changeset) — commensurate with feature footprint
+- **1712 Go test functions** across repo (new integration tests cover #587-trap scenarios)
+- **133 site tests** (up from 122, +11 from PR #613 MultiSelectFilter coverage)
+- **Race detector clean**: `go test -race ./hyoka/... -timeout 3m` passes all packages
+- No obvious coverage gaps for new module interactions
+
+### Embed pipeline integrity
+
+- ✅ Three CI checks green (per Ronnie's context)
+- ✅ `verify-embed` uses `git status --porcelain` (catches untracked files) + `rm -rf $(EMBED_DIR)/*` (prunes stale hashes)
+- ✅ Embedded assets match source: `hyoka/internal/serve/site/` structure validated (`index.html` + `assets/`)
+- ✅ Concurrency guards prevent race conditions on parallel site PRs (PR #614 hardening)
+
+### Residual nits N1–N4 assessment
+
+Read `2026-04-21-phase6-polish-nits-resolved.md`. My call: **none block merge**.
+
+- **N1 (value-vs-label UX):** Non-blocking. Trinity correctly locked in current behavior with test comment. Fix is a one-liner; ship separately.
+- **N2 (Makefile EMBED_DIR guard):** Non-blocking. Pre-existing risk, not introduced by #614. Defense-in-depth worth doing, but variable is hardcoded at parse time.
+- **N3 (skill prose stale):** Non-blocking. Doc hygiene, no runtime impact.
+- **N4 (`.gitignore` blind spot):** Non-blocking. Pre-existing edge case. Optional defense, not worth doing without triggering incident.
+
+All four are documented follow-ups with clear owners. Right deferred set — small, peripheral, well-understood.
+
+### Verdict rationale
+
+**Ship it.** Phase 6 is architecturally sound. Module boundaries clean, Go conventions followed, test coverage strong, embed pipeline production-grade. Residual nits are non-blocking and properly tracked.
+
+The observable-wiring-tests pattern (#603, #605) is a Phase 6 win that will pay dividends — apply to any future flag-gated runtime behavior. The #587 trap won't repeat.
+
+**Artifacts:**
+- PR comment: https://github.com/ronniegeraghty/hyoka/pull/607#pullrequestreview
+- Review stats: 78 files, +7852/-2210 lines, +2092 test lines, 133 site tests, 1712 Go test functions
+- Build status: `go build ./hyoka/...` clean, `go test -race ./hyoka/...` clean
+- Embed integrity: verified via Makefile + CI gate
