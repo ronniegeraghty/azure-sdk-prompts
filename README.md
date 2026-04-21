@@ -13,7 +13,7 @@
 ```bash
 git clone https://github.com/ronniegeraghty/hyoka.git
 cd hyoka
-go run . list  # Verify installation
+go run ./hyoka list  # Verify installation
 ```
 
 **Install as a CLI:**

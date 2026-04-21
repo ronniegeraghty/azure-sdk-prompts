@@ -226,3 +226,24 @@ Surfaces touched: root/run/new-prompt commands, graders, eval, review, config, l
 - Test signature changes (return value count) require fixing all call sites. Use sed for bulk replacements (`sed -i 's/old_pattern/new_pattern/g'`) when the pattern is uniform across many test files.
 - Disabled tests should have a clear comment explaining why and what condition would re-enable them. Keeps the intent clear for future readers.
 - The `--force-with-lease` push is safe after amending a merge commit to include forgotten files — it only force-pushes if the remote still matches your pre-amendment state.
+### Session 2026-04-21 (Main Sync — ronniegeraghty/dev)
+
+**Status:** COMPLETE  
+**Branch:** `ronniegeraghty/dev` (commit 8bfc4da2)
+
+**What:** Merged `origin/main` (12 commits behind) into `ronniegeraghty/dev` to sync missing commits. Main's tip was 7aa917a1, which had the older `hyoka/main.go` structure (pre-PR #300 restructure).
+
+**Conflict resolution:**
+- **Main.go location** — kept dev's structure (`main.go` at repo root), rejected main's `hyoka/main.go`
+- **hyoka/internal/ paths** — rejected all main's changes in stale `hyoka/internal/...` paths (moved to `internal/...` in restructure)
+- **SkippedReviewers field** — manually ported from main to `hyoka/internal/report/types.go` + markdown rendering
+- **Test signature mismatches** — fixed ReviewPanel call sites (3 return values on dev vs 4 on main)
+- **Missing test functions** — disabled tests for `parseRepoSpec()` and `Branch` field (don't exist on dev)
+
+**Verification:** `go build ./... && go test -race ./... -timeout 5m` — all PASS.
+
+**Learnings:**
+- When main and feature branches diverge on a major restructure, always keep the side with the newer structure. The older structure's paths will generate conflicts but those files don't exist anymore — reject them wholesale.
+- If main adds a new field to a shared struct, hand-port it even if paths differ. Build errors guide you to all update spots.
+- Use sed for bulk test fixes when pattern is uniform: `sed -i 's/old_pattern/new_pattern/g'`
+
