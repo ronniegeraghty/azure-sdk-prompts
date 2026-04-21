@@ -126,6 +126,11 @@ if p.Difficulty() != "" && !validDifficultiesMap[p.Difficulty()] {
 addErr(fmt.Sprintf("invalid difficulty %q; must be one of: %s", p.Difficulty(), joinKeys(validDifficultiesMap)))
 }
 
+// Optional group field (#599): kebab-case, max 64 chars, starts with a letter.
+if p.Group != "" && !IsValidGroupName(p.Group) {
+addErr(fmt.Sprintf("invalid group %q; must be kebab-case (lowercase letters/digits/hyphens, start with a letter, no leading/trailing/consecutive hyphens, max 64 chars)", p.Group))
+}
+
 // ID naming convention: {service}-{dp|mp}-{language}-
 if p.Service() != "" && p.Plane() != "" && p.Language() != "" {
 abbrev := planeAbbrev[p.Plane()]

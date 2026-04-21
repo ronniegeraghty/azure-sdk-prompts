@@ -75,6 +75,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	if len(task.Prompt.Tags) > 0 {
 		evalReport.PromptMeta["tags"] = strings.Join(task.Prompt.Tags, ", ")
 	}
+	if task.Prompt.Group != "" {
+		evalReport.PromptMeta["group"] = task.Prompt.Group
+	}
 
 	lg.Info("Starting Copilot session")
 

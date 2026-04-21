@@ -25,6 +25,7 @@ MaxSessionActions int               `yaml:"max_session_actions"`
 MaxTurns          int               `yaml:"max_turns"`
 ExpectedPkgs      []string          `yaml:"expected_packages"`
 ExpectedTools     []string          `yaml:"expected_tools"`
+Group             string            `yaml:"group"`
 
 Properties map[string]string `yaml:"properties"`
 
@@ -50,6 +51,7 @@ MaxSessionActions: fm.MaxSessionActions,
 MaxTurns:          fm.MaxTurns,
 ExpectedPkgs:      fm.ExpectedPkgs,
 ExpectedTools:     fm.ExpectedTools,
+Group:             strings.TrimSpace(fm.Group),
 Properties:        props,
 }
 }

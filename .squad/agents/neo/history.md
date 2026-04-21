@@ -264,3 +264,12 @@ Design:
 - **Heredoc/create tools occasionally drop content silently.** Always verify with `ls -la` / `grep` after non-trivial writes.
 - **Cross-package type duplication is sometimes the right call.** `Bucket` lives in `criteria`, `review`, and `graders` because `graders → review` already exists and the engine builds buckets from `criteria`. Centralizing would create a cycle. Document the duplication and convert at boundaries.
 - **Make resurrected dead flags observably alive.** Adding a `slog.Warn` when `--review-mode isolated` is requested but no graders are marked is the cheap insurance against the same regression that killed PR #578 (flag wired but no runtime effect).
+
+## 2026-04-21: #599 — Prompt `group` property
+
+**Branch:** `ronniegeraghty/issue-599-group-property` (off phase-6)
+**Worktree:** `/home/rgeraghty/projects/hyoka-599`
+
+Added optional top-level `group` frontmatter field. Backwards compatible (empty = ungrouped). Kebab-case validation: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, max 64 chars. Enforced in both `validate.ValidatePromptStruct` (struct path) and `validate.validatePrompt` (CLI path — these two paths exist in parallel; remember to keep them in sync). Propagated to reports via `EvalReport.PromptMeta["group"]` (no schema bump). Tests in `prompt/group_test.go` and `validate/group_test.go`. Site work deferred to Trinity (#600). Decision: `.squad/decisions/inbox/neo-issue-599-group-property.md`.
+
+**Note:** parser.go, types.go, validate.go in this codebase are not gofmt-clean (no leading whitespace on body code). Resisted the urge to gofmt — kept PR diff focused on the issue. If we ever decide to gofmt the codebase, do it as a separate PR.
