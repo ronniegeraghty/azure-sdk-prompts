@@ -32,22 +32,37 @@ site-build:
 
 # site-embed is idempotent: rerunning with no source changes leaves the
 # embedded tree byte-identical (vite content-hashes filenames deterministically).
+#
+# Cleanup assumption: vite's output under site/dist/ is a flat tree of
+# `assets/` plus root-level files (currently `index.html`; future builds may
+# emit favicons, manifests, etc.). We wipe $(EMBED_DIR)/* wholesale before
+# copy so stale root-level files are pruned alongside hashed asset files.
+# There are no hand-maintained files (e.g. .gitkeep) inside $(EMBED_DIR);
+# embed.go points at the directory itself, not at a sentinel.
 site-embed: site-build
-	rm -rf $(EMBED_DIR)/assets
+	rm -rf $(EMBED_DIR)/*
 	mkdir -p $(EMBED_DIR)
 	cp -R $(SITE_DIR)/dist/. $(EMBED_DIR)/
 	@echo "[site-embed] refreshed $(EMBED_DIR)/ from $(SITE_DIR)/dist/"
 
 # verify-embed is the CI gate: rebuild and diff. Non-zero exit if the
 # committed embedded bundle drifted from what site/src/** currently produces.
+#
+# We use `git status --porcelain` rather than `git diff --quiet` so that
+# NEW files inside $(EMBED_DIR)/ (untracked by git) also trip the gate.
+# `git diff` only sees modifications to tracked files and would silently
+# pass a build that introduced a new asset filename.
 verify-embed: site-embed
-	@if ! git diff --quiet -- $(EMBED_DIR); then \
+	@if [ -n "$$(git status --porcelain -- $(EMBED_DIR))" ]; then \
 		echo ""; \
 		echo "ERROR: embedded site bundle is stale."; \
 		echo "  site/src/** has changes that were not copied into $(EMBED_DIR)/."; \
 		echo "  Run 'make site-embed' and commit the result."; \
 		echo ""; \
-		echo "Diff:"; \
+		echo "Status:"; \
+		git status --porcelain -- $(EMBED_DIR); \
+		echo ""; \
+		echo "Diff (tracked files only):"; \
 		git --no-pager diff --stat -- $(EMBED_DIR); \
 		exit 1; \
 	fi
