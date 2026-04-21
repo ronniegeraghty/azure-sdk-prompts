@@ -1,234 +1,29 @@
 # Project Context
 
 - **Project:** hyoka — Go evaluation tool that runs prompts through the Copilot SDK, reviews code via a multi-model panel, produces criteria-based pass/fail reports
-- **Stack:** Go 1.26.1+, GitHub Copilot CLI/SDK, MCP servers (Azure MCP via npx)
+- **Stack:** Go 1.26.1+, GitHub Copilot CLI/SDK, internal/eval + internal/review packages
 - **User:** Ronnie Geraghty
 - **Created:** 2026-04-03
 - **Repo:** /home/rgeraghty/projects/hyoka
-- **Key paths:** hyoka/internal/ (core engine), hyoka/main.go (entry point), prompts/ (evaluation prompts), criteria/ (pass/fail criteria)
 
 ## Core Context
 
-Agent Neo initialized as Core Dev for hyoka. Owns the evaluation engine, review panel, criteria logic, and Copilot SDK integration. The tool has guardrails (max turns: 25, max files: 50, max output: 1MB, max session actions: 50). Safety boundaries prevent real Azure resource provisioning by default (`--allow-cloud` to opt out).
+Agent Neo initialized as Core Engine architect. Charter: evaluation pipeline, review orchestration, criteria system, feature flags. Expertise: eval/engine, review/graders, wiring-layer design, #587 regression prevention.
 
-## Recent Updates
+### Condensed History (Phase 0–4)
 
-📌 Team initialized on 2026-04-03
+**Phase 0 (2026-04-03):** Team initialization. Neo tasked with critical path WorkspaceDelta (#566) + comparison unification (#357) + hierarchical review modes.
 
-📋 **Morpheus Audit (2026-04-03):** Comprehensive codebase health assessment complete. Key finding: **reviewer model bug in main.go:469-473** (P0) — multi-config evaluations share one reviewer panel. See `.squad/decisions.md` for full P0/P1/P2 action items.
+**Phase 1–3 (2026-04-04 → 2026-04-17):** Shipped #566 WorkspaceDelta (2-day hard cap), #355/#356 multi-bucket review infrastructure, #357 comparison unification. Encountered #587 regression trap (tests pass, runtime behavior absent). Recovered via wiring-layer integration tests.
 
-## Learnings
+**Phase 4 (2026-04-17 → 2026-04-20):** Hierarchical criteria system (#356), comparison-result struct contract, custom tool fetcher with version override (#597), remote-skill caching. All approvals and merges completed.
 
-### Issue #92: Per-Task Reviewer Panel Creation (2025-01-19)
-**Branch:** `ronniegeraghty/issue-92-reviewer-model-bug`  
-**PR:** [#170](https://github.com/ronniegeraghty/hyoka/pull/170)  
-**Status:** ✅ Complete
+**Phase 5 (2026-04-20):** Implemented --review-mode isolated flag (#580) enabling multi-bucket sessions. Tests excellent at unit level; wiring layer gap discovered by Switch (exact #587 trap). Locked out per reviewer-protocol; Tank fixed wiring tests.
 
-Fixed critical bug where multi-config evaluations reused the reviewer panel from the FIRST config for ALL configs, causing every evaluation to use incorrect reviewer models.
+**Key pattern:** Wiring-layer regression tests (integration via engine.Run with stubs) are mandatory for flag-driven feature work. Unit tests alone insufficient.
 
-**Implementation:**
-- Introduced `ReviewerFactory` function type that creates reviewers per-config
-- Replaced `Engine.reviewer/panelReviewer` fields with `reviewerFactory` field
-- Moved reviewer creation from main.go into `runSingleEval()` using `task.Config`
-- Each config now gets its own reviewer panel with correct models
-- Added `NewEngineWithReviewerFactory()` constructor
-- Maintained backward compatibility with deprecated `NewEngineWithReviewer()`
+## Recent Sessions
 
-**Testing:**
-- Created `reviewer_factory_test.go` with 3 tests verifying correct behavior
-- All existing tests pass
-- Build and vet clean
-
-**Learnings:**
-1. **Reviewer Factory Pattern**: When multiple configs need different reviewer settings, create reviewers lazily per-task rather than once at engine creation. Use a factory function that closes over shared resources (clientOpts) but creates instances based on task.Config.
-
-2. **Backward Compatibility**: When refactoring constructors, wrap deprecated APIs to call new implementation. Preserves existing call sites while enabling new patterns.
-
-3. **Testing Concurrent Tasks**: Don't assert on execution order. Use maps to track outcomes by task ID when testing engines with concurrent workers.
-
-Initial setup complete. Architecture is sound. Main engineering focus should be: (1) fix reviewer model bug, (2) refactor main.go into cmd/ package, (3) add integration tests.
-
-### Session 2026-04-04T00-05 (Morpheus Evolution Plan)
-
-Evolution plan assigns you Phase 1 core model changes (generic properties, criteria filters, tool filters) and Phase 2 pairwise testing. Read `.squad/decisions.md` for full plan. Also assigned: reviewer model bug (P0), discarded error logging, early auth check.
-
-### Session 2026-04-04T19:45 (Phase 0 Execution — Reviewer Factory Fix)
-
-**Status:** COMPLETE  
-**Issue:** #92  
-**PR:** #170
-
-Implemented ReviewerFactory pattern to fix multi-config reviewer panel bug. Each config now receives correct reviewer models instead of all configs using first config's reviewers.
-
-**Key outcome:** Lazy per-task reviewer creation replaces engine-scoped setup. Factory pattern enables clean separation of concerns and tested backward compatibility.
-
-**Cross-agent dependency:** Tank's config migration (#96, PR #171) enabled clean Generator/Reviewer schema that makes this fix viable. Switch's flaky test fix (#99, PR #167) and Tank's CI pipeline (#91, PR #168) ensure test reliability in review panel code.
-
-**Files:** engine.go, main.go, reviewer_factory_test.go
-
-### Session 2026-04-07T03:47 (P0 Config Hardening)
-
-**Status:** COMPLETE  
-**PR:** [#256](https://github.com/ronniegeraghty/hyoka/pull/256)  
-**Branch:** `ronniegeraghty/p0-config-hardening`
-
-Implemented P0 config hardening from codebase audit (#252, items 1-2):
-
-1. **Validation Before Logging:** Moved `cfg.Validate()` before the config-loaded logging loop in `Parse()` to prevent nil-pointer panic when accessing `c.Generator.Model` on invalid configs.
-
-2. **Negative Limit Rejection:** Added validation to reject negative values for all SessionLimits fields (max_turns, max_files, max_output_size, max_session_actions). Zero is explicitly allowed (means "use default").
-
-**Implementation:**
-- Fixed validation order in `config.go:125-133` (Parse function)
-- Added negative-value checks in `config.go:183-197` (Validate function)
-- Created 6 new tests: negative limits (4 tests), zero limits acceptance, nil generator panic prevention
-- Fixed UTF-8 encoding (em-dash in comment) and Go formatting
-
-**Testing:** All 69 config package tests pass. Full build succeeds.
-
-**Key Learning:** Validation order matters for early error detection. Always validate config structure BEFORE accessing fields that may not exist. This prevents cryptic panics and provides clear error messages to users.
-
-**Files:** hyoka/internal/config/config.go, hyoka/internal/config/config_test.go
-
-
-### Session 2026-04-08 (Config Unification #252)
-
-**Status:** COMPLETE
-
-Unified generator/reviewer tooling into a single `tools` array with typed entries (`tool`, `mcp`, `skill`). Updated config validation, tool resolution, MCP wiring, pairwise ablation logic, plugin merging, and skill path resolution to operate on typed ToolEntry records.
-
-**Implementation:**
-- Extended `ToolEntry` with MCP and skill metadata plus type normalization
-- Reworked eval/session setup to derive MCP servers, skills, and available tools from `generator.tools`
-- Updated configs and docs to the unified `tools` schema and migrated tests
-
-**Testing:** `go build ./hyoka/...`, `go vet ./hyoka/...`, `go test ./hyoka/... -count=1`
-
-**Key Learning:** Centralizing tool configuration simplifies downstream consumers — filter by type once and reuse the same entries for MCP, skills, and tool allowlists without duplicating schema fields.
-
-### Phase 3 Integration with Hotfix #567 (2026-04-16)
-**Branch:** Merged PR #562 into `ronniegeraghty/dev`  
-**PR:** [#562](https://github.com/ronniegeraghty/hyoka/pull/562) (Phase 3: Advanced Core & CLI Polish)  
-**Merge commits:** `1ef6081d` (main→dev), `4b4e95f9` (Phase 3→dev)  
-**Status:** ✅ Complete
-
-Successfully integrated hotfix #567 (starter-aware guardrails) with Phase 3 work. The challenge was that Phase 2 split engine.go into engine.go + engine_eval.go, while main still had everything in engine.go.
-
-**Conflict Resolution:**
-- Main tried to add `runSingleEval()` to engine.go, but dev already had it in engine_eval.go
-- Resolution: kept dev's engine.go (ends at line ~700), updated engine_eval.go with hotfix guardrail logic
-- Added `snapshotStarterSizes()` call after `CopyStarterFiles()` in engine_eval.go (line 125)
-- Replaced old guardrail logic (lines 422-448) with starter-aware helpers:
-  - `computeAgentFileCount()` for file count guardrail
-  - `computeAgentOutputSize()` for output size guardrail
-- New files from hotfix (guardrail.go, guardrail_test.go) merged cleanly
-
-**Testing:** Full test suite passed with race detector (`go test -race ./... -timeout 3m`). All 15 guardrail test cases pass, including zero-byte edge cases.
-
-**Key Learnings:**
-1. **File splits require careful merge attention**: When one branch splits a file and another modifies it, auto-merge may fail. Solution: understand the split intent, keep the split structure, port changes to the correct file.
-2. **Guardrail helpers are testable**: Extracting pure functions (snapshotStarterSizes, computeAgentOutputSize, computeAgentFileCount) to guardrail.go made the logic directly unit-testable (15 table-driven cases).
-3. **Phase 3 now includes hotfix**: The dev branch has both Phase 3 features AND the starter-aware guardrail fix. Future merges to main will include both.
-
-## 2026-04-16: Cross-Agent Update — Remote Skill Bug Flagged
-
-**From:** Tank 📡 (PR #573)  
-**Relevance:** Config/tool territory
-
-Tank discovered bug during remote skill example work: `internal/skills/fetcher.go::fetchRemote` shells out to `npx skills add` without `--yes`, causing interactive prompt to block under non-TTY and yield 0 skills selected (repo clones fine, but manifest resolution fails).
-
-**Impact on your work:**
-- **#566 (WorkspaceDelta):** Not directly blocked; delta is independent of skill fetching.
-- **Phase 4 config/tool work (#355–#357):** If you touch `FetchRemote` or skill fetcher, this is a known issue worth fixing: add `--yes` to `npx skills add` invocation.
-- **Real remote-skill usage:** Will fail in CI without fix.
-
-**Decision captured:** `.squad/decisions.md` → "Where example configs live + how to invoke them" (Tank decision, Tank caveat section).
-
-
-### Session 2026-04-17: #355 + #356 Review Modes & Hierarchical When
-
-**Branch:** `squad/355-356-review-modes-and-when`  
-**PR:** TBD  
-**Status:** ✅ Implemented (hierarchical when complete, review modes foundation only)
-
-Implemented hierarchical `when` conditions (#356) and laid foundation for review session modes (#355).
-
-**#356 Hierarchical When — COMPLETE:**
-- Extended `GraderEntry` with `When` (grader-level) and `Isolate` fields
-- Created `GraderGroup` type for grouping graders with shared conditions
-- Extended `GraderConfig` with `Groups` array
-- Implemented `mergeWhen()` helper for three-level hierarchy resolution
-- Updated `MatchingGraders()` to respect file → group → grader precedence
-- 9 new tests in `hierarchical_test.go` covering all resolution paths
-- 100% backward compatible — old YAML files work unchanged
-
-**#355 Review Modes — FOUNDATION ONLY:**
-- Added `--review-mode` CLI flag (combined|isolated)
-- Flag validation in run command
-- Wired through to `EngineOptions.ReviewMode`
-- Session splitting NOT implemented (deferred to follow-up)
-
-**Rationale for deferral:**
-Current architecture merges all criteria into a single string before review. Implementing true isolation requires:
-1. Criteria parsing (split merged string back to graders)
-2. Session orchestration (separate Copilot sessions per grader)
-3. Result consolidation (merge ReviewResults)
-4. Panel integration (decide panel runs once or per-grader)
-
-This is multi-day refactor touching review/, graders/, eval/. Decided to ship foundation + hierarchical when (complete) and defer session splitting to focused follow-up issue.
-
-**Key design decisions:**
-- Three-level when hierarchy: file → group → grader
-- Child overrides parent for same key (merge semantics)
-- `isolate: true` parsed but not yet functional
-- Default review mode: `combined` (backward compat)
-
-**Files modified:**
-- `hyoka/internal/criteria/criteria.go` — schema, matching, merging
-- `hyoka/internal/criteria/hierarchical_test.go` — new comprehensive tests
-- `hyoka/internal/eval/engine.go` — EngineOptions.ReviewMode
-- `hyoka/cmd/run.go` — CLI flag, validation, wiring
-- `docs/hierarchical-when-examples.md` — usage documentation
-- `.squad/decisions/inbox/neo-355-356-decisions.md` — architectural decisions
-
-**Testing:**
-✅ `go build ./...` clean  
-✅ `go test -race ./... -timeout 3m` all pass (incl. 9 new hierarchical tests)  
-✅ `go run . validate` — all criteria files valid (backward compat confirmed)
-
-**Learnings:**
-1. **Hierarchical merge semantics:** Settled on "always merge, child wins" after considering alternatives. Matches user expectations for additive filtering.
-2. **Premature implementation risk:** Recognized session splitting scope early, deferred to avoid half-working feature in PR.
-3. **Test-first for schema:** Wrote hierarchical tests before validating real files; caught empty-file edge case.
-
-
-## #357 Comparison Unification — Phase 4 Wave 3
-
-**Branch:** `squad/357-comparison-unification` → PR #583 → `squad/phase-4-remainder`
-**Worktree:** `/home/rgeraghty/projects/hyoka-357`
-
-### Architecture decisions
-
-- **Single `ComparisonResult` type keyed on `ComparisonKind`** replaces the three wrapper types (`ConfigComparison`/`RunComparison`/`TemporalComparison`). CLI, serve API, and auto-gen all land on the same struct → Morpheus gate (CLI == site) is satisfied by shared code path, not by testing two paths for equality.
-- **`CompareReports` is the in-memory core.** Every public entry point delegates. Disk-backed `CompareConfigs`/`CompareRuns`/`TemporalDiff` = load reports + call `CompareReports`. `AutoGenerateForRun` = fan out to `CompareReports` across pairs.
-- **Auto-gen writes `comparisons.json` alongside `summary.json`** rather than a field on `RunSummary`. Rationale: adding `Comparisons []ComparisonResult` to `report.RunSummary` creates `comparison → report → comparison` cycle. File-adjacent is cleaner + site can read or recompute — either gives identical output.
-- **`summary_stats.PromptDeltas` retained.** Pass/fail toggle is a distinct aggregate view from score-delta comparison. Direct import would cycle. Documented in PR body.
-
-### Lessons
-
-- **Worktrees for parallel agents.** Main checkout had Trinity's branch active mid-task. Running `git worktree add ../hyoka-357 -b squad/357-comparison-unification origin/squad/phase-4-remainder` gave isolated working directory. `.squad/decisions/inbox/` is gitignored so inbox files are worktree-local — informational only for Trinity.
-- **Drop the contract early.** `ComparisonResult` type file committed + pushed as a WIP commit before the rewrite. Trinity could import against the shape while I refactored behavior.
-- **Serve handlers as pass-through wins.** `dashboard.go` handlers at lines 111/127/147 needed *no* code change — they just `writeJSON(w, cmp)` over whatever the comparison pkg returns. The type swap flowed through for free.
-- **Mux route collisions.** `mux.HandleFunc("/api/runs/", ...)` in `dashboard.go` collided with the existing catchall in `serve.go`. Fix: add `comparisons` as a sub-resource case in the existing switch, not a new registration.
-- **Test file indentation:** `cmd/compare_test.go` uses pure tabs, no leading whitespace. Small detail that bites on edits.
-
-### Follow-ups to consider
-
-- If the site surface never consumes `summary_stats.PromptDeltas`, future cleanup: move the pass-toggle computation into the `comparison` package (or a third shared one) and delete from `summary_stats.go`. Out of scope for #357 (semantics differ + import cycle).
-
-## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
-
-Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
 
 Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
 
@@ -309,3 +104,23 @@ fetcher matches every remote skill same as before; only diff is cache path
 now segments by version (`.skills-cache/default/...`).
 
 **Tests:** `go test -race ./hyoka/... -timeout 3m` clean. Vet clean.
+
+## Session 2026-04-21 (Phase 6 Round-1: #603 Request Changes + Reviewer-Protocol Lockout)
+
+**Mission:** PR #603 (Review session splitting, #580) test review — ended with LOCKED OUT reassignment
+
+**Context:** #603 implements `--review-mode isolated` flag enabling multi-bucket review sessions. Unit-level tests of `BuildReviewBuckets` (14 tests in `criteria/buckets_test.go`) are excellent.
+
+**Switch's Finding:** Wiring-layer completely untested on 4 surfaces:
+1. `Engine.reviewBuckets()` — bridge from cmd-flag to engine-mode
+2. `PromptReviewGrader.gradeSingle/gradeWithPanel` branch selection — determines which path fires for `len(buckets) ∈ {0, 1, 3}`
+3. `mergeBucketResults` — prefixes per-bucket criterion names
+4. CLI flag validation — `cmd/run.go:289-293` validates `--review-mode` value
+
+This is exact failure mode of #587: tests pass, runtime behavior absent.
+
+**Verdict:** REQUEST CHANGES. Per reviewer-protocol, original implementer (Neo) locked out of revisions.
+
+**Outcome:** Tank reassigned + implemented fix (16 tests, 22 subtests). Switch re-reviewed ✅ APPROVE. Commit 04579b47.
+
+**Status:** #603 approved pending merge. Neo locked per protocol; Tank's wiring tests land in PR.

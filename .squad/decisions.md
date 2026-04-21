@@ -2,6 +2,133 @@
 
 ## Active Decisions
 
+### Decision: Phase 6 Round-1 Review Batch — 2 APPROVE, 1 REQUEST CHANGES (2026-04-21)
+
+**Authors:** Switch (🧪), Morpheus (🏗️), Tank (📡 reassignment)  
+**Date:** 2026-04-21  
+**PRs:** #601, #602, #603  
+**Phase:** 6 (epic #312)  
+**Status:** Switch & Morpheus reviews complete; Tank owns #603 wiring-layer test fix  
+
+**Context:** Phase 6 Round-1 batch (PRs #601 Compare page, #602 Configurable prompts dir, #603 Review session splitting) underwent test + architectural review.
+
+**Test Review Verdicts (Switch):**
+- **#601 (Trinity):** ✅ APPROVE — 31 new tests, 99/99 green; edge cases covered (top-bin overflow, malformed JSON, filter semantics). Non-blocking: `group-builder.tsx` isolation test gap.
+- **#602 (Tank):** ✅ APPROVE — 11 new tests green; backwards-compat locked; `go test -race ./hyoka/...` all 24 packages pass. Non-blocking: no `--prompts` flag priority test; no malformed-YAML peek.
+- **#603 (Neo):** ❌ REQUEST CHANGES — Wiring-layer coverage gap on 4 surfaces: `Engine.reviewBuckets()`, `PromptReviewGrader` branch selection, `mergeBucketResults`, CLI flag validation. Unit tests of `BuildReviewBuckets` (14 tests) excellent but insufficient — same failure mode as #587. Per reviewer-protocol, Neo locked; Tank reassigned.
+
+**Architectural Review Verdicts (Morpheus):**
+- All three PRs clear architectural bar (no drift, no lockouts)
+- #601: Layering matches site convention; catalog + versioned localStorage; follow-up: remove dead `fetchCompareConfigs`
+- #602: Backwards-compat enforced in code; priority resolution consistent across CLI commands; follow-ups: nil-check on `cfgFile`; separate malformed init template bug
+- #603: Flag drives runtime behavior; #355/#587 regression actively prevented; byte-identical output for non-opt-in users; follow-ups: document `[bucket-name]` prefix in config.md; audit trends/comparison for prefix
+
+**Critical Finding: Embedded Asset Freshness**
+
+Morpheus discovered: Phase 6 PRs implemented site/src changes but served UI (bundled in `hyoka/internal/serve/site/`) remained pre-Phase-6. Root cause: site/dist not rebuilt after Phase 5 changes. 
+
+**Decision captured:** New skill `.squad/skills/embedded-asset-freshness/SKILL.md` — policy is **when site/src changes land in a PR, bundled site/dist MUST be rebuilt and committed as part of same PR.**
+
+**Coordinator action:** Rebuilt site/dist (npm run build) → copied to embed path. Commit a1a3c95d, pushed to phase-6. Build + serve tests green. PR #607 confirmation comment posted.
+
+**Tank's Reassignment (PR #603):** Wiring-test fix complete. Commit `04579b47` adds:
+- `internal/eval/engine_reviewbuckets_test.go` (5 unit tests)
+- `internal/eval/engine_reviewmode_runtime_test.go` (2 integration tests via engine.Run with stub reviewers — the #587 regression guard)
+- `internal/graders/prompt_review_grader_buckets_test.go` (3-row table + fallback + error)
+- `internal/review/buckets_test.go` (prefix rules, aggregation, nil-safety)
+- `cmd/run_validate_test.go` (validator + flag wiring + invalid-rejection)
+
+Coverage deltas: eval 54.5% (reviewBuckets 0%→100%), review 48.6%→53.5%, graders 79.9%→82.9%, cmd 42.4%→42.6%. Switch re-reviewed: ✅ APPROVE. Ready to merge into phase-6.
+
+**Pattern for future:** When re-implementing a dead-flagged feature, wiring-layer integration tests (esp. Engine/cmd plumbing) required as gating criterion, not optional follow-up.
+
+---
+
+### Decision: Tank — Configurable Prompt Directory (#598) (2026-04-21)
+
+**Author:** Tank 📡  
+**Date:** 2026-04-21  
+**Issue:** #598  
+**PR:** #602 (phase-6)  
+**Status:** ✅ APPROVED  
+
+**What changed:** Added `prompt_directory:` top-level config YAML field (optional, string). Fully backwards compatible — when absent, discovery unchanged.
+
+**Surfaces:**
+- **Config key:** `prompt_directory:` (sibling of `configs:`). Relative paths resolve vs config dir; absolute paths honored.
+- **CLI flag:** `--prompts` remains highest-priority override.
+- **No env var** — kept scope minimal.
+
+**Resolution priority:** (1) `--prompts` flag, (2) `prompt_directory:` from config, (3) `.hyoka/prompts/`, (4-5) legacy fallbacks `./prompts/`, `../prompts/`.
+
+**Migration:** Existing users: zero action. New users can opt into custom layout via config YAML. Conflict handling: if two configs declare different dirs, `LoadDir` errors with both filenames.
+
+**Coverage:** 11 new tests in `prompt_dir_test.go`. `go test -race ./hyoka/...` all 24 packages pass. Follow-ups: nil-check on `cfgFile` in cmd/run.go:185; separate bug for malformed init template.
+
+---
+
+### Decision: Run-level Filter System (#600) (2026-04-21)
+
+**Author:** Trinity 🖤  
+**Date:** 2026-04-21  
+**Issue:** #600 (R146/R147)  
+**PR:** #601 (phase-6)  
+**Status:** ✅ APPROVED  
+
+**Problem:** Runs page listed every eval as flat scroll; finding "all Python runs" or "all azure-mcp runs" tedious.
+
+**Design:** Filter at **run level** (not per-eval). A run matches when every active filter dimension finds ≥1 matching eval inside. Preserves runs-page identity.
+
+**Semantics:** Within-dim OR (multi-select), across-dim AND, empty = match-all. Status derived from run aggregate (errors > failures > passing priority).
+
+**Module layout:**
+- `site/src/app/lib/run-filters.ts` — pure model (catalog, matching, URL ser/deserialize)
+- `site/src/app/components/ui/multi-select-filter.tsx` — reusable chip dropdown primitive
+- `site/src/app/components/runs-page.tsx` — `<FilterBar>` composes three multi-selects
+
+**URL persistence:** `useSearchParams` is source of truth; filter changes call `setSearchParams(..., { replace: true })` for no-history pollution. Stable param keys: `config`, `lang`, `status` (comma-joined).
+
+**Alternatives rejected:** React Context (URL-as-state wins), per-eval filtering (changes page identity), server-side (client-side instant on 100s of runs).
+
+**Consequence:** New reusable `MultiSelectFilter` primitive for other pages; pure-function lib pattern now default for site filter logic.
+
+---
+
+### Decision: README.md Re-audit v2 — Executed-Command Validation (2026-04-21)
+
+**Author:** Oracle 🔮  
+**Date:** 2026-04-21  
+**Issue:** #368  
+**PR:** phase-5  
+**Status:** ✅ COMPLETED  
+
+**Supersedes:** Prior `oracle-readme-audit` decision (commit `9931af2c`), which verified by reading source.
+
+**Finding:** `origin/main` is 3 commits ahead of phase-5 / dev:
+- `9f293cee`: Move main.go into hyoka/ → `go run ./hyoka <cmd>` (not `go run .`)
+- `8e8ae1fc`: Fix commands to use `--config baseline/claude-opus-4.6`, replace `tools` → `plugins`
+- `a0a78426`: Add remote-skill config example
+
+On phase-5, main.go is at root (go run . works locally), but README targets **destination layout** (main post-merge). Validation performed in worktree on origin/main.
+
+**Commands tested (all executed, not read):** 15 total. Exit codes all 0. Examples:
+- `go build ./hyoka/...` ✅
+- `go build .` (repo root) ❌ — proves `go run .` wrong on main
+- `go test -race ./...` ✅
+- `go run ./hyoka list` ✅
+- `go run ./hyoka run --service storage --config baseline/claude-opus-4.6 --dry-run` ✅
+- All help subcommands ✅
+
+**Doc-link audit:** All 8 links exist (roadmap.md + CONTRIBUTING.md added on phase-5, both exist at merge).
+
+**Diff applied:** All `go run .` → `go run ./hyoka`; `go build .` → `go build ./hyoka/...`. One copy tweak: "Generated output" → "Captured the agent's output" for scope guard.
+
+**Scope guard:** README contains no "code generation" framing; neutral "AI agents" / "agent's output" used. No site/ files touched.
+
+**Cleanup:** `git rm README.backup` (22 KB leftover from Trinity's pre-#368 backup, separate from #593).
+
+---
+
 ### Decision: PR #592 Phase-5 Fixups — CI Green + R151 Closure (2026-04-20)
 
 **Authors:** Switch (🧪), Morpheus (🏗️)  

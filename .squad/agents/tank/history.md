@@ -146,3 +146,24 @@ Surfaces touched: root/run/new-prompt commands, graders, eval, review, config, l
 - **Concurrent worktree hazard:** Neo was running #580 in the *same* worktree (no separate `git worktree`), which kept dropping unrelated `criteria/buckets.go` and `eval/engine.go` files into my staging area. Worked around by `git restore`-ing/deleting the leftovers before each build cycle and being explicit about which files to `git add`. Future spawns should always create a worktree per agent.
 - `gopkg.in/yaml.v3` doesn't strictly validate fields when target struct only declares the keys you care about (no `KnownFields(true)`), which makes `PeekPromptDirectory` safe even on configs with extra/unknown keys.
 - The example config emitted by `hyoka init --with-examples` is **already broken** (flat `name:` instead of nested `configs:`). Pre-existing bug, unrelated to this issue — left for a separate fix.
+
+## Session 2026-04-21 (Phase 6 Round-1: #602 Approval + #603 Wiring Tests Reassignment)
+
+**Mission:** Implement wiring-layer test fixes for PR #603 (reassigned from Neo per reviewer-protocol)
+
+**Context:** Switch requested changes on PR #603 because wiring-layer coverage gap on 4 surfaces (despite excellent unit-level `BuildReviewBuckets` coverage). Same failure mode as #587: tests pass, runtime behavior absent. Per strict reviewer-protocol, Neo locked; Tank reassigned.
+
+**What was added:** 16 new tests (22 subtests) closing all 4 gaps:
+- `internal/eval/engine_reviewbuckets_test.go` — 5 unit tests, 0%→100% line coverage; combined/isolated/degraded paths + slog warn capture
+- `internal/eval/engine_reviewmode_runtime_test.go` — 2 integration tests via engine.Run with stub reviewers proving flag has runtime effect
+- `internal/graders/prompt_review_grader_buckets_test.go` — 3-row table + fallback + error
+- `internal/review/buckets_test.go` — prefix rules, aggregation, nil-safety
+- `cmd/run_validate_test.go` — validator + flag wiring + invalid-rejection
+
+**Coverage deltas:** review 48.6%→53.5%, graders 79.9%→82.9%, cmd 42.4%→42.6%, eval 54.5% (reviewBuckets 0%→100%).
+
+**Switch re-review:** ✅ APPROVE. Commit 04579b47, ready to merge.
+
+**Implication for future:** Wiring-layer regression tests (integration through engine.Run with stubs) now standard pattern for any flag-driven feature work — cheapest defense against "tests pass, behavior gone" failure mode.
+
+**Status:** PR #603 approved. Phase 6 Round-1 test batch complete.
