@@ -251,15 +251,15 @@ func (p *PanelReviewer) Models() []string {
 // in the list, which receives all other reviewers' outputs.
 // Reviews run one at a time so each Copilot session starts, completes, and stops
 // before the next begins, reducing peak memory usage.
-func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (panel []ReviewResult, consolidated *ReviewResult, err error) {
+func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (panel []ReviewResult, consolidated *ReviewResult, skipped []SkippedReviewer, err error) {
 	slog.Info("Starting sequential panel review", "model_count", len(p.models), "models", p.models)
 	if len(p.models) == 0 {
-		return nil, nil, fmt.Errorf("no reviewer models configured")
+		return nil, nil, nil, fmt.Errorf("no reviewer models configured")
 	}
 
 	generatedFiles, err := utils.ReadDirFiles(workDir)
 	if err != nil || len(generatedFiles) == 0 {
-		return nil, nil, fmt.Errorf("no generated files to review in %s", workDir)
+		return nil, nil, nil, fmt.Errorf("no generated files to review in %s", workDir)
 	}
 
 	var referenceFiles map[string]string
@@ -293,6 +293,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		}
 		if reviewErr != nil {
 			slog.Warn("Panel reviewer failed", "model", model, "error", reviewErr)
+			skipped = append(skipped, SkippedReviewer{Model: model, Error: reviewErr.Error()})
 			continue
 		}
 		slog.Debug("Panel reviewer complete", "model", model, "overall_score", result.OverallScore, "max_score", result.MaxScore)
@@ -300,13 +301,13 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 	}
 
 	if len(panel) == 0 {
-		return nil, nil, fmt.Errorf("all reviewers failed")
+		return nil, nil, skipped, fmt.Errorf("all reviewers failed")
 	}
 
 	// If only one reviewer succeeded, use it as consolidated
 	if len(panel) == 1 {
 		c := panel[0]
-		return panel, &c, nil
+		return panel, &c, skipped, nil
 	}
 
 	// Consolidate: use the first model to synthesize all reviews
@@ -320,12 +321,12 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 	consolidated.Model = "consensus"
 	slog.Info("Panel review complete", "panel_size", len(panel), "consensus_score", consolidated.OverallScore, "max_score", consolidated.MaxScore)
 
-	return panel, consolidated, nil
+	return panel, consolidated, skipped, nil
 }
 
 // Review implements the Reviewer interface using the panel (for backward compat).
 func (p *PanelReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error) {
-	_, consolidated, err := p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, evaluationCriteria)
+	_, consolidated, _, err := p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, evaluationCriteria)
 	return consolidated, err
 }
 

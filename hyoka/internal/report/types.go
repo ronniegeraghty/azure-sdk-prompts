@@ -231,37 +231,38 @@ type ActionSummaryReport struct {
 
 // EvalReport contains the results of a single prompt evaluation.
 type EvalReport struct {
-	SchemaVersion      int                   `json:"schema_version"`
-	PromptID           string                `json:"prompt_id"`
-	ConfigName         string                `json:"config_name"`
-	Timestamp          string                `json:"timestamp"`
-	Duration           float64               `json:"duration_seconds"`
-	GenerationDuration float64               `json:"generation_duration_seconds,omitempty"`
-	ReviewDuration     float64               `json:"review_duration_seconds,omitempty"`
-	PromptMeta         map[string]any        `json:"prompt_metadata"`
-	ConfigUsed         map[string]any        `json:"config_used"`
-	GeneratedFiles     []string              `json:"generated_files"`
-	StarterFiles       []string              `json:"starter_files,omitempty"`
-	ReviewedFiles      []ReviewedFile        `json:"reviewed_files,omitempty"`
-	Review             *review.ReviewResult  `json:"review,omitempty"`
-	ReviewPanel        []review.ReviewResult `json:"review_panel,omitempty"`
-	GraderResults      []GraderResult        `json:"grader_results,omitempty"`
-	ToolUsage          *ToolUsageResult      `json:"tool_usage,omitempty"`
-	SessionEvents      []SessionEventRecord  `json:"session_events,omitempty"`
-	ActionTimeline     *ActionTimelineReport `json:"action_timeline,omitempty"` // Structured action log (#139)
-	EventCount         int                   `json:"event_count"`
-	ToolCalls          []string              `json:"tool_calls"`
-	Environment        *EnvironmentInfo      `json:"environment,omitempty"`
-	ResourceUsage      *ResourceStats        `json:"resource_usage,omitempty"`  // Per-eval resource stats (#45)
-	ScoreBreakdown     *ScoreBreakdown       `json:"score_breakdown,omitempty"` // Weighted aggregation breakdown (#143)
-	SessionSetup       *SessionSetupEvent    `json:"session_setup,omitempty"`   // Tool/skill/MCP loading status (#219)
-	Success            bool                  `json:"success"`
-	Error              string                `json:"error,omitempty"`
-	ErrorDetails       string                `json:"error_details,omitempty"`
-	ErrorCategory      string                `json:"error_category,omitempty"` // timeout, sdk_error, generation_failure, review_failure, no_files
-	FailureReason      string                `json:"failure_reason,omitempty"` // human-readable explanation of failure
-	IsStub             bool                  `json:"is_stub,omitempty"`
-	RerunCommand       string                `json:"rerunCommand,omitempty"`
+	SchemaVersion      int                      `json:"schema_version"`
+	PromptID           string                   `json:"prompt_id"`
+	ConfigName         string                   `json:"config_name"`
+	Timestamp          string                   `json:"timestamp"`
+	Duration           float64                  `json:"duration_seconds"`
+	GenerationDuration float64                  `json:"generation_duration_seconds,omitempty"`
+	ReviewDuration     float64                  `json:"review_duration_seconds,omitempty"`
+	PromptMeta         map[string]any           `json:"prompt_metadata"`
+	ConfigUsed         map[string]any           `json:"config_used"`
+	GeneratedFiles     []string                 `json:"generated_files"`
+	StarterFiles       []string                 `json:"starter_files,omitempty"`
+	ReviewedFiles      []ReviewedFile           `json:"reviewed_files,omitempty"`
+	Review             *review.ReviewResult     `json:"review,omitempty"`
+	ReviewPanel        []review.ReviewResult    `json:"review_panel,omitempty"`
+	SkippedReviewers   []review.SkippedReviewer `json:"skipped_reviewers,omitempty"`
+	GraderResults      []GraderResult           `json:"grader_results,omitempty"`
+	ToolUsage          *ToolUsageResult         `json:"tool_usage,omitempty"`
+	SessionEvents      []SessionEventRecord     `json:"session_events,omitempty"`
+	ActionTimeline     *ActionTimelineReport    `json:"action_timeline,omitempty"` // Structured action log (#139)
+	EventCount         int                      `json:"event_count"`
+	ToolCalls          []string                 `json:"tool_calls"`
+	Environment        *EnvironmentInfo         `json:"environment,omitempty"`
+	ResourceUsage      *ResourceStats           `json:"resource_usage,omitempty"`  // Per-eval resource stats (#45)
+	ScoreBreakdown     *ScoreBreakdown          `json:"score_breakdown,omitempty"` // Weighted aggregation breakdown (#143)
+	SessionSetup       *SessionSetupEvent       `json:"session_setup,omitempty"`   // Tool/skill/MCP loading status (#219)
+	Success            bool                     `json:"success"`
+	Error              string                   `json:"error,omitempty"`
+	ErrorDetails       string                   `json:"error_details,omitempty"`
+	ErrorCategory      string                   `json:"error_category,omitempty"` // timeout, sdk_error, generation_failure, review_failure, no_files
+	FailureReason      string                   `json:"failure_reason,omitempty"` // human-readable explanation of failure
+	IsStub             bool                     `json:"is_stub,omitempty"`
+	RerunCommand       string                   `json:"rerunCommand,omitempty"`
 	// Generator guardrails (#35)
 	GuardrailMaxTurns          int    `json:"guardrail_max_turns,omitempty"`
 	GuardrailMaxFiles          int    `json:"guardrail_max_files,omitempty"`

@@ -287,6 +287,17 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		}
 	}
 
+	// Skipped reviewers
+	if len(r.SkippedReviewers) > 0 {
+		b.WriteString("## Skipped Reviewers\n\n")
+		b.WriteString("| Model | Error |\n")
+		b.WriteString("|-------|-------|\n")
+		for _, s := range r.SkippedReviewers {
+			fmt.Fprintf(&b, "| `%s` | %s |\n", s.Model, s.Error)
+		}
+		b.WriteString("\n")
+	}
+
 	// Grader Results summary
 	if len(r.GraderResults) > 0 {
 		b.WriteString("## Grader Results\n\n")
