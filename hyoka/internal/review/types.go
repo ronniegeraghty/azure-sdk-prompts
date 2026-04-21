@@ -57,6 +57,12 @@ type ReviewEvent struct {
 	Duration float64 `json:"duration_ms,omitempty"`
 }
 
+// SkippedReviewer records a reviewer model that was configured but failed to run.
+type SkippedReviewer struct {
+	Model string `json:"model"`
+	Error string `json:"error"`
+}
+
 // ReviewResult holds the full output from an LLM-as-judge code review.
 type ReviewResult struct {
 	Model        string        `json:"model,omitempty"`

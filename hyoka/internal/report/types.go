@@ -288,10 +288,11 @@ type EvalReport struct {
 	ConfigUsed         map[string]any        `json:"config_used"`
 	GeneratedFiles     []string              `json:"generated_files"`
 	StarterFiles       []string              `json:"starter_files,omitempty"`
-	ReviewedFiles      []ReviewedFile        `json:"reviewed_files,omitempty"`
-	Review             *review.ReviewResult  `json:"review,omitempty"`
-	ReviewPanel        []review.ReviewResult `json:"review_panel,omitempty"`
-	GraderResults      []GraderResult        `json:"grader_results,omitempty"`
+	ReviewedFiles      []ReviewedFile           `json:"reviewed_files,omitempty"`
+	Review             *review.ReviewResult     `json:"review,omitempty"`
+	ReviewPanel        []review.ReviewResult    `json:"review_panel,omitempty"`
+	SkippedReviewers   []review.SkippedReviewer `json:"skipped_reviewers,omitempty"`
+	GraderResults      []GraderResult           `json:"grader_results,omitempty"`
 	ToolUsage          *ToolUsageResult        `json:"tool_usage,omitempty"`
 	ToolAvailability   []ToolAvailabilityEntry `json:"tool_availability,omitempty"` // Tools available vs used (#348)
 	SessionEvents      []SessionEventRecord  `json:"session_events,omitempty"`

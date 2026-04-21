@@ -387,7 +387,7 @@ func InstallSkillsAndPlugins(configs []ToolConfig) error {
 			cmd = exec.Command("copilot", "plugin", "install", e.value)
 		} else {
 			// npm-based skill package
-			cmd = exec.Command("npx", "skills", "add", e.value)
+			cmd = exec.Command("npx", "skills", "add", e.value, "--yes")
 		}
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
