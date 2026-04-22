@@ -469,6 +469,7 @@ func TestGuardrailMaxFiles(t *testing.T) {
 		t.Fatalf("expected 1 result, got %d", len(summary.Results))
 	}
 	r := summary.Results[0]
+	// MaxFiles remains a HARD FAIL (the byte-size guardrail was dropped in #566).
 	if r.Success {
 		t.Error("expected guardrail to fail the eval")
 	}
@@ -565,19 +566,23 @@ func TestActionLimitSoftCap(t *testing.T) {
 	}
 }
 
-func TestGuardrailMaxOutputSize(t *testing.T) {
+// TestGuardrailMaxNewFiles and the byte-size guardrail test were removed
+// (#566 amendment): the byte-size guardrail was dropped entirely and the
+// new-files soft cap was rolled back. MaxFiles=50 hard fail remains the
+// agent-output backstop.
+
+// TestWorkspaceDeltaCaptured verifies WorkspaceDelta is populated on every
+// successful eval (#566) and reaches the report (grader coverage via #571 nil-safety tests).
+func TestWorkspaceDeltaCaptured(t *testing.T) {
 	outputDir := t.TempDir()
-	// Use a custom evaluator that creates a large file
-	largeEval := &manyFilesRunner{fileCount: 1}
-	engine := NewEngine(largeEval, quietOpts(EngineOptions{
-		Workers:       1,
-		OutputDir:     outputDir,
-		SkipReview:    true,
-		MaxOutputSize: 10, // 10 bytes
+	engine := NewEngine(&manyFilesRunner{fileCount: 3}, quietOpts(EngineOptions{
+		Workers:    1,
+		OutputDir:  outputDir,
+		SkipReview: true,
 	}))
 
 	prompts := []*prompt.Prompt{
-		{ID: "guardrail-size", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
+		{ID: "delta-capture", Properties: map[string]string{"service": "storage", "plane": "data-plane", "language": "go", "category": "auth"}},
 	}
 	configs := []config.ToolConfig{
 		{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}},
@@ -587,16 +592,15 @@ func TestGuardrailMaxOutputSize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(summary.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(summary.Results))
-	}
 	r := summary.Results[0]
-	// The file has 7 bytes ("content") which is < 10 bytes, so it should pass
-	// But the file also gets copied to report dir — the guardrail checks workspace files.
-	// Actually "content" is 7 bytes which is under 10 bytes, so this should succeed.
-	// Let's check that a valid case passes:
-	if !r.Success {
-		t.Log("Note: eval did not succeed, which may be expected depending on file size")
+	if r.WorkspaceDelta == nil {
+		t.Fatal("expected WorkspaceDelta to be populated")
+	}
+	if got := r.WorkspaceDelta.NewFileCount; got != 3 {
+		t.Errorf("NewFileCount: expected 3, got %d", got)
+	}
+	if r.WorkspaceDelta.BytesAdded == 0 {
+		t.Error("expected BytesAdded > 0")
 	}
 }
 
@@ -611,9 +615,6 @@ func TestGuardrailDefaultValues(t *testing.T) {
 	if engine.opts.MaxFiles != 50 {
 		t.Errorf("default MaxFiles: expected 50, got %d", engine.opts.MaxFiles)
 	}
-	if engine.opts.MaxOutputSize != 1048576 {
-		t.Errorf("default MaxOutputSize: expected 1048576, got %d", engine.opts.MaxOutputSize)
-	}
 }
 
 func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
@@ -623,7 +624,6 @@ func TestResolveLimitsNilFallsBackToDefaults(t *testing.T) {
 	if lim.maxTurns != 25 { t.Errorf("expected maxTurns 25, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected maxSessionActions 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected maxFiles 50, got %d", lim.maxFiles) }
-	if lim.maxOutputSize != 1048576 { t.Errorf("expected maxOutputSize 1048576, got %d", lim.maxOutputSize) }
 }
 
 func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
@@ -633,17 +633,15 @@ func TestResolveLimitsZeroFieldsFallBackToDefaults(t *testing.T) {
 	if lim.maxTurns != 25 { t.Errorf("expected 25, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
-	if lim.maxOutputSize != 1048576 { t.Errorf("expected 1048576, got %d", lim.maxOutputSize) }
 }
 
 func TestResolveLimitsConfigOverridesDefaults(t *testing.T) {
 	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
-	cfg := config.ToolConfig{Name: "custom", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxFiles: 20, MaxOutputSize: 524288, MaxSessionActions: 30}}
+	cfg := config.ToolConfig{Name: "custom", Generator: &config.GeneratorConfig{Model: "gpt-4"}, Limits: &config.SessionLimits{MaxTurns: 10, MaxFiles: 20, MaxSessionActions: 30}}
 	lim := engine.resolveLimits(cfg, nil)
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 30 { t.Errorf("expected 30, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 20 { t.Errorf("expected 20, got %d", lim.maxFiles) }
-	if lim.maxOutputSize != 524288 { t.Errorf("expected 524288, got %d", lim.maxOutputSize) }
 }
 
 func TestResolveLimitsPartialOverride(t *testing.T) {
@@ -653,7 +651,6 @@ func TestResolveLimitsPartialOverride(t *testing.T) {
 	if lim.maxTurns != 10 { t.Errorf("expected 10, got %d", lim.maxTurns) }
 	if lim.maxSessionActions != 50 { t.Errorf("expected 50, got %d", lim.maxSessionActions) }
 	if lim.maxFiles != 50 { t.Errorf("expected 50, got %d", lim.maxFiles) }
-	if lim.maxOutputSize != 1048576 { t.Errorf("expected 1048576, got %d", lim.maxOutputSize) }
 }
 
 func TestResolveLimitsPromptOverridesConfig(t *testing.T) {

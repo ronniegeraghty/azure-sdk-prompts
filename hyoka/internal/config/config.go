@@ -48,10 +48,9 @@ type ReviewerConfig struct {
 // SessionLimits configures per-config guardrail limits for evaluation sessions.
 // Zero values are ignored and fall back to engine-level defaults.
 type SessionLimits struct {
-	MaxTurns          int   `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
-	MaxFiles          int   `yaml:"max_files,omitempty" json:"max_files,omitempty"`
-	MaxOutputSize     int64 `yaml:"max_output_size,omitempty" json:"max_output_size,omitempty"`
-	MaxSessionActions int   `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
+	MaxTurns          int `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
+	MaxFiles          int `yaml:"max_files,omitempty" json:"max_files,omitempty"`
+	MaxSessionActions int `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
 }
 
 // ToolConfig represents a single evaluation configuration.
@@ -156,7 +155,46 @@ func (tc *ToolConfig) EffectiveGeneratorSkills() []ToolEntry {
 
 // ConfigFile represents the top-level config file structure.
 type ConfigFile struct {
-	Configs []ToolConfig `yaml:"configs"`
+	// PromptDirectory is an optional path that overrides the default prompt
+	// discovery (.hyoka/prompts → ./prompts → ../prompts). When set in a
+	// config YAML loaded from disk, relative paths are resolved against the
+	// containing config file's directory by Load/LoadDir.
+	PromptDirectory string `yaml:"prompt_directory,omitempty" json:"prompt_directory,omitempty"`
+	// ToolVersionOverride pins specific tool entries (matched by Entry.Name)
+	// to a given version. The version is forwarded to the registered Fetcher
+	// (for the default npx fetcher, it becomes a git ref). Per-entry
+	// `version:` set directly on a tool entry takes precedence over this map.
+	// Empty map (or absent field) means "no overrides" — fetcher defaults
+	// are used everywhere.
+	ToolVersionOverride map[string]string `yaml:"tool_version_override,omitempty" json:"tool_version_override,omitempty"`
+	Configs             []ToolConfig      `yaml:"configs"`
+}
+
+// ApplyVersionOverrides applies cf.ToolVersionOverride to every tool entry
+// in every config (Generator and Reviewer). Entries with a non-empty
+// Version field are left untouched (per-entry pin wins). Idempotent.
+func (cf *ConfigFile) ApplyVersionOverrides() {
+	if cf == nil || len(cf.ToolVersionOverride) == 0 {
+		return
+	}
+	apply := func(entries []ToolEntry) {
+		for i := range entries {
+			if entries[i].Version != "" {
+				continue
+			}
+			if v, ok := cf.ToolVersionOverride[entries[i].Name]; ok && v != "" {
+				entries[i].Version = v
+			}
+		}
+	}
+	for i := range cf.Configs {
+		if cf.Configs[i].Generator != nil {
+			apply(cf.Configs[i].Generator.Tools)
+		}
+		if cf.Configs[i].Reviewer != nil {
+			apply(cf.Configs[i].Reviewer.Tools)
+		}
+	}
 }
 
 // Load reads and parses a configuration file from the given path.
@@ -173,8 +211,14 @@ func Load(path string) (*ConfigFile, error) {
 	if err := cfg.ExpandPlugins(resolvePluginsDir()); err != nil {
 		return nil, fmt.Errorf("expanding plugins: %w", err)
 	}
+	cfg.ApplyVersionOverrides()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
+	}
+	// Resolve a relative prompt_directory against the config file's directory
+	// so a config that sits under .hyoka/configs/ can reference ../my-prompts.
+	if cfg.PromptDirectory != "" && !filepath.IsAbs(cfg.PromptDirectory) {
+		cfg.PromptDirectory = filepath.Join(filepath.Dir(path), cfg.PromptDirectory)
 	}
 	return cfg, nil
 }
@@ -190,6 +234,7 @@ func LoadDir(dir string) (*ConfigFile, error) {
 
 	merged := &ConfigFile{}
 	nameSource := make(map[string]string) // config name → source filename
+	var promptDirSource string             // filename that first set prompt_directory
 	for _, e := range entries {
 		if e.IsDir() || (filepath.Ext(e.Name()) != ".yaml" && filepath.Ext(e.Name()) != ".yml") {
 			continue
@@ -198,6 +243,18 @@ func LoadDir(dir string) (*ConfigFile, error) {
 		if err != nil {
 			return nil, fmt.Errorf("loading %s: %w", e.Name(), err)
 		}
+		if cf.PromptDirectory != "" {
+			if merged.PromptDirectory == "" {
+				merged.PromptDirectory = cf.PromptDirectory
+				promptDirSource = e.Name()
+			} else if merged.PromptDirectory != cf.PromptDirectory {
+				return nil, fmt.Errorf(
+					"conflicting prompt_directory: %q in %s vs %q in %s",
+					merged.PromptDirectory, promptDirSource,
+					cf.PromptDirectory, e.Name(),
+				)
+			}
+		}
 		for _, c := range cf.Configs {
 			if prev, ok := nameSource[c.Name]; ok {
 				return nil, fmt.Errorf("duplicate config name %q found in files %s and %s", c.Name, prev, e.Name())
@@ -205,6 +262,17 @@ func LoadDir(dir string) (*ConfigFile, error) {
 			nameSource[c.Name] = e.Name()
 		}
 		merged.Configs = append(merged.Configs, cf.Configs...)
+		// Merge tool_version_override maps. Conflicting values across files
+		// are an error — silently last-write-wins would be a footgun.
+		for k, v := range cf.ToolVersionOverride {
+			if merged.ToolVersionOverride == nil {
+				merged.ToolVersionOverride = make(map[string]string)
+			}
+			if existing, ok := merged.ToolVersionOverride[k]; ok && existing != v {
+				return nil, fmt.Errorf("conflicting tool_version_override for %q: %q vs %q (in %s)", k, existing, v, e.Name())
+			}
+			merged.ToolVersionOverride[k] = v
+		}
 	}
 
 	if len(merged.Configs) == 0 {
@@ -292,9 +360,6 @@ func (cf *ConfigFile) Validate() error {
 			}
 			if c.Limits.MaxFiles < 0 {
 				return fmt.Errorf("config %q: limits.max_files must not be negative", c.Name)
-			}
-			if c.Limits.MaxOutputSize < 0 {
-				return fmt.Errorf("config %q: limits.max_output_size must not be negative", c.Name)
 			}
 			if c.Limits.MaxSessionActions < 0 {
 				return fmt.Errorf("config %q: limits.max_session_actions must not be negative", c.Name)

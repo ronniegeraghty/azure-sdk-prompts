@@ -13,10 +13,11 @@
 ```bash
 git clone https://github.com/ronniegeraghty/hyoka.git
 cd hyoka
-go run ./hyoka list  # Verify installation
+go install ./...
+hyoka version
 ```
 
-**Install as a CLI:**
+**From GitHub (latest release):**
 
 ```bash
 go install github.com/ronniegeraghty/hyoka@latest
@@ -29,15 +30,15 @@ Run your first evaluation in under 5 minutes:
 
 ```bash
 # 1. List available prompts
-go run ./hyoka list --service key-vault --language python
+hyoka list --service key-vault --language python
 
 # 2. Run a single evaluation
-go run ./hyoka run \
+hyoka run \
   --prompt-id key-vault-dp-python-crud \
   --config baseline/claude-opus-4.6
 
 # 3. View results in your browser
-go run ./hyoka serve
+hyoka serve
 # Open http://localhost:8080
 ```
 
@@ -173,7 +174,6 @@ Every evaluation session is automatically aborted if it exceeds any of these lim
 |-------|---------|------|---------|
 | Session actions | 50 | `--max-session-actions` | Limits reasoning, response, and tool call actions per session |
 | File count | 50 | `--max-files` | Prevents excessive file creation (counts new files + deleted starters) |
-| Output size | 1 MB | `--max-output-size` | Prevents oversized outputs (counts deltas only) |
 
 Prompts can override defaults via frontmatter. Resolution order: prompt frontmatter > config YAML > CLI flag > engine default.
 
@@ -209,7 +209,7 @@ We welcome contributions! To get started:
 # Clone and build
 git clone https://github.com/ronniegeraghty/hyoka.git
 cd hyoka
-go build ./hyoka/...
+go build ./...
 
 # Run tests
 go test -race ./...
@@ -217,8 +217,13 @@ go test -race ./...
 # Test site (frontend)
 cd site && npm test
 
+# Rebuild the site AND refresh the embedded bundle that `hyoka serve` ships.
+# Required whenever you change anything under site/src/** — a CI check
+# (site-embed-freshness) will fail the PR otherwise.
+make site-embed
+
 # Test with a live eval (fastest feedback)
-go run ./hyoka run --prompt-id key-vault-dp-python-crud \
+hyoka run --prompt-id key-vault-dp-python-crud \
   --config baseline/claude-opus-4.6
 ```
 

@@ -384,3 +384,205 @@ Your README audit (commit 2208bfcb) established task-agnostic framing. Tank comp
 
 **Decision documented:** `.squad/decisions.md` (3 entries merged from inbox: copilot-directive-readme-scope, oracle-readme-audit, tank-cli-help-scrub)
 
+
+### Phase 6 Comprehensive Documentation Audit (2026-04-21)
+
+**Status:** COMPLETE  
+**Branch:** phase-6  
+**Commits:** b5c4782c, 0db8f454, 904b1a04
+
+Comprehensive pre-merge audit of ALL documentation on `phase-6` branch before PR #607 merge to ronniegeraghty/dev. Verified every command shown in docs actually works.
+
+**Scope:** 18 files audited (README, AGENTS, CHANGELOG, CONTRIBUTING, all docs/, skills/)
+**Commands tested:** 17 different commands with various flags
+
+**Critical fixes:**
+1. **Command pattern error** — All docs incorrectly used `go run ./hyoka` when correct is `go run .` (main.go in repo root, not hyoka/ subdir). Fixed 47 instances across 4 files. This was a regression from Phase 5 where I documented this exact learning but new Phase 6 changes reintroduced the error.
+2. **Version drift** — Updated docs to show `hyoka version dev` (not `0.2.0`)
+3. **Deprecated command** — Marked `hyoka configs` as deprecated in cli-reference.md
+4. **Duplicate entry** — Removed duplicate "hyoka list" line in architecture.md
+
+**Testing methodology:**
+- Ran every single command shown in docs (with --dry-run or --help where applicable)
+- Verified all flags exist and match documented behavior
+- Tested filters (--service, --language, --plane, --category)
+- Tested guardrails (--max-session-actions, --max-files, --max-output-size)
+- Confirmed deprecated commands still work but show deprecation warnings
+- Verified site tests (133 tests, up from 72 in Phase 5)
+- Verified make site-embed workflow
+
+**Key findings:**
+- `--check-models` and `--review-mode` flags still exist (not removed as task description suggested)
+- All Phase 6 features correctly documented (serve embed, compare redesign)
+- No stale .ai-team/ references found (all .squad/)
+- All config names match filenames correctly documented
+- Prompt frontmatter format documentation accurate
+
+**Verification approach:**
+1. Read every doc file start to finish
+2. Extract every command shown
+3. Run it (or closest dry-run equivalent)
+4. If output contradicts docs → fix docs
+5. Cross-check flags against --help output
+
+**Result:** 3 commits pushed to phase-6, all CI checks should pass on PR #607.
+
+**Lesson reinforced:** The `go run .` vs `go run ./hyoka` distinction is subtle but critical — Go looks for main.go relative to the dot. Since go.work exists at repo root, `go run .` is correct. This should be memorialized as a docs-standards pattern.
+
+---
+
+## Session 2026-04-21T23:22:02Z: User Directive — Docs Installed-Binary Command Form
+
+**Status:** NOTED (routing guidance for future)  
+**Date:** 2026-04-21
+
+### Directive
+
+User Ronnie requested that all examples in `docs/` use installed-binary command form (`hyoka run`, `hyoka list`, etc.), never source-dev form (`go run .` or `go run ./hyoka`).
+
+**Rationale:** docs/ is for end users who installed the tool, not contributors. Source-dev commands belong in CONTRIBUTING.md only.
+
+### Implementation
+
+Tank executed the conversion in commit d111c964 (28 replacements in docs/getting-started.md). Decision captured in `.squad/decisions.md` as "docs/ Uses Installed-Binary Command Form" + formal user directive.
+
+### Routing Note for Future Sessions
+
+**Future docs work should route to Oracle by default,** not Tank. Oracle has specialized expertise in documentation accuracy, user-facing tone, and cross-file consistency. Tank should focus on CLI/platform work.
+
+**Decision captured:** `.squad/decisions.md` — "Routing Note (Informal): Future Docs Work"
+
+
+### WI-058: Post-Architecture Examples & Samples Review (2026-04-21)
+
+**Status:** COMPLETE  
+**Branch:** squad/370-examples-post-arch-review → PR #617 → phase-6  
+**Issue:** #370
+
+Completed comprehensive audit of examples/ directory to ensure all reflect post-Phase-3 architecture.
+
+**Audit Requirements (All ✅):**
+
+1. **R1 — Unified tools system:** Verified all example configs use new `tools:` block (no legacy `mcp_servers:`)
+   - example-full.yaml: shows MCP + local skills + remote skills
+   - example-generator-skills.yaml: demonstrates skill_dir patterns
+   - example-remote-skill.yaml: demonstrates whole-repo + subpath fetching
+   - Result: ALL configs compliant, no legacy patterns found
+
+2. **R2 — Prompt-level graders:** Created new example demonstrating `graders:` frontmatter
+   - New file: `examples/prompts/graders-frontmatter-example.prompt.md`
+   - Shows multiple grader kinds (prompt_review, file)
+   - Demonstrates weight/gate/when fields
+
+3. **R3 — Hierarchical when syntax:** Created comprehensive example
+   - New file: `examples/criteria/hierarchical-when-example.yaml`
+   - Demonstrates file-level when (applies to all graders in file)
+   - Demonstrates group-level when (new section with different when)
+   - Demonstrates grader-level when (individual grader overrides)
+   - Clear comments showing AND semantics of multiple when levels
+
+4. **R4 — Examples documentation:** Created comprehensive README
+   - New file: `examples/README.md` (5.7KB)
+   - Directory structure explanation
+   - Links to all example files with descriptions
+   - Architecture pattern explanations with YAML examples
+   - Running examples section (validate, run, list)
+   - Adding new examples guidelines
+
+**Validation Results:**
+- ✅ All 89 prompts valid (including new graders-frontmatter-example)
+- ✅ All 12 configs valid
+- ✅ All 2 criteria files valid (+ hierarchical-when-example)
+- ✅ All tests pass: `go test -race ./... -timeout 5m`
+
+**Files Added:**
+- examples/README.md
+- examples/criteria/hierarchical-when-example.yaml
+- examples/prompts/graders-frontmatter-example.prompt.md
+
+**Documentation Updated:**
+- CHANGELOG.md: Added entry under Unreleased section
+
+**Key Insight:** The examples directory now functions as both a validation suite and a teaching tool. Each example directly reflects the current architecture, removing drift risk.
+
+
+## Session: Fix PR #618 non-blocking nits
+
+**Date:** 2026-04-22 (async follow-up to Morpheus review)
+**Outcome:** ✅ All 3 nits addressed & merged
+
+### Work log
+- **N1** (cmd/helpers.go:167-168): Deleted 2-line tombstone comment referencing removed `parseByteSize` helper. Convention: clean removal, no obituary.
+- **N2** (README.md:177): Deleted guardrails-table row "`| Output size | — | — | Removed in #566 —...`" to match cleanup across other docs.
+- **N3** (engine_test.go:575): Tightened comment from "reaches both the report and graders" to "reaches the report (grader coverage via #571 nil-safety tests)" to accurately reflect SkipReview: true test path.
+
+Build: ✓ green  
+Tests: ✓ all 24 packages passing  
+Commit: `fccebad1` with Co-authored-by trailer  
+Pushed: `squad/566-workspacedelta-firstclass`  
+PR #618 comment: posted acknowledgment
+
+### Lessons
+- Dead code removal should be surgical (no comments), not apologetic.
+- Test comments must stay in sync with test setup (SkipReview is a coverage boundary).
+- Cross-doc consistency matters: if one doc removes a row, others should too.
+
+## PR #618 merged into phase-6
+
+All nits addressed. Work reflects code hygiene principles: total removal (no partial patches), cross-doc consistency, comment/code sync.
+
+**2026-04-22 (Morpheus Examples Audit):** Examples can have misleading patterns — e.g., `hierarchical-when-example.yaml` uses YAML `---` doc separator suggesting multi-doc support, but the schema requires `groups:` list (the loader silently truncates docs 2+). Oracle should audit examples during docs maintenance cycles to catch patterns that might misguide new users. PR #607 comment 3125721580 has full context.
+
+## Session: Rewrite Hierarchical When Example (Phase 6 Polish)
+
+**Date:** 2026-04-22 (follow-up to Morpheus PR #607 insight)  
+**Outcome:** ✅ Example rewritten, validate green, build green
+
+### Work Summary
+
+**Problem:** `examples/criteria/hierarchical-when-example.yaml` used YAML `---` document separators to suggest multi-doc support, but hyoka's criteria loader (`criteria.go:130-136`) only decodes the first document, silently truncating everything after `---`. This could mislead users into an incorrect pattern.
+
+**Solution:** Rewrote the example to use the correct `groups:` top-level list (canonical pattern per `hierarchical_test.go:216-246`), removed all `---` separators, and enhanced the leading comment block to clarify the correct shape.
+
+### Validation Results
+
+- ✅ `go run . validate`: All 2 criteria files valid (25 graders)
+- ✅ `go build ./...`: Build succeeds, no errors
+- ✅ Example now demonstrates:
+  - File-level `when: language: python` (applies to all graders and groups)
+  - Two groups with distinct `when` conditions: `Python Auth Group` (category: auth) and `Python CRUD Group` (category: crud)
+  - Grader-level override: "Query Efficiency" adds `plane: data-plane` on top of group conditions
+  - Clear comments showing AND semantics across levels
+
+### Pattern Documentation
+
+**Canonical `groups:` shape** (extracted for future reference):
+```yaml
+when:
+  language: python        # File-level: applies to all graders AND all groups
+graders:
+  - name: TopLevel       # Inherits file-level when
+    weight: 1.0
+groups:
+  - name: AuthGroup      # Each group has own when
+    when:
+      category: auth     # GROUP-level (ORs with file-level, combined via AND)
+    graders:
+      - name: Grader1    # Inherits file + group when
+        weight: 1.0
+      - name: Grader2
+        weight: 1.0
+        when:            # GRADER-level overrides/extends group + file
+          plane: data-plane
+```
+
+Resolution order: **FILE-level (universal baseline) → GROUP-level (domain focus) → GRADER-level (fine-grained override)**. All levels AND together to determine applicability.
+
+### Files Modified
+
+- `examples/criteria/hierarchical-when-example.yaml`: Complete rewrite
+
+### Outstanding
+
+**Underlying Loader Bug (Neo's territory):** The loader's silent truncation of docs 2+ is not fixed here (per instructions, only example rewrite). Issue remains in `criteria.go` loadFile() — should either support multi-doc properly or emit a clear error on `---` separator detection.
+

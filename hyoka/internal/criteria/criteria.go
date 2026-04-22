@@ -22,20 +22,32 @@ import (
 
 // GraderEntry defines a single grader with its evaluation prompt and weight.
 // Supports hierarchical when conditions for prompt-based matching.
+//
+// Isolate, when true and the engine is run with --review-mode isolated, causes
+// this grader to be reviewed in a dedicated Copilot session rather than sharing
+// a session with other criteria. Has no effect in the default combined mode.
 type GraderEntry struct {
-Name   string            `yaml:"name" json:"name"`
-Weight float64           `yaml:"weight" json:"weight"`
-Prompt string            `yaml:"prompt" json:"prompt"`
-When   map[string]string `yaml:"when,omitempty" json:"when,omitempty"` // Grader-level when conditions
+Name    string            `yaml:"name" json:"name"`
+Weight  float64           `yaml:"weight" json:"weight"`
+Prompt  string            `yaml:"prompt" json:"prompt"`
+When    map[string]string `yaml:"when,omitempty" json:"when,omitempty"` // Grader-level when conditions
+Isolate bool              `yaml:"isolate,omitempty" json:"isolate,omitempty"`
 }
 
 // GraderGroup is a named collection of graders with optional when conditions.
 // Groups allow hierarchical when matching: group-level conditions apply to
 // all graders in the group unless overridden by grader-level conditions.
+//
+// Isolate, when true and the engine is run with --review-mode isolated, causes
+// the entire group to be reviewed in a single dedicated Copilot session
+// (separate from other criteria but shared across the group's graders).
+// Per-grader Isolate within an isolated group is ignored — the group-level
+// flag wins. Has no effect in the default combined mode.
 type GraderGroup struct {
 Name    string            `yaml:"name,omitempty" json:"name,omitempty"`
 When    map[string]string `yaml:"when,omitempty" json:"when,omitempty"`
 Graders []GraderEntry     `yaml:"graders" json:"graders"`
+Isolate bool              `yaml:"isolate,omitempty" json:"isolate,omitempty"`
 }
 
 // GraderConfig is a collection of graders with conditions for when they apply.
@@ -134,36 +146,12 @@ return &gc, nil
 // match the given prompt properties. Respects hierarchical when resolution:
 // file-level → group-level → grader-level (most specific wins).
 func MatchingGraders(configs []GraderConfig, props map[string]string) []GraderEntry {
-var matched []GraderEntry
-for _, gc := range configs {
-// File-level when must match for ANY grader in this config to be included
-if !matchesWhen(gc.When, props) {
-continue
-}
-
-// Top-level graders (no group)
-for _, grader := range gc.Graders {
-effectiveWhen := mergeWhen(gc.When, grader.When)
-if matchesWhen(effectiveWhen, props) {
-matched = append(matched, grader)
-}
-}
-
-// Grouped graders
-for _, group := range gc.Groups {
-groupWhen := mergeWhen(gc.When, group.When)
-if !matchesWhen(groupWhen, props) {
-continue
-}
-for _, grader := range group.Graders {
-effectiveWhen := mergeWhen(groupWhen, grader.When)
-if matchesWhen(effectiveWhen, props) {
-matched = append(matched, grader)
-}
-}
-}
-}
-return matched
+	matched := MatchingGradersWithIsolation(configs, props)
+	out := make([]GraderEntry, 0, len(matched))
+	for _, m := range matched {
+		out = append(out, m.Entry)
+	}
+	return out
 }
 
 // FormatGraders formats a list of grader entries as a text block suitable for

@@ -1,0 +1,58 @@
+name: Site Embed Freshness
+
+# Enforces that hyoka/internal/serve/site/ (the go:embed'd bundle) is kept
+# in sync with site/src/**. Rebuilds the site on the PR branch and fails if
+# the committed embedded tree differs from a fresh build.
+#
+# See .squad/skills/embedded-asset-freshness/SKILL.md.
+#
+# Deliberate duplication note: this workflow's `npm ci && npm run build`
+# overlaps with ci.yml's `site-build-and-test` job (~1–2 min/run). The
+# duplication is intentional — keeping freshness as a discrete required
+# check gives a clear, named status on PRs ("Verify embedded site bundle is
+# fresh") that reviewers can gate on without reading into a generic site
+# CI job. Reconsider folding into ci.yml only if CI minute pressure
+# materially outweighs the signal clarity.
+
+on:
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'site/**'
+      - 'hyoka/internal/serve/site/**'
+      - 'hyoka/internal/serve/embed.go'
+      - 'Makefile'
+      - '.github/workflows/site-embed-freshness.yml'
+  push:
+    # phase-6 was a temporary integration branch and was removed once it
+    # merged into ronniegeraghty/dev. Add it back only if a similar
+    # short-lived integration line is reopened.
+    branches:
+      - main
+      - ronniegeraghty/dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-embedded-bundle:
+    name: Verify embedded site bundle is fresh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        run: make site-install
+
+      - name: Verify embedded bundle matches fresh build
+        run: make verify-embed

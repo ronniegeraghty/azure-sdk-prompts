@@ -188,6 +188,28 @@ func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _
 	}, nil
 }
 
+// ReviewBuckets returns a stub review result with one criterion per bucket so
+// StubReviewer satisfies MultiBucketReviewer for tests.
+func (s *StubReviewer) ReviewBuckets(_ context.Context, _ string, _ string, _ string, buckets []Bucket) (*ReviewResult, error) {
+	criteria := make([]CriterionResult, 0, len(buckets))
+	for _, b := range buckets {
+		criteria = append(criteria, CriterionResult{
+			Name: "stub_criterion_" + b.Name, Passed: true, Reason: "stub mode",
+		})
+	}
+	if len(criteria) == 0 {
+		criteria = append(criteria, CriterionResult{Name: "stub_criterion", Passed: true, Reason: "stub mode"})
+	}
+	return &ReviewResult{
+		Scores:       ReviewScores{Criteria: criteria},
+		OverallScore: len(criteria),
+		MaxScore:     len(criteria),
+		Summary:      "Review skipped (stub evaluator, bucketed)",
+		Issues:       []string{},
+		Strengths:    []string{},
+	}, nil
+}
+
 // parseReviewResponse extracts the JSON ReviewResult from the LLM response.
 // It supports both the new ReviewerResponse schema (flat criteria array) and
 // the legacy nested scores.criteria format for backward compatibility.

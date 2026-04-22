@@ -108,11 +108,10 @@ Pluggable grading criteria defined in YAML. Five deterministic grader types are 
 
 ```bash
 hyoka run           # Run evaluations (main command)
-hyoka list          # List available prompts
+hyoka list          # List prompts, configs, and criteria
 hyoka init          # Scaffold a .hyoka project directory
 hyoka compare       # Compare evaluation results between configs/runs
 hyoka tools         # List available tools and plugins (alias: hyoka plugins)
-hyoka configs       # List available configurations
 hyoka validate      # Validate prompt frontmatter
 hyoka check-env     # Verify prerequisites
 hyoka trends        # Analyze trends across runs

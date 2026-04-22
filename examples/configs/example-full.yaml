@@ -65,7 +65,6 @@ configs:
     limits:
       max_turns: 75
       max_files: 50
-      max_output_size: 1048576  # 1 MB
       max_session_actions: 50
 
   # Minimal config — only required fields

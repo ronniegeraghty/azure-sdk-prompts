@@ -88,11 +88,12 @@ type EngineOptions struct {
 	// Fan-out visibility (#34)
 	ConfirmLargeRuns bool
 	AutoConfirm      bool
-	// Generator guardrails (#35)
+	// Generator guardrails (#35). Phase 3.5 (#566) dropped the byte-size
+	// guardrail entirely — review no longer inlines file contents, and the
+	// review-side caps in internal/utils prevent runaway memory.
 	MaxTurns          int
 	MaxSessionActions int
 	MaxFiles          int
-	MaxOutputSize     int64
 	// Tiered limits (#347): separate generator and reviewer guardrails.
 	// Reviewer limits default to half of generator limits when zero.
 	ReviewerMaxTurns   int
@@ -107,6 +108,11 @@ type EngineOptions struct {
 	MonitorResources bool
 	// Tiered criteria (#30)
 	CriteriaDir string // Directory containing attribute-matched criteria YAML files.
+	// Review session splitting (#580). When "isolated", graders/groups marked
+	// with isolate: true are reviewed in their own Copilot session per panel
+	// model. Empty string or "combined" preserves legacy single-session
+	// behavior. Validated at the CLI layer.
+	ReviewMode string
 	// Pluggable graders (#136)
 	GradersDir string // Directory containing grader config YAML files.
 	// Generator safety (#36)
@@ -161,9 +167,6 @@ func NewEngineWithReviewerFactory(evaluator PromptRunner, factory ReviewerFactor
 	}
 	if opts.MaxFiles <= 0 {
 		opts.MaxFiles = 50
-	}
-	if opts.MaxOutputSize <= 0 {
-		opts.MaxOutputSize = 1048576 // 1MB
 	}
 	// Tiered reviewer limits: default to half of generator limits (#347)
 	if opts.ReviewerMaxTurns <= 0 {
@@ -260,6 +263,31 @@ func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) strin
 	return merged
 }
 
+// reviewBuckets builds the set of review buckets for a prompt under the
+// configured ReviewMode. In combined mode (default) it returns one bucket
+// containing all matched graders + prompt criteria — byte-identical to the
+// legacy single-criteria path. In isolated mode it returns one bucket per
+// isolated grader/group plus a shared "combined" bucket for the rest. When
+// isolated mode is requested but nothing is marked isolate, it logs a warning
+// so the flag is observably no-op rather than silently dead.
+func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string) []graders.ReviewBucket {
+	mode := e.opts.ReviewMode
+	if mode == "" {
+		mode = criteria.ReviewModeCombined
+	}
+	matched := criteria.MatchingGradersWithIsolation(e.graderConfigs, props)
+	if mode == criteria.ReviewModeIsolated && !criteria.HasIsolation(matched) {
+		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
+			"prompt_id", p.ID)
+	}
+	cb := criteria.BuildReviewBuckets(matched, p.EvaluationCriteria, mode)
+	out := make([]graders.ReviewBucket, 0, len(cb))
+	for _, b := range cb {
+		out = append(out, graders.ReviewBucket{Name: b.Name, Criteria: b.FormatCriteria()})
+	}
+	return out
+}
+
 // EvalTask represents a single prompt+config evaluation to run.
 type EvalTask struct {
 	Prompt *prompt.Prompt
@@ -271,7 +299,6 @@ type EvalTask struct {
 type resolvedLimits struct {
 	maxTurns          int
 	maxFiles          int
-	maxOutputSize     int64
 	maxSessionActions int
 }
 
@@ -358,7 +385,6 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 	rl := resolvedLimits{
 		maxTurns:          e.opts.MaxTurns,
 		maxFiles:          e.opts.MaxFiles,
-		maxOutputSize:     e.opts.MaxOutputSize,
 		maxSessionActions: e.opts.MaxSessionActions,
 	}
 	if cfg.Limits != nil {
@@ -367,9 +393,6 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 		}
 		if cfg.Limits.MaxFiles > 0 {
 			rl.maxFiles = cfg.Limits.MaxFiles
-		}
-		if cfg.Limits.MaxOutputSize > 0 {
-			rl.maxOutputSize = cfg.Limits.MaxOutputSize
 		}
 		if cfg.Limits.MaxSessionActions > 0 {
 			rl.maxSessionActions = cfg.Limits.MaxSessionActions
@@ -464,7 +487,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	if e.opts.DryRun {
-		return e.dryRun(tasks)
+		return e.dryRun(ctx, tasks)
 	}
 
 	// Resource monitor (#45) — opt-in via --monitor-resources.
@@ -732,7 +755,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	return summary, nil
 }
 
-func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
+func (e *Engine) dryRun(ctx context.Context, tasks []EvalTask) (*report.RunSummary, error) {
 	summary := &report.RunSummary{
 		RunID:        "dry-run",
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
@@ -762,7 +785,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
 			entries := countSkillEntries(t.Config.Generator.Tools)
-			resolved, err := tool.ResolveSkills(t.Config.Generator.Tools, "")
+			resolved, err := tool.ResolveSkills(ctx, t.Config.Generator.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
@@ -774,7 +797,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		}
 		if t.Config.Reviewer != nil {
 			entries := countSkillEntries(t.Config.Reviewer.Tools)
-			resolved, err := tool.ResolveSkills(t.Config.Reviewer.Tools, "")
+			resolved, err := tool.ResolveSkills(ctx, t.Config.Reviewer.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue

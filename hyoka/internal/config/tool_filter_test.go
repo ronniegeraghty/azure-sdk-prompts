@@ -311,17 +311,17 @@ func TestValidateToolEntry_SkillDirOnLocal(t *testing.T) {
 	}
 }
 
-// TestValidateToolEntry_BranchOnRemote disabled — Branch field doesn't exist in dev structure
+// TestValidateToolEntry_BranchOnRemote disabled — Branch field doesn't exist in phase-6 structure
 // func TestValidateToolEntry_BranchOnRemote(t *testing.T) {
-// 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills", Branch: "feature-branch"}
+// 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills"}
 // 	if err := validateToolEntry(entry, "test", 0); err != nil {
 // 		t.Fatalf("unexpected error for branch on remote skill: %v", err)
 // 	}
 // }
 
-// TestValidateToolEntry_BranchOnLocal disabled — Branch field doesn't exist in dev structure
+// TestValidateToolEntry_BranchOnLocal disabled — Branch field doesn't exist in phase-6 structure
 // func TestValidateToolEntry_BranchOnLocal(t *testing.T) {
-// 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/gen", Branch: "main"}
+// 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/gen"}
 // 	if err := validateToolEntry(entry, "test", 0); err == nil {
 // 		t.Fatal("expected error for branch on local skill (no repo)")
 // 	}

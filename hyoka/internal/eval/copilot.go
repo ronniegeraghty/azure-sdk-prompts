@@ -163,7 +163,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	}
 	defer os.RemoveAll(configDir)
 
-	sessionCfg := e.buildSessionConfig(cfg, workDir, configDir, mergePromptProperties(p))
+	sessionCfg := e.buildSessionConfig(ctx, cfg, workDir, configDir, mergePromptProperties(p))
 
 	// Subscribe to events with detailed capture and debug logging.
 	// This MUST be set before CreateSession — the SDK reads OnEvent during
@@ -719,13 +719,13 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 	return make(map[string]string)
 }
 
-func (e *CopilotPromptRunner) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
+func (e *CopilotPromptRunner) buildSessionConfig(ctx context.Context, cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
 	// Resolve skill directories from Generator.Tools using the skills package.
 	// This handles glob patterns, validates directories exist and contain skills,
 	// and warns about empty/missing directories (#291).
 	var skillDirs []string
 	if cfg.Generator != nil {
-		resolved, err := tool.ResolveSkills(cfg.Generator.Tools, configDir)
+		resolved, err := tool.ResolveSkills(ctx, cfg.Generator.Tools, configDir)
 		if err != nil {
 			slog.Warn("Failed to resolve generator skill directories", "error", err)
 		} else {

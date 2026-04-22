@@ -16,6 +16,7 @@ import (
 "github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
 )
 
 func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string, sendPhase func(progress.Phase), sendEvent func(progress.EventType, string)) *report.EvalReport {
@@ -69,11 +70,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	lim := e.resolveLimits(task.Config, task.Prompt)
 	evalReport.GuardrailMaxTurns = lim.maxTurns
 	evalReport.GuardrailMaxFiles = lim.maxFiles
-	evalReport.GuardrailMaxOutputSize = lim.maxOutputSize
 	evalReport.GuardrailMaxSessionActions = lim.maxSessionActions
 
 	if len(task.Prompt.Tags) > 0 {
 		evalReport.PromptMeta["tags"] = strings.Join(task.Prompt.Tags, ", ")
+	}
+	if task.Prompt.Group != "" {
+		evalReport.PromptMeta["group"] = task.Prompt.Group
 	}
 
 	lg.Info("Starting Copilot session")
@@ -123,6 +126,18 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// the bytes/files it actually contributed, not the starter project it was
 	// handed (#565).
 	starterSnapshot := snapshotStarterSizes(genDir, starterFiles)
+
+	// Take a content-hashed snapshot of the workspace post-starter-copy.
+	// Pairing this with a post-generation snapshot yields a WorkspaceDelta
+	// describing exactly what the agent created/modified/deleted (#566).
+	beforeSnap, snapErr := workspace.TakeSnapshot(genDir)
+	if snapErr != nil {
+		// Non-fatal: if we cannot snapshot, the eval still proceeds; delta
+		// will simply be unavailable for graders and report consumers.
+		lg.Warn("Workspace pre-snapshot failed; WorkspaceDelta will be unavailable",
+			"error", snapErr)
+		beforeSnap = nil
+	}
 
 	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
 		"starter_files", len(starterFiles))
@@ -208,6 +223,23 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.GeneratedFiles = generatedFiles
 
+	// Compute the WorkspaceDelta now that the agent has finished writing to
+	// genDir (#566). If the pre-snapshot failed we skip — graders nil-check.
+	if beforeSnap != nil {
+		afterSnap, snapErr := workspace.TakeSnapshot(genDir)
+		if snapErr != nil {
+			lg.Warn("Workspace post-snapshot failed; WorkspaceDelta unavailable",
+				"error", snapErr)
+		} else {
+			evalReport.WorkspaceDelta = workspace.ComputeDelta(beforeSnap, afterSnap)
+			lg.Debug("WorkspaceDelta captured",
+				"new_files", evalReport.WorkspaceDelta.NewFileCount,
+				"modified_files", evalReport.WorkspaceDelta.ModifiedFileCount,
+				"deleted_files", evalReport.WorkspaceDelta.DeletedFileCount,
+				"bytes_net", evalReport.WorkspaceDelta.BytesNet)
+		}
+	}
+
 	// Diagnostic: if 0 files generated, check if agent attempted file creation
 	if len(generatedFiles) == 0 && !evalFailed {
 		fileToolAttempts := 0
@@ -247,7 +279,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Use ResolveSkillDirs for accurate directory resolution (#291).
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		resolved, err := tool.ResolveSkills(task.Config.Generator.Tools, "")
+		resolved, err := tool.ResolveSkills(ctx, task.Config.Generator.Tools, "")
 		if err != nil {
 			slog.Warn("Failed to resolve skill directories for report", "error", err)
 		} else {
@@ -393,7 +425,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				"actions", actionCount, "max_session_actions", lim.maxSessionActions)
 		}
 
-		// Check file count (starter-aware #565)
+		// File count — HARD FAIL (#35). Counts agent-attributable files
+		// (starter-aware via #565). Phase 3.5 (#566) dropped the byte-size
+		// guardrail entirely; MaxFiles remains the only generator-side cap
+		// with MaxTurns / MaxSessionActions covering session length.
 		agentFileCount := computeAgentFileCount(generatedFiles, starterSnapshot)
 		if agentFileCount > lim.maxFiles {
 			reason := fmt.Sprintf("guardrail: agent file count %d exceeded limit of %d", agentFileCount, lim.maxFiles)
@@ -401,16 +436,6 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			evalReport.Error = reason
 			evalReport.Success = false
 			lg.Warn("Guardrail triggered", "reason", reason, "agent_files", agentFileCount, "max_files", lim.maxFiles)
-		}
-
-		// Check total output size (starter-aware #565)
-		totalSize := computeAgentOutputSize(ws.Dir, generatedFiles, starterSnapshot)
-		if totalSize > lim.maxOutputSize {
-			reason := fmt.Sprintf("guardrail: agent output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
-			evalReport.GuardrailAbortReason = reason
-			evalReport.Error = reason
-			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "agent_output_size", totalSize, "max_size", lim.maxOutputSize)
 		}
 	}
 
@@ -427,9 +452,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 		// Build common grader input shared by all grader types.
 		graderInput := graders.GraderInput{
-			WorkspacePath:  genWs.Dir,
-			OriginalPrompt: task.Prompt.PromptText,
-			EvalCriteria:   e.mergedCriteria(task.Prompt, props),
+			WorkspacePath:       genWs.Dir,
+			OriginalPrompt:      task.Prompt.PromptText,
+			EvalCriteria:        e.mergedCriteria(task.Prompt, props),
+			EvalCriteriaBuckets: e.reviewBuckets(task.Prompt, props),
+			WorkspaceDelta:      evalReport.WorkspaceDelta,
 		}
 		if task.Prompt.ReferenceAnswer != "" {
 			graderInput.ReferenceDir = task.Prompt.ReferenceAnswer

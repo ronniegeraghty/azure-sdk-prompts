@@ -48,5 +48,5 @@ site/dist/
 # Playwright MCP snapshots
 .playwright-mcp/
 
-# Remote skill cache (populated on first run / dry-run by internal/skills/fetcher.go)
-.skills-cache/
+# Local Playwright debug artifacts
+.morpheus-screenshots/

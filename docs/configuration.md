@@ -6,6 +6,33 @@ hyoka uses YAML configuration files to define evaluation setups. Each config spe
 
 By default, configs are loaded from `./configs/`. Use `--config-dir` to specify a different location.
 
+## Custom Prompt Directory
+
+By default, hyoka looks for prompts in this order:
+
+1. `./.hyoka/prompts/` (created by `hyoka init`)
+2. `./prompts/` (legacy fallback)
+3. `../prompts/` (legacy fallback)
+
+You can override this by setting `prompt_directory:` at the **top level** of any config YAML file:
+
+```yaml
+prompt_directory: ../shared-prompt-library
+configs:
+  - name: baseline/claude-opus-4.6
+    generator:
+      model: claude-opus-4.6
+```
+
+Notes:
+
+- The path is resolved **relative to the config file** that contains it (so `../shared-prompt-library` from `.hyoka/configs/foo.yaml` points at `.hyoka/../shared-prompt-library`). Absolute paths are honored as-is.
+- When loading multiple config files via `--config-dir`, only one file may set `prompt_directory`; conflicting values across files are an error.
+- The `--prompts` CLI flag still wins over the config-driven value, so a one-off `--prompts ./other` takes precedence.
+- If you don't set `prompt_directory`, behavior is identical to previous releases — existing repos require no changes.
+
+Resolution priority: `--prompts` flag → `prompt_directory:` in config YAML → `.hyoka/prompts/` → `./prompts/` → `../prompts/`.
+
 ## Config Names vs Filenames
 
 The `name` field in a config is what you pass to the `--config` CLI flag. It is **not** the filename. For example, a config file called `azure-mcp-opus.yaml` might define `name: azure-mcp/claude-opus-4.6`. You'd run it with: `--config azure-mcp/claude-opus-4.6`.
@@ -236,7 +263,6 @@ This allows fine-grained control at the prompt level while maintaining sensible 
 |-------|------|---------|----------|-------------|
 | `max_turns` | int | 25 | `--max-turns` | Maximum assistant turns per generation |
 | `max_files` | int | 50 | `--max-files` | Maximum generated files per evaluation |
-| `max_output_size` | string | "1MB" | `--max-output-size` | Maximum total output size (supports KB, MB suffixes) |
 | `max_session_actions` | int | 50 | `--max-session-actions` | Maximum actions per Copilot session |
 
 ### Config-Level Limits
@@ -251,7 +277,6 @@ configs:
     limits:
       max_turns: 15
       max_files: 30
-      max_output_size: "512KB"
       max_session_actions: 25
 ```
 
@@ -273,6 +298,67 @@ max_turns: 40             # Allow more back-and-forth turns
 ```
 
 Prompts with unset limit fields fall through to config > CLI > default, ensuring backward compatibility.
+
+## Tool Versioning & Custom Fetchers
+
+Remote skills (and other future remote tools) are pinned and fetched through hyoka's pluggable **Fetcher** system. By default, hyoka uses an `npx skills add`-backed fetcher that follows the repo's default branch.
+
+### Pinning versions
+
+Use `tool_version_override` at the top of any config file to pin tools by `name`:
+
+```yaml
+tool_version_override:
+  azure-sdk-java: "v1.4.2"      # git tag
+  copilot-knowledge: "main"      # branch
+  azsdk-samples: "abc123def"     # commit SHA
+
+configs:
+  - name: baseline/sonnet
+    generator:
+      model: claude-sonnet-4.5
+      tools:
+        - name: azure-sdk-java
+          type: skill
+          source: remote
+          repo: Azure/azure-sdk-skills
+        - name: pinned-by-entry
+          type: skill
+          source: remote
+          repo: x/y
+          version: "v2.0.0"      # per-entry version always wins
+```
+
+**Resolution order:** per-entry `version:` field > `tool_version_override` map > fetcher default (latest).
+
+The version is forwarded to the fetcher; the default `npx` fetcher appends it as a git ref (`repo@version`) and caches each version under a separate directory (`.skills-cache/<version>/<repo>/<name>/`) so toggling pins doesn't poison the cache.
+
+`tool_version_override` maps are scoped to the config file they live in. Conflicting values across files in a directory load are an error.
+
+### Custom fetchers
+
+The `tool.Fetcher` interface (in `hyoka/internal/config/tool/`) lets embedders register additional fetchers — useful for internal mirror caches, alternate package managers, or custom version-pinning rules:
+
+```go
+import "github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+
+type artifactoryFetcher struct{ /* ... */ }
+
+func (artifactoryFetcher) Name() string { return "artifactory" }
+func (artifactoryFetcher) CanFetch(e tool.Entry) bool {
+    return e.ResolvedType() == tool.TypeSkill && e.Source == "remote" &&
+           strings.HasPrefix(e.Repo, "internal/")
+}
+func (artifactoryFetcher) Fetch(ctx context.Context, req tool.FetchRequest) (tool.FetchResult, error) {
+    // download from internal Artifactory, return FetchResult{Dir, Version}
+}
+
+func init() { _ = tool.Register(artifactoryFetcher{}) }
+```
+
+**Lookup order:** custom fetchers are consulted before the built-in `npx` default; the first whose `CanFetch` returns true wins. This means custom fetchers can shadow the default for specific entries while leaving everything else on the default path.
+
+Hyoka calls `tool.ValidateFetchers(...)` at the start of every run, so any remote skill without a matching registered fetcher fails fast — before a session is spawned.
 
 ## Multiple Config Files
 

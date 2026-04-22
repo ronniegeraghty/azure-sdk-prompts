@@ -10,6 +10,7 @@ import (
 
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
@@ -42,7 +43,6 @@ type runFlags struct {
 	// Generator guardrails (#35)
 	maxSessionActions int
 	maxFiles          int
-	maxOutputSize     string
 	// Generator safety (#36)
 	allowCloud bool
 	// Resource monitoring (#45)
@@ -61,6 +61,8 @@ type runFlags struct {
 	maxTurns int
 	// Pre-flight model check (#264)
 	checkModels bool
+	// Review session splitting (#580)
+	reviewMode string
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -95,7 +97,6 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().IntVar(&f.maxSessionActions, "max-session-actions", 50, "Maximum actions per Copilot session (reasoning, response, or tool call each count as 1)")
 	cmd.Flags().IntVar(&f.maxTurns, "max-turns", 0, "Maximum conversation turns per generation (0 = use config/default)")
 	cmd.Flags().IntVar(&f.maxFiles, "max-files", 50, "Maximum generated files per evaluation before aborting")
-	cmd.Flags().StringVar(&f.maxOutputSize, "max-output-size", "1MB", "Maximum total output size per evaluation (e.g., 1MB, 512KB)")
 	// Generator safety (#36)
 	cmd.Flags().BoolVar(&f.allowCloud, "allow-cloud", false, "Allow agent output to provision real Azure resources (disables safety boundaries)")
 	cmd.Flags().Bool("sandbox", true, "Enforce safety boundaries preventing real Azure resource provisioning (default, opposite of --allow-cloud)")
@@ -112,6 +113,8 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().BoolVarP(&f.pairwiseMode, "pairwise", "P", false, "Expand each config into N+1 pairwise tool-ablation variants")
 
 	cmd.Flags().BoolVar(&f.checkModels, "check-models", false, "Pre-flight check that all configured models (generator + reviewer) are available before starting evaluations")
+	// Review session splitting (#580)
+	cmd.Flags().StringVar(&f.reviewMode, "review-mode", "combined", "How review criteria are bucketed across reviewer sessions: combined (default, single session per panel model) or isolated (one session per grader/group marked isolate: true)")
 }
 
 func buildFilter(f *runFlags) prompt.Filter {
@@ -160,13 +163,14 @@ func runCmd() *cobra.Command {
 			}
 
 			// Resolve all paths first, before any loading
-			f.prompts = resolvePromptsDir(cmd)
 			f.output = resolveOutputDir(cmd)
 			f.criteriaDir = resolveCriteriaDir(cmd)
 			f.configFile = resolveConfigFile(cmd)
 			configDir := resolveConfigDir(cmd)
 
-			// Load config(s)
+			// Load config(s) before resolving the prompts directory so that a
+			// config-driven `prompt_directory:` override can take precedence
+			// over the default .hyoka/prompts/ → ./prompts fallback.
 			var cfgFile *config.ConfigFile
 			if cmd.Flags().Changed("config-file") {
 				var err error
@@ -181,6 +185,8 @@ func runCmd() *cobra.Command {
 					return fmt.Errorf("loading configs from %s: %w", configDir, err)
 				}
 			}
+
+			f.prompts = resolvePromptsDirWithConfig(cmd, cfgFile.PromptDirectory)
 
 			// ── Load all resources ──────────────────────────────────
 			// Get selected configs
@@ -248,6 +254,21 @@ func runCmd() *cobra.Command {
 			// Resolve relative skill_directories in configs to absolute paths
 			resolveConfigSkillDirs(configs, f.prompts)
 
+			// Pre-flight: every remote skill needs a registered Fetcher.
+			// Failing here gives a fast, clear error before any session starts.
+			var allEntries []tool.Entry
+			for _, c := range configs {
+				if c.Generator != nil {
+					allEntries = append(allEntries, c.Generator.Tools...)
+				}
+				if c.Reviewer != nil {
+					allEntries = append(allEntries, c.Reviewer.Tools...)
+				}
+			}
+			if err := tool.ValidateFetchers(allEntries); err != nil {
+				return fmt.Errorf("tool fetcher validation: %w", err)
+			}
+
 			// Install declared skills and plugins (npx skills add)
 			if err := config.InstallSkillsAndPlugins(configs); err != nil {
 				return fmt.Errorf("installing skills/plugins: %w", err)
@@ -280,6 +301,11 @@ func runCmd() *cobra.Command {
 			sessionTimeout, err := time.ParseDuration(f.sessionTimeout)
 			if err != nil {
 				return fmt.Errorf("invalid --session-timeout %q: %w", f.sessionTimeout, err)
+			}
+
+			// Validate --review-mode (#580). Empty string is treated as combined.
+			if err := validateReviewMode(f.reviewMode); err != nil {
+				return err
 			}
 
 			// Create a real Copilot SDK evaluator
@@ -363,12 +389,6 @@ func runCmd() *cobra.Command {
 				reviewerFactory = nil
 			}
 
-			// Parse max-output-size flag (#35)
-			maxOutputSize, err := parseByteSize(f.maxOutputSize)
-			if err != nil {
-				return fmt.Errorf("invalid --max-output-size %q: %w", f.maxOutputSize, err)
-			}
-
 			// Create and run engine
 			// Parse exclude-dirs (#63)
 			var excludeDirs []string
@@ -392,11 +412,11 @@ func runCmd() *cobra.Command {
 				MaxTurns:          f.maxTurns,
 				MaxSessionActions: f.maxSessionActions,
 				MaxFiles:          f.maxFiles,
-				MaxOutputSize:     maxOutputSize,
 				MonitorResources:  f.monitorResources,
 				StrictCleanup:     f.strictCleanup,
 				AllowCloud:        f.allowCloud,
 				CriteriaDir:       f.criteriaDir,
+				ReviewMode:        f.reviewMode,
 				ExcludeDirs:       excludeDirs,
 				SessionTimeout:    sessionTimeout,
 				CheckModels:       f.checkModels,

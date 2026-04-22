@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,7 @@ func TestResolveSkills_SingleSkill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirs, err := ResolveSkills([]Entry{
+	dirs, err := ResolveSkills(context.Background(), []Entry{
 		{Type: "skill", Source: "local", Path: skillDir, Name: "local-skill"},
 	}, dir)
 	if err != nil {
@@ -38,7 +39,7 @@ func TestResolveSkills_SingleSkillMissingSKILLMD(t *testing.T) {
 	}
 	// No SKILL.md — should warn and return nothing
 
-	dirs, err := ResolveSkills([]Entry{
+	dirs, err := ResolveSkills(context.Background(), []Entry{
 		{Type: "skill", Source: "local", Path: skillDir, Name: "local-skill"},
 	}, dir)
 	if err != nil {
@@ -67,7 +68,7 @@ func TestResolveSkills_SkillDir(t *testing.T) {
 		}
 	}
 
-	dirs, err := ResolveSkills([]Entry{
+	dirs, err := ResolveSkills(context.Background(), []Entry{
 		{Type: "skill", Source: "local", Path: "skills/generator", Name: "gen-skills", SkillDir: true},
 	}, dir)
 	if err != nil {
@@ -88,7 +89,7 @@ func TestResolveSkills_SkillDirEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirs, err := ResolveSkills([]Entry{
+	dirs, err := ResolveSkills(context.Background(), []Entry{
 		{Type: "skill", Source: "local", Path: emptyDir, Name: "empty-skills", SkillDir: true},
 	}, dir)
 	if err != nil {
@@ -113,7 +114,7 @@ func TestResolveSkills_GlobPattern(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "skills", "readme.txt"), []byte("hi"), 0644)
 	_ = f
 
-	dirs, err := ResolveSkills([]Entry{
+	dirs, err := ResolveSkills(context.Background(), []Entry{
 		{Type: "skill", Source: "local", Path: filepath.Join(dir, "skills", "*"), Name: "local-skill"},
 	}, dir)
 	if err != nil {
@@ -126,7 +127,7 @@ func TestResolveSkills_GlobPattern(t *testing.T) {
 }
 
 func TestResolveSkills_EmptyEntries(t *testing.T) {
-	dirs, err := ResolveSkills(nil, ".")
+	dirs, err := ResolveSkills(context.Background(), nil, ".")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,7 +137,7 @@ func TestResolveSkills_EmptyEntries(t *testing.T) {
 }
 
 func TestResolveSkills_NonExistentDir(t *testing.T) {
-	dirs, err := ResolveSkills([]Entry{
+	dirs, err := ResolveSkills(context.Background(), []Entry{
 		{Type: "skill", Source: "local", Path: "/does/not/exist", Name: "missing"},
 	}, ".")
 	if err != nil {
@@ -186,7 +187,7 @@ func TestCountSkills_NilDirs(t *testing.T) {
 }
 
 func TestResolveSkills_InvalidType(t *testing.T) {
-	_, err := ResolveSkills([]Entry{
+	_, err := ResolveSkills(context.Background(), []Entry{
 		{Type: "skill", Source: "unknown", Path: "/some/path", Name: "bad-skill"},
 	}, ".")
 	if err == nil {
@@ -194,7 +195,7 @@ func TestResolveSkills_InvalidType(t *testing.T) {
 	}
 }
 
-// TestParseRepoSpec disabled — parseRepoSpec function doesn't exist in dev branch structure
+// TestParseRepoSpec disabled — parseRepoSpec function doesn't exist in phase-6 branch structure
 // TODO: Re-enable if parseRepoSpec is added back
 // func TestParseRepoSpec(t *testing.T) {
 // 	cases := []struct {

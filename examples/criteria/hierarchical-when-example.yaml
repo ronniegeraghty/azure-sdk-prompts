@@ -1,0 +1,68 @@
+# Example: Hierarchical `when` syntax demonstrating all levels
+#
+# This file demonstrates the three levels at which `when` conditions can be applied:
+#
+# 1. FILE-LEVEL when:  Condition applied to ALL graders in the file (and groups)
+# 2. GROUP-LEVEL when: Condition applied to a group of graders (override/supplement file-level)
+# 3. GRADER-LEVEL when: Condition applied to individual graders (override/supplement group-level)
+#
+# Multiple groups use the top-level `groups:` list — NOT YAML document separators.
+# When multiple levels are present, they are AND-ed together: a grader applies only
+# if ALL applicable `when` conditions match.
+#
+# This helps organize criteria for complex scenarios (e.g., Python prompts
+# with different requirements for async vs sync code, or Rust prompts
+# with different crate/runtime patterns). See also: hyoka/internal/criteria/hierarchical_test.go.
+
+# FILE-LEVEL when: applies to ALL graders (file-level graders AND all groups)
+when:
+  language: python
+
+# FILE-LEVEL graders: inherit the `language: python` condition
+graders:
+  - name: "General Python Quality"
+    weight: 1.0
+    prompt: >
+      This grader applies to all Python prompts because it inherits
+      the file-level `when: language: python` condition.
+
+# GROUP-LEVEL: Multiple groups, each with their own `when` conditions
+groups:
+  # Group 1: Auth-focused criteria for Python
+  - name: "Python Auth Group"
+    when:
+      category: auth
+    graders:
+      - name: "DefaultAzureCredential Usage"
+        weight: 1.0
+        prompt: >
+          Grader applies to Python prompts with `category: auth`.
+          Checks for proper use of DefaultAzureCredential instead of hardcoded secrets.
+          Inherits file-level `language: python` + group-level `category: auth`.
+
+      - name: "Error Handling for Auth Failures"
+        weight: 1.0
+        prompt: >
+          Grader applies to Python prompts with `category: auth`.
+          Checks that auth failures are caught and handled gracefully.
+
+  # Group 2: CRUD-focused criteria for Python
+  - name: "Python CRUD Group"
+    when:
+      category: crud
+    graders:
+      - name: "Connection Pooling"
+        weight: 1.0
+        prompt: >
+          Grader applies to Python prompts with `category: crud`.
+          Checks that the code uses connection pooling for database operations.
+          Inherits file-level `language: python` + group-level `category: crud`.
+
+      - name: "Query Efficiency"
+        weight: 1.0
+        when:
+          plane: data-plane
+        prompt: >
+          Grader applies to Python prompts with `category: crud` AND `plane: data-plane`.
+          This grader-level `when` adds an additional condition beyond group and file levels.
+          Checks for N+1 query patterns and appropriate indexing usage.

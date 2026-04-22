@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Eval Detail page workspace delta display** — reports now render file-level changes (created/modified/deleted) when available
 - **GraderResultRow component** — new reusable TypeScript component for rendering individual grader results with pass/fail badges, scores, and expandable details; standardizes grader display across report views
 - **Starter-aware MaxOutputSize and MaxFiles guardrails** — guardrails now correctly account for workspace state, only charging the agent for delta output (new files or modifications), not starter-project files copied in before generation
+- **Review session bucketing (Phase 6)** — reviewers now organize results by criteria buckets for improved multi-criterion grading
+- **Embedded asset freshness policy** — site/dist must be rebuilt and committed whenever site/src changes
+- **Installed-binary documentation form** — all documentation updated to use `hyoka` command form instead of `go run` for clarity
+- **Post-architecture examples audit (WI-058)** — new examples demonstrating hierarchical `when:` syntax, prompt-level `graders:` frontmatter, and overall examples documentation (examples/README.md)
 
 ### Changed
 
@@ -21,11 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Homepage, features, and documentation** — rewritten to describe general-purpose AI agent evaluation rather than Azure SDK code generation
 - **Eval detail page** — refactored to render `grader_results` table instead of legacy rubric badges; includes graceful backward compatibility notice for pre-Phase-3 reports
 - **TypeScript type alignment** — `GraderResult` types now match Go struct definitions, ensuring all grader detail types are properly represented in reports
+- **Docs: installed-binary form** — all examples in docs/ now use `hyoka <cmd>` instead of `go run . <cmd>` for consistency with end-user perspective
+- **getting-started.md** — clarified installation instructions with `go install ./...` and removed stale reference to old `hyoka/` directory structure
 
 ### Fixed
 
 - **False-positive MaxOutputSize failures on large starter projects** — large starter codebases no longer incorrectly trigger guardrail failures when copied into workspace before generation
 - **Silent zero-render bug from Go↔TypeScript field drift** — Phase 3 unified grading now properly serialized to reports; eval detail page gracefully handles legacy reports with missing grader_results field
+- **README and AGENTS docs:** — updated build/test commands to use `./...` glob instead of old `./hyoka/...` paths
+- **Stale directory references in docs** — removed obsolete references to `hyoka/internal/` and `cd hyoka/` patterns from documentation
 
 ## [0.3.1] — Phase 3: Advanced Core & CLI Polish
 

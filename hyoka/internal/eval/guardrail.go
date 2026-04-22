@@ -26,36 +26,6 @@ func snapshotStarterSizes(baseDir string, starterFiles []string) map[string]int6
 	return snap
 }
 
-// computeAgentOutputSize returns the bytes the agent is responsible for, given
-// the current workspace file list and a snapshot of starter-file sizes taken
-// before generation. Files present in the snapshot only count for bytes
-// *added* beyond their original size (max(0, current - original)). Files not
-// in the snapshot count their full size (agent-created). baseDir is the
-// workspace root used to resolve relative paths.
-func computeAgentOutputSize(baseDir string, files []string, snapshot map[string]int64) int64 {
-	var total int64
-	for _, f := range files {
-		absPath := f
-		if !filepath.IsAbs(f) {
-			absPath = filepath.Join(baseDir, f)
-		}
-		info, err := os.Stat(absPath)
-		if err != nil {
-			continue
-		}
-		cur := info.Size()
-		if orig, isStarter := snapshot[f]; isStarter {
-			delta := cur - orig
-			if delta > 0 {
-				total += delta
-			}
-			continue
-		}
-		total += cur
-	}
-	return total
-}
-
 // computeAgentFileCount returns the number of files the agent is responsible
 // for: new files (not in the snapshot) plus starter files the agent deleted
 // (present in snapshot but missing from the current list).

@@ -29,30 +29,30 @@ To see a complete package inventory with descriptions, run:
 
 ```bash
 # List all internal packages
-go list ./hyoka/internal/...
+go list ./internal/...
 
 # Or inspect the directory
-ls -la hyoka/internal/
+ls -la internal/
 ```
 
 ## Build & Test
 
 ```bash
 # Build (from repo root)
-go build ./hyoka/...
+go build ./...
 
 # Run tests
-go test ./hyoka/...
+go test ./...
 
 # Run the CLI
-go run ./hyoka <command>
+hyoka <command>
 
 # Common commands
-go run ./hyoka list
-go run ./hyoka run --all-configs
-go run ./hyoka validate
-go run ./hyoka check-env
-go run ./hyoka clean
+hyoka list
+hyoka run --all-configs
+hyoka validate
+hyoka check-env
+hyoka clean
 ```
 
 Go version: 1.26.1+ required. Module path: `github.com/ronniegeraghty/hyoka`.
@@ -67,7 +67,7 @@ To discover available configs:
 
 ```bash
 # List all available configs
-go run ./hyoka configs
+hyoka list --json | jq -r '.[].properties.service'
 
 # Or inspect the configs directory directly
 ls configs/ | grep -E '\.ya?ml$'
@@ -88,30 +88,30 @@ Example: `configs/azure-mcp-opus.yaml` contains `name: azure-mcp/claude-opus-4.6
 
 ```bash
 # Single prompt, single config:
-go run ./hyoka run --prompt-id identity-dp-python-default-credential \
+hyoka run --prompt-id identity-dp-python-default-credential \
   --config baseline/claude-opus-4.6
 
 # Single prompt, multiple configs (MUST quote comma-separated values):
-go run ./hyoka run --prompt-id identity-dp-python-default-credential \
+hyoka run --prompt-id identity-dp-python-default-credential \
   --config "baseline/claude-opus-4.6,azure-mcp/claude-opus-4.6"
 
 # Filter by service + language (runs ALL matching prompts):
-go run ./hyoka run --service key-vault --language python \
+hyoka run --service key-vault --language python \
   --config "baseline/claude-opus-4.6,azure-mcp/claude-opus-4.6"
 
 # Full debug logging with log file:
-go run ./hyoka run --service identity --language python \
+hyoka run --service identity --language python \
   --config azure-mcp/claude-opus-4.6 \
   --log-level debug --log-file hyoka-debug.log
 
 # Dry run (list matching prompts without executing):
-go run ./hyoka run --service storage --language dotnet --dry-run
+hyoka run --service storage --language dotnet --dry-run
 
 # All configs (requires explicit --all-configs flag):
-go run ./hyoka run --prompt-id identity-dp-python-default-credential --all-configs
+hyoka run --prompt-id identity-dp-python-default-credential --all-configs
 
 # With resource monitoring:
-go run ./hyoka run --service key-vault --language python \
+hyoka run --service key-vault --language python \
   --config azure-mcp/claude-opus-4.6 --monitor-resources
 ```
 
@@ -142,18 +142,18 @@ When working on hyoka itself, test your changes by running real evaluations:
 
 ```bash
 # Run 1 prompt on 1 config (fastest feedback loop — Python prompts finish quickest):
-go run ./hyoka run --prompt-id key-vault-dp-python-crud \
+hyoka run --prompt-id key-vault-dp-python-crud \
   --config "baseline/claude-opus-4.6" \
   --log-level debug --log-file hyoka-debug.log
 
 # After each run, clean up orphaned Copilot sessions:
-go run ./hyoka clean
+hyoka clean
 
 # Check the log file for role-prefixed output:
 grep "role=" hyoka-debug.log | head -20
 
 # Check the serve command to browse results:
-go run ./hyoka serve
+hyoka serve
 ```
 
 **Guidelines:**

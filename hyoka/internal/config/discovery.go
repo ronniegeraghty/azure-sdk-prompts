@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
 
 // ProjectDirName is the sentinel directory name that marks a hyoka project.
@@ -112,6 +114,77 @@ func ResolveCandidates(proj *ProjectDir, subdir string, extraCandidates ...strin
 	}
 
 	return candidates
+}
+
+// ResolvePromptDirCandidates returns ordered prompts-directory candidates,
+// preferring an explicit configPromptDir (e.g. from `prompt_directory` in a
+// config YAML) when set and existing on disk. Falls back to the standard
+// ResolveCandidates(proj, "prompts", "./prompts", "../prompts") chain so
+// behavior is unchanged when configPromptDir is empty.
+func ResolvePromptDirCandidates(proj *ProjectDir, configPromptDir string) []string {
+	var candidates []string
+	if configPromptDir != "" {
+		if resolved, ok := resolveIfDir(configPromptDir); ok {
+			candidates = append(candidates, resolved)
+		} else {
+			slog.Warn("prompt_directory from config does not exist or is not a directory", "path", configPromptDir)
+		}
+	}
+	candidates = append(candidates, ResolveCandidates(proj, "prompts", "./prompts", "../prompts")...)
+	return candidates
+}
+
+// PeekPromptDirectory does a best-effort scan of all .yaml/.yml files in dir
+// and returns the first non-empty top-level `prompt_directory` value, resolved
+// against the containing config file's directory. Errors and conflicts are
+// logged at debug level — callers that need strict behavior should use LoadDir.
+//
+// This exists so commands like `hyoka validate`, which need to locate the
+// prompts directory before fully loading & validating configs, can honor a
+// config-driven override without bootstrapping the entire config loader.
+func PeekPromptDirectory(dir string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	type peek struct {
+		PromptDirectory string `yaml:"prompt_directory"`
+	}
+	var found, source string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(e.Name())
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var p peek
+		if err := yaml.Unmarshal(data, &p); err != nil {
+			continue
+		}
+		if p.PromptDirectory == "" {
+			continue
+		}
+		resolved := p.PromptDirectory
+		if !filepath.IsAbs(resolved) {
+			resolved = filepath.Join(filepath.Dir(path), resolved)
+		}
+		if found == "" {
+			found = resolved
+			source = e.Name()
+		} else if found != resolved {
+			slog.Debug("Conflicting prompt_directory while peeking configs",
+				"existing", found, "existing_source", source,
+				"new", resolved, "new_source", e.Name())
+		}
+	}
+	return found
 }
 
 // resolveIfDir checks that path exists and is a directory (following symlinks),
