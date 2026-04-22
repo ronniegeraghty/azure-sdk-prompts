@@ -1,41 +1,60 @@
 # Output Check Grader
 
-The `output_check` grader verifies that the agent produced files in the workspace and that those files meet minimum size thresholds. Use this grader to ensure the agent actually generated output (as opposed to failing silently or producing empty files).
+The `output_check` grader evaluates the files an agent produced or modified during a run against a set of configured checks. It uses `WorkspaceDelta` to track created and edited files (excluding starter files the agent did not touch), then runs independent sub-checks on file counts, specific paths, and file sizes. All sub-checks are reported, and the overall result is the AND of all configured checks.
 
 ## When to Use
 
-- **Verify output generation**: Did the agent produce any files at all?
-- **Minimum content checks**: Ensure generated files are not empty or trivially small
-- **Workspace state validation**: Confirm the workspace was modified with meaningful content
-- **Gating minimal output**: Gate evaluations on "at least 1 file with content"
+- **Verify output generation**: Did the agent create or modify files?
+- **Ensure specific files exist**: Require particular files in the output (e.g., `README.md`)
+- **Validate file modifications**: Confirm the agent edited existing files, not just created new ones
+- **Enforce size constraints**: Check that generated files meet minimum and/or maximum size thresholds
+- **Forbid sensitive files**: Reject runs that produce secrets or config files accidentally
 
-For more specific checks (exact filename, content patterns, build success), use [`file`](./file.md) or [`program`](./program.md) graders instead.
+Use [`file`](./file.md) or [`program`](./program.md) graders for content pattern matching or build validation.
 
 ## Configuration
 
 ```yaml
 graders:
-  - name: Generated Output Exists
+  - name: Output File Checks
     type: output_check
-    weight: 0.2
+    weight: 0.3
     details:
       min_files: 1
+      require_files: [README.md]
+      forbid_files: [.env, secrets.json]
       min_bytes_per_file: 10
+      max_bytes_per_file: 1048576
 ```
 
 ### `details` Schema
 
-| Field                | Type   | Required | Default | Description                                                     |
-|----------------------|--------|----------|---------|--------------------------------------------------------------|
-| `min_files`          | int    | no       | 1       | Minimum number of files (with content) required to pass.     |
-| `min_bytes_per_file` | int64  | no       | 1       | Minimum file size in bytes for a file to count as valid.     |
-| `min_total_bytes`    | int64  | no       | 0       | Optional: minimum total bytes across all qualifying files. 0 = disabled. |
+All fields in `details` are optional. Unconfigured knobs are skipped; no implicit defaults apply.
 
-### Defaults
+| Field                  | Type      | Semantics |
+|------------------------|-----------|-----------|
+| `min_files`            | int       | Require ≥ N produced files (created or modified). 0 = unset (check skipped). |
+| `max_files`            | int       | Require ≤ N produced files. 0 = unset (check skipped). |
+| `require_files`        | []string  | Every listed path must appear in produced files (created or modified). Optional; no paths = check skipped. |
+| `forbid_files`         | []string  | None of the listed paths may appear in produced files. Optional; no paths = check skipped. |
+| `require_updated`      | []string  | Every listed path must appear in the *modified set* (agent edited existing content). Optional; no paths = check skipped. |
+| `min_bytes_per_file`   | int64     | Every produced file must be ≥ N bytes. 0 = unset (check skipped). Vacuously true if zero files produced. |
+| `max_bytes_per_file`   | int64     | Every produced file must be ≤ N bytes. 0 = unset (check skipped). |
 
-- If `min_files` is not set or ≤ 0, defaults to 1 (grader passes if at least one file exists with content).
-- If `min_bytes_per_file` is not set or ≤ 0, defaults to 1 (files with 1+ bytes are counted; empty files are ignored).
-- If `min_total_bytes` is 0 (default), this check is disabled.
+**"Produced files"** = files the agent created (NewFiles) ∪ files the agent modified (ModifiedFiles). Starter files the agent did not touch are not counted.
+
+## Result Structure
+
+Each `output_check` grader result includes:
+
+- **Pass/Fail**: Boolean; true iff all configured sub-checks pass.
+- **Score**: 1.0 if Pass, else 0.0 (boolean grader, no partial credit).
+- **OutputCheckDetails** (in JSON result):
+  - `ProducedFiles`: Sorted list of all created/modified file paths
+  - `SubChecks`: Array of check results, one per configured knob
+    - `Check`: Name of the check (e.g., `"min_files"`, `"require_files"`)
+    - `Pass`: Boolean result for this check
+    - `Message`: Human-readable explanation
 
 ## Examples
 
@@ -50,75 +69,127 @@ graders:
       min_files: 1
 ```
 
-This passes if at least one file with 1+ bytes was created.
+Passes if the agent created or modified at least one file.
 
-### Stricter: Multiple Files with Substantial Content
+### Require Specific Files
 
 ```yaml
 graders:
-  - name: Complete Implementation
+  - name: Generated Implementation
     type: output_check
     weight: 0.3
     details:
-      min_files: 3
-      min_bytes_per_file: 100
-      min_total_bytes: 1000
+      require_files: [main.py, README.md]
+      min_bytes_per_file: 50
 ```
 
-This passes if:
-- At least 3 files exist
-- Each file has ≥ 100 bytes
-- Total content across all files is ≥ 1000 bytes
+Passes if:
+- Both `main.py` and `README.md` are in the produced files
+- Every produced file is ≥ 50 bytes
 
-### Conditional: Language-Specific Output Checks
+### Enforce Size Constraints
 
 ```yaml
 graders:
-  - name: Python Files Generated
+  - name: Reasonable Output Size
+    type: output_check
+    weight: 0.2
+    details:
+      min_files: 1
+      max_bytes_per_file: 1048576  # 1 MB max per file
+      forbid_files: [.env, secrets.json, config.json]
+```
+
+Passes if:
+- At least one file was produced
+- No file exceeds 1 MB
+- The forbidden sensitive paths are not present
+
+### Validate File Modifications
+
+```yaml
+graders:
+  - name: Updated Existing Files
     type: output_check
     weight: 0.15
+    details:
+      require_updated: [src/main.py, src/config.py]
+```
+
+Passes if the agent modified (not just created) both `src/main.py` and `src/config.py`.
+
+### Complete Example (All Knobs)
+
+```yaml
+graders:
+  - name: Output Check - All Knobs
+    type: output_check
+    weight: 0.5
+    details:
+      min_files: 1                    # At least 1 file
+      max_files: 50                   # At most 50 files
+      require_files: [README.md]      # Must have README.md
+      require_updated: [src/main.py]  # Must have modified src/main.py
+      min_bytes_per_file: 10          # Every file ≥ 10 bytes
+      max_bytes_per_file: 1048576     # Every file ≤ 1 MB
+      forbid_files: [.env]            # Must NOT contain .env
+```
+
+### Conditional: Language-Specific Checks
+
+```yaml
+graders:
+  - name: Python Package Structure
+    type: output_check
+    weight: 0.2
     when:
       language: python
     details:
       min_files: 2
-      min_bytes_per_file: 50
+      require_files: [__init__.py, setup.py]
 
-  - name: Minimal Go Output
+  - name: Go Module Minimal
     type: output_check
-    weight: 0.1
+    weight: 0.15
     when:
       language: go
     details:
       min_files: 1
-      min_bytes_per_file: 1
+      require_files: [go.mod]
 ```
 
-## Result Structure
+## Behavior
 
-Each `output_check` grader result includes:
-- **Pass/Fail**: Binary result based on whether minimums are met
-- **Files checked**: List of all files in the workspace with their sizes
-- **Qualifying count**: Number of files meeting the size threshold
-- **Total bytes**: Sum of bytes in qualifying files
+### Sub-Check Execution
 
-Results are visible in the evaluation report under `grader_results`.
+- Each configured knob runs as an independent sub-check.
+- **No early exit**: All sub-checks run and are reported, even if earlier ones fail.
+- **Deterministic**: Results depend only on the produced files and their sizes; fully reproducible.
 
-## Coming in v1 (Future Enhancements)
+### Nil or Empty WorkspaceDelta
 
-The following features are planned for future releases:
+If the engine could not compute a `WorkspaceDelta` (e.g., due to workspace access issues), the grader treats it as an empty delta (zero files produced). This ensures meaningful failures: `min_files=1` will correctly fail with a clear message rather than silently skip.
 
-- **Filename presence checking**: Verify specific file names exist (e.g., "README.md must be present")
-- **Updated file detection**: Use WorkspaceDelta to verify specific files were modified/created by the agent (not pre-existing)
-- **File pattern matching**: Include/exclude files by glob patterns before applying size checks
-- **Extension filtering**: Count only files with specific extensions (e.g., "only .py files count")
+### Construction-Time Validation
 
-Until these features ship, use the [`file`](./file.md) grader for specific filename checks and combine multiple `output_check` graders with different thresholds and `when:` conditions for language-specific validation.
+`NewOutputCheckGrader` rejects structurally invalid configs:
+
+- `min_files < 0`, `max_files < 0`
+- `min_files > max_files` (when both > 0)
+- `min_bytes_per_file < 0`, `max_bytes_per_file < 0`
+- `min_bytes_per_file > max_bytes_per_file` (when both > 0)
+
+### No Implicit Defaults
+
+- Unconfigured knobs are skipped entirely.
+- A config with no knobs specified trivially passes (all zero sub-checks pass).
+- There are no defaults like "min_files defaults to 1" — only explicit values matter.
 
 ## Notes
 
-- **Empty file handling**: Files with 0 bytes are never counted toward `min_files`, regardless of configuration.
-- **Workspace state**: The grader inspects the final workspace state after generation is complete.
-- **No pattern matching (v1)**: This version checks only file count and total size. Specific filename or content pattern checks use the [`file`](./file.md) grader.
-- **Deterministic**: Unlike LLM-based graders, results are fully deterministic given the same workspace state.
+- **Empty file handling**: Files with 0 bytes are included in the produced set and subject to all checks (e.g., `min_bytes_per_file: 1` will fail for a 0-byte file).
+- **File ordering**: Produced files are reported in sorted order for stable result presentation.
+- **No pattern matching (v1)**: This version checks exact paths. Glob or regex matching is deferred to v2.
+- **Workspace state**: The grader runs after agent generation is complete, inspecting the final workspace state.
 
 See [index.md](./index.md#applicability-when) for `when:` syntax and conditional grader application.
