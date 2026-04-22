@@ -109,18 +109,38 @@ type ActionSequenceConfig struct {
 }
 
 // OutputCheckConfig holds configuration for the "output_check" grader kind.
-// It verifies the agent produced output files in the workspace, optionally
-// requiring a minimum count and minimum content size per file.
+//
+// This is a boolean grader that operates on the run's WorkspaceDelta (files
+// created or modified by the agent, not starter files). Each configured knob
+// produces one pass/fail sub-check with a human-readable reason. The overall
+// grader result is the AND of every configured sub-check; unconfigured knobs
+// are skipped (no implicit defaults apply).
+//
+// v1 knobs (Q7, locked 2026-04-22): min_files, max_files, require_files,
+// forbid_files, require_updated, min_bytes_per_file, max_bytes_per_file.
+// Globs/regex deferred beyond v1.
 type OutputCheckConfig struct {
-	// MinFiles is the minimum number of files (with size >= MinBytesPerFile)
-	// required for the grader to pass. Defaults to 1.
+	// MinFiles is the minimum number of files the agent must have created
+	// or modified. 0 disables the check.
 	MinFiles int `yaml:"min_files,omitempty" json:"min_files,omitempty"`
-	// MinBytesPerFile is the minimum size (in bytes) for a file to count
-	// toward MinFiles. Defaults to 1 (non-empty).
+	// MaxFiles is the maximum number of files the agent may have created
+	// or modified. 0 disables the check.
+	MaxFiles int `yaml:"max_files,omitempty" json:"max_files,omitempty"`
+	// RequireFiles lists workspace-relative paths that MUST appear among
+	// files the agent created or modified.
+	RequireFiles []string `yaml:"require_files,omitempty" json:"require_files,omitempty"`
+	// ForbidFiles lists workspace-relative paths that MUST NOT appear among
+	// files the agent created or modified.
+	ForbidFiles []string `yaml:"forbid_files,omitempty" json:"forbid_files,omitempty"`
+	// RequireUpdated lists workspace-relative paths that MUST appear in the
+	// delta's modified set (the agent changed an existing file's content).
+	RequireUpdated []string `yaml:"require_updated,omitempty" json:"require_updated,omitempty"`
+	// MinBytesPerFile is the minimum size (in bytes) each created-or-modified
+	// file must meet. 0 disables the check.
 	MinBytesPerFile int64 `yaml:"min_bytes_per_file,omitempty" json:"min_bytes_per_file,omitempty"`
-	// MinTotalBytes is an optional minimum total size across all qualifying
-	// files. Zero (default) disables this check.
-	MinTotalBytes int64 `yaml:"min_total_bytes,omitempty" json:"min_total_bytes,omitempty"`
+	// MaxBytesPerFile is the maximum size (in bytes) any created-or-modified
+	// file may reach. 0 disables the check.
+	MaxBytesPerFile int64 `yaml:"max_bytes_per_file,omitempty" json:"max_bytes_per_file,omitempty"`
 }
 
 // ToolConstraintConfig holds configuration for the "tool_constraint" grader kind.

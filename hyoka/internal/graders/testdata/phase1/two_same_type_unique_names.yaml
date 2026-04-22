@@ -10,5 +10,5 @@ graders:
     weight: 0.5
     details:
       min_files: 3
+      max_files: 20
       min_bytes_per_file: 100
-      min_total_bytes: 1024

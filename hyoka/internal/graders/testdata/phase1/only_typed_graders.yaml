@@ -5,8 +5,8 @@ graders:
     details:
       min_files: 1
       min_bytes_per_file: 1
-  - name: Minimum Total Size
+  - name: Bounded Output Size
     type: output_check
     weight: 0.5
     details:
-      min_total_bytes: 512
+      max_bytes_per_file: 1048576

@@ -95,11 +95,35 @@ ProgramDetails  *ProgramGraderDetails  `json:"program_details,omitempty"`
 PromptDetails   *PromptGraderDetails   `json:"prompt_details,omitempty"`
 BehaviorDetails *BehaviorGraderDetails `json:"behavior_details,omitempty"`
 ReviewDetails   *ReviewGraderDetails   `json:"review_details,omitempty"`
+OutputCheckDetails *OutputCheckGraderDetails `json:"output_check_details,omitempty"`
 }
 
 // FileGraderDetails holds file-check specifics.
 type FileGraderDetails struct {
 CheckedFiles []FileCheckResult `json:"checked_files"`
+}
+
+// OutputCheckGraderDetails holds per-sub-check results for the output_check
+// grader. Each configured knob (min_files, require_files, etc.) produces
+// one OutputCheckSubResult. The grader's overall Pass is the AND of every
+// SubCheck.Pass.
+type OutputCheckGraderDetails struct {
+	// ProducedFiles is the flat list of files the agent created or modified
+	// (NewFiles ∪ ModifiedFiles from WorkspaceDelta), rendered as paths.
+	ProducedFiles []string `json:"produced_files,omitempty"`
+	// SubChecks reports one entry per configured knob, in a stable order.
+	SubChecks []OutputCheckSubResult `json:"sub_checks"`
+}
+
+// OutputCheckSubResult records one configured output_check knob's outcome.
+type OutputCheckSubResult struct {
+	// Check is the knob name (e.g. "min_files", "require_files").
+	Check string `json:"check"`
+	// Pass is true iff the knob's constraint was satisfied.
+	Pass bool `json:"pass"`
+	// Message is a human-readable description of what was checked and why
+	// it passed or failed.
+	Message string `json:"message"`
 }
 
 // FileCheckResult records the outcome of a single file check.
