@@ -469,3 +469,41 @@ The observable-wiring-tests pattern (#603, #605) is a Phase 6 win that will pay 
 
 
 
+
+
+## 2026-04-22 — PR #618 Architectural Review (WorkspaceDelta first-class, Issue #566)
+
+**PR:** https://github.com/ronniegeraghty/hyoka/pull/618 — `squad/566-workspacedelta-firstclass` @ `2e67bc51`
+**Verdict:** ✅ APPROVE (posted as `--comment`; author-isolation blocked `--approve` — same pattern as Neo on #611/#614)
+
+**Diff shape:** 21 files, +205/-291 (a *removal-heavy* PR — exactly what a clean Phase 3.5 should look like).
+
+### Verified
+
+- `go build ./...` clean
+- `go test ./hyoka/... -timeout 3m` green across all 24 packages (including serve/validate — no pre-existing failures in this run)
+- `grep -rn "MaxOutputSize\|max_output_size\|max-output-size"` returns zero hits in `hyoka/`, `examples/`, `docs/`, `README.md`
+
+### Architectural takeaways
+
+1. **Single-source-of-truth for first-class artifacts.** Engine computes `evalReport.WorkspaceDelta` once via `workspace.ComputeDelta(before, after)`, then `graderInput.WorkspaceDelta = evalReport.WorkspaceDelta`. No parallel compute paths, no recomputation in graders. This is the textbook shape for promoting a derived value to "first-class" — and it pays off because the type alias trick (`report.WorkspaceDelta = workspace.WorkspaceDelta`, `graders.WorkspaceDelta = workspace.WorkspaceDelta`) avoids the import cycle without introducing a wrapper. **Use this pattern next time we promote a metric.**
+
+2. **Snapshot threading is one stack frame.** Both `before` (after `CopyStarterFiles`) and `after` (after `ws.ListFiles`) live in `runSingleEval`. Errors short-circuit naturally — pre-snapshot failure makes post-snapshot a no-op via `if beforeSnap != nil`. Neo flagged this as a lesson in their history: *"don't over-engineer with helpers when a single stack frame works."* Confirmed.
+
+3. **Graceful degradation matches the nil-safety contract.** Snapshot failure → `lg.Warn` + nil delta → graders already nil-check (PR #571's `delta_nil_safety_test.go` scenario 3.2). Backwards-compat is a property of the design, not an afterthought: `omitempty` on the report field means pre-#566 reports deserialize without modification.
+
+4. **Removal-as-feature.** The bigger lesson from this PR is the second-amendment removal of `MaxOutputSize`. Original issue softened it; first amendment kept it as a soft warning that aborted nothing; reviewer pushed back; second amendment dropped it entirely along with `GuardrailWarnings []string`, the CLI flag, the schema validator, the negative-value test, and the dead `computeAgentOutputSize` helper. **A guardrail that never fires is decoration, not protection.** Neo captured this as "Compromise is a tell" — when reviewer says "scope down" and you keep the controversial piece in softer form, you're negotiating against stated intent. This deserves promotion to a team-wide principle.
+
+5. **Author-isolation pattern reconfirmed.** Ronnie's gh account = PR author from GitHub's view, so `gh pr review --approve` 403s. Posted with `--comment` and verdict explicit in the body (`## Verdict: ✅ APPROVE`). Same workaround as Neo on #611/#614. Future agents reviewing PRs authored under `ronniegeraghty` should expect this and pre-compose the verdict-in-body.
+
+### Non-blocking nits filed in review body
+
+- **N1:** Tombstone comment in `hyoka/cmd/helpers.go:167-168` for removed `parseByteSize`. Convention is delete cleanly; let `git blame` and PR description carry the why.
+- **N2:** `README.md:177` keeps a degenerate row (`| Output size | — | — | Removed in #566 ... |`). Other docs removed the row entirely. Minor consistency issue.
+- **N3:** `TestWorkspaceDeltaCaptured` uses `SkipReview: true`, so `graderInput.WorkspaceDelta` assignment isn't exercised; comment slightly overclaims "reaches both the report and graders." Coverage gap is filled by #571's nil-safety tests.
+
+All three are doc-/comment-level. None block merge.
+
+**Artifacts:**
+- Review comment: posted to PR #618 (state: COMMENTED, 2026-04-22T16:36:10Z)
+- Decision: `.squad/decisions/inbox/morpheus-pr618-verdict.md`

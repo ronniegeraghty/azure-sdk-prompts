@@ -289,3 +289,135 @@ See Tank's orchestration log: `.squad/orchestration-log/2026-04-21T23-22-02Z-tan
 
 **Decision captured:** `.squad/decisions.md` ("Decision: PR #607 Merge Conflict Resolution Strategy")
 
+
+## 2026-04-22 — Issue #566: WorkspaceDelta first-class + guardrail softening
+
+**Branch:** `squad/566-workspacedelta-firstclass` (off `ronniegeraghty/dev`)
+**PR:** opens against `ronniegeraghty/dev`, "Closes #566"
+
+**Built on PR #571's foundation.** That PR delivered the `workspace.WorkspaceDelta` type, snapshot/compute API, `EvalReport.WorkspaceDelta` field, `GraderInput.WorkspaceDelta` field, and nil-safety tests. What was missing: actual capture wiring in the engine, and the guardrail softening the issue called for.
+
+### What landed
+
+1. **Capture wiring** in `engine_eval.go`:
+   - `workspace.TakeSnapshot(genDir)` immediately after `CopyStarterFiles` (the "before" picture)
+   - Second `TakeSnapshot` after `ws.ListFiles()` returns and `evalReport.GeneratedFiles` is set (the "after")
+   - `workspace.ComputeDelta(before, after)` → assigned to `evalReport.WorkspaceDelta`
+   - Snapshot failures degrade gracefully (warn + nil delta); graders are already nil-safe (#571's test scenario 3.2)
+2. **GraderInput.WorkspaceDelta = evalReport.WorkspaceDelta** — single source of truth, no duplicate compute
+3. **Guardrail softening** per issue table:
+   - `MaxOutputSize`: 1 MiB hard fail → **10 MiB warning**, prefers `delta.BytesNet` when available, falls back to the starter-aware estimator otherwise. Logs which basis was used.
+   - `MaxFiles`: 50 hard fail → **200 warning** (still counts agent-attributable files via `computeAgentFileCount`)
+   - `MaxNewFiles` (NEW): default **100 warning**, counts `delta.NewFileCount` (silently skipped when delta is nil)
+   - `MaxTurns` and `MaxSessionActions` unchanged (out of scope per issue)
+4. **`EvalReport.GuardrailWarnings []string`** — soft-cap breaches populate this. `Success` is no longer flipped to `false` by these three guardrails. `GuardrailAbortReason` reserved for hard-fail (turns) only.
+5. **Config schema:** `SessionLimits.MaxNewFiles` added with negative-value validation in `Validate()`.
+
+### Tests
+
+- Updated existing hard-fail tests (`TestGuardrailMaxFiles`, `TestGuardrailMaxOutputSize`, `TestConfigLimitsOverrideEngineDefaults`) to assert the new warning behavior — no `GuardrailAbortReason`, populated `GuardrailWarnings`.
+- Updated default-value tests (`TestGuardrailDefaultValues`, `TestResolveLimits*`) to the new defaults (200/10MiB/100).
+- New: `TestGuardrailMaxNewFiles` — verifies the new soft cap fires off `WorkspaceDelta.NewFileCount` and produces the right warning message.
+- New: `TestWorkspaceDeltaCaptured` — end-to-end check that delta is populated on every successful eval and reaches the report.
+- `go build ./...` clean. `go test -race ./... -timeout 5m` clean across all 24 packages.
+
+### Decision (queued for inbox)
+
+Soft-cap guardrails communicate via `GuardrailWarnings []string`, not by flipping `Success` or setting `GuardrailAbortReason`. This gives downstream consumers (HTML report, comparison tooling, future graders) a structured channel to surface "warning, not fatal" without conflating it with generation failure. Hard-fail guardrails (currently only `MaxTurns`) keep using `GuardrailAbortReason`.
+
+### Lessons
+
+- **Snapshot threading is one commit.** Capturing `before` 100 lines above where `after` runs is fine — both live in `runSingleEval` and any error along the way naturally short-circuits past the after-snapshot. Don't over-engineer with helpers when a single stack frame works.
+- **Two metrics, one cap.** When softening `MaxOutputSize` to use `delta.BytesNet` but keeping the legacy estimator as fallback, log the basis (`basis=delta.bytes_net` vs `starter_aware_estimator`). Otherwise, comparing two runs with different basis silently lies.
+
+---
+
+## 2026-04-22 — PR #618 amendment: scope-correction on guardrail softening
+
+**Branch:** `squad/566-workspacedelta-firstclass` (force-pushed, commit `cb10cb17`)
+
+Original PR #618 implemented the #566 issue spec faithfully: relaxed `MaxOutputSize` (1 MiB → 10 MiB warning), `MaxFiles` (50 → 200 warning), and added a new `MaxNewFiles` cap. Ronnie reviewed and course-corrected: **only** `MaxOutputSize` should be relaxed. The other guardrails were not actually wanted as warnings; the 50-file cap and hard-fail semantics still earn their keep.
+
+### What stayed
+- WorkspaceDelta capture wiring (snapshot before/after, `ComputeDelta`, populates `EvalReport.WorkspaceDelta` and `GraderInput.WorkspaceDelta`). Core #566 deliverable, no controversy.
+- `MaxOutputSize` as a **soft warning at 10 MiB**, prefers `delta.BytesNet`, falls back to starter-aware estimator. Kept the `EvalReport.GuardrailWarnings []string` channel because there's still one user (MaxOutputSize). Chose Option B over full removal because removing the field cascaded into CLI flag (`cmd/run.go`), schema validator (`internal/validate`), and config tests — too much churn for a Phase 3.5 polish PR.
+
+### What reverted
+- `MaxFiles` back to **50, hard fail** (sets `GuardrailAbortReason`, flips `Success=false`).
+- `SessionLimits.MaxNewFiles` config field — removed.
+- `EngineOptions.MaxNewFiles`, `EvalReport.GuardrailMaxNewFiles`, default value, validation, the check itself, and `TestGuardrailMaxNewFiles` — all removed.
+- `TestGuardrailMaxFiles` and `TestConfigLimitsOverrideEngineDefaults` — restored to assert hard-fail behavior.
+
+Final amended diff: 5 files, +171 / -32. Build clean, full race test suite green.
+
+## Learnings
+
+### Faithful spec implementation can still miss intent
+
+This is the lesson, and it's a real one. Issue #566 had a clean table laying out three guardrails to soften plus a new one to add. I implemented exactly what was on the page. Ronnie's actual intent was narrower — only the per-file size cap, because the review-restructure work eliminated its original purpose. The other guardrails were still earning their keep.
+
+**The error I want to not repeat:** when an issue says "soften these N guardrails," it's worth one sanity-check round of "wait, **why** is each of these being softened, and does the reason actually apply to all of them?" If the reasons differ (one is "no longer needed for X", another is "wider net is fine"), surface that ambiguity in a PR description or pre-implementation question rather than rolling them up into a single uniform change.
+
+The mechanical fix is also a lesson: when amending a PR for scope reduction, **revert by writing the inverse, not by selectively reverting commits**. The amended commit has a clean message describing exactly what's IN scope and what's intentionally NOT — future readers grep for `MaxNewFiles` in this PR's history and find a clear "rolled back, scope-narrow" comment in the test file. No git archaeology needed.
+
+### Guardrail policy going forward (for me, for #619)
+
+- Hard-fail guardrails are the default. They flip `Success=false` and set `GuardrailAbortReason`. Soft warnings are the exception, and they need a specific justification (in #566's case: "review no longer inlines content, so the byte cap's original purpose is gone").
+- New guardrails default to hard-fail unless there's a deliberate "we want signal but not enforcement" case.
+- The `GuardrailWarnings []string` field exists; if a future soft warning needs the channel, it's already there. Don't confuse "soft warning" with "abort reason" in tests — they're separate fields with separate semantics.
+
+## 2026-04-22 — Issue #619 reading: tool-load fast-fail guardrail
+
+Read the issue + traced SDK surface. Findings:
+
+- SDK exposes loaded inventory cleanly via `copilot.SessionEventTypeSessionSkillsLoaded` (`event.Data.Skills`) and `copilot.SessionEventTypeSessionMcpServersLoaded` (`event.Data.Servers`). Both already handled in `hyoka/internal/eval/copilot.go`.
+- Partial enforcement scaffolding already exists: `expectedMCPServers map[string]bool` is built from config and compared against loaded names in `copilot.go:366-370`. Currently warns; #619 promotes this to hard-fail and generalizes to skills.
+- Two design choices for "fast-fail before generation": (1) post-hoc abort after session completes, (2) streaming abort via `context.CancelFunc` in the SDK event loop. (1) is simpler and satisfies the acceptance criteria as written; (2) is a follow-up optimization.
+- Issue is co-labeled `squad:neo` + `squad:trinity` — engine vs report surfacing split. Posted [proposal comment on #619](https://github.com/ronniegeraghty/hyoka/issues/619#issuecomment-4292673005) to confirm scope/approach before branching.
+
+### Architecture note
+
+The `copilot.go` event loop is the natural seam. It already builds `expectedMCPServers` at session start. Adding `expectedSkills` alongside, then swapping the existing warning for a hard-fail signal (cancel context if streaming, or just record a flag if post-hoc), is a localized change. The engine-side `runSingleEval` then needs to consume that signal, populate `EvalReport.MissingTools`, and skip review.
+
+## 2026-04-22 — PR #618 second amendment: drop the byte-size guardrail entirely
+
+**Branch:** `squad/566-workspacedelta-firstclass` (force-pushed again)
+
+The first amendment kept the byte-size cap as a 10 MiB **soft warning** while reverting `MaxFiles` back to a 50-file hard fail and removing `MaxNewFiles`. Ronnie reviewed that compromise and pushed back: *"make sure neo isn't just re-tightening those guardrails but making sure they go back to failing the eval instead of letting it progress."* Combined with his earlier "no longer needed" framing of the file-size cap, the resolution was Option A: drop the byte-size guardrail entirely.
+
+### Why Option A is right
+
+A guardrail that never aborts the eval is decoration, not protection. The byte-size cap's original purpose was to bound review-prompt context size; the review-restructure work eliminated that purpose. With it gone, `MaxFiles=50` (hard fail) is the agent-output backstop, and the review-side per-file/total caps in `internal/utils/utils.go` prevent runaway memory in the panel. There's nothing left for a byte cap to defend against — so it goes.
+
+### Final landed shape
+
+Removed surface area:
+- `SessionLimits.MaxOutputSize` (config struct)
+- `EngineOptions.MaxOutputSize` + the 10 MiB default
+- `EvalReport.GuardrailMaxOutputSize` and `EvalReport.GuardrailWarnings` (its sole consumer is gone)
+- `--max-output-size` CLI flag and the `parseByteSize` helper (+ its tests)
+- Schema validator entry in `internal/validate/schema.go`
+- Negative-value validator in `config.Validate()`
+- `computeAgentOutputSize` (dead code — only the soft-warn block called it) and its table-driven test
+- Doc references in `README.md`, `docs/{guardrails,cli-reference,configuration,getting-started}.md`, `examples/configs/example-full.yaml`, `examples/README.md`
+- Tests: `TestGuardrailMaxOutputSize`, `TestParseByteSizeValid`, `TestParseByteSizeInvalid`, `TestValidateRejectsNegativeMaxOutputSize`, `TestComputeAgentOutputSize`; updated `TestParseSessionLimits[Partial]`, `TestGuardrailDefaultValues`, `TestResolveLimits*` to drop the field
+
+Kept (untouched):
+- All WorkspaceDelta wiring — the actual #566 deliverable
+- `MaxFiles=50` hard fail
+- `MaxTurns`, `MaxSessionActions`
+- `TestGuardrailMaxFiles`, `TestConfigLimitsOverrideEngineDefaults`, `TestWorkspaceDeltaCaptured`
+
+Verification: `grep -ri "MaxOutputSize\|GuardrailWarnings\|max_output_size\|max-output-size"` returns zero matches in active source (excluding `reports/`, `hyoka-prompt-docs/` snapshot, `CHANGELOG.md` historical notes, `.squad/` bookkeeping, `plan/` historical docs). `go build ./...` clean. `go test -race ./... -timeout 5m` green across all 24 packages.
+
+## Lessons
+
+### Compromise is a tell
+
+When a reviewer says "scope this down" and you respond by keeping the controversial piece in a softer form, you are negotiating against the reviewer's stated intent. The first amendment kept the byte-size cap as a soft warning to avoid touching the CLI flag, schema validator, and report field — framed internally as "minimizing churn for a Phase 3.5 polish PR." That framing was self-deceiving. The reviewer's request was *narrower* than my read; the right response was to ask "should this be removed entirely?" before writing the compromise. Half-measures left in code are worse than the original, because they look intentional but no longer serve any purpose.
+
+The mechanical lesson: if a feature has zero load-bearing users (the `GuardrailWarnings` field had exactly one consumer — itself, via the cap I was trying to keep), delete the whole thing. Cascading removal across CLI / schema / tests is a few minutes of work, not a reason to leave dead code in the report schema.
+
+### Guardrail policy, locked in
+
+Going forward (and codified in `.squad/decisions/inbox/neo-guardrail-scope-correction.md`): **guardrails fail the eval, period.** There is no soft-warning tier. If you want signal without enforcement, that's a metric — put it in `WorkspaceDelta` or grader output. The `GuardrailWarnings []string` channel is gone; if a future need surfaces, that's a new design decision, not a free reuse.

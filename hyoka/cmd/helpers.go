@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/spf13/cobra"
@@ -164,29 +162,4 @@ func openInBrowser(path string) {
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("Could not open browser: %v\nOpen manually: %s\n", err, path)
 	}
-}
-
-// parseByteSize parses a human-readable byte size string (e.g., "1MB", "512KB", "1048576").
-func parseByteSize(s string) (int64, error) {
-	s = strings.TrimSpace(strings.ToUpper(s))
-	multipliers := map[string]int64{
-		"KB": 1024,
-		"MB": 1024 * 1024,
-		"GB": 1024 * 1024 * 1024,
-	}
-	for suffix, mult := range multipliers {
-		if strings.HasSuffix(s, suffix) {
-			numStr := strings.TrimSuffix(s, suffix)
-			num, err := strconv.ParseFloat(strings.TrimSpace(numStr), 64)
-			if err != nil {
-				return 0, fmt.Errorf("invalid number %q", numStr)
-			}
-			return int64(num * float64(mult)), nil
-		}
-	}
-	num, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid size %q \u2014 use a number with optional KB/MB/GB suffix", s)
-	}
-	return num, nil
 }

@@ -263,7 +263,6 @@ This allows fine-grained control at the prompt level while maintaining sensible 
 |-------|------|---------|----------|-------------|
 | `max_turns` | int | 25 | `--max-turns` | Maximum assistant turns per generation |
 | `max_files` | int | 50 | `--max-files` | Maximum generated files per evaluation |
-| `max_output_size` | string | "1MB" | `--max-output-size` | Maximum total output size (supports KB, MB suffixes) |
 | `max_session_actions` | int | 50 | `--max-session-actions` | Maximum actions per Copilot session |
 
 ### Config-Level Limits
@@ -278,7 +277,6 @@ configs:
     limits:
       max_turns: 15
       max_files: 30
-      max_output_size: "512KB"
       max_session_actions: 25
 ```
 

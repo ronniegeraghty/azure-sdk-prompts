@@ -88,11 +88,12 @@ type EngineOptions struct {
 	// Fan-out visibility (#34)
 	ConfirmLargeRuns bool
 	AutoConfirm      bool
-	// Generator guardrails (#35)
+	// Generator guardrails (#35). Phase 3.5 (#566) dropped the byte-size
+	// guardrail entirely — review no longer inlines file contents, and the
+	// review-side caps in internal/utils prevent runaway memory.
 	MaxTurns          int
 	MaxSessionActions int
 	MaxFiles          int
-	MaxOutputSize     int64
 	// Tiered limits (#347): separate generator and reviewer guardrails.
 	// Reviewer limits default to half of generator limits when zero.
 	ReviewerMaxTurns   int
@@ -166,9 +167,6 @@ func NewEngineWithReviewerFactory(evaluator PromptRunner, factory ReviewerFactor
 	}
 	if opts.MaxFiles <= 0 {
 		opts.MaxFiles = 50
-	}
-	if opts.MaxOutputSize <= 0 {
-		opts.MaxOutputSize = 1048576 // 1MB
 	}
 	// Tiered reviewer limits: default to half of generator limits (#347)
 	if opts.ReviewerMaxTurns <= 0 {
@@ -301,7 +299,6 @@ type EvalTask struct {
 type resolvedLimits struct {
 	maxTurns          int
 	maxFiles          int
-	maxOutputSize     int64
 	maxSessionActions int
 }
 
@@ -388,7 +385,6 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 	rl := resolvedLimits{
 		maxTurns:          e.opts.MaxTurns,
 		maxFiles:          e.opts.MaxFiles,
-		maxOutputSize:     e.opts.MaxOutputSize,
 		maxSessionActions: e.opts.MaxSessionActions,
 	}
 	if cfg.Limits != nil {
@@ -397,9 +393,6 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 		}
 		if cfg.Limits.MaxFiles > 0 {
 			rl.maxFiles = cfg.Limits.MaxFiles
-		}
-		if cfg.Limits.MaxOutputSize > 0 {
-			rl.maxOutputSize = cfg.Limits.MaxOutputSize
 		}
 		if cfg.Limits.MaxSessionActions > 0 {
 			rl.maxSessionActions = cfg.Limits.MaxSessionActions

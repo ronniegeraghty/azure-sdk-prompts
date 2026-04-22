@@ -43,7 +43,6 @@ type runFlags struct {
 	// Generator guardrails (#35)
 	maxSessionActions int
 	maxFiles          int
-	maxOutputSize     string
 	// Generator safety (#36)
 	allowCloud bool
 	// Resource monitoring (#45)
@@ -98,7 +97,6 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().IntVar(&f.maxSessionActions, "max-session-actions", 50, "Maximum actions per Copilot session (reasoning, response, or tool call each count as 1)")
 	cmd.Flags().IntVar(&f.maxTurns, "max-turns", 0, "Maximum conversation turns per generation (0 = use config/default)")
 	cmd.Flags().IntVar(&f.maxFiles, "max-files", 50, "Maximum generated files per evaluation before aborting")
-	cmd.Flags().StringVar(&f.maxOutputSize, "max-output-size", "1MB", "Maximum total output size per evaluation (e.g., 1MB, 512KB)")
 	// Generator safety (#36)
 	cmd.Flags().BoolVar(&f.allowCloud, "allow-cloud", false, "Allow agent output to provision real Azure resources (disables safety boundaries)")
 	cmd.Flags().Bool("sandbox", true, "Enforce safety boundaries preventing real Azure resource provisioning (default, opposite of --allow-cloud)")
@@ -391,12 +389,6 @@ func runCmd() *cobra.Command {
 				reviewerFactory = nil
 			}
 
-			// Parse max-output-size flag (#35)
-			maxOutputSize, err := parseByteSize(f.maxOutputSize)
-			if err != nil {
-				return fmt.Errorf("invalid --max-output-size %q: %w", f.maxOutputSize, err)
-			}
-
 			// Create and run engine
 			// Parse exclude-dirs (#63)
 			var excludeDirs []string
@@ -420,7 +412,6 @@ func runCmd() *cobra.Command {
 				MaxTurns:          f.maxTurns,
 				MaxSessionActions: f.maxSessionActions,
 				MaxFiles:          f.maxFiles,
-				MaxOutputSize:     maxOutputSize,
 				MonitorResources:  f.monitorResources,
 				StrictCleanup:     f.strictCleanup,
 				AllowCloud:        f.allowCloud,

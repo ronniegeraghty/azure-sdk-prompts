@@ -21,7 +21,7 @@ Configuration files demonstrate the unified tool system and multi-model review s
 - **`example-full.yaml`** — Comprehensive example showing all available config options:
   - Generator section with local and remote skills
   - Reviewer section with multiple models
-  - Session limits (max_turns, max_files, max_output_size)
+  - Session limits (max_turns, max_files, max_session_actions)
   - Unified `tools:` block (no separate `mcp_servers:` section)
 
 - **`example-generator-skills.yaml`** — Demonstrates loading skills from a local directory:
