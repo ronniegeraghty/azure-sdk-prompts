@@ -494,3 +494,95 @@ green. `internal/criteria/` still on disk (Phase 3 retires it) — engine no
 longer touches it. Decision memo at
 `.squad/decisions/inbox/neo-phase2-engine-cutover-shipped.md`. Phase 2 of
 #625 now truly complete.
+
+**Grader Unification — Phase 3 Criteria Deleted (2026-04-22, commit 46b624fb):**
+Closed out `#626`. Deleted `internal/criteria/` in full (5 files, ~1400 LOC):
+`buckets.go`, `buckets_test.go`, `criteria.go`, `criteria_test.go`,
+`hierarchical_test.go`. Three import sites remained after Phase 2 — all
+migrated in-commit:
+
+- `cmd/list`: now loads graders via `graders.LoadUnifiedDir`; unified
+  `Source` / `When` are rendered identically, and `grader_count` in both
+  text and JSON output now sums top-level graders + group graders
+  (previously undercounted grouped criteria). Internal types
+  `listCriteriaEntry` / `listOutput` retained for stable JSON shape.
+- `cmd/validate`: criteria section rewritten against `Bundle.FileErrors`
+  — surfaces every deferred parse/validation failure with the loader's
+  own error message (Phase 1 semantics). Dropped the ad-hoc per-grader
+  name/prompt checks since `graders.validateEntry` already enforces them
+  strictly at load time. Exit code + success phrasing preserved.
+- `internal/validate/schema.go`: removed the dead
+  `ValidateCriteriaStruct` helper and its sole caller
+  `TestCriteriaStructValidation_GraderTypes`. Unified validation lives
+  in `graders.ParseUnified` / `LoadUnifiedDir` and is already covered by
+  the Phase 1 suite.
+
+Verified: `go build`, `go vet`, `go test -race ./... -timeout 3m` all
+clean; `rg 'hyoka/internal/criteria' --type go` zero hits; live
+`hyoka list` and `hyoka validate` smoke-tested against the real
+`criteria/` directory (2 files, 25 graders — "All 2 criteria file(s)
+valid").
+
+Deviation from issue scope: `#626` also listed golden-file snapshot
+tests in `internal/graders/` as a replacement for the Phase 1/2
+parallel-run safety net. Deferred — the existing
+`unified_loader_test`, `unified_entry_test`, `unified_realfixtures_test`,
+and `phase1_loader_test` already exercise parse + matching on real
+fixtures. Flagged for Ronnie/Morpheus in the closing comment on #626 in
+case a dedicated snapshot suite is still wanted.
+
+Grader unification is code-complete: unified schema (Phase 1) → engine
+cutover (Phase 2) → criteria deletion (Phase 3). `internal/graders/` is
+now the single source of truth for grading config. Decision memo at
+`.squad/decisions/inbox/neo-phase3-criteria-deleted.md`.
+
+## Learnings — Option A grader restructure (2026-04-22, commit 46ddda2e)
+
+- `criteria/` umbrella + `criteria/graders/` nested sub-package mirrors
+  the YAML data model (files contain graders). Parent-imports-child is
+  the only legal direction — never have the grader-type package import
+  the file-level package.
+- `ReviewBucket` lives with grader-type code because it rides inside
+  `GraderInput`; the file-level `BuildUnifiedReviewBuckets` imports it.
+- When a single registry file mixes per-grader-type construction
+  (NewGrader) with file-level execution (InstantiateGraders/RunGraders),
+  split the file-level helpers into their own `exec.go` at the criteria
+  layer. Keeps the grader-type package free of multi-entry concerns.
+- `git mv` for every file move preserved history cleanly even across a
+  package hierarchy change. Package-decl updates and import rewrites can
+  then be done with sed in bulk.
+
+## Learnings — ProgressEvent schema extension (CLI UX overhaul, sprint todo #2)
+
+- `ProgressEvent` is a **fat union struct** — every existing emitter uses raw
+  struct literals and only sets the fields its `EventType` cares about. I
+  followed that pattern rather than introducing a nested payload interface;
+  switching styles mid-struct would have forced every existing call site to
+  change and broken the "no emitter changes in this task" boundary.
+- **No JSON tags** on the struct. The existing fields have none and the type
+  is in-process only (never serialized to the report JSON or over a wire).
+  The task said "json tags consistent with existing fields" — consistent here
+  means none. If we ever need to serialize, tag the whole struct in one pass
+  rather than half-tagging new fields now.
+- `Score *float64` — pointer so "grader didn't report a score" is
+  distinguishable from a legitimate `0.0`. All other numerics stayed as
+  value types because their zero has an unambiguous meaning (0 turns,
+  0 tool calls, $0 cost for a free/cached run).
+- Kept `Status` (tool load outcome) and `Result` (grader outcome) as
+  separate fields rather than overloading one. They share lexical space
+  ("pass"/"fail" vs "loaded"/"failed") but are semantically distinct — a
+  single field would force renderers to branch on `EventType` just to
+  interpret the value, which is exactly the coupling the schema should
+  avoid.
+- `EventToolsVerified` carries `Tools []ToolStatus` rather than being
+  replayed as N single-tool events. The sprint plan explicitly allows one
+  bulk redraw at verification time; a slice payload keeps that as a single
+  event the renderer can atomically redraw.
+- Exported string constants (`ToolKindSkill/Plugin/MCP`,
+  `ToolStatusLoaded/Failed`, `GraderResultPass/Fail`) so the downstream
+  emitter agents (tool-resolution, tool-verification, grader-serializer)
+  don't hardcode magic strings that would drift.
+- Did **not** add constructor helpers — existing emitters all use raw
+  struct literals, so a helper would be an inconsistent half-measure.
+  Documented this explicitly in the inbox decision so downstream agents
+  don't chase a nonexistent pattern.

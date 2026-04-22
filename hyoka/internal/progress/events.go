@@ -15,7 +15,47 @@ const (
 	EventPassed                         // Eval passed
 	EventFailed                         // Eval failed
 	EventError                          // Eval errored
+
+	// Tool resolution & verification (config load / post-session-start).
+	EventToolResolutionStart  // A skill/plugin/MCP tool has started resolving
+	EventToolResolutionResult // Resolution finished (loaded or failed)
+	EventToolsVerified        // Post-session-start verification bulk result
+
+	// Per-grader lifecycle (serialized in interactive mode).
+	EventGraderStart    // A grader started running
+	EventGraderComplete // A grader finished (pass/fail)
+
+	// Session-level details captured after generation completes.
+	EventSessionDetails // Files, turns, tool calls, cost summary for a session
 )
+
+// Tool kind constants used with ToolKind fields on ProgressEvent.
+const (
+	ToolKindSkill  = "skill"
+	ToolKindPlugin = "plugin"
+	ToolKindMCP    = "mcp"
+)
+
+// Tool resolution / verification status constants used with Status fields.
+const (
+	ToolStatusLoaded = "loaded"
+	ToolStatusFailed = "failed"
+)
+
+// Grader result constants used with the Result field.
+const (
+	GraderResultPass = "pass"
+	GraderResultFail = "fail"
+)
+
+// ToolStatus captures the post-session-start verification outcome for a single tool.
+// Used as the element type of ProgressEvent.Tools on EventToolsVerified.
+type ToolStatus struct {
+	ToolName string // Tool identifier (skill name, plugin name, MCP server name)
+	ToolKind string // One of ToolKindSkill, ToolKindPlugin, ToolKindMCP
+	Status   string // One of ToolStatusLoaded, ToolStatusFailed
+	Reason   string // Optional human-readable reason (typically for failures)
+}
 
 // Phase identifies which stage an eval is in.
 type Phase string
@@ -26,6 +66,11 @@ const (
 )
 
 // ProgressEvent carries status from the eval engine or Copilot session to the display.
+//
+// The struct is a fat union: only fields relevant to the EventType are populated.
+// Existing consumers only read EventType-specific fields, so new fields are additive
+// and backward-compatible. Pointer-typed fields (e.g. Score) signal "unset" distinct
+// from the zero value.
 type ProgressEvent struct {
 	EvalID      string    // Unique eval identifier (promptID/configName)
 	PromptID    string    // Prompt ID
@@ -35,6 +80,26 @@ type ProgressEvent struct {
 	FileCount   int       // Generated file count (for completion events)
 	Phase       Phase     // Current phase (for EventPhaseChange)
 	ReviewScore int       // Review score out of 10 (for EventPassed)
+
+	// Tool resolution / verification fields.
+	// Populated by EventToolResolutionStart, EventToolResolutionResult, EventToolsVerified.
+	ToolName string       // Tool identifier (single-tool events)
+	ToolKind string       // One of ToolKindSkill, ToolKindPlugin, ToolKindMCP
+	Status   string       // One of ToolStatusLoaded, ToolStatusFailed (single-tool events)
+	Reason   string       // Optional explanation, typically for failures
+	Tools    []ToolStatus // Bulk verification payload for EventToolsVerified
+
+	// Grader lifecycle fields (EventGraderStart, EventGraderComplete).
+	GraderID   string   // Grader identifier (e.g. "prompt_review", "no_secrets")
+	GraderKind string   // Grader kind / model label (e.g. "claude-opus-4.6", "output_check")
+	Result     string   // One of GraderResultPass, GraderResultFail (EventGraderComplete)
+	Score      *float64 // Optional grader score; nil means "not reported"
+
+	// Session summary fields (EventSessionDetails).
+	Files     []string // Files written by the session
+	Turns     int      // Total turns consumed
+	ToolCalls int      // Total tool calls made
+	Cost      float64  // Session cost in USD
 }
 
 // ProgressFunc receives progress events from evaluators.
