@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/trends"
@@ -152,15 +154,31 @@ func runCmd() *cobra.Command {
 		Short: "Run evaluations",
 		Long:  "Run evaluations with optional filters against the prompt library.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// When log-level is debug or info and progress mode is auto,
-			// disable live progress so slog output is visible on stderr
-			// without corrupting ANSI cursor save/restore. If --log-file
-			// is set, slog writes to the file only (stderr stays clean),
-			// so live progress can coexist with debug logging.
+			// Resolve --progress auto based on context. The decision sequence:
+			//   1. explicit live|log|off → already honored (no change).
+			//   2. non-TTY stdout      → "off" (piped output shouldn't animate).
+			//   3. workers == 1        → "live" (interactive single-eval mode).
+			//   4. workers  > 1        → "log"  (CI-style multi-worker mode).
+			//   5. debug/info logging without --log-file downgrades "live" to "log"
+			//      so slog output on stderr doesn't corrupt ANSI cursor redraws.
+			//      When --log-file is set, slog writes to the file and stderr stays
+			//      clean, so live mode can coexist with verbose logging.
+			// The renderer swaps for the new interactive/CI modes land in later
+			// tasks; this change only picks the existing "live"/"log" string.
 			if f.progressMode == "auto" {
 				logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
 				logFile, _ := cmd.Root().PersistentFlags().GetString("log-file")
-				if (logLevel == "debug" || logLevel == "info") && logFile == "" {
+
+				switch {
+				case !progress.IsTerminal(os.Stdout):
+					f.progressMode = "off"
+				case f.workers > 1:
+					f.progressMode = "log"
+				default:
+					f.progressMode = "live"
+				}
+
+				if f.progressMode == "live" && (logLevel == "debug" || logLevel == "info") && logFile == "" {
 					f.progressMode = "log"
 				}
 			}
