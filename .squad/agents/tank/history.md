@@ -294,3 +294,14 @@ Morpheus has proposed a comprehensive unification of the grading pipeline (Issue
 - **Your role:** Phase 1-3 implementation track (schema, execution, cleanup) — likely paired with Neo
 
 📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full spec and phased plan. Awaiting team consensus and architecture sign-off.
+
+---
+
+## 2025 — workers default → 1
+
+Flipped `--workers` default from `runtime.NumCPU()` (capped at 8) to `1` in `engine.go`. Updated help text in `run.go`. Kept the >8 clamp for explicit user values.
+
+### Learnings
+- `EngineOptions.Workers` default was set inside `NewEngineWithReviewerFactory` (not at flag definition time), so the CLI flag is `0` and the engine substitutes the default. Changing the substituted default is a one-line change — no flag plumbing needed.
+- `runtime` package was only used for `NumCPU()` in engine.go; removing that call let me drop the import cleanly.
+- This is the foundational switch for the sprint's interactive-vs-CI mode split driven by worker count.
