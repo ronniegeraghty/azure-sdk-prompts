@@ -478,3 +478,19 @@ type UnifiedGraderEntry struct {
 **Q4 deferred-error semantics need the file-level `when:` preserved on failure.** I extended the proposed `FileErrors map[string]error` to `map[string]FileError` where `FileError` carries `Path, When, Err`. Without this, `Bundle.MatchingErrors(props)` would need a second filesystem pass per eval. The `peekFileWhen` helper uses a permissive non-strict decoder so it can extract `when:` from files whose body is broken — if even the `when:` can't be peeked, `MatchingErrors` surfaces the error universally (fail-loud default, safer than silently hiding a file that might be relevant).
 
 **Review-bucket builder deliberately deferred.** The issue listed `unified_buckets.go` as Phase 1, but nothing in Phase 1 consumes buckets — `internal/criteria/buckets.go` is still wired and still authoritative. Porting it now ships dead code. It'll land in the Phase 2 (#625) wiring commit where the engine actually starts using it, which keeps every line of `unified_buckets.go` immediately exercised in the same PR. Documented as deviation 3 in the issue comment.
+
+**Grader Unification — Phase 2 Engine Cutover Shipped (2026-04-22, commit a8a6d2d4):**
+Completed the deferred engine cutover from the 7d7372ef helper landing. Removed
+`EngineOptions.GradersDir` and the dual `graderConfigs`/`pluginGraders` fields;
+engine now loads a single `graders.Bundle` via `LoadUnifiedDir(CriteriaDir)`.
+runSingleEval's grading block rewritten: `Bundle.MatchingErrors(props)` fails
+the eval when a relevant file is malformed (Q4), `PartitionMatched` splits
+matched entries into typed graders (run via `InstantiateGraders+RunGraders`
+after `ToRuntimeConfig`) and prompt entries (feed `BuildUnifiedReviewBuckets` /
+`MergeUnifiedCriteria` into `GraderInput`). Removed the gate short-circuit in
+`AggregateResults`: every grader contributes; `Pass` is the AND of per-result
+pass. Rewrote 6 tests against the new Bundle API; full `go test -race ./...`
+green. `internal/criteria/` still on disk (Phase 3 retires it) — engine no
+longer touches it. Decision memo at
+`.squad/decisions/inbox/neo-phase2-engine-cutover-shipped.md`. Phase 2 of
+#625 now truly complete.
