@@ -205,10 +205,16 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			expectedMCPServers[entry.Name] = true
 		}
 	}
+	// verifier accumulates SDK-reported tool loads and produces exactly one
+	// bulk EventToolsVerified per eval once every configured kind has fired.
+	// Emission is gated on a non-nil progressFn; the slice is built under the
+	// OnEvent mutex below but dispatched after unlock.
+	verifier := newToolVerifier(sessionCfg.SkillDirectories, expectedMCPServers)
 
 	sessionCfg.OnEvent = func(event copilot.SessionEvent) {
 		mu.Lock()
 		events = append(events, event)
+		var verifiedTools []progress.ToolStatus
 
 		// Build serializable event record
 		rec := report.SessionEventRecord{
@@ -341,25 +347,31 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		case copilot.SessionEventTypePermissionCompleted:
 			// Audit trail
 		case copilot.SessionEventTypeSessionSkillsLoaded:
-			if len(event.Data.Skills) > 0 {
-				names := make([]string, 0, len(event.Data.Skills))
-				for _, s := range event.Data.Skills {
-					names = append(names, s.Name)
-				}
+			names := make([]string, 0, len(event.Data.Skills))
+			for _, s := range event.Data.Skills {
+				names = append(names, s.Name)
+			}
+			if len(names) > 0 {
 				rec.Content = strings.Join(names, ", ")
 				lg.Info("Skills loaded", "skills", rec.Content)
 			} else if tool.CountSkills(sessionCfg.SkillDirectories) > 0 {
 				lg.Warn("No skills loaded despite configured skill directories",
 					"expected_dirs", len(sessionCfg.SkillDirectories))
 			}
-		case copilot.SessionEventTypeSessionMcpServersLoaded:
-			if len(event.Data.Servers) > 0 {
-				loadedNames := make(map[string]bool, len(event.Data.Servers))
-				names := make([]string, 0, len(event.Data.Servers))
-				for _, s := range event.Data.Servers {
-					names = append(names, s.Name)
-					loadedNames[s.Name] = true
+			verifier.onSkillsLoaded(names)
+			if e.progressFn != nil {
+				if t := verifier.emitIfReady(); t != nil {
+					verifiedTools = t
 				}
+			}
+		case copilot.SessionEventTypeSessionMcpServersLoaded:
+			names := make([]string, 0, len(event.Data.Servers))
+			loadedNames := make(map[string]bool, len(event.Data.Servers))
+			for _, s := range event.Data.Servers {
+				names = append(names, s.Name)
+				loadedNames[s.Name] = true
+			}
+			if len(names) > 0 {
 				rec.Content = strings.Join(names, ", ")
 				lg.Info("MCP servers loaded", "servers", rec.Content)
 				// Verify all expected MCP servers loaded (#347)
@@ -372,6 +384,12 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			} else if len(expectedMCPServers) > 0 {
 				lg.Warn("No MCP servers loaded despite configuration",
 					"expected", len(expectedMCPServers))
+			}
+			verifier.onMCPLoaded(names)
+			if e.progressFn != nil {
+				if t := verifier.emitIfReady(); t != nil {
+					verifiedTools = t
+				}
 			}
 		case copilot.SessionEventTypeSessionToolsUpdated:
 			lg.Info("Tools updated")
@@ -387,6 +405,19 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 
 		sessionRecords = append(sessionRecords, rec)
 		mu.Unlock()
+
+		// Emit the bulk tool-verification event outside the lock (matches the
+		// rest of the progress-forwarding in this handler; avoids any risk of
+		// deadlock with renderers that take their own locks in progressFn).
+		if verifiedTools != nil && e.progressFn != nil {
+			e.progressFn(progress.ProgressEvent{
+				EvalID:     debugPrefix,
+				PromptID:   p.ID,
+				ConfigName: cfg.Name,
+				Type:       progress.EventToolsVerified,
+				Tools:      verifiedTools,
+			})
+		}
 
 		// Forward progress events to display
 		if e.progressFn != nil {

@@ -435,6 +435,93 @@ Morpheus has proposed a comprehensive unification of the grading pipeline (Issue
 
 **Gotcha: Error event in interactive mode.** Writing the error-path case (`EventError`), I expected `onError` to print something like `"❌ ERROR"`. Actually it calls `agentComplete(0, false)` which writes `"❌ Failed"` (same as grader failure) THEN appends a separate line with the error message. So the assertion is `"❌ Failed"` + the literal message + `"1 errors"` in the summary. Would have caught a real regression if agentComplete changed its glyph.
 
-**Commit:** `[SHA]` — `test(progress): table-driven snapshot tests for interactive + CI renderers`.
+**Commit:** `3130c84c` — `test(progress): table-driven snapshot tests for interactive + CI renderers`.
 
 **Decision memo:** `.squad/decisions/inbox/switch-renderer-tests.md`
+
+---
+
+## 2026-04-22 — Event-emission unit tests: tool resolution, verification, grader lifecycle
+
+Sibling task to the renderer snapshots. Wrote unit tests for the new
+progress events across three packages: `config/tool` (resolution),
+`eval` (verification + grader hooks), `criteria` (pipeline hooks). All
+four test files are new and live alongside the source; 22 new Test
+functions + 13 table-subtest cases = 35 cases total.
+
+**Files added:**
+- `hyoka/internal/eval/tool_verification.go` — refactor (see Learnings).
+- `hyoka/internal/eval/tool_verification_test.go` — 9 functions.
+- `hyoka/internal/eval/grader_events_test.go` — 7 functions.
+- `hyoka/internal/config/tool/resolve_order_test.go` — 1 function (sequential multi-skill order).
+- `hyoka/internal/config/plugins_emit_test.go` — 5 functions.
+- `hyoka/internal/eval/copilot.go` — edited to wire the extracted verifier.
+
+Verifications:
+- `go test -race ./...` — green across every package.
+- `go vet ./hyoka/...` — clean.
+
+### Learnings
+
+**Reporter test double pattern.** For all four test files I used the
+same shape: a `reporter` struct with `events []progress.ProgressEvent`
+and an `emit(e progress.ProgressEvent)` method that appends. Lives in
+the first test file in each package so sibling tests can reuse it.
+Assertions are always "len(events) == N" *then* index into the slice
+by position — index-based indexing reads better than
+name-keyed maps when the ordering guarantee is itself part of the
+contract. I re-used this pattern three times; it's a good default for
+any emission test.
+
+**Assertion style: check Type/ID/Kind together per slot.** When
+asserting ordered event sequences, I used a small inline struct slice
+and compared all three fields per position in one line. This
+surfaced ordering AND field-population bugs in the same failure
+message — more efficient than separate per-field loops.
+
+**Gotcha I found: 82cd8590 never merged.** The decisions ledger
+(`.squad/decisions.md`) claims the tool-verification wiring
+(`82cd8590`) is "✅ Shipped" on `ronniegeraghty/dev`, but
+`git merge-base --is-ancestor 82cd8590 HEAD` returned non-zero.
+`copilot.go` as of branch-HEAD built the expected-skills/MCP sets
+but *never emitted* `EventToolsVerified`. Filed
+`.squad/decisions/inbox/switch-tool-verification-rerelease.md`. Rather
+than skip the tests, I re-landed the emission in a refactored,
+testable shape (`toolVerifier` struct in
+`hyoka/internal/eval/tool_verification.go`) and covered the contract
+with 9 table-driven cases. Charter bullet "push back on code that's
+hard to test — suggest refactors that improve testability" applied
+directly: the original closure-scoped state in `Run()` would have
+required either an integration harness or test-only accessors to
+verify.
+
+**Skill basename edge cases (`newToolVerifier`):** `filepath.Base` of
+`./` returns `"."` and of `/` returns `"/"`. The verifier filters
+these plus the empty string to avoid spurious entries — added a
+dedicated test (`TestToolVerifier_SkillBasenameDerivation`) because
+this felt like the kind of silent bug that would produce
+"tool 'loaded': failed" lines in the UI and confuse everyone.
+
+**Plugin emission test needs env isolation.** `EmitPluginResolutions`
+falls through to `resolveInstalledPlugin(name)` which stats
+`$HOME/.copilot/installed-plugins/`. Without `t.Setenv("HOME", ...)`,
+a developer with a matching plugin installed would get flaky Failed
+vs Loaded flips. Same trick for `t.Chdir(t.TempDir())` — the
+registry-lookup branch looks at `./plugins` relative to CWD. The
+"found in registry" test uses the *correct* plugin YAML schema
+(`skills:`, not `tools:` — discovered on first run, where the loader
+silently skipped my malformed YAML).
+
+**"Fires outside mutex" guarantee — not unit-testable.** The round 1–2
+contract says `progressFn` must be invoked after `mu.Unlock()` in
+`copilot.go`. Can't prove it in a unit test without spinning up a real
+session. Closest I got: `TestToolVerifier_EmitIsSeparatedFromStateMutation`
+asserts `emitIfReady()` doesn't mutate the state maps during slice
+construction, which means callers can legitimately hold their own
+lock up to the return and release before `progressFn`. Code review is
+the actual guard for the copilot.go unlock-then-emit order — I
+confirmed by inspection.
+
+**Commit:** `3130c84c` — `test(events): unit tests for tool + grader event emission`.
+
+**Decision memo:** `.squad/decisions/inbox/switch-tool-verification-rerelease.md`
