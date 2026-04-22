@@ -2,6 +2,35 @@
 
 ## Active Decisions
 
+### Decision Inbox: Grader Unification — 10 Open Questions Awaiting Ronnie
+
+**Author:** Morpheus 🕶️  
+**Date:** 2026-04-22 (recovery)  
+**Phase:** 4 (deferred implementation pending decision)  
+**Status:** ⏳ Awaiting Ronnie's decisions
+
+**Context:** Morpheus regenerated complete grader unification proposal (744 lines, post-recovery) covering schema redesign, implementation roadmap, and 10 decision points. Proposal unifies typed and untyped graders under a single config structure with optional field `Kind` to disambiguate grader types.
+
+**Full proposal:** `.squad/decisions/inbox/morpheus-grader-unification-proposal.md` § 6 — 10 questions with options and recommendations
+
+**Open Questions (summary):**
+
+1. **CLI flag naming** — Keep `--criteria-dir` or rename to `--graders-dir` with alias?
+2. **`Kind` placement** — Bare optional field on entry or nested `typed:` block?
+3. **`Gate` on typed graders** — Hard fail (consistent with `AggregateResults`) or soft warn?
+4. **`Isolate` on typed graders** — Silent ignore, load-time warning, or load-time error?
+5. **Multiple same-Kind in one file** — Allowed with unique names or rejected?
+6. **`internal/criteria/` deletion timing** — Immediate (Phase 3) or deprecation shim?
+7. **`output_check` v1 knobs** — Recommend shipping `min_files`/`min_bytes_per_file` now; defer extensions/glob.
+8. **Test strategy** — Golden-file + parallel-run both during transition (recommended).
+9. **`Gate` on prompt graders** — Reject at load time (LLM scores too noisy for gates).
+10. **`action_sequence`/`tool_constraint` docs** — Document in Advanced section.
+
+**Next step:** Ronnie reviews proposal and provides decisions → Coordinator spawns Phase 1 team (Neo, Tank, Trinity) for implementation.
+
+---
+
+
 ### Decision: Morpheus — Examples Validation Audit & PR #607 Hierarchical-When Investigation (2026-04-22)
 
 **Author:** Morpheus 🏗️
