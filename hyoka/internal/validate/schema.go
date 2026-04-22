@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
 
@@ -92,56 +91,6 @@ func ValidatePromptStruct(p *prompt.Prompt) error {
 		if err := validatePromptIDConvention(p); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-// ValidateCriteriaStruct validates a criteria config struct against schema rules.
-func ValidateCriteriaStruct(gc *criteria.GraderConfig) error {
-	if len(gc.Graders) == 0 && len(gc.Groups) == 0 {
-		return fmt.Errorf("criteria validation failed: no graders or groups defined")
-	}
-
-	var errors []string
-
-	// Validate all graders
-	for i, g := range gc.Graders {
-		if g.Name == "" {
-			errors = append(errors, fmt.Sprintf("grader at index %d: field \"name\" is required", i))
-		}
-		if g.Prompt == "" {
-			errors = append(errors, fmt.Sprintf("grader at index %d: field \"prompt\" is required", i))
-		}
-		if g.Weight < 0 {
-			errors = append(errors, fmt.Sprintf("grader at index %d: field \"weight\" must be at least 0", i))
-		}
-		if g.Weight == 0 {
-			errors = append(errors, fmt.Sprintf("grader at index %d: field \"weight\" must be greater than 0", i))
-		}
-	}
-
-	// Validate graders in groups
-	for groupIdx, group := range gc.Groups {
-		for graderIdx, g := range group.Graders {
-			if g.Name == "" {
-				errors = append(errors, fmt.Sprintf("group %d, grader %d: field \"name\" is required", groupIdx, graderIdx))
-			}
-			if g.Prompt == "" {
-				errors = append(errors, fmt.Sprintf("group %d, grader %d: field \"prompt\" is required", groupIdx, graderIdx))
-			}
-			if g.Weight < 0 {
-				errors = append(errors, fmt.Sprintf("group %d, grader %d: field \"weight\" must be at least 0", groupIdx, graderIdx))
-			}
-			if g.Weight == 0 {
-				errors = append(errors, fmt.Sprintf("group %d, grader %d: field \"weight\" must be greater than 0", groupIdx, graderIdx))
-			}
-		}
-	}
-
-	if len(errors) > 0 {
-		errMsg := "criteria validation failed:\n  - " + strings.Join(errors, "\n  - ")
-		return fmt.Errorf("%s", errMsg)
 	}
 
 	return nil

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
 
@@ -196,101 +195,11 @@ func TestPromptStructValidation_EnumValues(t *testing.T) {
 	}
 }
 
-// TestCriteriaStructValidation_GraderTypes tests that criteria YAML validates
-// grader types using Go struct validation tags.
-func TestCriteriaStructValidation_GraderTypes(t *testing.T) {
-	tests := []struct {
-		name    string
-		gc      *criteria.GraderConfig
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name: "valid grader entry",
-			gc: &criteria.GraderConfig{
-				Graders: []criteria.GraderEntry{
-					{
-						Name:   "correctness",
-						Weight: 1.0,
-						Prompt: "Does the code work correctly?",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "missing grader name",
-			gc: &criteria.GraderConfig{
-				Graders: []criteria.GraderEntry{
-					{
-						Weight: 1.0,
-						Prompt: "Does the code work correctly?",
-					},
-				},
-			},
-			wantErr: true,
-			errMsg:  "name",
-		},
-		{
-			name: "invalid weight: negative",
-			gc: &criteria.GraderConfig{
-				Graders: []criteria.GraderEntry{
-					{
-						Name:   "correctness",
-						Weight: -0.5,
-						Prompt: "Does the code work correctly?",
-					},
-				},
-			},
-			wantErr: true,
-			errMsg:  "weight",
-		},
-		{
-			name: "invalid weight: zero",
-			gc: &criteria.GraderConfig{
-				Graders: []criteria.GraderEntry{
-					{
-						Name:   "correctness",
-						Weight: 0.0,
-						Prompt: "Does the code work correctly?",
-					},
-				},
-			},
-			wantErr: true,
-			errMsg:  "weight",
-		},
-		{
-			name: "missing prompt text",
-			gc: &criteria.GraderConfig{
-				Graders: []criteria.GraderEntry{
-					{
-						Name:   "correctness",
-						Weight: 1.0,
-					},
-				},
-			},
-			wantErr: true,
-			errMsg:  "prompt",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateCriteriaStruct(tt.gc)
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected validation error mentioning %s, got nil", tt.errMsg)
-				} else if !containsFieldName(err.Error(), tt.errMsg) {
-					t.Errorf("expected error to mention %q, got: %v", tt.errMsg, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected validation error: %v", err)
-				}
-			}
-		})
-	}
-}
+// TestCriteriaStructValidation_GraderTypes was removed in Phase 3 of the
+// Grader Unification rollout (issue #626). ValidateCriteriaStruct targeted
+// the now-deleted internal/criteria package; the unified schema validates
+// via graders.ParseUnified / graders.LoadUnifiedDir, which are covered by
+// tests in internal/graders/.
 
 // TestConfigStructValidation_RequiredSections tests that config YAML validates
 // required sections (generator, reviewer) using Go struct validation tags.

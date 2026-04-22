@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/spf13/cobra"
 )
@@ -45,19 +45,21 @@ func listCmd() *cobra.Command {
 			filter := buildFilter(f)
 			filtered := prompt.FilterPrompts(prompts, filter)
 
-			// Load criteria
+			// Load graders (unified schema; Phase 3 of grader unification).
 			baseDir := filepath.Dir(f.prompts)
 			criteriaDir := resolveCriteriaDir(cmd)
 			if criteriaDir == "" {
 				criteriaDir = filepath.Join(baseDir, "criteria")
 			}
-			var criteriaConfigs []criteria.GraderConfig
+			var graderConfigs []graders.UnifiedGraderConfig
 			if _, err := os.Stat(criteriaDir); err == nil {
-				criteriaConfigs, _ = criteria.LoadDir(criteriaDir)
+				if bundle, loadErr := graders.LoadUnifiedDir(criteriaDir); loadErr == nil && bundle != nil {
+					graderConfigs = bundle.Configs
+				}
 			}
 
 			if jsonOutput {
-				return listJSON(filtered, configs, criteriaConfigs)
+				return listJSON(filtered, configs, graderConfigs)
 			}
 
 			// ── Prompts ───────────────────────────────────────────
@@ -88,9 +90,9 @@ func listCmd() *cobra.Command {
 			}
 
 			// ── Criteria ──────────────────────────────────────────
-			if len(criteriaConfigs) > 0 {
-				fmt.Printf("\nCriteria (%d):\n\n", len(criteriaConfigs))
-				for _, gc := range criteriaConfigs {
+			if len(graderConfigs) > 0 {
+				fmt.Printf("\nCriteria (%d):\n\n", len(graderConfigs))
+				for _, gc := range graderConfigs {
 					source := gc.Source
 					if rel, err := filepath.Rel(".", source); err == nil {
 						source = rel
@@ -103,7 +105,7 @@ func listCmd() *cobra.Command {
 					if len(whenParts) > 0 {
 						whenStr = strings.Join(whenParts, ", ")
 					}
-					fmt.Printf("  %-40s when: %-25s graders: %d\n", source, whenStr, len(gc.Graders))
+					fmt.Printf("  %-40s when: %-25s graders: %d\n", source, whenStr, totalGraders(gc))
 				}
 			}
 
@@ -135,11 +137,11 @@ type listCriteriaEntry struct {
 	GraderCount int               `json:"grader_count"`
 }
 
-func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, criteriaConfigs []criteria.GraderConfig) error {
+func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, graderConfigs []graders.UnifiedGraderConfig) error {
 	out := listOutput{
 		Prompts:  prompts,
 		Configs:  make([]listConfigEntry, 0, len(configs)),
-		Criteria: make([]listCriteriaEntry, 0, len(criteriaConfigs)),
+		Criteria: make([]listCriteriaEntry, 0, len(graderConfigs)),
 	}
 	if out.Prompts == nil {
 		out.Prompts = []*prompt.Prompt{}
@@ -159,7 +161,7 @@ func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, criteriaCon
 		})
 	}
 
-	for _, gc := range criteriaConfigs {
+	for _, gc := range graderConfigs {
 		source := gc.Source
 		if rel, err := filepath.Rel(".", source); err == nil {
 			source = rel
@@ -167,7 +169,7 @@ func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, criteriaCon
 		out.Criteria = append(out.Criteria, listCriteriaEntry{
 			Source:      source,
 			When:        gc.When,
-			GraderCount: len(gc.Graders),
+			GraderCount: totalGraders(gc),
 		})
 	}
 
@@ -177,4 +179,14 @@ func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, criteriaCon
 	}
 	fmt.Println(string(data))
 	return nil
+}
+
+// totalGraders returns the total grader count across top-level graders and
+// every group in a unified grader config.
+func totalGraders(gc graders.UnifiedGraderConfig) int {
+	n := len(gc.Graders)
+	for _, g := range gc.Groups {
+		n += len(g.Graders)
+	}
+	return n
 }

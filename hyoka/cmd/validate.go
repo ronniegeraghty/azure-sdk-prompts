@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/validate"
 	"github.com/spf13/cobra"
@@ -102,38 +102,37 @@ func validateCmd() *cobra.Command {
 				}
 			}
 
-			// ── Validate criteria ─────────────────────────────────
+			// ── Validate criteria (unified grader schema) ─────────
 			criteriaDir := resolveCriteriaDir(cmd)
 			if criteriaDir == "" {
 				criteriaDir = filepath.Join(baseDir, "criteria")
 			}
 			if _, err := os.Stat(criteriaDir); err == nil {
-				configs, loadErr := criteria.LoadDir(criteriaDir)
+				bundle, loadErr := graders.LoadUnifiedDir(criteriaDir)
 				if loadErr != nil {
 					fmt.Printf("✗ Criteria: %v\n", loadErr)
 					allOK = false
-				} else if len(configs) == 0 {
-					fmt.Printf("⚠ No criteria files found in %s\n", criteriaDir)
 				} else {
+					// Surface every per-file error deferred by the loader
+					// (Bundle.FileErrors — Phase 1 semantics: malformed
+					// files are collected, not fatal at load time).
 					criteriaErrors := 0
+					for _, fe := range bundle.FileErrors {
+						fmt.Printf("✗ Criteria %s: %v\n", fe.Path, fe.Err)
+						criteriaErrors++
+						allOK = false
+					}
 					totalGraders := 0
-					for _, gc := range configs {
+					for _, gc := range bundle.Configs {
 						totalGraders += len(gc.Graders)
-						for _, g := range gc.Graders {
-							if g.Name == "" {
-								fmt.Printf("✗ Criteria %s: grader missing name\n", gc.Source)
-								criteriaErrors++
-								allOK = false
-							}
-							if g.Prompt == "" {
-								fmt.Printf("✗ Criteria %s: grader %q missing prompt\n", gc.Source, g.Name)
-								criteriaErrors++
-								allOK = false
-							}
+						for _, g := range gc.Groups {
+							totalGraders += len(g.Graders)
 						}
 					}
-					if criteriaErrors == 0 {
-						fmt.Printf("✓ All %d criteria file(s) valid (%d grader(s))\n", len(configs), totalGraders)
+					if len(bundle.Configs) == 0 && criteriaErrors == 0 {
+						fmt.Printf("⚠ No criteria files found in %s\n", criteriaDir)
+					} else if criteriaErrors == 0 {
+						fmt.Printf("✓ All %d criteria file(s) valid (%d grader(s))\n", len(bundle.Configs), totalGraders)
 					} else {
 						fmt.Printf("✗ %d error(s) in criteria files\n", criteriaErrors)
 					}
