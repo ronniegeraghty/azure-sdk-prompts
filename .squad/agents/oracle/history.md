@@ -505,3 +505,28 @@ Completed comprehensive audit of examples/ directory to ensure all reflect post-
 
 **Key Insight:** The examples directory now functions as both a validation suite and a teaching tool. Each example directly reflects the current architecture, removing drift risk.
 
+
+## Session: Fix PR #618 non-blocking nits
+
+**Date:** 2026-04-22 (async follow-up to Morpheus review)
+**Outcome:** ✅ All 3 nits addressed & merged
+
+### Work log
+- **N1** (cmd/helpers.go:167-168): Deleted 2-line tombstone comment referencing removed `parseByteSize` helper. Convention: clean removal, no obituary.
+- **N2** (README.md:177): Deleted guardrails-table row "`| Output size | — | — | Removed in #566 —...`" to match cleanup across other docs.
+- **N3** (engine_test.go:575): Tightened comment from "reaches both the report and graders" to "reaches the report (grader coverage via #571 nil-safety tests)" to accurately reflect SkipReview: true test path.
+
+Build: ✓ green  
+Tests: ✓ all 24 packages passing  
+Commit: `fccebad1` with Co-authored-by trailer  
+Pushed: `squad/566-workspacedelta-firstclass`  
+PR #618 comment: posted acknowledgment
+
+### Lessons
+- Dead code removal should be surgical (no comments), not apologetic.
+- Test comments must stay in sync with test setup (SkipReview is a coverage boundary).
+- Cross-doc consistency matters: if one doc removes a row, others should too.
+
+## PR #618 merged into phase-6
+
+All nits addressed. Work reflects code hygiene principles: total removal (no partial patches), cross-doc consistency, comment/code sync.

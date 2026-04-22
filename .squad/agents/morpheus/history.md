@@ -507,3 +507,9 @@ All three are doc-/comment-level. None block merge.
 **Artifacts:**
 - Review comment: posted to PR #618 (state: COMMENTED, 2026-04-22T16:36:10Z)
 - Decision: `.squad/decisions/inbox/morpheus-pr618-verdict.md`
+
+## Learnings
+
+### PR #618 merged into phase-6
+
+The approval verdict was posted and nits addressed. Guardrail policy locked in for team — "hard-fail only, no soft-warning tier."

@@ -2920,3 +2920,219 @@ When two branches independently merge the same upstream and resolve conflicts di
 **Note:** Future docs work should route to Oracle by default, not Tank. Oracle has specialized expertise in documentation, tone, and user-facing accuracy. Tank focuses on CLI/platform.
 
 ---
+
+---
+
+### Morpheus Verdict: PR #618 — WorkspaceDelta first-class (#566)
+
+**Date:** 2026-04-22
+**Reviewer:** Morpheus 🕶️
+**PR:** https://github.com/ronniegeraghty/hyoka/pull/618
+**Branch:** `squad/566-workspacedelta-firstclass` @ `2e67bc51`
+**Verdict:** ✅ **APPROVE** (posted as `--comment` due to author-isolation; verdict explicit in body)
+
+#### Key rationale
+
+1. **Right architectural shape.** `WorkspaceDelta` is now a single source of truth: engine computes once on `EvalReport.WorkspaceDelta`, `GraderInput` reads the same pointer. No duplicate compute, no parallel paths, no leaky abstraction. This is what "first-class" means.
+
+2. **Snapshot wiring is appropriately minimal.** Pre-snapshot after `CopyStarterFiles`, post-snapshot after `ws.ListFiles()`, both in the same stack frame (`runSingleEval`). No premature helper extraction. Errors short-circuit naturally — pre-snapshot failure makes post-snapshot a no-op via `if beforeSnap != nil`.
+
+3. **Graceful degradation matches the contract.** Snapshot failure → warn + nil delta → graders nil-check (already covered by #571's `delta_nil_safety_test.go`). Backwards-compatible by construction: pre-#566 reports deserialize fine because the field is `omitempty`.
+
+4. **Removal is total, not partial.** `MaxOutputSize` is gone from `SessionLimits`, `EngineOptions`, `EvalReport`, CLI flag, schema validator, negative-value validator, the dead `computeAgentOutputSize` helper, all tests, and all docs. Verified with `grep -rn` — zero hits in active source. This is the right call after the second amendment: a guardrail that never fires is decoration, not protection.
+
+5. **Tests + build green.** `go build ./...` clean; `go test ./hyoka/... -timeout 3m` green across all 24 packages (including `serve`/`validate` — no pre-existing failures observed in this run).
+
+#### Non-blocking nits (filed in review body, do not gate merge)
+
+- **N1:** Tombstone comment in `hyoka/cmd/helpers.go:167-168` referencing the removed `parseByteSize`. Convention is to delete dead code without an in-source obituary.
+- **N2:** `README.md:177` keeps a row in the guardrails table reading `| Output size | — | — | Removed in #566 — ... |`. Other docs cleanly removed the row; README should match.
+- **N3:** `TestWorkspaceDeltaCaptured` uses `SkipReview: true`, so the `graderInput.WorkspaceDelta` assignment isn't exercised. Surrounding comment slightly overclaims ("reaches both the report and graders"). Coverage gap is filled by #571's nil-safety tests, so it's a comment/clarity nit only.
+
+#### Architectural takeaway for the team
+
+When a feature has zero load-bearing users (the `GuardrailWarnings []string` field in the first amendment had exactly one consumer — itself, via the cap it was intended to support), delete the whole thing. Cascading removal across CLI / schema / report / tests is a few minutes of work, not a reason to leave dead code in the schema. PR #618's second amendment is the right shape: identify the controversial piece, remove it cleanly, document the why in the PR body.
+
+The amendment trail itself (issue spec → spec-faithful PR → reviewer narrows → author over-compromises → reviewer corrects → clean removal) is a reusable lesson — surfaced in Neo's history as "Compromise is a tell." Worth promoting into team-wide guidance.
+
+#### Related
+
+- Issue #566 (closed by this PR)
+- PR #571 (`WorkspaceDelta` type, snapshot/compute API, nil-safety contract — foundation)
+- Future Issue #619 (tool-load fast-fail guardrail) — Neo's reading already in `.squad/agents/neo/history.md`
+
+---
+
+### Decision: PR #618 Non-Blocking Nits — Resolved
+
+**Date:** 2026-04-22  
+**Agent:** Oracle 🔮 (Documentation)  
+**PR:** #618 — WorkspaceDelta first-class (#566)  
+
+#### Summary
+
+All 3 non-blocking documentation nits filed by Morpheus have been addressed:
+
+| Nit | File | Fix | Rationale |
+|-----|------|-----|-----------|
+| N1 | `cmd/helpers.go:167-168` | Deleted tombstone comment about `parseByteSize` | Dead code removal should be clean, not apologetic |
+| N2 | `README.md:177` | Deleted stale guardrails-table row | Consistency: other docs removed the row; README now matches |
+| N3 | `engine_test.go:575` | Tightened comment to reflect `SkipReview: true` | Comment overclaimed coverage; note says "report only" + point to #571 grader tests |
+
+#### Verification
+
+- Build: ✅ `go build ./...` green
+- Tests: ✅ `go test ./hyoka/... -timeout 3m` green (24 packages)
+- Commit: ✅ `fccebad1` with Co-authored-by trailer
+- Push: ✅ `squad/566-workspacedelta-firstclass` updated
+- PR comment: ✅ Posted acknowledgment
+
+#### Implementation details
+
+**N1 – Dead comment removal**  
+Removed 2-line comment block referencing removed helper `parseByteSize`. Convention: delete dead code without in-source obituary. The git history already documents the removal.
+
+**N2 – Guardrails table consistency**  
+Deleted row from README.md guardrails table: `| Output size | — | — | Removed in #566 —...`. Other documentation (config schema, Go doc, etc.) cleanly removed the row. README should mirror that consistency.
+
+**N3 – Test comment accuracy**  
+Updated comment on `TestWorkspaceDeltaCaptured` to accurately reflect the fact that `SkipReview: true` skips the grader pipeline, so grader coverage is provided by #571's `delta_nil_safety_test.go`.
+
+#### Architectural alignment
+
+These nits enforce code hygiene principles:
+- **Removal is total, not partial** — no obituaries left behind
+- **Cross-doc consistency** — updates propagate uniformly
+- **Comment/code sync** — documentation must stay in sync with test setup
+
+No behavior changes; all three fixes are documentation-only.
+
+---
+
+### Decision: Test Disablement Pattern for Merge Conflicts
+
+**Context**: PR #607 phase-6 merge included 3 tests disabled due to missing code (`parseRepoSpec` function, `Branch` field).
+
+**Decision**: Tank correctly **commented out** tests (not `t.Skip()`) that reference non-existent code.
+
+**Rationale**:
+- Commented tests don't run, don't bloat test output, and wouldn't compile if uncommented (compile-time safety)
+- `t.Skip()` should be reserved for tests that are temporarily disabled but still compile (e.g., flaky tests, env-dependent tests)
+- TODO comments on commented tests provide tracking for future re-enablement
+
+**Pattern to Follow**:
+```go
+// TestFeatureX disabled — featureX function doesn't exist in phase-6 structure
+// TODO: Re-enable if featureX is added back
+// func TestFeatureX(t *testing.T) { ... }
+```
+
+**Team Impact**: All agents reviewing merge PRs should check disabled tests follow this pattern.
+
+**Status**: Approved ✅ (Switch)
+**Date**: 2026-04-21
+
+---
+
+### Decision: Guardrail scope correction (#566 amendment) and #619 enforcement direction
+
+**Date:** 2026-04-22 (revised after second reviewer pass)
+**Author:** Neo 💊
+**Related:** PR #618 (amended twice), Issue #619, Issue #566
+
+#### Context
+
+PR #618 originally implemented the #566 spec verbatim: relax three guardrails (`MaxFiles`, byte-size cap) to warnings, widen `MaxFiles` 50→200, add a new `MaxNewFiles` cap. First requester pass course-corrected to keep `MaxFiles=50` hard fail and drop `MaxNewFiles`, but kept the byte-size cap as a 10 MiB soft warning. Second pass course-corrected again: drop the byte-size cap *entirely*. No soft warning, no warnings field.
+
+Concurrently, issue #619 was filed to **add** a new hard-fail guardrail for tool/skill/MCP load failures.
+
+#### Decision 1: Guardrail relaxation policy
+
+**Hard-fail is the default. Guardrails either fail the eval or they don't exist. There is no "soft warning" tier.**
+
+Final state after the second amendment to PR #618:
+
+| Guardrail | Status | Behavior |
+|---|---|---|
+| `MaxTurns` | Hard fail | Sets `GuardrailAbortReason`, flips `Success=false` |
+| `MaxFiles` (50) | Hard fail | Sets `GuardrailAbortReason`, flips `Success=false` |
+| `MaxSessionActions` | Hard fail | Sets `GuardrailAbortReason`, flips `Success=false` |
+| ~~Byte-size cap~~ | **Removed** | Review no longer inlines file contents, and review-side total/per-file caps in `internal/utils/utils.go` already prevent runaway memory. The cap's original purpose is gone; the cap is gone. |
+
+Removed surface area: `SessionLimits.MaxOutputSize`, `EngineOptions.MaxOutputSize`, `EvalReport.GuardrailMaxOutputSize`, `EvalReport.GuardrailWarnings`, `--max-output-size` CLI flag, `parseByteSize` helper, schema validation entry, default value constant, `TestGuardrailMaxOutputSize`, `TestParseByteSize*`, `computeAgentOutputSize` and its test.
+
+**Rule for future PRs:** when adding a guardrail, it fails the eval. If you find yourself wanting "signal but not enforcement," that's not a guardrail — that's a metric. Put it in `WorkspaceDelta` or grader output, not in the guardrail layer.
+
+#### Decision 2: Tool-load enforcement direction (#619)
+
+A new **hard-fail** guardrail will be added: if a config declares tools (skills, plugins, MCP servers) and any of them don't load successfully, the eval is marked failed before scores are produced.
+
+- New `EvalReport.MissingTools []string` field
+- `GuardrailAbortReason` formatted as `"tools_failed_to_load: <comma-separated list>"`
+- `Success=false`, review skipped
+- Implementation seam: `hyoka/internal/eval/copilot.go` event loop already tracks `expectedMCPServers` and compares against loaded names (currently just warns at line 366-370). Promote this to a hard signal and generalize to skills.
+
+#### Why this matters
+
+Eval results that look valid but were produced under a degraded tool environment are worse than no result. They go into trend graphs, comparison tables, and human decisions about which model/config to use. Silent skill/MCP load failures have already produced misleading scores in past `azure-mcp/*` runs. Hard-fail with a clear reason is the right default.
+
+The same logic applies in reverse to dead guardrails: a cap that doesn't fail the eval is just decoration. Either it earns its keep by aborting bad runs or it gets deleted.
+
+---
+
+### Decision Inbox — Validate Must Dry-Run Remote Acquisition (Never Check Cache)
+
+**Source:** Ronnie directive, 2026-04-21
+**Captured by:** Switch 🤍
+**Related:** Issue #616 (filed), #593 (ref pinning), #586 (builtin skills)
+
+#### The Rule
+
+`hyoka validate` MUST verify remote skills and plugins via a **dry-run acquisition** — resolve the URL, hit HEAD / `git ls-remote --exit-code` / `npm view`, etc. — to confirm the source is real and reachable.
+
+It MUST NOT:
+- Check whether the artifact is in the local cache (`.skills-cache/`, `~/.hyoka/cache/`, `~/.copilot/installed-plugins/`).
+- Treat a cache miss as a validation failure.
+- Write to the cache as a side effect of validate.
+
+It MUST fail (non-zero exit) only when the source itself is invalid or unreachable (404, DNS failure, npm package missing, git repo absent).
+
+#### Current State (as of 2026-04-21)
+
+Validate does **neither** — it skips remote skills entirely (parse-only). A config referencing `this-org-does-not-exist/no-such-repo` passes with `EXIT=0`. See #616 reproduction.
+
+#### Implementation Hook
+
+Extend the `Fetcher` interface (`internal/config/tool/fetcher.go:50`) with a `Validate(ctx, FetchRequest) error` method (or add a sibling `Validator` interface for backward compat with custom fetchers). Wire `cmd/validate.go` to call it for every `Type=skill, Source=remote` entry plus every top-level `plugins:` ref. Gate behind `--offline` flag for air-gapped CI.
+
+#### Anti-Pattern to Avoid
+
+Do not "fix" this by making validate pre-warm the cache. The whole point is that validate is fast, side-effect-free, and works on a fresh clone with zero state.
+
+---
+
+### Directive: Investigate validate vs upstream version drift
+
+**Date:** 2026-04-22
+**From:** Ronnie
+**To:** Tank
+**Status:** Completed (investigation deliverable; no code changes)
+
+#### Directive
+
+Investigate whether `hyoka validate` checks upstream for newer versions when a config references a remote skill/plugin without a `ref:` pin. File a new GitHub issue with current behavior, recommended UX, code locations needing change, and relationship to #593.
+
+#### Outcome
+
+- **Verified:** validate does NOT check upstream. It only validates prompts, configs (parse-only), criteria. The fetcher cache (`.skills-cache/<version|"default">/...`) has no freshness probe and no record of what SHA was fetched.
+- **Filed:** Issue #615 — recommended warning (exit 0), `--check-updates` opt-in flag, sidecar versioning as prerequisite, complementary to #593.
+- **Coordination:** Parallel with Switch's "validate-vs-cache-miss" investigation — both feed unified validate-for-remote-artifacts story.
+
+#### Cross-reference
+
+- Issue #615 (filed)
+- Issue #593 (ref pinning — complementary, OPEN)
+- `hyoka/cmd/validate.go`
+- `hyoka/internal/config/tool/{resolve,fetcher,entry}.go`
+
+---

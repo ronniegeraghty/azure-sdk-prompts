@@ -421,3 +421,7 @@ The mechanical lesson: if a feature has zero load-bearing users (the `GuardrailW
 ### Guardrail policy, locked in
 
 Going forward (and codified in `.squad/decisions/inbox/neo-guardrail-scope-correction.md`): **guardrails fail the eval, period.** There is no soft-warning tier. If you want signal without enforcement, that's a metric — put it in `WorkspaceDelta` or grader output. The `GuardrailWarnings []string` channel is gone; if a future need surfaces, that's a new design decision, not a free reuse.
+
+## 2026-04-22 — PR #618 merged into phase-6
+
+Orchestration complete. Morpheus verdict APPROVE, Oracle nits resolved, Scribe merged all inbox entries into decisions.md and cleared the inbox. Guardrail policy locked in as team guidance. Issue #619 (tool-load fast-fail) now unblocked.
