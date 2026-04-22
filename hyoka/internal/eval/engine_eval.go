@@ -20,7 +20,7 @@ import (
 "github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
 )
 
-func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string, sendPhase func(progress.Phase), sendEvent func(progress.EventType, string)) *report.EvalReport {
+func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string, sendPhase func(progress.Phase), sendEvent func(progress.EventType, string), sendRawEvent func(progress.ProgressEvent)) *report.EvalReport {
 	// Each phase gets its own independent timeout so a slow generation
 	// doesn't starve build or review (fixes issue #3).
 	genCtx, genCancel := context.WithCancel(ctx)
@@ -479,7 +479,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				if instErr != nil {
 					glg.Error("Failed to instantiate typed graders", "error", instErr)
 				} else {
-					typedResults := criteria.RunGraders(ctx, instances, typedConfigs, graderInput)
+					hooks := buildGraderHooks(sendRawEvent)
+					typedResults := criteria.RunGradersWithHooks(ctx, instances, typedConfigs, graderInput, hooks)
 					allGraderResults = append(allGraderResults, typedResults...)
 					glg.Debug("Typed graders complete", "count", len(typedResults))
 				}
@@ -509,6 +510,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 						sendEvent(progress.EventToolStart, "Single model review")
 					}
 
+					emitGraderStart(sendRawEvent, reviewGrader)
 					reviewResult, reviewErr := reviewGrader.Grade(ctx, graderInput)
 					if reviewErr != nil {
 						glg.Error("Review grader failed", "error", reviewErr)
@@ -531,6 +533,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 					if reviewResult.Weight == 0 {
 						reviewResult.Weight = 1.0
 					}
+					emitGraderComplete(sendRawEvent, reviewGrader, reviewResult)
 					allGraderResults = append(allGraderResults, reviewResult)
 
 					// Populate backward-compat report fields.
@@ -939,4 +942,64 @@ func expandReviewGraderResult(r graders.GraderResult) []report.GraderResult {
 	})
 
 	return results
+}
+
+// buildGraderHooks wires criteria.GraderHooks to a raw progress emitter so
+// each grader run in RunGradersWithHooks produces GraderStart/GraderComplete
+// events. A nil sendRawEvent means "no reporter wired" — in that case we
+// return zero-value hooks and RunGradersWithHooks will skip emission.
+func buildGraderHooks(sendRawEvent func(progress.ProgressEvent)) criteria.GraderHooks {
+if sendRawEvent == nil {
+return criteria.GraderHooks{}
+}
+return criteria.GraderHooks{
+OnStart: func(g graders.Grader) {
+emitGraderStart(sendRawEvent, g)
+},
+OnComplete: func(g graders.Grader, result graders.GraderResult) {
+emitGraderComplete(sendRawEvent, g, result)
+},
+}
+}
+
+// emitGraderStart sends a GraderStart progress event. Safe to call with a nil
+// sender (no-op) so callers in the review path don't need to guard.
+func emitGraderStart(sendRawEvent func(progress.ProgressEvent), g graders.Grader) {
+if sendRawEvent == nil || g == nil {
+return
+}
+sendRawEvent(progress.ProgressEvent{
+Type:       progress.EventGraderStart,
+GraderID:   g.Name(),
+GraderKind: g.Kind(),
+})
+}
+
+// emitGraderComplete sends a GraderComplete progress event. Score is only
+// populated for grader kinds that produce a meaningful numeric score
+// (prompt_review and prompt LLM-as-judge). Output-check / file / program /
+// behavior graders are binary pass/fail, so Score stays nil for them to
+// avoid misleading renders like "pass (0/10)".
+func emitGraderComplete(sendRawEvent func(progress.ProgressEvent), g graders.Grader, result graders.GraderResult) {
+if sendRawEvent == nil || g == nil {
+return
+}
+outcome := progress.GraderResultFail
+if result.Pass {
+outcome = progress.GraderResultPass
+}
+var scorePtr *float64
+switch g.Kind() {
+case graders.KindPromptReview, graders.KindPrompt:
+s := result.Score
+scorePtr = &s
+}
+sendRawEvent(progress.ProgressEvent{
+Type:       progress.EventGraderComplete,
+GraderID:   g.Name(),
+GraderKind: g.Kind(),
+Result:     outcome,
+Score:      scorePtr,
+Message:    result.Message,
+})
 }

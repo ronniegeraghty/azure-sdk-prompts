@@ -586,3 +586,40 @@ now the single source of truth for grading config. Decision memo at
   struct literals, so a helper would be an inconsistent half-measure.
   Documented this explicitly in the inbox decision so downstream agents
   don't chase a nonexistent pattern.
+
+## Learnings — grader serialization + per-grader events (sprint todo #5)
+
+**Context:** Wired `GraderStart` / `GraderComplete` events around each grader in
+`engine_eval.go` so the interactive display can render a per-grader "Running…
+→ Pass/Fail" tail line instead of one aggregate summary.
+
+- **Graders were already sequential.** Expected to find goroutines + WaitGroup
+  and rewrite. Actually `criteria.RunGraders` is a plain `for` loop over
+  `[]Grader` calling `Grade()` one at a time, and the review grader runs
+  *after* typed graders finish in `engine_eval.go`. So the "serialize in
+  interactive mode" part of the task was a no-op — only the event emission
+  was new code. Documented in the decision memo so future agents don't look
+  for parallelism that isn't there.
+- **Workers==1 interactive signal plumbed but unused at runtime.** The task
+  asked for a mode-detection rule. Since graders are already serial, the
+  `interactive` bool would only gate future parallelism. I chose to emit
+  events unconditionally whenever the raw-event sender is non-nil, which
+  matches the schema doc's "reporter nil = skip" guard and avoids dead
+  branches. If we later parallelize the review grader alongside typed
+  graders for CI mode, the gate belongs there — not in the emission layer.
+- **Score field is kind-dependent.** `GraderResult.Score` is always populated
+  (0.0–1.0 normalized), but it's only semantically meaningful for LLM-judge
+  kinds (`prompt_review`, `prompt`). For `output_check` / `file` / `program`
+  / `behavior` it's just `0` or `1` mirroring `Pass`, and rendering "pass
+  (0/10)" would be misleading. So `emitGraderComplete` populates `Score`
+  only for `KindPromptReview` and `KindPrompt`; others leave it `nil`. This
+  lines up with the schema doc's "`nil` = not reported" convention.
+- **Extended `RunGraders` via new `RunGradersWithHooks` rather than mutating
+  the existing signature.** Keeps the two existing test call sites
+  untouched and gives downstream callers (tests, future CI-mode wiring)
+  the option to opt in.
+- **New callback `sendRawEvent` in engine.go** auto-fills `EvalID` /
+  `PromptID` / `ConfigName` so `engine_eval.go` can emit rich events
+  without duplicating identity plumbing. Same pattern as `sendEvent` /
+  `sendPhase` but for events that carry arbitrary fields (grader ID, score,
+  result).

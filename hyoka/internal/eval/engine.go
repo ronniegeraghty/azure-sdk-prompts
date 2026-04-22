@@ -605,8 +605,23 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 					Type: evtType, Message: msg,
 				})
 			}
+			// sendRawEvent lets callers emit ProgressEvents with richer fields
+			// (e.g. GraderID/GraderKind/Result/Score) while still auto-filling
+			// identity fields so downstream renderers can match events to evals.
+			sendRawEvent := func(evt progress.ProgressEvent) {
+				if evt.EvalID == "" {
+					evt.EvalID = taskName
+				}
+				if evt.PromptID == "" {
+					evt.PromptID = t.Prompt.ID
+				}
+				if evt.ConfigName == "" {
+					evt.ConfigName = t.Config.Name
+				}
+				display.HandleEvent(evt)
+			}
 
-			evalReport := e.runSingleEval(ctx, t, runID, sendPhase, sendEvent)
+			evalReport := e.runSingleEval(ctx, t, runID, sendPhase, sendEvent, sendRawEvent)
 
 			// Attach per-eval resource stats (#45)
 			if resMonitor != nil {
