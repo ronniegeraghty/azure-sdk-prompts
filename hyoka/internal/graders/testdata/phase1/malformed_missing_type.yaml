@@ -1,4 +1,5 @@
 graders:
-  - name: Missing Type Field
+  - name: Missing Type And Prompt
     weight: 1.0
-    prompt: This entry has no type field — must fail at load.
+    # No type field, no prompt body — legacy back-compat cannot translate this
+    # (it needs a prompt body to infer type=prompt), so validation must reject.

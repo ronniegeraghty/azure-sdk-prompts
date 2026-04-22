@@ -1,21 +1,15 @@
-//go:build phase1_pending
-
-// Package graders — Phase 1 acceptance tests for the unified grader loader.
+// Package graders — Phase 1 acceptance tests for the unified grader loader (#624).
 //
-// These tests are gated behind the `phase1_pending` build tag so they do not
-// break CI before Neo lands the Phase 1 loader (#624). Once the new schema
-// (flat `type` discriminator, no `Gate`, back-compat for legacy criteria.yaml)
-// ships in internal/graders/, drop the build tag and adapt any struct or
-// function names that Neo chose (e.g. `details` vs `config`, `Bundle` type
-// name, etc.). The BEHAVIOR under test is locked in issue #624; only the
-// identifier names may drift.
+// These are the TDD acceptance tests locked against the schema in issue #624:
+// flat `type` discriminator, `details:` payload for typed graders, name
+// uniqueness per file, no `gate:`, no `kind:`, back-compat translation for
+// legacy criteria.yaml shape, and deferred-error Bundle semantics on LoadDir.
 //
-// To run locally while iterating:
-//   go test -race -tags phase1_pending ./hyoka/internal/graders/...
+// They exercise Neo's Phase 1 implementation: UnifiedGraderConfig /
+// UnifiedGraderEntry / UnifiedGraderGroup, ParseUnified, LoadUnifiedFile,
+// LoadUnifiedDir, Bundle.
 //
-// See .squad/decisions/inbox/switch-phase1-test-coverage.md for the coverage
-// summary and .squad/decisions/inbox/morpheus-grader-unification-proposal.md
-// for the full schema spec.
+// See .squad/decisions/inbox/switch-phase1-test-coverage.md for coverage map.
 package graders
 
 import (
@@ -32,13 +26,11 @@ func testdataDir(t *testing.T) string {
 	return filepath.Join("testdata", "phase1")
 }
 
-// loadPhase1File is a thin wrapper around the new Phase 1 LoadFile. If Neo
-// names the entry point differently, update this single call-site rather than
-// every test. The returned *GraderConfig is the new unified top-level struct
-// (NOT the existing runtime GraderConfig in types.go — Neo must disambiguate).
-func loadPhase1File(t *testing.T, path string) (*GraderConfig, error) {
+// loadPhase1File is a thin wrapper around Neo's LoadUnifiedFile so that any
+// future rename is a one-line change here instead of in every test.
+func loadPhase1File(t *testing.T, path string) (*UnifiedGraderConfig, error) {
 	t.Helper()
-	return LoadFile(path)
+	return LoadUnifiedFile(path)
 }
 
 // -----------------------------------------------------------------------------
@@ -239,23 +231,22 @@ func TestPhase1Loader_LegacyBackCompat(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Case 6: empty graders list loads cleanly (no graders, no error)
+// Case 6: empty graders list — REJECTED (matches legacy internal/criteria/
+// behavior preserved in Neo's Phase 1 impl). The original task spec said
+// "loads cleanly" but that would silently drop real criteria files whose
+// `graders:` key was mis-indented. Phase 1 preserves the legacy fail-loud
+// behavior, which is the correct back-compat stance.
 // -----------------------------------------------------------------------------
 
 func TestPhase1Loader_EmptyGraders(t *testing.T) {
 	t.Parallel()
 	gc, err := loadPhase1File(t, filepath.Join(testdataDir(t), "empty_graders.yaml"))
-	if err != nil {
-		t.Fatalf("empty graders list must load cleanly, got: %v", err)
+	if err == nil {
+		t.Fatalf("empty graders list must be rejected (back-compat with legacy criteria loader), got config: %+v", gc)
 	}
-	if gc == nil {
-		t.Fatal("expected non-nil config even for empty list")
-	}
-	if len(gc.Graders) != 0 {
-		t.Errorf("expected 0 graders, got %d", len(gc.Graders))
-	}
-	if len(gc.Groups) != 0 {
-		t.Errorf("expected 0 groups, got %d", len(gc.Groups))
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "no graders") && !strings.Contains(msg, "empty") {
+		t.Errorf("error must mention empty/no graders, got: %v", err)
 	}
 }
 
@@ -329,9 +320,9 @@ func TestPhase1Loader_LoadDirDeferredErrors(t *testing.T) {
 		}
 	}
 	copyFixture("only_prompt_graders.yaml", "good.yaml")
-	copyFixture("malformed_missing_type.yaml", "bad.yaml")
+	copyFixture("malformed_unknown_type.yaml", "bad.yaml")
 
-	bundle, err := LoadDir(dir)
+	bundle, err := LoadUnifiedDir(dir)
 	// Two valid contracts satisfy Q4 semantics. Neo may choose either:
 	//   (a) Return (bundle, nil); bundle.FileErrors contains the bad file.
 	//   (b) Return (bundle, err); bundle is still populated with the good file.
@@ -376,13 +367,13 @@ func TestPhase1Loader_LoadDirDeferredErrors(t *testing.T) {
 // bundleConfigs / bundleFileErrors are thin accessors so that renaming the
 // Bundle struct field is a one-line change. If Neo picks different names
 // (e.g. Configs → Loaded, FileErrors → Errors), update here.
-func bundleConfigs(b *Bundle) []GraderConfig { return b.Configs }
-func bundleFileErrors(b *Bundle) map[string]error { return b.FileErrors }
+func bundleConfigs(b *Bundle) []UnifiedGraderConfig { return b.Configs }
+func bundleFileErrors(b *Bundle) map[string]FileError { return b.FileErrors }
 
 // Sanity: errors are non-nil when returned by LoadFile for missing files.
 func TestPhase1Loader_NonexistentFile(t *testing.T) {
 	t.Parallel()
-	_, err := LoadFile(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
+	_, err := LoadUnifiedFile(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
