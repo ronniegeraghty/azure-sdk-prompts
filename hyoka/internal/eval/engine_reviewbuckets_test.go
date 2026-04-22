@@ -6,7 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
 
@@ -20,12 +21,12 @@ func captureSlog(t *testing.T) (*bytes.Buffer, func()) {
 	return buf, func() { slog.SetDefault(prev) }
 }
 
-// bundleWith builds a minimal *graders.Bundle from one file's top-level
+// bundleWith builds a minimal *criteria.Bundle from one file's top-level
 // entries, for tests that need to populate the engine's grader bundle
 // without touching disk.
-func bundleWith(entries ...graders.UnifiedGraderEntry) *graders.Bundle {
-	return &graders.Bundle{
-		Configs: []graders.UnifiedGraderConfig{{
+func bundleWith(entries ...criteria.UnifiedGraderEntry) *criteria.Bundle {
+	return &criteria.Bundle{
+		Configs: []criteria.UnifiedGraderConfig{{
 			Graders: entries,
 			Source:  "test://inline",
 		}},
@@ -37,11 +38,11 @@ func bundleWith(entries ...graders.UnifiedGraderEntry) *graders.Bundle {
 // merged with the prompt's own evaluation criteria.
 func TestEngineReviewBuckets_Combined(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
-		ReviewMode: graders.ReviewModeCombined,
+		ReviewMode: criteria.ReviewModeCombined,
 	}))
 	e.graderBundle = bundleWith(
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "criterion A", Isolate: true},
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "criterion B"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "criterion A", Isolate: true},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "criterion B"},
 	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "prompt-level criteria"}
@@ -62,8 +63,8 @@ func TestEngineReviewBuckets_Combined(t *testing.T) {
 func TestEngineReviewBuckets_DefaultModeMatchesCombined(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	e.graderBundle = bundleWith(
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "A", Isolate: true},
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "B"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "A", Isolate: true},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "B"},
 	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "pc"}
@@ -78,12 +79,12 @@ func TestEngineReviewBuckets_DefaultModeMatchesCombined(t *testing.T) {
 // the rest.
 func TestEngineReviewBuckets_IsolatedWithIsolation(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
-		ReviewMode: graders.ReviewModeIsolated,
+		ReviewMode: criteria.ReviewModeIsolated,
 	}))
 	e.graderBundle = bundleWith(
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is formatted"},
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "tests", Prompt: "tests exist"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is formatted"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "tests", Prompt: "tests exist"},
 	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "pc"}
@@ -124,11 +125,11 @@ func TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation(t *testing.T) {
 	defer restore()
 
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
-		ReviewMode: graders.ReviewModeIsolated,
+		ReviewMode: criteria.ReviewModeIsolated,
 	}))
 	e.graderBundle = bundleWith(
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "A"},
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "B"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "A"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "B"},
 	)
 
 	p := &prompt.Prompt{ID: "prompt-X", EvaluationCriteria: "pc"}

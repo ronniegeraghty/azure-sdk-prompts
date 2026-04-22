@@ -9,7 +9,7 @@
 // the engine (Phase 2) is responsible for failing an eval only when it
 // actually selects a file that failed to load. Loader-level fatal errors
 // are reserved for I/O failures (e.g. directory walk).
-package graders
+package criteria
 
 import (
 	"bytes"
@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 )
 
 // Bundle is the result of loading a directory of unified grader configs.
@@ -89,7 +91,7 @@ func translateLegacy(gc *UnifiedGraderConfig) {
 func translateSlice(entries []UnifiedGraderEntry) {
 	for i := range entries {
 		if entries[i].Type == "" && entries[i].Prompt != "" && !hasDetails(entries[i].Details) {
-			entries[i].Type = KindPrompt
+			entries[i].Type = graders.KindPrompt
 		}
 	}
 }

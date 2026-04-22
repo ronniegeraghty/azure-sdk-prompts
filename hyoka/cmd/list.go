@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/spf13/cobra"
 )
@@ -51,9 +51,9 @@ func listCmd() *cobra.Command {
 			if criteriaDir == "" {
 				criteriaDir = filepath.Join(baseDir, "criteria")
 			}
-			var graderConfigs []graders.UnifiedGraderConfig
+			var graderConfigs []criteria.UnifiedGraderConfig
 			if _, err := os.Stat(criteriaDir); err == nil {
-				if bundle, loadErr := graders.LoadUnifiedDir(criteriaDir); loadErr == nil && bundle != nil {
+				if bundle, loadErr := criteria.LoadUnifiedDir(criteriaDir); loadErr == nil && bundle != nil {
 					graderConfigs = bundle.Configs
 				}
 			}
@@ -137,7 +137,7 @@ type listCriteriaEntry struct {
 	GraderCount int               `json:"grader_count"`
 }
 
-func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, graderConfigs []graders.UnifiedGraderConfig) error {
+func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, graderConfigs []criteria.UnifiedGraderConfig) error {
 	out := listOutput{
 		Prompts:  prompts,
 		Configs:  make([]listConfigEntry, 0, len(configs)),
@@ -183,7 +183,7 @@ func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, graderConfi
 
 // totalGraders returns the total grader count across top-level graders and
 // every group in a unified grader config.
-func totalGraders(gc graders.UnifiedGraderConfig) int {
+func totalGraders(gc criteria.UnifiedGraderConfig) int {
 	n := len(gc.Graders)
 	for _, g := range gc.Groups {
 		n += len(g.Graders)

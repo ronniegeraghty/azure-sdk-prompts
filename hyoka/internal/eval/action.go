@@ -1,7 +1,7 @@
 package eval
 
 import (
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 

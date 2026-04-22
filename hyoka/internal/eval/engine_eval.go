@@ -11,7 +11,8 @@ import (
 
 "github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/report"
@@ -447,7 +448,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			// consumed indirectly via reviewBuckets/mergedCriteria on
 			// graderInput; we only need typedMatched here.
 			matched := e.matchedForEval(props)
-			_, typedMatched := graders.PartitionMatched(matched)
+			_, typedMatched := criteria.PartitionMatched(matched)
 
 			// Collect all grader results across typed graders and AI review.
 			var allGraderResults []graders.GraderResult
@@ -474,11 +475,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 					typedConfigs = append(typedConfigs, m.Entry.ToRuntimeConfig())
 				}
 				glg.Debug("Typed graders matched", "count", len(typedConfigs))
-				instances, instErr := graders.InstantiateGraders(typedConfigs)
+				instances, instErr := criteria.InstantiateGraders(typedConfigs)
 				if instErr != nil {
 					glg.Error("Failed to instantiate typed graders", "error", instErr)
 				} else {
-					typedResults := graders.RunGraders(ctx, instances, typedConfigs, graderInput)
+					typedResults := criteria.RunGraders(ctx, instances, typedConfigs, graderInput)
 					allGraderResults = append(allGraderResults, typedResults...)
 					glg.Debug("Typed graders complete", "count", len(typedResults))
 				}

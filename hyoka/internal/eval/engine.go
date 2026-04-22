@@ -18,7 +18,8 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/comparison"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
@@ -139,7 +140,7 @@ type Engine struct {
 	// criteria.GraderConfig (prompt-review criteria) and
 	// graders.GraderConfig (typed graders). Every matched entry — prompt
 	// or typed — flows through the same Bundle.
-	graderBundle *graders.Bundle
+	graderBundle *criteria.Bundle
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
@@ -224,7 +225,7 @@ func (e *Engine) loadBundle() {
 		slog.Debug("Criteria directory does not exist, skipping", "dir", e.opts.CriteriaDir)
 		return
 	}
-	bundle, err := graders.LoadUnifiedDir(e.opts.CriteriaDir)
+	bundle, err := criteria.LoadUnifiedDir(e.opts.CriteriaDir)
 	if err != nil {
 		slog.Warn("Failed to walk criteria directory", "dir", e.opts.CriteriaDir, "error", err)
 		return
@@ -240,8 +241,8 @@ func (e *Engine) loadBundle() {
 // matchedForEval returns the grader entries whose file/group/grader `when`
 // blocks match the eval's prompt properties. Thin wrapper kept for call-site
 // symmetry with reviewBuckets.
-func (e *Engine) matchedForEval(props map[string]string) []graders.MatchedUnifiedEntry {
-	return graders.MatchingUnifiedEntries(e.graderBundle, props)
+func (e *Engine) matchedForEval(props map[string]string) []criteria.MatchedUnifiedEntry {
+	return criteria.MatchingUnifiedEntries(e.graderBundle, props)
 }
 
 // reviewBuckets builds the set of review buckets for a prompt under the
@@ -254,15 +255,15 @@ func (e *Engine) matchedForEval(props map[string]string) []graders.MatchedUnifie
 func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string) []graders.ReviewBucket {
 	mode := e.opts.ReviewMode
 	if mode == "" {
-		mode = graders.ReviewModeCombined
+		mode = criteria.ReviewModeCombined
 	}
 	matched := e.matchedForEval(props)
-	promptMatched, _ := graders.PartitionMatched(matched)
-	if mode == graders.ReviewModeIsolated && !graders.HasUnifiedIsolation(promptMatched) {
+	promptMatched, _ := criteria.PartitionMatched(matched)
+	if mode == criteria.ReviewModeIsolated && !criteria.HasUnifiedIsolation(promptMatched) {
 		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
 			"prompt_id", p.ID)
 	}
-	return graders.BuildUnifiedReviewBuckets(promptMatched, p.EvaluationCriteria, mode)
+	return criteria.BuildUnifiedReviewBuckets(promptMatched, p.EvaluationCriteria, mode)
 }
 
 // mergedCriteria returns the combined attribute-matched + prompt-specific
@@ -271,12 +272,12 @@ func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string) []grad
 // field consumed by review-aware graders in the single-bucket path.
 func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) string {
 	matched := e.matchedForEval(props)
-	promptMatched, _ := graders.PartitionMatched(matched)
-	entries := make([]graders.UnifiedGraderEntry, 0, len(promptMatched))
+	promptMatched, _ := criteria.PartitionMatched(matched)
+	entries := make([]criteria.UnifiedGraderEntry, 0, len(promptMatched))
 	for _, m := range promptMatched {
 		entries = append(entries, m.Entry)
 	}
-	merged := graders.MergeUnifiedCriteria(entries, p.EvaluationCriteria)
+	merged := criteria.MergeUnifiedCriteria(entries, p.EvaluationCriteria)
 	if merged == "" {
 		return p.EvaluationCriteria
 	}

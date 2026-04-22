@@ -1,6 +1,7 @@
-package graders
+package criteria
 
 import (
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +11,7 @@ import (
 // --- entry-level validation -------------------------------------------------
 
 func TestValidateEntry_PromptOK(t *testing.T) {
-	e := UnifiedGraderEntry{Type: KindPrompt, Name: "x", Prompt: "say hi"}
+	e := UnifiedGraderEntry{Type: graders.KindPrompt, Name: "x", Prompt: "say hi"}
 	if err := validateEntry(e); err != nil {
 		t.Fatalf("expected valid prompt entry, got %v", err)
 	}
@@ -26,8 +27,8 @@ func TestValidateEntry_TypedOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if got := gc.Graders[0].Type; got != KindOutputCheck {
-		t.Fatalf("type = %q want %q", got, KindOutputCheck)
+	if got := gc.Graders[0].Type; got != graders.KindOutputCheck {
+		t.Fatalf("type = %q want %q", got, graders.KindOutputCheck)
 	}
 }
 
@@ -179,8 +180,8 @@ graders:
 		t.Fatalf("graders=%d want 2", len(gc.Graders))
 	}
 	for i, g := range gc.Graders {
-		if g.Type != KindPrompt {
-			t.Errorf("graders[%d].Type=%q want %q", i, g.Type, KindPrompt)
+		if g.Type != graders.KindPrompt {
+			t.Errorf("graders[%d].Type=%q want %q", i, g.Type, graders.KindPrompt)
 		}
 	}
 }
@@ -202,8 +203,8 @@ func TestParse_LegacyMixedWithGroups(t *testing.T) {
 		t.Fatalf("unexpected shape: %+v", gc)
 	}
 	for _, g := range gc.Groups[0].Graders {
-		if g.Type != KindPrompt {
-			t.Errorf("group grader %q got Type=%q want %q", g.Name, g.Type, KindPrompt)
+		if g.Type != graders.KindPrompt {
+			t.Errorf("group grader %q got Type=%q want %q", g.Name, g.Type, graders.KindPrompt)
 		}
 	}
 }
@@ -225,7 +226,7 @@ graders:
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
-	if gc.Graders[0].Type != KindPrompt || gc.Graders[1].Type != KindOutputCheck {
+	if gc.Graders[0].Type != graders.KindPrompt || gc.Graders[1].Type != graders.KindOutputCheck {
 		t.Fatalf("types wrong: %+v", gc.Graders)
 	}
 }
@@ -381,7 +382,7 @@ graders:
 		t.Fatalf("want 2 graders, got %d", len(gc.Graders))
 	}
 	for _, g := range gc.Graders {
-		if g.Type != KindPrompt {
+		if g.Type != graders.KindPrompt {
 			t.Errorf("legacy entry %q should translate to type=prompt, got %q", g.Name, g.Type)
 		}
 	}

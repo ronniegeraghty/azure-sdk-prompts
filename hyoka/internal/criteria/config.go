@@ -10,13 +10,15 @@
 //
 // The schema is loaded by unified_loader.go. The engine wiring is Phase 2
 // (issue #625) and is intentionally not done here.
-package graders
+package criteria
 
 import (
 	"fmt"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 )
 
 // UnifiedGraderEntry is one grader in a criteria/graders YAML file under the
@@ -74,21 +76,21 @@ type UnifiedGraderConfig struct {
 }
 
 // validTypedKinds enumerates the non-prompt grader types accepted by the
-// unified schema. Mirrors validKinds in types.go minus KindPrompt.
+// unified schema. Mirrors validKinds in types.go minus graders.KindPrompt.
 var validTypedKinds = map[string]bool{
-	KindFile:           true,
-	KindProgram:        true,
-	KindBehavior:       true,
-	KindActionSequence: true,
-	KindToolConstraint: true,
-	KindPromptReview:   true,
-	KindOutputCheck:    true,
+	graders.KindFile:           true,
+	graders.KindProgram:        true,
+	graders.KindBehavior:       true,
+	graders.KindActionSequence: true,
+	graders.KindToolConstraint: true,
+	graders.KindPromptReview:   true,
+	graders.KindOutputCheck:    true,
 }
 
 // IsValidUnifiedType returns true if t is a recognized unified-schema type
-// (KindPrompt or any typed kind).
+// (graders.KindPrompt or any typed kind).
 func IsValidUnifiedType(t string) bool {
-	if t == KindPrompt {
+	if t == graders.KindPrompt {
 		return true
 	}
 	return validTypedKinds[t]
@@ -131,7 +133,7 @@ func validateEntry(e UnifiedGraderEntry) error {
 	if e.Weight < 0 {
 		return fmt.Errorf("grader %q: weight must be >= 0, got %f", tag, e.Weight)
 	}
-	if e.Type == KindPrompt {
+	if e.Type == graders.KindPrompt {
 		if strings.TrimSpace(e.Prompt) == "" {
 			return fmt.Errorf("grader %q: type=prompt requires non-empty prompt", tag)
 		}

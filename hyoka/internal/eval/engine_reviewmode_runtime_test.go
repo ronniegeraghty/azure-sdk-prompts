@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
@@ -69,14 +70,14 @@ func TestIntegrationReviewModeIsolatedFiresBuckets(t *testing.T) {
 	engine := NewEngineWithReviewerFactory(&StubRunner{}, factory, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
-		ReviewMode: graders.ReviewModeIsolated,
+		ReviewMode: criteria.ReviewModeIsolated,
 	}))
 	// Inject a unified Bundle directly so we don't need a CriteriaDir on disk.
 	// One isolate-marked prompt grader + one regular prompt grader → 2 buckets
 	// in isolated mode.
 	engine.graderBundle = bundleWith(
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is well formatted"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is well formatted"},
 	)
 
 	prompts := []*prompt.Prompt{{
@@ -125,12 +126,12 @@ func TestIntegrationReviewModeCombinedSkipsBuckets(t *testing.T) {
 	engine := NewEngineWithReviewerFactory(&StubRunner{}, factory, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
-		ReviewMode: graders.ReviewModeCombined,
+		ReviewMode: criteria.ReviewModeCombined,
 	}))
 	engine.graderBundle = bundleWith(
 		// Even with isolate:true, combined mode should ignore it.
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
-		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is well formatted"},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
+		criteria.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is well formatted"},
 	)
 
 	prompts := []*prompt.Prompt{{

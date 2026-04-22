@@ -1,12 +1,13 @@
-package graders
+package criteria
 
 import (
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"strings"
 	"testing"
 )
 
 func promptEntry(name, crit string, isolate bool) UnifiedGraderEntry {
-	return UnifiedGraderEntry{Type: KindPrompt, Name: name, Prompt: crit, Isolate: isolate}
+	return UnifiedGraderEntry{Type: graders.KindPrompt, Name: name, Prompt: crit, Isolate: isolate}
 }
 
 func typedEntry(kind, name string) UnifiedGraderEntry {
@@ -24,7 +25,7 @@ func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 			When: map[string]string{"plane": "data-plane"},
 			Graders: []UnifiedGraderEntry{
 				promptEntry("b", "B", false),
-				{Type: KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}},
+				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}},
 			},
 		}},
 	}}}
@@ -62,9 +63,9 @@ func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 func TestPartitionMatched_SplitsPromptAndTyped(t *testing.T) {
 	matched := []MatchedUnifiedEntry{
 		{Entry: promptEntry("a", "A", false)},
-		{Entry: typedEntry(KindFile, "f1")},
+		{Entry: typedEntry(graders.KindFile, "f1")},
 		{Entry: promptEntry("b", "B", true)},
-		{Entry: typedEntry(KindOutputCheck, "oc1")},
+		{Entry: typedEntry(graders.KindOutputCheck, "oc1")},
 	}
 	prompts, typed := PartitionMatched(matched)
 	if len(prompts) != 2 || prompts[0].Entry.Name != "a" || prompts[1].Entry.Name != "b" {
@@ -169,12 +170,12 @@ func TestMergeUnifiedCriteria_ContainsAllAndPromptCriteria(t *testing.T) {
 
 func TestUnifiedGraderEntry_ToRuntimeConfig_CopiesFields(t *testing.T) {
 	e := UnifiedGraderEntry{
-		Type:   KindFile,
+		Type:   graders.KindFile,
 		Name:   "n",
 		Weight: 0.5,
 	}
 	rc := e.ToRuntimeConfig()
-	if rc.Kind != KindFile || rc.Name != "n" || rc.Weight != 0.5 {
+	if rc.Kind != graders.KindFile || rc.Name != "n" || rc.Weight != 0.5 {
 		t.Errorf("runtime config unexpected: %+v", rc)
 	}
 }

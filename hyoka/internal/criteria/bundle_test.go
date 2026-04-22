@@ -10,7 +10,7 @@
 // LoadUnifiedDir, Bundle.
 //
 // See .squad/decisions/inbox/switch-phase1-test-coverage.md for coverage map.
-package graders
+package criteria
 
 import (
 	"errors"

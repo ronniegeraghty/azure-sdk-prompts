@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/validate"
 	"github.com/spf13/cobra"
@@ -108,7 +108,7 @@ func validateCmd() *cobra.Command {
 				criteriaDir = filepath.Join(baseDir, "criteria")
 			}
 			if _, err := os.Stat(criteriaDir); err == nil {
-				bundle, loadErr := graders.LoadUnifiedDir(criteriaDir)
+				bundle, loadErr := criteria.LoadUnifiedDir(criteriaDir)
 				if loadErr != nil {
 					fmt.Printf("✗ Criteria: %v\n", loadErr)
 					allOK = false

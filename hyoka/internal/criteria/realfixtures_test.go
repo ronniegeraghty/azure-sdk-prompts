@@ -1,4 +1,4 @@
-package graders
+package criteria
 
 import (
 "path/filepath"

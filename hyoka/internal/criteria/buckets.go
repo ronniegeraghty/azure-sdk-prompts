@@ -1,5 +1,5 @@
 // Unified matching, partitioning, review-bucket construction, and legacy
-// GraderConfig translation for the Phase 2 execution path (issue #625).
+// graders.GraderConfig translation for the Phase 2 execution path (issue #625).
 //
 // The engine calls these helpers to:
 //   1. Match grader entries from a Bundle against a prompt's properties,
@@ -9,19 +9,21 @@
 //   3. Build review buckets from the prompt entries — one bucket per
 //      isolated grader/group plus a combined bucket for the rest, or a
 //      single combined bucket in combined mode.
-//   4. Bridge a UnifiedGraderEntry to the runtime GraderConfig used by
+//   4. Bridge a UnifiedGraderEntry to the runtime graders.GraderConfig used by
 //      NewGrader.
 //
 // This file replaces the matching/bucket logic in internal/criteria (ported
 // here so internal/graders is self-contained). The criteria package remains
 // on disk during Phase 2 and is deleted in Phase 3.
-package graders
+package criteria
 
 import (
 	"fmt"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 )
 
 // ReviewMode constants used by the engine to select bucket construction.
@@ -89,7 +91,7 @@ func MatchingUnifiedEntries(bundle *Bundle, props map[string]string) []MatchedUn
 // preserving their relative order.
 func PartitionMatched(matched []MatchedUnifiedEntry) (promptEntries, typedEntries []MatchedUnifiedEntry) {
 	for _, m := range matched {
-		if m.Entry.Type == KindPrompt {
+		if m.Entry.Type == graders.KindPrompt {
 			promptEntries = append(promptEntries, m)
 		} else {
 			typedEntries = append(typedEntries, m)
@@ -161,12 +163,12 @@ func MergeUnifiedCriteria(entries []UnifiedGraderEntry, promptCriteria string) s
 // When isolated mode is requested but nothing is marked isolate, the
 // function silently falls back to a single combined bucket — callers that
 // want a warning must check HasUnifiedIsolation themselves first.
-func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mode string) []ReviewBucket {
+func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mode string) []graders.ReviewBucket {
 	if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
-		return []ReviewBucket{combinedUnifiedBucket(matched, promptCriteria)}
+		return []graders.ReviewBucket{combinedUnifiedBucket(matched, promptCriteria)}
 	}
 
-	var buckets []ReviewBucket
+	var buckets []graders.ReviewBucket
 	var leftover []UnifiedGraderEntry
 
 	type groupBag struct {
@@ -181,7 +183,7 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 	for _, m := range matched {
 		if m.GroupName == "" && !m.GroupIsolate {
 			if m.Entry.Isolate {
-				buckets = append(buckets, ReviewBucket{
+				buckets = append(buckets, graders.ReviewBucket{
 					Name:     bucketName(m.Entry.Name, len(buckets)),
 					Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, ""),
 				})
@@ -211,7 +213,7 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 			if name == "" {
 				name = fmt.Sprintf("group-%d", len(buckets))
 			}
-			buckets = append(buckets, ReviewBucket{
+			buckets = append(buckets, graders.ReviewBucket{
 				Name:     bucketName(name, len(buckets)),
 				Criteria: MergeUnifiedCriteria(append([]UnifiedGraderEntry(nil), bag.entries...), ""),
 			})
@@ -219,7 +221,7 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 		}
 		for _, e := range bag.entries {
 			if e.Isolate {
-				buckets = append(buckets, ReviewBucket{
+				buckets = append(buckets, graders.ReviewBucket{
 					Name:     bucketName(e.Name, len(buckets)),
 					Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{e}, ""),
 				})
@@ -230,23 +232,23 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 	}
 
 	if len(leftover) > 0 || strings.TrimSpace(promptCriteria) != "" {
-		buckets = append(buckets, ReviewBucket{
+		buckets = append(buckets, graders.ReviewBucket{
 			Name:     "combined",
 			Criteria: MergeUnifiedCriteria(leftover, promptCriteria),
 		})
 	}
 	if len(buckets) == 0 {
-		return []ReviewBucket{combinedUnifiedBucket(matched, promptCriteria)}
+		return []graders.ReviewBucket{combinedUnifiedBucket(matched, promptCriteria)}
 	}
 	return buckets
 }
 
-func combinedUnifiedBucket(matched []MatchedUnifiedEntry, promptCriteria string) ReviewBucket {
+func combinedUnifiedBucket(matched []MatchedUnifiedEntry, promptCriteria string) graders.ReviewBucket {
 	entries := make([]UnifiedGraderEntry, 0, len(matched))
 	for _, m := range matched {
 		entries = append(entries, m.Entry)
 	}
-	return ReviewBucket{
+	return graders.ReviewBucket{
 		Name:     "combined",
 		Criteria: MergeUnifiedCriteria(entries, promptCriteria),
 	}
@@ -260,16 +262,16 @@ func bucketName(raw string, index int) string {
 	return n
 }
 
-// ToRuntimeConfig converts a UnifiedGraderEntry into the GraderConfig shape
+// ToRuntimeConfig converts a UnifiedGraderEntry into the graders.GraderConfig shape
 // consumed by NewGrader. Typed entries (type != prompt) carry their payload
 // in Details; prompt entries are not expected to flow through NewGrader
 // under the Phase 2 design (they feed the review panel instead).
 //
-// The returned GraderConfig has Kind=Type, Config=Details, Weight and Name
+// The returned graders.GraderConfig has Kind=Type, Config=Details, Weight and Name
 // copied, Gate=false (Phase 2 locked decision: no gating), and an empty
 // WhenMap — matching has already been resolved by MatchingUnifiedEntries.
-func (e UnifiedGraderEntry) ToRuntimeConfig() GraderConfig {
-	return GraderConfig{
+func (e UnifiedGraderEntry) ToRuntimeConfig() graders.GraderConfig {
+	return graders.GraderConfig{
 		Kind:   e.Type,
 		Name:   e.Name,
 		Config: cloneYAMLNode(e.Details),
