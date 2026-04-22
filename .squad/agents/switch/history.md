@@ -407,3 +407,34 @@ Morpheus has proposed a comprehensive unification of the grading pipeline (Issue
 **TDD process lesson:** When Neo is implementing in parallel and exact identifier names aren't locked yet, gating tests behind a build tag is the right first move. Keeps CI green, lands the TDD spec anyway, and the two-commit pattern (gated spec + drop-tag-when-impl-lands) makes the adaptation diff crisp and reviewable.
 
 **Decision memo:** `.squad/decisions/inbox/switch-phase1-test-coverage.md`
+
+## 2026-04-23 — Renderer snapshot tests (tests-renderer-snapshots)
+
+**Mission:** Add table-driven snapshot tests for BOTH progress renderers (interactive + CI) covering happy paths, failure paths, edge cases, and NO_COLOR. Direct commit to `ronniegeraghty/dev`, no PR.
+
+**Files:**
+- `hyoka/internal/progress/display_interactive_test.go` — extended Neo's 3 existing tests with: 5-case table (`TestInteractive_Cases`), ANSI-marker assertions (`TestInteractive_ANSIMarkers`), NO_COLOR env test (`TestInteractive_NoColorEnvDropsColor`).
+- `hyoka/internal/progress/display_ci_test.go` — NEW. 5-case table (`TestCIRenderer_Cases`) + pinned full-output snapshot (`TestCIRenderer_HappyPathSnapshot`) with timestamp/duration normalization.
+
+**Coverage matrix (all 11 spec cases):**
+- Interactive: happy path, tool load failure, ToolsVerified flip (Loaded→Failed), grader fail, error path, NO_COLOR.
+- CI: 3-pass happy, 2-pass + 1-fail w/ reason, interleaved multi-eval graders, NO_COLOR, zero-evals empty summary.
+
+### Learnings
+
+**Pattern: ANSI-escape assertions for interactive renderer.** The cursor-move escapes (`\r\x1b[2K`, DECSC `\x1b7`, DECRC `\x1b8`) are emitted via direct `fmt.Fprintf` against constants in `display_interactive.go`, independent of the `style.Styler`. They appear in a `bytes.Buffer` even though the Styler is disabled for non-TTY writers. So I can assert on these raw escapes with plain `strings.Contains`. For the tools-block redraw test, I also assert DECSC index < DECRC index to pin ordering.
+
+**Pattern: Timestamp stripping via regex in CI snapshots.** The `[HH:MM:SS]` prefix and `(Ns, G/T graders)` duration suffix vary run-to-run. Built `normalizeCI(s)` with three compiled regexes: `reCITimestamp`, `reCIDuration`, `reCITableDur`. Replace with stable placeholders (`[HH:MM:SS]`, `DUR`). Snapshot compare against the normalized output. Meta-assertion: after normalizing, the timestamp regex must NOT still match (catches normalization bugs).
+
+**Pattern: Color on/off without refactoring the constructor.** The renderers create their own `style.Styler` via `style.New(w)` internally — no injection seam. So I couldn't force-enable color from a test. Instead:
+- Default `bytes.Buffer` path already exercises "color disabled" (Styler.Enabled=false) — covers the NO_COLOR + piped-output case.
+- `t.Setenv("NO_COLOR", "1")` test demonstrates the env-var path also disables color (defense in depth; confirms style.detectEnabled honors both signals).
+- The NO_COLOR assertion checks specifically for SGR codes (`\x1b[31m` etc.) being *absent*, while cursor-move escapes are still allowed — because those aren't color, they're animation.
+
+**Pattern: Full-snapshot + substring-matrix hybrid.** Pure full-buffer snapshots are brittle when layout shifts. Used substring matrices for the 10 broad cases (each pins its distinctive markers) and ONE full normalized snapshot (`TestCIRenderer_HappyPathSnapshot`) that locks the exact CI layout. Rationale: the full snapshot surfaces breaking layout changes (column widths, border chars) as a visible diff, while the matrix tests remain stable under cosmetic tweaks.
+
+**Gotcha: Error event in interactive mode.** Writing the error-path case (`EventError`), I expected `onError` to print something like `"❌ ERROR"`. Actually it calls `agentComplete(0, false)` which writes `"❌ Failed"` (same as grader failure) THEN appends a separate line with the error message. So the assertion is `"❌ Failed"` + the literal message + `"1 errors"` in the summary. Would have caught a real regression if agentComplete changed its glyph.
+
+**Commit:** `[SHA]` — `test(progress): table-driven snapshot tests for interactive + CI renderers`.
+
+**Decision memo:** `.squad/decisions/inbox/switch-renderer-tests.md`
