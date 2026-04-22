@@ -572,3 +572,16 @@ All non-template examples are schema-valid. The single "failure" (`prompt-templa
 **Proposal:** `.squad/decisions/inbox/morpheus-grader-unification-proposal.md`
 **Direction:** `.squad/decisions/inbox/morpheus-grader-unification-direction.md`
 **Parent issue:** #622
+
+## Learnings (Proposal Recovery — 2026-04-23)
+
+**Date:** 2026-04-23
+
+**Incident:** The 513-line grader unification proposal (`morpheus-grader-unification-proposal.md`) was deleted from the inbox before being committed. Scribe had already merged a summary into `decisions.md` (line 3229) but the full proposal with Section 6 (Open Questions) was lost.
+
+**Recovery:** Regenerated the full proposal from:
+1. The locked direction preserved in `decisions.md:3229-3278`
+2. Fresh code analysis of `criteria.go`, `types.go`, `registry.go`, `engine.go`, `engine_eval.go`
+3. History context from this file's "Learnings (Grader Unification Architecture)" section
+
+**Process fix required:** Scribe must **commit inbox files before merging summaries** into `decisions.md`. The merge-then-delete workflow creates a window where the full proposal is irrecoverably lost if the session ends between merge and commit. Correct order: `git add inbox/file.md → git commit → merge summary → git commit`.
