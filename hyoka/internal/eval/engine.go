@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -151,11 +150,9 @@ func NewEngine(evaluator PromptRunner, opts EngineOptions) *Engine {
 // NewEngineWithReviewerFactory creates a new Engine with an evaluator and reviewer factory.
 func NewEngineWithReviewerFactory(evaluator PromptRunner, factory ReviewerFactory, opts EngineOptions) *Engine {
 	if opts.Workers <= 0 {
-		w := runtime.NumCPU()
-		if w > 8 {
-			w = 8
-		}
-		opts.Workers = w
+		opts.Workers = 1
+	} else if opts.Workers > 8 {
+		opts.Workers = 8
 	}
 	if opts.OutputDir == "" {
 		opts.OutputDir = "./reports"

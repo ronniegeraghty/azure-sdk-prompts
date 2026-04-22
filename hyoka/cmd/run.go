@@ -82,7 +82,7 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 
 // addRunFlags adds execution-only flags to the run command.
 func addRunFlags(cmd *cobra.Command, f *runFlags) {
-	cmd.Flags().IntVar(&f.workers, "workers", 0, "Parallel evaluation workers (default: number of CPUs, max 8)")
+	cmd.Flags().IntVar(&f.workers, "workers", 0, "Parallel evaluation workers (default: 1)")
 	cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
 	cmd.Flags().MarkHidden("model")
 	cmd.Flags().StringVar(&f.output, "output", "./reports", "Report output directory")
@@ -152,12 +152,15 @@ func runCmd() *cobra.Command {
 		Short: "Run evaluations",
 		Long:  "Run evaluations with optional filters against the prompt library.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Backward compat: --debug upgrades log level to debug
 			// When log-level is debug or info and progress mode is auto,
-			// disable live progress so slog output is visible on stderr.
+			// disable live progress so slog output is visible on stderr
+			// without corrupting ANSI cursor save/restore. If --log-file
+			// is set, slog writes to the file only (stderr stays clean),
+			// so live progress can coexist with debug logging.
 			if f.progressMode == "auto" {
 				logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
-				if logLevel == "debug" || logLevel == "info" {
+				logFile, _ := cmd.Root().PersistentFlags().GetString("log-file")
+				if (logLevel == "debug" || logLevel == "info") && logFile == "" {
 					f.progressMode = "log"
 				}
 			}
