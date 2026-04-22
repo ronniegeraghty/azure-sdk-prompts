@@ -7,7 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 )
+
+// ProgressEmitter is an optional callback for emitting progress events during
+// tool resolution. A nil emitter means callers don't care about progress and
+// resolution proceeds silently (matching the pre-emission behavior).
+type ProgressEmitter func(progress.ProgressEvent)
 
 // ResolveSkills takes a list of tool entries and resolves the skill entries to
 // absolute directory paths. The baseDir is used as the root for resolving
@@ -17,31 +24,127 @@ import (
 //   - source: local, skill_dir: true  → path is a directory of skills (subdirs contain SKILL.md)
 //   - source: local with glob         → each glob match is treated as a single skill directory
 //   - source: remote                  → dispatched to the registered Fetcher (default: npx)
+//
+// This is a thin wrapper around ResolveSkillsWithReporter that passes a nil
+// emitter. Callers that want per-skill ToolResolutionStart/Result events on
+// the progress channel should use ResolveSkillsWithReporter directly.
 func ResolveSkills(ctx context.Context, entries []Entry, baseDir string) ([]string, error) {
+	return ResolveSkillsWithReporter(ctx, entries, baseDir, nil)
+}
+
+// ResolveSkillsWithReporter resolves skill entries and, when emit is non-nil,
+// emits a ToolResolutionStart / ToolResolutionResult pair for each skill entry
+// encountered. Emission is sequential — Start and Result for one skill are
+// delivered before the next skill's Start, so renderers bound by the
+// "last-line only" update rule can treat each pair as a single tail line.
+//
+// An emit of nil silently skips progress reporting; behavior is otherwise
+// identical to the pre-emission implementation.
+func ResolveSkillsWithReporter(ctx context.Context, entries []Entry, baseDir string, emit ProgressEmitter) ([]string, error) {
 	var dirs []string
 	for _, entry := range entries {
 		if entry.ResolvedType() != TypeSkill {
 			continue
 		}
+		emitStart(emit, entry.Name, progress.ToolKindSkill)
+
+		var resolved []string
+		var err error
 		switch entry.SkillSource() {
 		case SourceLocal:
-			resolved, err := resolveLocal(entry, baseDir)
+			resolved, err = resolveLocal(entry, baseDir)
 			if err != nil {
-				return nil, fmt.Errorf("resolving local skill %q: %w", entry.Path, err)
+				err = fmt.Errorf("resolving local skill %q: %w", entry.Path, err)
+			} else {
+				slog.Debug("Resolved local skill", "path", entry.Path, "skill_dir", entry.SkillDir, "resolved_count", len(resolved))
 			}
-			slog.Debug("Resolved local skill", "path", entry.Path, "skill_dir", entry.SkillDir, "resolved_count", len(resolved))
-			dirs = append(dirs, resolved...)
 		case SourceRemote:
-			dir, err := FetchRemote(ctx, entry, baseDir)
+			var dir string
+			dir, err = FetchRemote(ctx, entry, baseDir)
 			if err != nil {
-				return nil, fmt.Errorf("fetching remote skill %s/%s: %w", entry.Repo, entry.Name, err)
+				err = fmt.Errorf("fetching remote skill %s/%s: %w", entry.Repo, entry.Name, err)
+			} else {
+				resolved = []string{dir}
 			}
-			dirs = append(dirs, dir)
 		default:
-			return nil, fmt.Errorf("unknown skill source %q", entry.Source)
+			err = fmt.Errorf("unknown skill source %q", entry.Source)
 		}
+
+		if err != nil {
+			emitResult(emit, entry.Name, progress.ToolKindSkill, progress.ToolStatusFailed, err.Error())
+			return nil, err
+		}
+		// A skill entry that resolves to zero directories (missing SKILL.md,
+		// empty skill_dir, missing path) is a user-visible failure even though
+		// the existing contract treats it as a non-fatal warning.
+		if len(resolved) == 0 {
+			emitResult(emit, entry.Name, progress.ToolKindSkill, progress.ToolStatusFailed, "no skill directories resolved")
+		} else {
+			emitResult(emit, entry.Name, progress.ToolKindSkill, progress.ToolStatusLoaded, "")
+		}
+		dirs = append(dirs, resolved...)
 	}
 	return dirs, nil
+}
+
+func emitStart(emit ProgressEmitter, name, kind string) {
+	if emit == nil {
+		return
+	}
+	emit(progress.ProgressEvent{
+		Type:     progress.EventToolResolutionStart,
+		ToolName: name,
+		ToolKind: kind,
+	})
+}
+
+func emitResult(emit ProgressEmitter, name, kind, status, reason string) {
+	if emit == nil {
+		return
+	}
+	emit(progress.ProgressEvent{
+		Type:     progress.EventToolResolutionResult,
+		ToolName: name,
+		ToolKind: kind,
+		Status:   status,
+		Reason:   reason,
+	})
+}
+
+// EmitMCPResolutions walks entries, emits a ToolResolutionStart/Result pair
+// for every MCP entry, and returns. Unlike skills, MCP entries carry no
+// filesystem state that needs resolving at config-load time — "resolution"
+// here is a static validation that the entry has the fields its mode
+// requires (Command for local, URL for remote). A nil emit is a no-op.
+//
+// This exists as a sibling of ResolveSkillsWithReporter so the engine can
+// render a Tools block that includes MCP lines alongside skill lines before
+// the Copilot session starts.
+func EmitMCPResolutions(entries []Entry, emit ProgressEmitter) {
+	if emit == nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.ResolvedType() != TypeMCP {
+			continue
+		}
+		emitStart(emit, entry.Name, progress.ToolKindMCP)
+		status := progress.ToolStatusLoaded
+		reason := ""
+		switch entry.ResolvedMCPType() {
+		case "remote":
+			if entry.URL == "" {
+				status = progress.ToolStatusFailed
+				reason = "remote MCP entry missing url"
+			}
+		default: // local
+			if entry.Command == "" {
+				status = progress.ToolStatusFailed
+				reason = "local MCP entry missing command"
+			}
+		}
+		emitResult(emit, entry.Name, progress.ToolKindMCP, status, reason)
+	}
 }
 
 // CountSkills counts the number of actual skill subdirectories (containing

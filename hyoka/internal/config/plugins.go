@@ -5,6 +5,7 @@ import (
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 )
 
 // ExpandPlugins loads plugins from dir and appends their tool entries to configs.
@@ -76,6 +77,53 @@ func (c *ToolConfig) ExpandPlugins(reg *plugin.Registry) error {
 		c.Reviewer.Tools = tool.AppendEntries(c.Reviewer.Tools, entries)
 	}
 	return nil
+}
+
+// EmitPluginResolutions replays plugin-lookup results as ToolResolutionStart /
+// ToolResolutionResult progress events. It does not mutate the config — plugin
+// expansion has already happened at config.Load time, and the registry lookup
+// here is read-only. A nil emit is a no-op.
+//
+// Kind is always progress.ToolKindPlugin. A plugin that resolves via either
+// the local plugin registry or the installed Copilot CLI plugin cache is
+// reported as Loaded; otherwise Failed with reason "not found", matching the
+// existing slog.Warn in ExpandPlugins.
+func (c *ToolConfig) EmitPluginResolutions(emit tool.ProgressEmitter) {
+	if emit == nil || len(c.Plugins) == 0 {
+		return
+	}
+	reg := plugin.NewRegistry()
+	// Best-effort load; an error here just means registry lookups will miss
+	// and we fall through to the installed-plugins check (same as ExpandPlugins).
+	if dir := resolvePluginsDir(); dir != "" {
+		_ = reg.LoadDir(dir)
+	}
+	for _, name := range c.Plugins {
+		emit(progress.ProgressEvent{
+			Type:     progress.EventToolResolutionStart,
+			ToolName: name,
+			ToolKind: progress.ToolKindPlugin,
+		})
+		found := false
+		if _, err := reg.Get(name); err == nil {
+			found = true
+		} else if dir := resolveInstalledPlugin(name); dir != "" {
+			found = true
+		}
+		status := progress.ToolStatusLoaded
+		reason := ""
+		if !found {
+			status = progress.ToolStatusFailed
+			reason = "not found"
+		}
+		emit(progress.ProgressEvent{
+			Type:     progress.EventToolResolutionResult,
+			ToolName: name,
+			ToolKind: progress.ToolKindPlugin,
+			Status:   status,
+			Reason:   reason,
+		})
+	}
 }
 
 func resolvePluginsDir() string {

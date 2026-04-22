@@ -720,12 +720,24 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 }
 
 func (e *CopilotPromptRunner) buildSessionConfig(ctx context.Context, cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
+	// Emit tool-resolution progress events so the interactive renderer can
+	// render the Tools block before the Copilot session starts. Ordering is
+	// plugin → MCP → skill, matching the read order of a user scanning a
+	// config's tool stack. Emission is a no-op when progressFn is nil (e.g.
+	// tests, CI-only runs that don't care about the per-tool lines).
+	if e.progressFn != nil {
+		cfg.EmitPluginResolutions(tool.ProgressEmitter(e.progressFn))
+		if cfg.Generator != nil {
+			tool.EmitMCPResolutions(cfg.Generator.Tools, tool.ProgressEmitter(e.progressFn))
+		}
+	}
+
 	// Resolve skill directories from Generator.Tools using the skills package.
 	// This handles glob patterns, validates directories exist and contain skills,
 	// and warns about empty/missing directories (#291).
 	var skillDirs []string
 	if cfg.Generator != nil {
-		resolved, err := tool.ResolveSkills(ctx, cfg.Generator.Tools, configDir)
+		resolved, err := tool.ResolveSkillsWithReporter(ctx, cfg.Generator.Tools, configDir, tool.ProgressEmitter(e.progressFn))
 		if err != nil {
 			slog.Warn("Failed to resolve generator skill directories", "error", err)
 		} else {
