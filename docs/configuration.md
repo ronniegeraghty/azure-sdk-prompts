@@ -364,9 +364,15 @@ Hyoka calls `tool.ValidateFetchers(...)` at the start of every run, so any remot
 
 Place multiple `.yaml` files in the config directory. All are loaded automatically. Use `--config <name>` to select specific configs, or `--all-configs` to run all.
 
-## Tiered Evaluation Criteria
+## Evaluation Criteria
 
-Use `--criteria-dir` to point to a directory of attribute-matched criteria YAML files. These are matched against prompt metadata (language, service, plane) and merged with prompt-specific criteria at review time. See [prompt-authoring.md](prompt-authoring.md) for details.
+Use `--criteria-dir` to point to a directory of criteria YAML files. These define graders that evaluate generated outputs across multiple dimensions: file output, build success, LLM-based code review, tool usage constraints, and more.
+
+**Grader types:** Each criteria file contains a list of graders. Graders are matched against prompt metadata (language, service, plane) and evaluated independently. See [graders/index.md](graders/index.md) for complete reference and type documentation.
+
+**Criteria files are merged** across the criteria directory. Graders can be conditional (via `when:` properties), weighted for scoring, and configured per-type with specific checks.
+
+For authoring criteria files, hierarchical organization, and advanced patterns, see [criteria-authoring.md](criteria-authoring.md).
 
 ## Plugins
 
