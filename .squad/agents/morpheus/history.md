@@ -550,3 +550,38 @@ All non-template examples are schema-valid. The single "failure" (`prompt-templa
 - **Multiple group-level `when`s** in a single criteria file are expressed via the top-level `groups:` list on `GraderConfig` (`hyoka/internal/criteria/criteria.go:61-66`). Each `GraderGroup` (`criteria.go:46-51`) carries its own optional `when` map, applied hierarchically with file-level and grader-level conditions (AND-merged via `mergeWhen`). Canonical shape demonstrated in `hyoka/internal/criteria/hierarchical_test.go:208-247`.
 - **YAML `---` document separators are silently truncated.** `loadFile` (`criteria.go:134-136`) constructs `yaml.NewDecoder` but calls `Decode` exactly once, so only the first document is parsed. Any subsequent documents are dropped without warning. This is why `hyoka validate` accepts `examples/criteria/hierarchical-when-example.yaml` cleanly even though its second document (the Rust block, lines 46-66) is unreachable.
 - **Resolution for PR #607:** Ronnie's review comment was correct. The example is misleading — it implies multi-document YAML expresses two sibling group-level `when`s, but the schema requires `groups:` for that. Replied in-thread on comment 3125681737 with file:line citations and recommended a follow-up. Dropped recommendation in decisions inbox: `morpheus-pr607-when-followup.md`.
+
+## 2026-04-22 — Issue #621: YAML Multi-Document Streams Proposal
+
+**Issue:** https://github.com/ronniegeraghty/hyoka/issues/621
+**Context:** Architectural proposal to formally support YAML 1.2 multi-document streams (`---` separators) across prompts, configs, and criteria — or explicitly reject them with actionable errors.
+
+### Investigation results
+
+All three YAML loader families exhibit **silent truncation** when a file contains multiple documents:
+
+| Artifact | Loader Location | Current Behavior |
+|----------|----------------|------------------|
+| **Criteria** | `hyoka/internal/criteria/criteria.go:134-136` | Single `yaml.Decode()` call → only first document loaded, rest discarded |
+| **Prompts (Markdown)** | `hyoka/internal/prompt/parser.go:106-108` | Single `Decode()` on frontmatter section only |
+| **Prompts (YAML)** | `hyoka/internal/prompt/parser.go:136-138` | Single `Decode()` call → only first document loaded |
+| **Configs** | `hyoka/internal/config/config.go:287-290` | Single `Decode()` call → only first document loaded |
+
+This pattern produced the misleading `examples/criteria/hierarchical-when-example.yaml` (rewritten in commit `8b6fce91` after discovery during PR #607 review).
+
+### Proposed semantics (from issue #621)
+
+- **Criteria:** Load all documents, **merge** into unified `GraderConfig` (enables composable criteria sets within a single file)
+- **Prompts:** **Reject** multi-doc files with explicit error (prompts are single-evaluation units; multi-doc conflicts with file-based identity model)
+- **Configs:** Load all documents, **merge** into unified `ConfigFile` with concatenated `configs:` list (enables base + override workflows)
+
+Implementation uses decode loop: `for { dec.Decode(&doc); if errors.Is(err, io.EOF) break; ... }`. Backward-compat guaranteed: single-doc files produce identical structures.
+
+### Learnings
+
+- Loader file paths for future reference:
+  - Criteria: `hyoka/internal/criteria/criteria.go:134-136` (function `loadFile`)
+  - Prompts: `hyoka/internal/prompt/parser.go:106-108` (Markdown frontmatter), `parser.go:136-138` (YAML)
+  - Configs: `hyoka/internal/config/config.go:287-290` (function `Parse`)
+- All loaders use `gopkg.in/yaml.v3` with `yaml.NewDecoder(bytes.NewReader(...))` pattern
+- `hyoka validate` operates on parsed structures, so it doesn't detect trailing documents in raw YAML — validation surface needs expansion to catch this footgun

@@ -2,6 +2,30 @@
 
 ## Active Decisions
 
+### Decision: Issue #621 — YAML Multi-Document Streams Architectural Proposal (2026-04-22)
+
+**Author:** Morpheus 🏗️  
+**Date:** 2026-04-22  
+**Issue:** https://github.com/ronniegeraghty/hyoka/issues/621  
+**Status:** Proposal filed; awaiting implementation assignment
+
+**Summary:** Filed comprehensive architectural proposal for formal multi-document YAML support across hyoka's three YAML-driven artifact types (prompts, configs, criteria). Discovery root: PR #607 investigation revealed `examples/criteria/hierarchical-when-example.yaml` used `---` separators to imply multi-group conditions, but loaders silently truncated document 2..N (single `Decode()` call in all three loader families).
+
+**Proposed semantics per artifact type:**
+- **Criteria:** Load all documents, merge into single `GraderConfig` (enables composable criteria sets within one file)
+- **Prompts:** Reject multi-doc files with explicit error (file-based identity model constraint)
+- **Configs:** Load all documents, merge into single `ConfigFile` with unified `configs:` list (enables base + override workflows)
+
+**Implementation sketch:** Replace single `Decode()` with decode loop; backward-compat guaranteed for single-doc files. All loader locations documented in issue + Morpheus history.
+
+**Loader locations (for future reference):**
+- Criteria: `hyoka/internal/criteria/criteria.go:134-136` (function `loadFile`)
+- Prompts (Markdown): `hyoka/internal/prompt/parser.go:106-108`
+- Prompts (YAML): `hyoka/internal/prompt/parser.go:136-138`
+- Configs: `hyoka/internal/config/config.go:287-290` (function `Parse`)
+
+---
+
 ### Decision: Morpheus — Examples Validation Audit & PR #607 Hierarchical-When Investigation (2026-04-22)
 
 **Author:** Morpheus 🏗️
