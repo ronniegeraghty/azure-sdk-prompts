@@ -699,3 +699,52 @@ Once shipped, `output_check.md` sections marked "(coming in v1)" will be expande
 - Site build to verify all links work
 
 **Microsoft Style Guide compliance:** Tone matches existing docs/ (e.g., configuration.md). Clear, direct, task-focused.
+
+## Session: Phase 4 Documentation Finalization
+
+**Date:** 2026-04-22  
+**Work:** Finalized `docs/graders/output_check.md` against Tank's shipped v1 API (commit ad2a8ce7)
+
+### Changes Made
+
+1. **Rewrote docs/graders/output_check.md** to reflect Tank's actual implementation:
+   - All 7 v1 knobs fully documented: `min_files`, `max_files`, `require_files`, `forbid_files`, `require_updated`, `min_bytes_per_file`, `max_bytes_per_file`
+   - Clear WorkspaceDelta semantics: NewFiles ∪ ModifiedFiles = "produced files"
+   - Sub-check execution model: all configured checks run independently, overall result is AND of all sub-checks
+   - Construction-time validation rules for invalid configs
+   - Removed all "coming in v1" markers — shipped, not planned
+   - Updated YAML example from Tank's `examples/criteria/typed-output-check.yaml`
+   - Comprehensive examples: basic, require-specific-files, size-constraints, file-modifications, all-knobs, conditional
+
+2. **Cross-checked docs**:
+   - ✅ `docs/graders/index.md`: No updates needed; no pending markers
+   - ✅ `docs/configuration.md`: No references to `output_check`; no changes needed
+   - ✅ Verified `min_total_bytes` (removed in v1) is not mentioned anywhere in docs
+
+3. **Committed & pushed**:
+   - Commit: `dd70f3d2` — "docs: finalize output_check grader docs (#627)" with Copilot trailer
+   - Push: `origin/ronniegeraghty/dev`
+
+4. **Notified team**:
+   - Commented on issue #627 noting docs are v1-complete; Trinity can proceed with UI rendering
+
+**Status:** ✅ Complete. All 7 knobs documented with no pending items.
+
+## Session: Output UX Sprint Documentation
+
+**Date:** 2026-04-23  
+**Work:** Documented the new interactive / CI progress renderers and `--workers` default flip.
+
+### Files touched
+
+- `hyoka/README.md` — added **Progress Display Modes** section under Debugging Tips: new `--workers` default (`1`), full `--progress` value table (`auto`, `interactive`, `ci`, `live`→alias, `log`→alias, `off`), and `NO_COLOR` note.
+- `docs/getting-started.md` — added **Understanding the output** section after the first-eval walkthrough with sample blocks copied from the sprint plan (interactive + CI layouts) and mode-activation rules.
+- `docs/cli-reference.md` — fixed stale flag table: `--workers` default `CPU count (max 8)` → `1`; `--progress` now lists `interactive`/`ci` plus `live`/`log` aliases.
+
+### Learnings
+
+- **`docs/configuration.md` does not document `--workers` or `--progress`** — confirmed via grep. Respected the task's "only if already covered" rule and left it alone.
+- **Two README locations, two audiences.** Root `/README.md` is install + quick-start; `hyoka/README.md` is the internal dev guide (Debugging Tips, package table, testing patterns). The sprint's progress-mode docs fit the dev guide, not the root README. The user-facing flag surface lives in `docs/cli-reference.md` — had to update that too to keep defaults honest (the task's verification step demands flag/default parity with `cmd/run.go`).
+- **Aliases matter for scripted callers.** `live` → `interactive` and `log` → `ci` are kept per Trinity's decision doc. Documented them as aliases rather than hiding them, so existing CI scripts don't look broken when users grep the reference.
+- **NO_COLOR trigger is OR, not AND.** Per Trinity's renderer doc and `style.New`, either `NO_COLOR=1` OR non-TTY stdout disables styling. Wrote it as a bulleted OR list to avoid the common "both required" misreading.
+- **Sample blocks are verbatim from the sprint plan.** Neo's and Trinity's decision docs match the plan's layout exactly — no drift to reconcile. Kept the code fences unmodified so future renderer tweaks can be detected by a simple diff against the golden text.

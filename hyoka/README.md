@@ -141,7 +141,8 @@ Existing kinds: `file`, `program`, `prompt`, `behavior`, `action_sequence`,
 ## Debugging Tips
 
 ```bash
-# Verbose logging — writes to both stderr and the log file
+# Verbose logging — when --log-file is set, logs go to the file only
+# (stderr stays clean, so the live progress display keeps working).
 go run ./hyoka run --prompt-id <id> --config <cfg> \
     --log-level debug --log-file hyoka-debug.log
 
@@ -157,6 +158,40 @@ go run ./hyoka run --service storage --language python --dry-run
 # Grep debug logs for role-tagged entries
 grep "role=" hyoka-debug.log | head -20
 ```
+
+## Progress Display Modes
+
+`hyoka run` has two purpose-built renderers plus a couple of legacy aliases.
+Selection is driven by `--workers` and `--progress`.
+
+### `--workers` (default: `1`)
+
+The default is `1`, not `runtime.NumCPU()`. A single worker gives the richer
+interactive view; raise it only when you need to fan out in CI.
+
+### `--progress` values
+
+| Value | Behavior |
+|-------|----------|
+| `auto` (default) | Picks `interactive` when `workers == 1`, `ci` when `workers > 1`. Falls back to `off` when stdout is not a TTY. Downgrades `interactive` → `ci` when `--log-level debug\|info` is set without `--log-file`. |
+| `interactive` | Single-eval live view. Sections: **Prompt**, **Config**, **Tools**, **Agent Attempt**, **Session Details**, **Graders**. Only the tail line updates in place. |
+| `ci` | Append-only, one `[HH:MM:SS] ▶ start` / `✅ pass` / `❌ fail` line per eval, then a summary table at the end. Safe for CI logs — no cursor movement. |
+| `live` (legacy) | Alias for `interactive`. |
+| `log` (legacy) | Alias for `ci`. |
+| `off` | No progress output. |
+
+### `NO_COLOR` support
+
+ANSI colors and emoji glyphs (`✅`, `❌`, `🔄`, `▶`) are dropped when either of
+the following is true:
+
+- The `NO_COLOR` environment variable is set (any non-empty value).
+- `stdout` is not a TTY (e.g., piped, redirected, or running under CI without
+  a PTY).
+
+In that case output uses plain text markers (`PASS`, `FAIL`, `START`). Box-
+drawing characters in the CI summary table are always emitted — they render
+cleanly in GitHub Actions, Datadog, Splunk, and `less`.
 
 ## Testing Patterns
 

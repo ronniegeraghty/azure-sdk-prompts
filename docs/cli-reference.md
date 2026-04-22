@@ -58,11 +58,11 @@ hyoka run --config baseline --dry-run
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--workers` | CPU count (max 8) | Parallel evaluation workers |
+| `--workers` | `1` | Parallel evaluation workers (clamped to 8). Also drives `--progress auto` mode selection. |
 | `--max-sessions` | workers × 3 | Maximum concurrent Copilot sessions |
 | `--session-timeout` | 600s | Maximum time in seconds for any single session phase to complete |
 | `--output` | `./reports` | Report output directory |
-| `--progress` | `auto` | Progress display: `auto`, `live`, `log`, `off` |
+| `--progress` | `auto` | Progress display: `auto`, `interactive`, `ci`, `live` (alias for `interactive`), `log` (alias for `ci`), `off`. `auto` picks `interactive` when `workers == 1`, `ci` when `workers > 1`, and `off` for non-TTY stdout. |
 | `--stub` | false | Use stub evaluator (no Copilot SDK) |
 | `-y`, `--yes` | false | Skip large run confirmation |
 

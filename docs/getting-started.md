@@ -103,6 +103,77 @@ Run Summary:
 ...
 ```
 
+## Understanding the output
+
+hyoka has two progress renderers. `--progress auto` (the default) picks one
+based on `--workers`:
+
+- **`workers == 1`** (the default) → **interactive mode**. One eval at a time,
+  live tail line, per-tool and per-grader status.
+- **`workers > 1`** → **CI mode**. Append-only timestamped lines plus a summary
+  table at the end. Safe for CI logs.
+
+Force a specific mode with `--progress interactive` or `--progress ci`. Use
+`--progress off` to disable progress output entirely. `live` and `log` are
+kept as aliases for `interactive` and `ci` respectively.
+
+### Interactive mode
+
+```
+Prompt: key-vault-dp-python-crud-secrets
+Config: python-pairwise
+Tools:
+  - azure-mcp (MCP server): ✅ Loaded
+  - azure-sdk-python (plugin): ❌ Failed to load (not found)
+  - review-criteria (skill): ✅ Loaded
+Agent Attempt:
+  🔄 Running… turn 3/25, 2 tool calls   (00:42)
+  ✅ Complete — 4 files written, 12 turns   (01:18)
+Session Details:
+  Files: src/kv_client.py, tests/test_kv.py, README.md, requirements.txt
+  Turns: 12    Tool calls: 7    Cost: $0.03
+Graders:
+  - prompt_review (claude-opus-4.6):     ✅ Pass (8/10)
+  - prompt_review (gpt-5.3-codex):       ✅ Pass (9/10)
+  - output_check (no_secrets):           🔄 Running…
+```
+
+Only the last printed line updates in place. Earlier lines are immutable,
+so the full scrollback is a readable trace of the run. Graders run one at a
+time so the tail line always reflects the grader currently executing.
+
+### CI mode
+
+```
+Running 9 evals across 3 configs with 4 workers…
+
+[00:00:03] ▶ start  key-vault-dp-python-crud-secrets  |  python-pairwise
+[00:00:05] ▶ start  identity-dp-python-default-credential  |  baseline/claude-opus-4.6
+[00:01:12] ✅ pass  key-vault-dp-python-crud-secrets  |  python-pairwise  (1m09s, 3/3 graders)
+[00:02:48] ❌ fail  identity-dp-python-default-credential  |  baseline/claude-opus-4.6  (1m43s, 1/3 graders) — output_check: missing_credential
+
+Summary
+┌──────────────────────────────────────────────┬──────────────────────────────┬────────┬─────────┬──────────┐
+│ Prompt                                       │ Config                       │ Result │ Graders │ Duration │
+├──────────────────────────────────────────────┼──────────────────────────────┼────────┼─────────┼──────────┤
+│ key-vault-dp-python-crud-secrets             │ python-pairwise              │  PASS  │  3/3    │   1m09s  │
+│ identity-dp-python-default-credential        │ baseline/claude-opus-4.6     │  FAIL  │  1/3    │   1m43s  │
+└──────────────────────────────────────────────┴──────────────────────────────┴────────┴─────────┴──────────┘
+
+6/9 passed · report: reports/2025-…
+```
+
+Timestamps are elapsed wall time from the start of the run. Summary rows are
+ordered by eval start time, matching the timeline above. The `report:` footer
+is omitted when no report directory is configured.
+
+### NO_COLOR support
+
+Set `NO_COLOR=1` (or redirect stdout to a non-TTY) to drop ANSI colors and
+emoji. Status markers fall back to plain text: `START`, `PASS`, `FAIL`. The
+CI summary table keeps its Unicode box-drawing characters — those render
+correctly in every common log viewer.
+
 ## 4. View Results
 
 Reports are generated in `reports/<run-id>/`:
