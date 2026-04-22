@@ -623,3 +623,127 @@ now the single source of truth for grading config. Decision memo at
   without duplicating identity plumbing. Same pattern as `sendEvent` /
   `sendPhase` but for events that carry arbitrary fields (grader ID, score,
   result).
+
+### emit-tool-verification (2026-XX-XX)
+
+**Scope:** wire one `EventToolsVerified` emission out of `hyoka/internal/eval/copilot.go` after the SDK reports its session-start skill + MCP-server load results. Display flips "Loaded"-optimistic tools to "Failed" when the SDK never confirmed them.
+
+**Learnings:**
+
+- **Where session-start events are observed:** the SDK calls `sessionCfg.OnEvent` once per `copilot.SessionEvent`. Two events matter for verification: `SessionEventTypeSessionSkillsLoaded` (carries `event.Data.Skills[].Name`) and `SessionEventTypeSessionMcpServersLoaded` (carries `event.Data.Servers[].Name`). Both fire during `CreateSession` / early post-creation — there is no explicit "session start complete" event, so the only reliable trigger for verification is "we've now received both load events" (or "we've received the one we care about, given the config").
+- **Where verification happens:** inside the shared `OnEvent` closure in `copilot.go`, which is already the single place that aggregates SDK data (session records, warnings, progress forwarding). Keeping the logic there means `expectedMCPServers` + `expectedSkills` (derived from `sessionCfg.SkillDirectories` basenames) stay colocated with the existing "Expected MCP server not loaded" warning, which we retain in addition to the new event.
+- **Locking discipline for progress callbacks:** the existing pattern releases `mu` before calling `e.progressFn` to avoid holding the eval's shared lock across display writes. I preserved that — `emitToolsVerified` mutates/reads state under the lock and returns the tool slice; the actual `progressFn` call happens after `mu.Unlock()`. This is consistent with the other progress forwarders in the same handler.
+- **Skill-name convention:** the SDK reports skills by `Name`, which matches the skill directory's basename (the dir containing `SKILL.md`). So deriving expected names as `filepath.Base(sessionCfg.SkillDirectories[i])` lines up 1:1 with SDK-reported names. No additional metadata lookup needed.
+- **Single-emit guarantee:** `verifiedEmitted` is a closure-local flag guarded by `mu`. Whichever event (skills or MCP) fires second triggers the emission; the first event stashes its data and exits early. If only one kind is configured, emission fires as soon as that one event arrives. If neither is configured, no event is emitted (display has nothing to flip).
+
+## Learnings — ToolResolution emit plumbing (CLI UX overhaul, sprint todo #3, commit e06ead61)
+
+- Config-tool package had zero progress awareness. Minimal hook is a
+  callback type `tool.ProgressEmitter = func(progress.ProgressEvent)`
+  defined in `config/tool/resolve.go`. No import cycle: `progress` pulls
+  nothing from `config/*`. Matches the plan's "simple function-pointer
+  parameter is fine" guidance; no context-key shenanigans.
+- Kept backward compat by making the old `ResolveSkills` a nil-emitter
+  shim over the new `ResolveSkillsWithReporter`. Every existing caller
+  (dry-run in `engine.go:778/790`, reporting in `engine_eval.go:262`,
+  existing tests) keeps working unchanged because nil-emit is a no-op.
+- MCPs don't "resolve" at config-load time — they're static entries. So
+  `EmitMCPResolutions` is a validation-only helper: Loaded when the
+  required mode-specific field is set (`Command` for local, `URL` for
+  remote), Failed otherwise. Not routing through ResolveSkills.
+- Plugins are already expanded into `Tools` at `config.Load` time (via
+  `ExpandPlugins`, which runs before the engine creates a display). I
+  could not emit events from inside `ExpandPlugins` because no reporter
+  exists yet. Chose to add `ToolConfig.EmitPluginResolutions(emit)` that
+  **re-runs** the registry + installed-plugins lookup read-only and
+  emits events. The existing `slog.Warn` stays — it fires at load time
+  for the log/CI paths; the new emit fires at eval time for the
+  interactive renderer. Single source of truth for "found?" is the same
+  two lookup calls (`reg.Get` + `resolveInstalledPlugin`) that
+  `ExpandPlugins` uses.
+- Engine wire-in is one hunk in
+  `eval/copilot.go:buildSessionConfig`. The runner already carries
+  `e.progressFn progress.ProgressFunc` (set by `engine.Run` via
+  `pr.SetProgressFunc(display.HandleEvent)` through the
+  `progress.Reporter` interface). Conversion
+  `tool.ProgressEmitter(e.progressFn)` is structural — both are
+  `func(progress.ProgressEvent)`. Order: plugin → MCP → skill, so the
+  Tools block renders top-to-bottom in declaration-scan order.
+- Pairing contract for downstream renderers: every
+  `EventToolResolutionStart` has exactly one matching
+  `EventToolResolutionResult` with the same `(ToolName, ToolKind)` before
+  the next tool's Start. This holds because emission is synchronous on
+  the eval goroutine and `ResolveSkillsWithReporter` / `EmitMCP*` /
+  `EmitPluginResolutions` all run a simple for-loop with no concurrency.
+- A skill entry resolving to zero directories (missing SKILL.md, empty
+  skill_dir) used to be non-fatal with just a log warning. Now also
+  surfaces as `EventToolResolutionResult{Status: Failed, Reason: "no
+  skill directories resolved"}`. Existing tests don't inspect events so
+  they pass; the `ResolveSkills_SingleSkillMissingSKILLMD` test still
+  expects (nil err, 0 dirs) and gets that. UX-correct: users want to see
+  the failure, not hope they spotted the log line.
+- **Coordination hazard**: working alongside the parallel
+  emit-tool-verification agent (same file: `copilot.go`), my first
+  commit was clobbered when the other agent's staged changes got swept
+  in (pre-commit hook or similar). Fixed via `git reset --soft HEAD~1`,
+  then saved their WIP diff to `.copilot-tmp-parallel.patch`, reverted
+  the file, re-applied only my hunk, and committed with
+  `git commit --only <path>...` for explicit path safety. Patch didn't
+  reapply cleanly after my commit (line numbers shifted); the other
+  agent will need to regenerate — this is the expected failure mode for
+  concurrent agents on the same file. Lesson: always commit with
+  `--only <paths>` when other agents are live on the same working tree.
+
+## Interactive renderer (display-interactive-renderer) — 2025 sprint
+
+Built `hyoka/internal/progress/display_interactive.go` — new renderer for
+the single-eval, human-watched case (`workers==1`, default). Trinity was
+parallel on `display_ci.go` in the same working tree; I mirrored her
+delegation pattern (Display holds a `*interactiveRenderer` pointer, set in
+`NewDisplay`, dispatched from `HandleEvent`/`Finish`) so we only collided
+on `display.go` — clean merge, no reverts.
+
+Wired new `ModeInteractive = "interactive"` constant; updated `cmd/run.go`
+auto-mode to pick `"interactive"` for workers==1 and `"ci"` for workers>1
+(replacing the previous `"live"`/`"log"` strings — but `live`/`log` still
+resolve, `log` routes into Trinity's CI renderer).
+
+Three tests added (`display_interactive_test.go`): happy-path, no-tools /
+no-graders omission, and the Tools flip path. Full `go test -race ./hyoka/...`
+green.
+
+Architecture doc: `.squad/decisions/inbox/neo-interactive-renderer.md` so
+Switch can author snapshot tests without re-reading the code.
+
+## Learnings
+
+- **Tail-update technique**: `"\r\x1b[2K" + text` replaces the current
+  line's content without advancing the row. Combined with a strict
+  `writeLine`/`writeTail`/`freezeTail` discipline that tracks
+  `linesWritten`, this gives us a single-line "scratchpad" at the bottom
+  without any save/restore gymnastics for normal updates. Freezing the
+  tail means writing `"\n"` — the line becomes immutable, `linesWritten++`,
+  `tailKind = tailNone`.
+- **The one exception: Tools block redraw on `EventToolsVerified`**. When
+  the SDK reports a tool as failed after we already printed it as Loaded
+  (the Tools section is no longer the tail — Agent Attempt lines are
+  below it), we do a single bracketed redraw: `\x1b7` (DECSC save),
+  `\x1b[<N>A\r` (move up N = `linesWritten - toolsFirstLine`),
+  rewrite each tool line with `\x1b[2K<text>\n`, `\x1b8` (DECRC restore).
+  Because we write exactly the same number of lines the tool block
+  originally occupied, lines below are untouched and the restore puts us
+  back on the original tail line unchanged. Gated by a `toolsVerified`
+  flag so it fires at most once per eval. Only non-tail update in the
+  whole renderer — documented inline.
+- **Ticker scope**: interactive mode's 1-second ticker only refreshes the
+  Agent Attempt tail (duration counter); it checks `tailKind == tailAgent`
+  and bails otherwise. Other sections are purely event-driven. Avoids the
+  522-line `display.go` region-redraw machinery entirely.
+- **Locking**: `interactiveRenderer` has its own `sync.Mutex`; caller
+  (Display.HandleEvent) already holds `d.mu` when delegating. Consistent
+  lock ordering (d.mu → r.mu, never reverse) prevents deadlock, and the
+  ticker goroutine only ever grabs `r.mu` so there's no cycle.
+- **Counter plumbing**: the outer `Display` still owns `completed/passed/
+  failed/errors` so `CompletedEvalCount()` keeps working; the dispatch
+  shim increments them on terminal events. Same pattern Trinity used for
+  the CI renderer — kept consistent.

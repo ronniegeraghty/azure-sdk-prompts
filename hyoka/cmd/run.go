@@ -89,7 +89,7 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().MarkHidden("model")
 	cmd.Flags().StringVar(&f.output, "output", "./reports", "Report output directory")
 	cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
-	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, live, log, off")
+	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, interactive, ci, live, log, off")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
 	cmd.Flags().BoolVar(&f.skipTrends, "skip-trends", false, "Skip automatic trend analysis after run")
 	// Fan-out visibility (#34)
@@ -173,13 +173,16 @@ func runCmd() *cobra.Command {
 				case !progress.IsTerminal(os.Stdout):
 					f.progressMode = "off"
 				case f.workers > 1:
-					f.progressMode = "log"
+					f.progressMode = "ci"
 				default:
-					f.progressMode = "live"
+					f.progressMode = "interactive"
 				}
 
-				if f.progressMode == "live" && (logLevel == "debug" || logLevel == "info") && logFile == "" {
-					f.progressMode = "log"
+				// Verbose logging on stderr would corrupt ANSI cursor redraws
+				// in interactive mode; downgrade to the append-only CI
+				// renderer unless the user routed slog output to a file.
+				if f.progressMode == "interactive" && (logLevel == "debug" || logLevel == "info") && logFile == "" {
+					f.progressMode = "ci"
 				}
 			}
 
