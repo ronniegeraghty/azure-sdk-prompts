@@ -2,6 +2,122 @@
 
 ## Active Decisions
 
+### Decision: CLI Output UX Overhaul — Round 1–2 Stable Contracts (2026-04-22)
+
+**Status:** ✅ Schema + emitters landed on `ronniegeraghty/dev`. Renderers (round 3) in flight.
+**Sprint:** CLI Output UX Overhaul (interactive vs CI modes).
+**Consolidated from 5 inbox entries** merged 2026-04-22T23-25-55Z:
+
+| Item | Agent | Commit | Status |
+|------|-------|--------|--------|
+| ProgressEvent schema extension (6 new event types + fields + string consts) | Neo 💊 | `61d830c6` | ✅ Locked |
+| Style helper package `internal/progress/style/` | Trinity 🖤 | `21636fdd` | ✅ Locked |
+| Tool-resolution emission wiring (plugin → MCP → skill) | Neo 💊 | `e06ead61` | ✅ Shipped |
+| Tool-verification emission wiring (SDK post-session) | Neo 💊 | `82cd8590` | ✅ Shipped |
+| Grader serialization + per-grader lifecycle events | Neo 💊 | `bffd0c40` | ✅ Shipped |
+| Workers default flipped to 1 | Tank 📡 | `3b9cbab9` | ✅ Shipped |
+| Progress mode auto-selection (TTY + worker count) | Tank 📡 | `d6fd0a59` | ✅ Shipped |
+
+#### ProgressEvent schema (permanent contract)
+
+New `EventType` values (appended to existing `iota` block — append-only):
+`EventToolResolutionStart`, `EventToolResolutionResult`, `EventToolsVerified`, `EventGraderStart`, `EventGraderComplete`, `EventSessionDetails`.
+
+New string constants (exported so emitters don't hardcode):
+- `ToolKindSkill = "skill"`, `ToolKindPlugin = "plugin"`, `ToolKindMCP = "mcp"`
+- `ToolStatusLoaded = "loaded"`, `ToolStatusFailed = "failed"`
+- `GraderResultPass = "pass"`, `GraderResultFail = "fail"`
+
+New fields on `ProgressEvent` (all in-process only, no JSON tags):
+`ToolName`, `ToolKind`, `Status`, `Reason`, `Tools []ToolStatus`, `GraderID`, `GraderKind`, `Result`, `Score *float64`, `Files []string`, `Turns int`, `ToolCalls int`, `Cost float64`.
+
+Helper type `ToolStatus{ToolName, ToolKind, Status, Reason}`. Fat-union pattern matches existing `ProgressEvent`. No constructor helpers — existing emitters use raw struct literals. `Score` is a pointer so "grader didn't report" is distinguishable from legitimate `0.0`.
+
+#### Grader serialization & event policy
+
+- Emission is gated on **reporter presence** (`sendRawEvent != nil`), not on worker count. Graders are already sequential in both modes (single `for` loop in `criteria.RunGraders`; `prompt_review` runs after typed graders in the same function).
+- `GraderID` is stable between `Start` and `Complete`. For the review panel, `GraderID = "ai_review"`. For typed graders, `GraderID = Grader.Name()`.
+- **`Score` policy:** populated (non-nil) only for `prompt_review` and `prompt` LLM-judge graders. All binary graders (`file`, `program`, `output_check`, `behavior`, `action_sequence`, `tool_constraint`) leave `Score` nil — rendering "(0/10)" for a binary fail would mislead.
+- `Result` is always populated (`GraderResultPass` / `GraderResultFail`). `Message` is whatever the grader already put in `GraderResult.Message` — no fabrication.
+- New API: `criteria.GraderHooks` + `criteria.RunGradersWithHooks`. `criteria.RunGraders` preserved as a zero-hooks shim. `engine.runSingleEval` gained a `sendRawEvent` sixth arg that auto-fills `EvalID`/`PromptID`/`ConfigName`.
+- Report JSON (`GraderResults`, `ScoreBreakdown`, aggregate `Pass`/`Score`) unchanged — events are in-process UX only.
+
+#### Tool-resolution wiring (what renderers can assume)
+
+Emitted from `CopilotPromptRunner.buildSessionConfig` before the Copilot session starts, gated on `e.progressFn != nil`:
+
+| Tool kind | Emitter | Loaded rule |
+|-----------|---------|-------------|
+| `plugin` | `config.ToolConfig.EmitPluginResolutions` | Resolves via plugin registry **or** installed Copilot CLI plugins; else Failed+"not found" |
+| `mcp` | `tool.EmitMCPResolutions` | Local: `Command` set. Remote: `URL` set. Else Failed with reason |
+| `skill` | `tool.ResolveSkillsWithReporter` | Resolves to ≥1 skill directory; else Failed (missing SKILL.md / empty dir) |
+
+- **Sequential pairing:** every `EventToolResolutionStart(ToolName, ToolKind)` is followed by exactly one matching `EventToolResolutionResult` before any other tool-resolution event.
+- **Order within a config:** plugins (declaration order under `plugins:`), then MCPs (declaration order in `generator.tools`), then skills (declaration order).
+- **No concurrency** between events for a single eval — all synchronous on the eval goroutine.
+- Nil reporter = silent no-op. `ResolveSkills` becomes a nil-emitter shim over `ResolveSkillsWithReporter`.
+
+#### Tool-verification wiring (ordering guarantees)
+
+Exactly one `EventToolsVerified` per eval is emitted after SDK `SessionSkillsLoaded` + `SessionMcpServersLoaded`:
+
+1. **At-most-once** per eval (guarded by `verifiedEmitted` under OnEvent mutex).
+2. **Fires after both load events** when both skills and MCP are configured; **fires after the single relevant event** when only one kind is configured; **never fires** when neither is configured.
+3. **Never fires** when reporter is nil.
+4. **Always fires before generation begins** — `CreateSession` finishes before `SendAndWait`. Renderers can treat `EventToolsVerified` as terminal for the Tools block; subsequent `EventToolStart` / `EventWritingFile` / `EventGraderStart` arrive after.
+5. `emitToolsVerified` builds the slice under lock but invokes `progressFn` post-unlock — no deadlock risk for renderers holding their own locks.
+6. `Tools` sorted by `(ToolKind, ToolName)` ascending — deterministic for snapshot tests.
+7. Every configured tool appears exactly once, tagged Loaded if SDK confirmed, Failed otherwise with populated `Reason`. Tools reported by SDK but not configured are dropped (intent: "did what I asked for succeed?", not "what did SDK load?").
+8. Plugin kind is **not** covered by verification — no SDK post-start signal; plugin status from config-time resolution remains authoritative.
+9. Skill match is by basename (`filepath.Base(dir)`) against SDK-reported `Name`.
+
+#### Style helper API (`internal/progress/style/`)
+
+- **Package:** `github.com/ronniegeraghty/hyoka/hyoka/internal/progress/style`. Stdlib-only.
+- **Constructors:** `New(w io.Writer) *Styler` (auto-detects TTY + `NO_COLOR`), `NewFromEnabled(bool) *Styler` (bypass for tests).
+- **Detection:** disabled if `NO_COLOR` set, if writer isn't `*os.File`, or if file is not a char device. Else enabled.
+- **Zero value / nil receiver are safe** — methods return raw text when disabled.
+- **Color methods:** `Green/Red/Yellow/Cyan/Blue/Dim/Bold/Reset`.
+- **Semantic helpers (preferred):** `OK` (green), `Fail` (red), `Warn` (yellow), `Info` (cyan), `Muted` (dim). Renderer code should use these so palette changes stay single-source.
+- Does **not** strip existing ANSI from input, **not** handle 256/truecolor, **not** expose writer helpers, **not** auto-enable Windows VT mode.
+- Tests: force `NewFromEnabled(false)` for plain-text goldens; `NewFromEnabled(true)` to assert ANSI presence. Never rely on `New(&bytes.Buffer{})` (always disabled).
+
+#### Backward-compatibility guarantees (all rounds)
+
+- `ProgressEvent` schema extension is additive only — no renames, reorders, or removals. Existing emitters and display paths compile + behave unchanged.
+- `criteria.RunGraders` signature unchanged; existing callers and tests untouched.
+- Report JSON format unchanged.
+- All verifications: `go build ./...`, `go vet ./hyoka/...`, `go test -race ./hyoka/internal/{progress,eval,criteria,config/tool}/...` green on each commit.
+
+---
+
+### Decision: Grader Unification — Phases 1–4 Shipped + Option A Restructure (2026-04-22)
+
+**Status:** ✅ Code-complete across Phases 1–4. Option A package restructure merged.
+**Branch:** `ronniegeraghty/dev` (direct commits, no PRs).
+
+Consolidated from 8 inbox entries merged 2026-04-22T23:05:53Z:
+
+| Item | Agent | Commit / Issue | Status |
+|------|-------|----------------|--------|
+| Morpheus grader unification proposal (schema redesign + roadmap) | Morpheus 🕶️ | — | Proposed → accepted |
+| User directive: grader package layout = **Option A** (nested under `hyoka/internal/criteria/`) | Ronnie (via Copilot) | 2026-04-22T22:11Z | Locked |
+| Morpheus Option A replan | Morpheus 🕶️ | — | Approved |
+| Phase 1: Unified schema + back-compat loader (#624) | Neo 💊 | `faf556eb` | ✅ Shipped |
+| Phase 1 test coverage | Switch 🤍 | — | ✅ All green |
+| Phase 2: Engine cutover (#625) | Neo 💊 | `a8a6d2d4` | ✅ Shipped |
+| Phase 3: `internal/criteria/` deleted (#626) | Neo 💊 | `46b624fb` | ✅ Shipped |
+| Phase 4: `output_check` workspace-delta grader | Tank 📡 | `ad2a8ce7` | ✅ Shipped |
+| Option A package restructure (supersedes phase 2/3 flat layout) | Neo 💊 | `46ddda2e` | ✅ Shipped |
+
+**Package layout (Option A, locked):**
+- `hyoka/internal/criteria/` — file-level concerns: `Bundle`, `LoadUnifiedDir`, `UnifiedGraderConfig`, `UnifiedGraderEntry`, `MatchingErrors`, `PartitionMatched`, `BuildUnifiedReviewBuckets`, `InstantiateGraders`, `RunGraders`.
+- `hyoka/internal/criteria/graders/` — typed grader implementations.
+
+Full per-agent shipping notes were merged from `.squad/decisions/inbox/` and the inbox cleared. See git history on `ronniegeraghty/dev` for commit-level detail.
+
+---
+
 ### Decision: Grader Unification — Locked Answers + Phase 1–4 Issues Filed (2026-04-22)
 
 **Author:** User (Ronnie) + Morpheus 🕶️  
