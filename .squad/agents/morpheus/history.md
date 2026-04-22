@@ -513,3 +513,40 @@ All three are doc-/comment-level. None block merge.
 ### PR #618 merged into phase-6
 
 The approval verdict was posted and nits addressed. Guardrail policy locked in for team — "hard-fail only, no soft-warning tier."
+
+## 2026-04-22 — Validate audit of `examples/`
+
+### Learnings
+
+**Validate command scope** (`hyoka/cmd/validate.go`):
+- Scans three dirs: prompts (via `--prompts` flag, default `./prompts`, with `.hyoka/prompts/` taking priority via `discoverProject()`), configs (resolved via `resolveConfigDir`, falls back to sibling-of-prompts `configs/`), criteria (via `resolveCriteriaDir`, falls back to sibling `criteria/`).
+- `.hyoka/prompts`, `.hyoka/configs`, `.hyoka/criteria` in this repo are **symlinks** to the root-level `prompts/`, `configs/`, `criteria/` — staging into either path is equivalent.
+- No `--all` or scope flags exist on validate; it always scans all three. Configs are parse-only (no remote-skill probe — confirmed against decisions.md item on Issue #616).
+- File-naming requirement for prompts: `*.prompt.md` or `*.prompt.yaml` (other files silently skipped). Criteria/config files: any `.yaml`/`.yml`.
+
+**Quirks discovered:**
+- `starter_project` paths in prompt frontmatter resolve **relative to the prompt file's directory**, so prefixing the staged prompt without also providing a same-named starter dir produces a false-positive failure. Pattern: stage starter dir under both prefixed AND original name (or symlink original → prefixed).
+- `prompts/configs/criteria/` are symlinked from `.hyoka/`, so `git status` cleanup works on either path.
+
+**Results summary** (8 example files audited):
+
+| Kind | File | Result |
+|---|---|---|
+| prompts | `example.prompt.yaml` | ✅ valid |
+| prompts | `graders-frontmatter-example.prompt.md` | ✅ valid |
+| prompts | `existing-files-example.prompt.md` | ✅ valid (when sibling `existing-files-example.starters/` is present) |
+| prompts | `prompt-template.prompt.md` | ❌ **by design** — skeleton with empty values for `service`, `plane`, `language`, `category`, `difficulty`, `created`, `author`. Intended to be copied + filled, not validated as-is. |
+| configs | `example-full.yaml` | ✅ valid |
+| configs | `example-generator-skills.yaml` | ✅ valid |
+| configs | `example-remote-skill.yaml` | ✅ valid |
+| criteria | `hierarchical-when-example.yaml` | ✅ valid |
+| criteria | `language/{python,dotnet,go,java,rust}.yaml` | ✅ all 5 valid |
+| criteria | `service/{key-vault,storage}.yaml` | ✅ both valid |
+
+All non-template examples are schema-valid. The single "failure" (`prompt-template.prompt.md`) is intentional. State restored — `git status` clean post-audit.
+
+## Learnings (PR #607 hierarchical-when-example.yaml)
+
+- **Multiple group-level `when`s** in a single criteria file are expressed via the top-level `groups:` list on `GraderConfig` (`hyoka/internal/criteria/criteria.go:61-66`). Each `GraderGroup` (`criteria.go:46-51`) carries its own optional `when` map, applied hierarchically with file-level and grader-level conditions (AND-merged via `mergeWhen`). Canonical shape demonstrated in `hyoka/internal/criteria/hierarchical_test.go:208-247`.
+- **YAML `---` document separators are silently truncated.** `loadFile` (`criteria.go:134-136`) constructs `yaml.NewDecoder` but calls `Decode` exactly once, so only the first document is parsed. Any subsequent documents are dropped without warning. This is why `hyoka validate` accepts `examples/criteria/hierarchical-when-example.yaml` cleanly even though its second document (the Rust block, lines 46-66) is unreachable.
+- **Resolution for PR #607:** Ronnie's review comment was correct. The example is misleading — it implies multi-document YAML expresses two sibling group-level `when`s, but the schema requires `groups:` for that. Replied in-thread on comment 3125681737 with file:line citations and recommended a follow-up. Dropped recommendation in decisions inbox: `morpheus-pr607-when-followup.md`.

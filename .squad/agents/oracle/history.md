@@ -530,3 +530,5 @@ PR #618 comment: posted acknowledgment
 ## PR #618 merged into phase-6
 
 All nits addressed. Work reflects code hygiene principles: total removal (no partial patches), cross-doc consistency, comment/code sync.
+
+**2026-04-22 (Morpheus Examples Audit):** Examples can have misleading patterns — e.g., `hierarchical-when-example.yaml` uses YAML `---` doc separator suggesting multi-doc support, but the schema requires `groups:` list (the loader silently truncates docs 2+). Oracle should audit examples during docs maintenance cycles to catch patterns that might misguide new users. PR #607 comment 3125721580 has full context.

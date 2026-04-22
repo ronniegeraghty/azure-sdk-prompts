@@ -2,6 +2,61 @@
 
 ## Active Decisions
 
+### Decision: Morpheus — Examples Validation Audit & PR #607 Hierarchical-When Investigation (2026-04-22)
+
+**Author:** Morpheus 🏗️
+**Date:** 2026-04-22
+**Scope:** Two parallel investigations
+
+#### Run 1: Examples Directory Validation
+
+**Status:** ✅ Audit complete. All 8 real artifacts valid. 1 intentional skeleton (`prompt-template.prompt.md`).
+
+**Findings:**
+
+| Kind | File | Status |
+|---|---|---|
+| prompt | `example.prompt.yaml` | ✅ |
+| prompt | `graders-frontmatter-example.prompt.md` | ✅ |
+| prompt | `existing-files-example.prompt.md` (+ `.starters/`) | ✅ |
+| prompt | `prompt-template.prompt.md` | ❌ intentional skeleton |
+| config | `example-full.yaml` | ✅ |
+| config | `example-generator-skills.yaml` | ✅ |
+| config | `example-remote-skill.yaml` | ✅ |
+| criteria | `hierarchical-when-example.yaml` | ✅ |
+| criteria | `language/*.yaml` (5 files) | ✅ |
+| criteria | `service/*.yaml` (2 files) | ✅ |
+
+**Recommended follow-up (low priority):** Rename `prompt-template.prompt.md` → `prompt-template.md` to skip validate scope. Keeps template human-readable; no schema fix needed. No urgent action — `examples/` is documentation, not active library.
+
+**Learnings appended to Morpheus history.md:** Staging quirk — `starter_project` paths resolve relative to prompt file's directory; when staging with prefix, starter dir symlink must exist under unprefixed name.
+
+#### Run 2: PR #607 Hierarchical-When Investigation
+
+**Status:** ❌ Investigation surfaced critical bugs.
+
+**Finding:** `examples/criteria/hierarchical-when-example.yaml` uses YAML `---` doc separator to suggest two group-level `when` blocks are valid. **They are not.** Root cause: `hyoka/internal/criteria/criteria.go:134-136` uses `yaml.NewDecoder` + single `Decode()` call, processing only the first YAML document. The Rust block (lines 46-66) is silently discarded at load time. Validate doesn't flag it because validation operates on parsed structure, not raw bytes.
+
+**Correct schema:** Top-level `groups:` list (each `GraderGroup` has optional `when`). Canonical example in `hyoka/internal/criteria/hierarchical_test.go:208-247`.
+
+**Risk:** Anyone copying the example loses half their criteria silently. No error, no warning.
+
+**Recommended follow-ups (file as separate GitHub issues):**
+
+1. **Fix the example** — rewrite `examples/criteria/hierarchical-when-example.yaml` to use `groups:` list instead of `---` separator. Keep file-level + grader-level demonstration on Python side; move Rust scope into group entry.
+2. **Fix the loader** — `hyoka/internal/criteria/criteria.go:loadFile` (lines 134-136) should either:
+   - Strict rejection: loop decoder, reject if more than one document (safest first move).
+   - OR merge documents (user-friendly but changes semantics — risky without demand signal).
+3. **Validate coverage gap** — `hyoka validate` should detect trailing YAML documents in criteria files as a footgun, independent of loader fix.
+
+**Threaded reply posted** on PR #607 (comment 3125721580) documenting the silent-truncation bug and recommended fixes.
+
+**Learnings appended:**
+- Neo history.md: "Loader silently drops YAML docs after first --- in criteria files; affects `hyoka/internal/criteria/criteria.go:134-136`." (Neo owns the fix)
+- Oracle history.md: "Examples can have misleading patterns (e.g., hierarchical-when-example.yaml uses discarded YAML docs); audit examples during docs maintenance cycles."
+
+---
+
 ### Decision: Phase 6 Round-1 Review Batch — 2 APPROVE, 1 REQUEST CHANGES (2026-04-21)
 
 **Authors:** Switch (🧪), Morpheus (🏗️), Tank (📡 reassignment)  

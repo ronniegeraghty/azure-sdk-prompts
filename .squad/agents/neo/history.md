@@ -425,3 +425,5 @@ Going forward (and codified in `.squad/decisions/inbox/neo-guardrail-scope-corre
 ## 2026-04-22 — PR #618 merged into phase-6
 
 Orchestration complete. Morpheus verdict APPROVE, Oracle nits resolved, Scribe merged all inbox entries into decisions.md and cleared the inbox. Guardrail policy locked in as team guidance. Issue #619 (tool-load fast-fail) now unblocked.
+
+**2026-04-22 (Morpheus Examples & PR #607 Follow-up):** Loader silently drops YAML docs after first `---` in criteria files (`hyoka/internal/criteria/criteria.go:134-136`). Neo owns fix — strict multi-doc rejection recommended as first move (PR #607 comment 3125721580 has details). Affects example misleadingness; separate issue recommended for example rewrite using `groups:` list.
