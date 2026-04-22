@@ -240,32 +240,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	// Diagnostic: if 0 files generated, check if agent attempted file creation
-	if len(generatedFiles) == 0 && !evalFailed {
-		fileToolAttempts := 0
-		for _, ev := range evalReport.SessionEvents {
-			if ev.Type == "tool.execution_start" && isFileWriteTool(ev.ToolName) {
-				fileToolAttempts++
-			}
-		}
-		if fileToolAttempts > 0 {
-			lg.Warn("0 files generated despite file-write tool attempts", "attempts", fileToolAttempts)
-			if evalReport.Error == "" {
-				evalReport.Error = fmt.Sprintf("0 files generated despite %d file-write tool attempts", fileToolAttempts)
-				evalReport.ErrorCategory = "no_files"
-				evalReport.FailureReason = fmt.Sprintf("Generator made %d file-write attempts but no files appeared in the workspace — files may have been written to the wrong location", fileToolAttempts)
-				evalReport.Success = false
-			}
-		} else {
-			lg.Warn("0 files generated — agent did not use any file-write tools")
-			if evalReport.Error == "" {
-				evalReport.Error = "0 files generated — agent did not create any files"
-				evalReport.ErrorCategory = "no_files"
-				evalReport.FailureReason = "Generator produced no files — the agent did not invoke any file-write tools"
-				evalReport.Success = false
-			}
-		}
-	}
+	// Note: legacy engine-level "no files generated" failure was removed in
+	// favor of the configurable `output_check` grader. Evals that care about
+	// file production should declare an output_check grader in their criteria
+	// (see hyoka/internal/graders/output_check_grader.go). Prompts that don't
+	// expect files now succeed cleanly with zero generated files.
 
 	lg.Debug("Session complete",
 		"tool_calls", len(evalReport.ToolCalls),
