@@ -548,8 +548,13 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	// Progress display — mode is controlled by --progress flag.
 	// When --log-level debug/info, main.go sets ProgressMode to "log" automatically.
+	uniqueConfigs := make(map[string]struct{}, len(tasks))
+	for _, t := range tasks {
+		uniqueConfigs[t.Config.Name] = struct{}{}
+	}
 	display := progress.NewDisplay(progress.DisplayConfig{
 		Total:     len(tasks),
+		Configs:   len(uniqueConfigs),
 		Workers:   e.opts.Workers,
 		ReportDir: runDir + "/",
 		Mode:      progress.ProgressMode(e.opts.ProgressMode),

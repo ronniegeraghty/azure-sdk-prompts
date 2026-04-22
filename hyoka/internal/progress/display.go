@@ -14,15 +14,18 @@ import (
 type ProgressMode string
 
 const (
-	ModeAuto ProgressMode = "auto" // ANSI if TTY, log otherwise
-	ModeLive ProgressMode = "live" // Force ANSI (cursor save/restore)
-	ModeLog  ProgressMode = "log"  // Append-only phase lines (no cursor movement)
-	ModeOff  ProgressMode = "off"  // No progress output
+	ModeAuto        ProgressMode = "auto"        // ANSI if TTY, log otherwise
+	ModeLive        ProgressMode = "live"        // Force ANSI (cursor save/restore)
+	ModeLog         ProgressMode = "log"         // Legacy alias for "ci" — routes to CI renderer
+	ModeCI          ProgressMode = "ci"          // Append-only, timestamped, summary table at end
+	ModeInteractive ProgressMode = "interactive" // Tail-line-only interactive renderer (single-eval)
+	ModeOff         ProgressMode = "off"         // No progress output
 )
 
 // DisplayConfig controls the progress display.
 type DisplayConfig struct {
 	Total     int
+	Configs   int // Number of distinct configs in this run; advisory, used by CI intro line
 	Workers   int
 	Writer    io.Writer
 	Disabled  bool
@@ -102,6 +105,15 @@ type Display struct {
 	ticker *time.Ticker
 	stopCh chan struct{}
 	wg     sync.WaitGroup
+
+	// CI renderer — non-nil when mode is ModeCI or ModeLog. When set, all
+	// event/finish handling delegates to it and the other rendering paths
+	// are dormant.
+	ci *ciRenderer
+
+	// Interactive renderer — non-nil when mode is ModeInteractive. When
+	// set, all event/finish handling delegates to it.
+	interactive *interactiveRenderer
 }
 
 // NewDisplay creates a progress display. When Writer is nil, it writes to
@@ -116,6 +128,8 @@ func NewDisplay(cfg DisplayConfig) *Display {
 
 	disabled := cfg.Disabled
 	ansi := false
+	useCI := false
+	useInteractive := false
 
 	switch cfg.Mode {
 	case ModeOff:
@@ -124,8 +138,14 @@ func NewDisplay(cfg DisplayConfig) *Display {
 		if !disabled {
 			ansi = true
 		}
-	case ModeLog:
-		ansi = false
+	case ModeLog, ModeCI:
+		if !disabled {
+			useCI = true
+		}
+	case ModeInteractive:
+		if !disabled {
+			useInteractive = true
+		}
 	default: // ModeAuto or ""
 		if !disabled && cfg.Writer == nil {
 			if IsTerminal(os.Stdout) {
@@ -146,6 +166,16 @@ func NewDisplay(cfg DisplayConfig) *Display {
 		reportDir:    cfg.ReportDir,
 		sections:     []*evalSection{},
 		sectionIndex: make(map[string]int),
+	}
+
+	if useCI {
+		d.ci = newCIRenderer(w, cfg.Total, cfg.Workers, cfg.Configs, cfg.ReportDir)
+		return d
+	}
+
+	if useInteractive {
+		d.interactive = newInteractiveRenderer(w, cfg.Total, cfg.Workers, cfg.ReportDir)
+		return d
 	}
 
 	if d.ansi && cfg.Total > 0 {
@@ -322,6 +352,40 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	if d.ci != nil {
+		d.ci.handle(evt)
+		// Keep Display's completion counters in sync so CompletedEvalCount
+		// stays meaningful across renderer modes.
+		switch evt.Type {
+		case EventPassed:
+			d.completed++
+			d.passed++
+		case EventFailed:
+			d.completed++
+			d.failed++
+		case EventError:
+			d.completed++
+			d.errors++
+		}
+		return
+	}
+
+	if d.interactive != nil {
+		d.interactive.handleEvent(evt)
+		switch evt.Type {
+		case EventPassed:
+			d.completed++
+			d.passed++
+		case EventFailed:
+			d.completed++
+			d.failed++
+		case EventError:
+			d.completed++
+			d.errors++
+		}
+		return
+	}
+
 	switch evt.Type {
 	case EventStarting:
 		idx := d.getOrAssignSlot(evt.EvalID, evt.PromptID, evt.ConfigName)
@@ -451,6 +515,18 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 // Finish stops the redraw timer, renders final state, and prints the summary.
 func (d *Display) Finish() {
 	if d.disabled {
+		return
+	}
+
+	if d.ci != nil {
+		d.mu.Lock()
+		d.ci.finish()
+		d.mu.Unlock()
+		return
+	}
+
+	if d.interactive != nil {
+		d.interactive.finish()
 		return
 	}
 

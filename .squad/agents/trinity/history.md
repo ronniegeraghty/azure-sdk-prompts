@@ -135,3 +135,62 @@ Created `hyoka/internal/progress/style` — a small dependency-free ANSI color h
 Two things I deliberately baked in that the spec didn't strictly require but will save downstream headaches:
 1. **Nil-safe Styler** — `var s *Styler; s.Green("x")` returns `"x"` instead of panicking. Downstream renderers can keep a lazily-initialized field without guard checks.
 2. **NO_COLOR short-circuits before the type assertion** — so even weird writers (nil, custom wrappers) respect NO_COLOR consistently.
+
+---
+
+## 2025-04-ci-renderer — append-only CI progress renderer
+
+Built `hyoka/internal/progress/display_ci.go` to replace the legacy log-mode
+renderer with a proper CI-oriented view: timestamped start/finish lines during
+the run + end-of-run summary table. Wired in parallel with Neo's interactive
+renderer (we both edited `display.go` via the shared filesystem; the
+mode-dispatch switch now fans out to ci / interactive / ansi paths cleanly).
+
+**Delivered:**
+- New `ModeCI` (`"ci"`); `ModeLog` kept as a back-compat alias that routes to
+  the same renderer so `--progress log` keeps working for scripted callers.
+- `[HH:MM:SS]` relative timestamps anchored to renderer construction.
+- Emoji glyphs (▶/✅/❌) when color is enabled; plain `START/PASS/FAIL` text
+  when NO_COLOR / non-TTY (log aggregators that choke on unicode get clean
+  output).
+- Grader pass/total tracked via `EventGraderStart` / `EventGraderComplete`
+  attributed by `EvalID`; safe with interleaved events across parallel evals.
+- End-of-run summary table with auto-sized columns, unicode box-drawing
+  (renders fine in modern CI log viewers), bolded headers.
+- `DisplayConfig.Configs` added so the intro line can render
+  `Running N evals across M configs with W workers…`; engine.go computes it
+  from unique `tasks[].Config.Name`.
+- Tests: `TestDisplay_LogMode` rewritten (was asserting old "Prompt: p1 /
+  generating…" shape), plus new `TestDisplay_CIMode` covering grader tally,
+  failure-reason collapse, report path footer, and table glyphs.
+
+### Learnings
+
+**Table rendering — hand-rolled beats pulling a new dep.** Considered
+pulling `github.com/jedib0t/go-pretty` or similar, but the column count is
+tiny (5) and content is all ASCII-ish. A `bytes.Buffer` + two pass (measure
+widths → render rows) with unicode box chars comes in at ~60 LOC and needs
+no external dependency — consistent with the stdlib-preferred convention.
+Used plain `len()` for width since the ADR spec said it's fine; if we ever
+need CJK / emoji in a cell, we'll swap in `runewidth`. Headers are bold via
+styler; cells are plain so snapshot tests don't carry ANSI noise.
+
+**NO_COLOR emoji strategy — tie emoji to the Styler's Enabled state.** The
+CI use case is often piped to log aggregators (GitHub Actions web UI, Datadog,
+Splunk) that happily render box-drawing characters but mangle emoji. Rather
+than adding a separate `useEmoji` flag to DisplayConfig, I piggy-backed on
+`Styler.Enabled` — if colors are off, emoji are off too. `NO_COLOR=1 hyoka
+run` becomes the one knob that switches the whole CI output to ASCII-safe
+mode. Box-drawing stays on because (a) it's valid UTF-8, (b) every tested CI
+log viewer handles it, and (c) the summary table becomes much harder to read
+with `+---+---+` borders. If that turns out to be wrong, the toggle is a
+one-line change in `writeBorder`.
+
+**Shared worktree gotcha.** Neo and I were both writing to
+`hyoka/internal/progress/display.go` through the same filesystem. No conflict
+landed — my CI dispatch and Neo's interactive dispatch ended up as sibling
+switch cases — but I caught a transient "declared and not used: useInteractive"
+mid-run where Neo's block wasn't fully written yet. The fix was just
+retrying `go build` once both agents had settled. Worth flagging for future
+parallel runs: if one agent is about to commit and the other is mid-edit,
+you get a brief window of non-compiling state.
