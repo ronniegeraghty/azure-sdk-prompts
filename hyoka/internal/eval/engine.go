@@ -18,7 +18,6 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/comparison"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
@@ -113,8 +112,6 @@ type EngineOptions struct {
 	// model. Empty string or "combined" preserves legacy single-session
 	// behavior. Validated at the CLI layer.
 	ReviewMode string
-	// Pluggable graders (#136)
-	GradersDir string // Directory containing grader config YAML files.
 	// Generator safety (#36)
 	AllowCloud bool // Allow agent output to provision real Azure resources.
 	// Directory exclusion (#63)
@@ -137,8 +134,12 @@ type Engine struct {
 	reviewerFactory ReviewerFactory
 	opts            EngineOptions
 	tracker         *process.ProcessTracker
-	graderConfigs   []criteria.GraderConfig // attribute-matched grader configs (#30)
-	pluginGraders   []graders.GraderConfig  // pluggable grader configs (#136)
+	// graderBundle holds the unified grader configuration loaded from
+	// CriteriaDir. It replaces the pre-#625 dual storage of
+	// criteria.GraderConfig (prompt-review criteria) and
+	// graders.GraderConfig (typed graders). Every matched entry — prompt
+	// or typed — flows through the same Bundle.
+	graderBundle *graders.Bundle
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
@@ -210,82 +211,76 @@ func (e *Engine) printf(format string, args ...any) {
 	fmt.Fprintf(e.opts.Stdout, format, args...)
 }
 
-// loadCriteria loads grader configs if CriteriaDir is configured.
-func (e *Engine) loadCriteria() {
+// loadBundle loads the unified grader bundle from CriteriaDir (#625).
+// Per-file parse/validation failures are captured in Bundle.FileErrors and
+// only surface when a specific eval's properties would have selected the
+// malformed file (Q4 deferred-error semantics).
+func (e *Engine) loadBundle() {
 	if e.opts.CriteriaDir == "" {
-		slog.Debug("No criteria directory configured, skipping criteria loading")
+		slog.Debug("No criteria directory configured, skipping bundle load")
 		return
 	}
 	if _, err := os.Stat(e.opts.CriteriaDir); os.IsNotExist(err) {
 		slog.Debug("Criteria directory does not exist, skipping", "dir", e.opts.CriteriaDir)
 		return
 	}
-	configs, err := criteria.LoadDir(e.opts.CriteriaDir)
+	bundle, err := graders.LoadUnifiedDir(e.opts.CriteriaDir)
 	if err != nil {
-		slog.Warn("Failed to load grader configs", "dir", e.opts.CriteriaDir, "error", err)
+		slog.Warn("Failed to walk criteria directory", "dir", e.opts.CriteriaDir, "error", err)
 		return
 	}
-	if len(configs) == 0 {
-		slog.Warn("Criteria directory exists but contains no criteria configs", "dir", e.opts.CriteriaDir)
-		return
-	}
-	e.graderConfigs = configs
-	slog.Info("Loaded criteria", "dir", e.opts.CriteriaDir, "count", len(configs))
+	e.graderBundle = bundle
+	slog.Info("Loaded unified grader bundle",
+		"dir", e.opts.CriteriaDir,
+		"files", len(bundle.Configs),
+		"file_errors", len(bundle.FileErrors),
+	)
 }
 
-// loadGraders loads pluggable grader configs if GradersDir is configured (#136).
-func (e *Engine) loadGraders() {
-	if e.opts.GradersDir == "" {
-		return
-	}
-	if _, err := os.Stat(e.opts.GradersDir); os.IsNotExist(err) {
-		slog.Debug("Graders directory does not exist, skipping", "dir", e.opts.GradersDir)
-		return
-	}
-	gcf, err := graders.LoadDir(e.opts.GradersDir)
-	if err != nil {
-		slog.Warn("Failed to load grader configs", "dir", e.opts.GradersDir, "error", err)
-		return
-	}
-	e.pluginGraders = gcf.Graders
-	slog.Info("Loaded pluggable grader configs", "graders", len(gcf.Graders), "dir", e.opts.GradersDir)
-}
-
-// mergedCriteria returns the combined attribute-matched + prompt-specific
-// evaluation criteria text for the given prompt. The props map provides
-// pre-computed prompt properties for criteria matching.
-func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) string {
-	matched := criteria.MatchingGraders(e.graderConfigs, props)
-	merged := criteria.MergeCriteria(matched, p.EvaluationCriteria)
-	if merged == "" {
-		return p.EvaluationCriteria
-	}
-	return merged
+// matchedForEval returns the grader entries whose file/group/grader `when`
+// blocks match the eval's prompt properties. Thin wrapper kept for call-site
+// symmetry with reviewBuckets.
+func (e *Engine) matchedForEval(props map[string]string) []graders.MatchedUnifiedEntry {
+	return graders.MatchingUnifiedEntries(e.graderBundle, props)
 }
 
 // reviewBuckets builds the set of review buckets for a prompt under the
 // configured ReviewMode. In combined mode (default) it returns one bucket
-// containing all matched graders + prompt criteria — byte-identical to the
-// legacy single-criteria path. In isolated mode it returns one bucket per
-// isolated grader/group plus a shared "combined" bucket for the rest. When
-// isolated mode is requested but nothing is marked isolate, it logs a warning
-// so the flag is observably no-op rather than silently dead.
+// containing all matched prompt-type graders + prompt criteria. In isolated
+// mode it returns one bucket per isolated grader/group plus a shared
+// "combined" bucket for the rest. When isolated mode is requested but
+// nothing is marked isolate, it logs a warning so the flag is observably
+// no-op rather than silently dead.
 func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string) []graders.ReviewBucket {
 	mode := e.opts.ReviewMode
 	if mode == "" {
-		mode = criteria.ReviewModeCombined
+		mode = graders.ReviewModeCombined
 	}
-	matched := criteria.MatchingGradersWithIsolation(e.graderConfigs, props)
-	if mode == criteria.ReviewModeIsolated && !criteria.HasIsolation(matched) {
+	matched := e.matchedForEval(props)
+	promptMatched, _ := graders.PartitionMatched(matched)
+	if mode == graders.ReviewModeIsolated && !graders.HasUnifiedIsolation(promptMatched) {
 		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
 			"prompt_id", p.ID)
 	}
-	cb := criteria.BuildReviewBuckets(matched, p.EvaluationCriteria, mode)
-	out := make([]graders.ReviewBucket, 0, len(cb))
-	for _, b := range cb {
-		out = append(out, graders.ReviewBucket{Name: b.Name, Criteria: b.FormatCriteria()})
+	return graders.BuildUnifiedReviewBuckets(promptMatched, p.EvaluationCriteria, mode)
+}
+
+// mergedCriteria returns the combined attribute-matched + prompt-specific
+// evaluation criteria text, using only the prompt-type entries from the
+// Bundle. Kept on Engine for back-compat with the GraderInput.EvalCriteria
+// field consumed by review-aware graders in the single-bucket path.
+func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) string {
+	matched := e.matchedForEval(props)
+	promptMatched, _ := graders.PartitionMatched(matched)
+	entries := make([]graders.UnifiedGraderEntry, 0, len(promptMatched))
+	for _, m := range promptMatched {
+		entries = append(entries, m.Entry)
 	}
-	return out
+	merged := graders.MergeUnifiedCriteria(entries, p.EvaluationCriteria)
+	if merged == "" {
+		return p.EvaluationCriteria
+	}
+	return merged
 }
 
 // EvalTask represents a single prompt+config evaluation to run.
@@ -412,11 +407,8 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 
 // Run executes evaluations for the given prompts crossed with configs.
 func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []config.ToolConfig) (*report.RunSummary, error) {
-	// Load grader configs (#30) if configured.
-	e.loadCriteria()
-
-	// Load pluggable grader configs (#136) if configured.
-	e.loadGraders()
+	// Load the unified grader bundle (#625) from CriteriaDir.
+	e.loadBundle()
 
 	expandedConfigs, err := expandGeneratorModels(configs)
 	if err != nil {

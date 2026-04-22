@@ -30,7 +30,10 @@ func TestAggregateResultsWeightedAverage(t *testing.T) {
 	}
 }
 
-func TestAggregateResultsGateFailureOverrides(t *testing.T) {
+func TestAggregateResultsGateFieldNoLongerShortCircuits(t *testing.T) {
+	// Phase 2 cutover (#625): Gate flag is a legacy field that no longer
+	// short-circuits aggregation. Every grader result contributes to the
+	// weighted score; Pass is the AND of every result's Pass.
 	results := []GraderResult{
 		{Kind: KindFile, Name: "file_check", Score: 1.0, Weight: 1.0, Pass: true, Gate: true},
 		{Kind: KindProgram, Name: "build", Score: 0.0, Weight: 1.0, Pass: false, Gate: true},
@@ -42,14 +45,16 @@ func TestAggregateResultsGateFailureOverrides(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if agg.Score != 0 {
-		t.Errorf("score = %f, want 0 (gate failure)", agg.Score)
+	// (1.0*1 + 0.0*1 + 0.9*2) / (1+1+2) = 2.8/4 = 0.7
+	want := 0.7
+	if math.Abs(agg.Score-want) > 1e-9 {
+		t.Errorf("score = %f, want %f (no gate short-circuit)", agg.Score, want)
 	}
 	if agg.Pass {
-		t.Error("expected pass = false (gate failure)")
+		t.Error("expected pass = false when any result fails")
 	}
-	if !agg.GateFailed {
-		t.Error("expected gate_failed = true")
+	if agg.GateFailed {
+		t.Error("GateFailed must stay false under Phase 2 no-gate semantics")
 	}
 }
 
@@ -138,12 +143,17 @@ func TestAggregateResultsNonGateFailureDoesNotForceZero(t *testing.T) {
 	if math.Abs(agg.Score-want) > 1e-9 {
 		t.Errorf("score = %f, want %f", agg.Score, want)
 	}
+	if agg.Pass {
+		t.Error("expected pass = false when any result fails")
+	}
 	if agg.GateFailed {
 		t.Error("gate_failed should be false for non-gate failures")
 	}
 }
 
-func TestAggregateResultsMultipleGateFailures(t *testing.T) {
+func TestAggregateResultsMultipleFailuresWithGateFlag(t *testing.T) {
+	// Phase 2 cutover (#625): multiple failing results with Gate=true no
+	// longer force Score=0 or GateFailed=true. Every result contributes.
 	results := []GraderResult{
 		{Kind: KindFile, Name: "gate1", Score: 0.0, Weight: 1.0, Pass: false, Gate: true},
 		{Kind: KindProgram, Name: "gate2", Score: 0.0, Weight: 1.0, Pass: false, Gate: true},
@@ -155,10 +165,15 @@ func TestAggregateResultsMultipleGateFailures(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if agg.Score != 0 {
-		t.Errorf("score = %f, want 0", agg.Score)
+	// (0 + 0 + 1) / 3 = 0.333...
+	want := 1.0 / 3.0
+	if math.Abs(agg.Score-want) > 1e-9 {
+		t.Errorf("score = %f, want %f", agg.Score, want)
 	}
-	if !agg.GateFailed {
-		t.Error("expected gate_failed = true")
+	if agg.Pass {
+		t.Error("expected pass = false when any grader fails")
+	}
+	if agg.GateFailed {
+		t.Error("expected gate_failed = false under Phase 2 no-gate semantics")
 	}
 }

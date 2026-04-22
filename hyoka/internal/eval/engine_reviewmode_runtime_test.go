@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
@@ -69,16 +69,15 @@ func TestIntegrationReviewModeIsolatedFiresBuckets(t *testing.T) {
 	engine := NewEngineWithReviewerFactory(&StubRunner{}, factory, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
-		ReviewMode: criteria.ReviewModeIsolated,
+		ReviewMode: graders.ReviewModeIsolated,
 	}))
-	// Inject grader configs directly so we don't need a CriteriaDir on disk.
-	// One isolate-marked grader + one regular grader → 2 buckets in isolated mode.
-	engine.graderConfigs = []criteria.GraderConfig{{
-		Graders: []criteria.GraderEntry{
-			{Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
-			{Name: "format", Prompt: "code is well formatted"},
-		},
-	}}
+	// Inject a unified Bundle directly so we don't need a CriteriaDir on disk.
+	// One isolate-marked prompt grader + one regular prompt grader → 2 buckets
+	// in isolated mode.
+	engine.graderBundle = bundleWith(
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is well formatted"},
+	)
 
 	prompts := []*prompt.Prompt{{
 		ID:                 "isolated-runtime-check",
@@ -126,15 +125,13 @@ func TestIntegrationReviewModeCombinedSkipsBuckets(t *testing.T) {
 	engine := NewEngineWithReviewerFactory(&StubRunner{}, factory, quietOpts(EngineOptions{
 		Workers:    1,
 		OutputDir:  outputDir,
-		ReviewMode: criteria.ReviewModeCombined,
+		ReviewMode: graders.ReviewModeCombined,
 	}))
-	engine.graderConfigs = []criteria.GraderConfig{{
-		Graders: []criteria.GraderEntry{
-			// Even with isolate:true, combined mode should ignore it.
-			{Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
-			{Name: "format", Prompt: "code is well formatted"},
-		},
-	}}
+	engine.graderBundle = bundleWith(
+		// Even with isolate:true, combined mode should ignore it.
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is well formatted"},
+	)
 
 	prompts := []*prompt.Prompt{{
 		ID: "combined-runtime-check", PromptText: "Demo", EvaluationCriteria: "Must build",

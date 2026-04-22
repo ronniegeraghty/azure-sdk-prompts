@@ -212,43 +212,41 @@ Results    []GraderResult `json:"results"`
 }
 
 // AggregateResults computes a weighted score from a set of grader results.
-// Gate semantics (DM3): if any gate grader fails, the overall result fails
-// with a score of 0 regardless of other scores.
+//
+// Phase 2 cutover (#625): the gate short-circuit was removed. Every grader
+// runs regardless of other graders' pass/fail and every result contributes
+// to the weighted score. Aggregate Pass is now "all results passed" so the
+// engine can still flag failed evals in reports without special-casing
+// gate graders. The GateFailed field is preserved for back-compat with
+// existing report schemas but is never set to true by this function.
 func AggregateResults(results []GraderResult) (*AggregateResult, error) {
-if len(results) == 0 {
-return nil, fmt.Errorf("no grader results to aggregate")
-}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no grader results to aggregate")
+	}
 
-agg := &AggregateResult{
-Results: results,
-Pass:    true,
-}
+	agg := &AggregateResult{
+		Results: results,
+		Pass:    true,
+	}
 
-// Check gate failures first.
-for _, r := range results {
-if r.Gate && !r.Pass {
-agg.GateFailed = true
-agg.Pass = false
-agg.Score = 0
-return agg, nil
-}
-}
+	// Compute weighted average; Pass is AND of every result's Pass.
+	var totalWeight float64
+	var weightedSum float64
+	for _, r := range results {
+		if !r.Pass {
+			agg.Pass = false
+		}
+		w := r.Weight
+		if w == 0 {
+			w = 1.0
+		}
+		totalWeight += w
+		weightedSum += r.Score * w
+	}
 
-// Compute weighted average.
-var totalWeight float64
-var weightedSum float64
-for _, r := range results {
-w := r.Weight
-if w == 0 {
-w = 1.0
-}
-totalWeight += w
-weightedSum += r.Score * w
-}
+	if totalWeight > 0 {
+		agg.Score = weightedSum / totalWeight
+	}
 
-if totalWeight > 0 {
-agg.Score = weightedSum / totalWeight
-}
-
-return agg, nil
+	return agg, nil
 }

@@ -6,16 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
 
 // captureSlog swaps the default slog logger for one that writes to buf.
 // The returned restore function reinstates whatever was set before.
-// Tests that depend on slog output should call it like:
-//
-//	buf, restore := captureSlog(t)
-//	defer restore()
 func captureSlog(t *testing.T) (*bytes.Buffer, func()) {
 	t.Helper()
 	buf := &bytes.Buffer{}
@@ -24,20 +20,29 @@ func captureSlog(t *testing.T) (*bytes.Buffer, func()) {
 	return buf, func() { slog.SetDefault(prev) }
 }
 
+// bundleWith builds a minimal *graders.Bundle from one file's top-level
+// entries, for tests that need to populate the engine's grader bundle
+// without touching disk.
+func bundleWith(entries ...graders.UnifiedGraderEntry) *graders.Bundle {
+	return &graders.Bundle{
+		Configs: []graders.UnifiedGraderConfig{{
+			Graders: entries,
+			Source:  "test://inline",
+		}},
+	}
+}
+
 // TestEngineReviewBuckets_Combined verifies that combined mode (default)
 // produces exactly one review bucket containing all matched grader criteria
-// merged with the prompt's own evaluation criteria — byte-identical to the
-// pre-#580 single-session path.
+// merged with the prompt's own evaluation criteria.
 func TestEngineReviewBuckets_Combined(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
-		ReviewMode: criteria.ReviewModeCombined,
+		ReviewMode: graders.ReviewModeCombined,
 	}))
-	e.graderConfigs = []criteria.GraderConfig{{
-		Graders: []criteria.GraderEntry{
-			{Name: "a", Prompt: "criterion A", Isolate: true}, // isolate flag IGNORED in combined mode
-			{Name: "b", Prompt: "criterion B"},
-		},
-	}}
+	e.graderBundle = bundleWith(
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "criterion A", Isolate: true},
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "criterion B"},
+	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "prompt-level criteria"}
 	buckets := e.reviewBuckets(p, nil)
@@ -53,16 +58,13 @@ func TestEngineReviewBuckets_Combined(t *testing.T) {
 }
 
 // TestEngineReviewBuckets_DefaultModeMatchesCombined verifies that an empty
-// ReviewMode (the zero value when --review-mode is not passed) is treated
-// as combined — no isolation, exactly one bucket.
+// ReviewMode is treated as combined — exactly one bucket.
 func TestEngineReviewBuckets_DefaultModeMatchesCombined(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
-	e.graderConfigs = []criteria.GraderConfig{{
-		Graders: []criteria.GraderEntry{
-			{Name: "a", Prompt: "A", Isolate: true},
-			{Name: "b", Prompt: "B"},
-		},
-	}}
+	e.graderBundle = bundleWith(
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "A", Isolate: true},
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "B"},
+	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "pc"}
 	buckets := e.reviewBuckets(p, nil)
@@ -73,20 +75,16 @@ func TestEngineReviewBuckets_DefaultModeMatchesCombined(t *testing.T) {
 
 // TestEngineReviewBuckets_IsolatedWithIsolation verifies that isolated mode
 // produces one bucket per grader marked isolate plus a combined bucket for
-// the rest (the wiring layer between EngineOptions.ReviewMode and
-// criteria.BuildReviewBuckets — the surface a future regression would
-// silently break).
+// the rest.
 func TestEngineReviewBuckets_IsolatedWithIsolation(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
-		ReviewMode: criteria.ReviewModeIsolated,
+		ReviewMode: graders.ReviewModeIsolated,
 	}))
-	e.graderConfigs = []criteria.GraderConfig{{
-		Graders: []criteria.GraderEntry{
-			{Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
-			{Name: "format", Prompt: "code is formatted"},
-			{Name: "tests", Prompt: "tests exist"},
-		},
-	}}
+	e.graderBundle = bundleWith(
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "security", Prompt: "no hardcoded secrets", Isolate: true},
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "format", Prompt: "code is formatted"},
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "tests", Prompt: "tests exist"},
+	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "pc"}
 	buckets := e.reviewBuckets(p, nil)
@@ -118,26 +116,20 @@ func TestEngineReviewBuckets_IsolatedWithIsolation(t *testing.T) {
 	}
 }
 
-// TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation verifies the
-// "observably no-op rather than silently dead" promise: when --review-mode
-// isolated is requested but nothing is marked isolate, the engine logs a
-// slog.Warn AND falls back to producing a single combined bucket.
-//
-// This is the regression check that PR #587 specifically wanted — without
-// this, dropping ReviewMode from the chain would compile and pass tests.
+// TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation verifies that
+// when --review-mode isolated is requested but nothing is marked isolate,
+// the engine logs a slog.Warn and falls back to a single combined bucket.
 func TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation(t *testing.T) {
 	buf, restore := captureSlog(t)
 	defer restore()
 
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
-		ReviewMode: criteria.ReviewModeIsolated,
+		ReviewMode: graders.ReviewModeIsolated,
 	}))
-	e.graderConfigs = []criteria.GraderConfig{{
-		Graders: []criteria.GraderEntry{
-			{Name: "a", Prompt: "A"},
-			{Name: "b", Prompt: "B"},
-		},
-	}}
+	e.graderBundle = bundleWith(
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "a", Prompt: "A"},
+		graders.UnifiedGraderEntry{Type: graders.KindPrompt, Name: "b", Prompt: "B"},
+	)
 
 	p := &prompt.Prompt{ID: "prompt-X", EvaluationCriteria: "pc"}
 	buckets := e.reviewBuckets(p, nil)
@@ -154,10 +146,7 @@ func TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation(t *testing.T) {
 	}
 }
 
-// TestEngineReviewBuckets_NoGraders verifies the no-graders edge case
-// returns a single combined bucket carrying just the prompt's own criteria
-// (so the legacy review path is preserved when a prompt has only inline
-// criteria and no attribute-matched graders).
+// TestEngineReviewBuckets_NoGraders verifies the no-graders edge case.
 func TestEngineReviewBuckets_NoGraders(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	p := &prompt.Prompt{ID: "p", EvaluationCriteria: "just this"}

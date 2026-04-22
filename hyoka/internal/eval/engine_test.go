@@ -1367,15 +1367,15 @@ func TestBuildToolAvailabilityNoEvents(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestReviewResultsAppendedNotOverwritten verifies the fix for the results
-// overwrite bug: pluggable grader results must coexist with review results
-// in the same GraderResults slice.
+// overwrite bug: typed grader results must coexist with review results in
+// the same GraderResults slice. Cut over to the unified Bundle path (#625).
 func TestReviewResultsAppendedNotOverwritten(t *testing.T) {
 	// Set up a file grader that will pass (stub_output.txt exists).
 	gradersDir := t.TempDir()
 	graderYAML := `graders:
-  - kind: file
+  - type: file
     name: "stub_exists"
-    config:
+    details:
       path: "stub_output.txt"
     weight: 1.0
 `
@@ -1387,9 +1387,9 @@ func TestReviewResultsAppendedNotOverwritten(t *testing.T) {
 	}
 
 	engine := NewEngineWithReviewerFactory(&StubRunner{}, reviewerFactory, quietOpts(EngineOptions{
-		Workers:    1,
-		OutputDir:  t.TempDir(),
-		GradersDir: gradersDir,
+		Workers:     1,
+		OutputDir:   t.TempDir(),
+		CriteriaDir: gradersDir,
 	}))
 
 	prompts := []*prompt.Prompt{
@@ -1450,9 +1450,9 @@ func TestUnifiedGraderSuccessIncludesReview(t *testing.T) {
 	// Overall should pass.
 	gradersDir := t.TempDir()
 	graderYAML := `graders:
-  - kind: file
+  - type: file
     name: "stub_check"
-    config:
+    details:
       path: "stub_output.txt"
     weight: 1.0
 `
@@ -1463,9 +1463,9 @@ func TestUnifiedGraderSuccessIncludesReview(t *testing.T) {
 	}
 
 	engine := NewEngineWithReviewerFactory(&StubRunner{}, reviewerFactory, quietOpts(EngineOptions{
-		Workers:    1,
-		OutputDir:  t.TempDir(),
-		GradersDir: gradersDir,
+		Workers:     1,
+		OutputDir:   t.TempDir(),
+		CriteriaDir: gradersDir,
 	}))
 
 	prompts := []*prompt.Prompt{

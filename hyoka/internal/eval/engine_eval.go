@@ -418,141 +418,164 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	// Unified grading pipeline (WI-023) — all graders (pluggable + AI review)
-	// run in a single phase. The review is now a grader type ("prompt_review"),
-	// not a separate phase. This fixes the results overwrite bug where
-	// GraderResultsFromReview() clobbered pluggable grader results.
+	// Unified grading pipeline (#625) — the single Bundle drives both
+	// prompt-type entries (LLM review panel) and typed entries (file,
+	// program, output_check, ...). A malformed grader file only fails THIS
+	// eval if its file-level when: block would have matched these props
+	// (Q4 deferred-error semantics).
 	if len(generatedFiles) > 0 {
 		gradeStart := time.Now()
 		glg := logging.WithPhase(lg, "grading")
 
-		// Collect all grader results across pluggable graders and AI review.
-		var allGraderResults []graders.GraderResult
-
-		// Build common grader input shared by all grader types.
-		graderInput := graders.GraderInput{
-			WorkspacePath:       genWs.Dir,
-			OriginalPrompt:      task.Prompt.PromptText,
-			EvalCriteria:        e.mergedCriteria(task.Prompt, props),
-			EvalCriteriaBuckets: e.reviewBuckets(task.Prompt, props),
-			WorkspaceDelta:      evalReport.WorkspaceDelta,
-		}
-		if task.Prompt.ReferenceAnswer != "" {
-			graderInput.ReferenceDir = task.Prompt.ReferenceAnswer
-		}
-		if result != nil && result.ActionTimeline != nil {
-			graderInput.ActionLog = result.ActionTimeline.ToGraderActionLog()
-		}
-
-		// --- Phase 1: Pluggable graders (file, program, behavior, etc.) ---
-		if len(e.pluginGraders) > 0 {
-			applicable := graders.ApplicableGraders(e.pluginGraders, props)
-			glg.Debug("Applicable graders", "total", len(e.pluginGraders), "applicable", len(applicable))
-
-			if len(applicable) > 0 {
-				instances, err := graders.InstantiateGraders(applicable)
-				if err != nil {
-					glg.Error("Failed to instantiate graders", "error", err)
-				} else {
-					pluginResults := graders.RunGraders(ctx, instances, applicable, graderInput)
-					allGraderResults = append(allGraderResults, pluginResults...)
-					glg.Debug("Pluggable graders complete", "count", len(pluginResults))
-				}
+		// Fail this eval (and only this eval) if a grader file relevant to
+		// its properties failed to load.
+		if bundleErr := e.graderBundle.MatchingErrors(props); bundleErr != nil {
+			glg.Error("Grader bundle has errors matching this eval", "error", bundleErr)
+			if !evalFailed {
+				evalReport.Success = false
+				evalReport.FailureReason = fmt.Sprintf("grader config error: %v", bundleErr)
+				evalReport.Error = "grader config error"
+				evalReport.ErrorDetails = bundleErr.Error()
+				evalReport.ErrorCategory = "grader_config_error"
 			}
-		}
+			evalReport.ReviewDuration = time.Since(gradeStart).Seconds()
+			// Skip grading entirely — we don't trust any partial result
+			// when the bundle couldn't be fully parsed for this eval.
+		} else {
+			// Resolve applicable graders, then partition into prompt (review
+			// panel) and typed (NewGrader) entries. promptMatched is
+			// consumed indirectly via reviewBuckets/mergedCriteria on
+			// graderInput; we only need typedMatched here.
+			matched := e.matchedForEval(props)
+			_, typedMatched := graders.PartitionMatched(matched)
 
-		// --- Phase 2: AI review grader (runs alongside pluggable graders) ---
-		var reviewGrader *graders.PromptReviewGrader
-		if !e.opts.SkipReview {
-			sendPhase(progress.PhaseReviewing)
+			// Collect all grader results across typed graders and AI review.
+			var allGraderResults []graders.GraderResult
 
-			var reviewer review.Reviewer
-			var panelReviewer *review.PanelReviewer
-			if e.reviewerFactory != nil {
-				reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
-				if err != nil {
-					glg.Warn("Reviewer creation failed, skipping review", "error", err)
-				}
+			// Build common grader input shared by all grader types.
+			graderInput := graders.GraderInput{
+				WorkspacePath:       genWs.Dir,
+				OriginalPrompt:      task.Prompt.PromptText,
+				EvalCriteria:        e.mergedCriteria(task.Prompt, props),
+				EvalCriteriaBuckets: e.reviewBuckets(task.Prompt, props),
+				WorkspaceDelta:      evalReport.WorkspaceDelta,
+			}
+			if task.Prompt.ReferenceAnswer != "" {
+				graderInput.ReferenceDir = task.Prompt.ReferenceAnswer
+			}
+			if result != nil && result.ActionTimeline != nil {
+				graderInput.ActionLog = result.ActionTimeline.ToGraderActionLog()
 			}
 
-			if panelReviewer != nil || reviewer != nil {
-				reviewGrader = graders.NewPromptReviewGrader("ai_review", reviewer, panelReviewer)
-
-				if panelReviewer != nil {
-					models := panelReviewer.Models()
-					sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
+			// --- Phase 1: Typed graders (file, program, output_check, ...) ---
+			if len(typedMatched) > 0 {
+				typedConfigs := make([]graders.GraderConfig, 0, len(typedMatched))
+				for _, m := range typedMatched {
+					typedConfigs = append(typedConfigs, m.Entry.ToRuntimeConfig())
+				}
+				glg.Debug("Typed graders matched", "count", len(typedConfigs))
+				instances, instErr := graders.InstantiateGraders(typedConfigs)
+				if instErr != nil {
+					glg.Error("Failed to instantiate typed graders", "error", instErr)
 				} else {
-					sendEvent(progress.EventToolStart, "Single model review")
+					typedResults := graders.RunGraders(ctx, instances, typedConfigs, graderInput)
+					allGraderResults = append(allGraderResults, typedResults...)
+					glg.Debug("Typed graders complete", "count", len(typedResults))
 				}
-
-				reviewResult, reviewErr := reviewGrader.Grade(ctx, graderInput)
-				if reviewErr != nil {
-					glg.Error("Review grader failed", "error", reviewErr)
-					sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", reviewErr))
-					// Add a failing result so aggregation accounts for the review attempt.
-					reviewResult = graders.GraderResult{
-						Kind:    graders.KindPromptReview,
-						Name:    "ai_review",
-						Pass:    false,
-						Score:   0,
-						Message: fmt.Sprintf("review grader error: %v", reviewErr),
-					}
-				} else {
-					if reviewGrader.LastConsolidated != nil {
-						sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed",
-							reviewGrader.LastConsolidated.OverallScore, reviewGrader.LastConsolidated.MaxScore))
-					}
-				}
-				// Apply default weight — review has weight 1.0, not a gate grader.
-				if reviewResult.Weight == 0 {
-					reviewResult.Weight = 1.0
-				}
-				allGraderResults = append(allGraderResults, reviewResult)
-
-				// Populate backward-compat report fields.
-				evalReport.ReviewPanel = reviewGrader.LastPanel
-				evalReport.Review = reviewGrader.LastConsolidated
 			}
-		}
 
-		// --- Aggregate all results and update report ---
-		if len(allGraderResults) > 0 {
-			agg, aggErr := graders.AggregateResults(allGraderResults)
-			if aggErr != nil {
-				glg.Error("Failed to aggregate grader results", "error", aggErr)
-			} else {
-				reportResults := convertGraderResults(agg.Results)
-				evalReport.GraderResults = reportResults
-				evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
+			// --- Phase 2: AI review grader (runs alongside typed graders) ---
+			var reviewGrader *graders.PromptReviewGrader
+			if !e.opts.SkipReview {
+				sendPhase(progress.PhaseReviewing)
 
-				if !agg.Pass && !evalFailed {
-					evalReport.Success = false
-					if agg.GateFailed {
-						evalReport.FailureReason = "gate grader(s) failed"
+				var reviewer review.Reviewer
+				var panelReviewer *review.PanelReviewer
+				if e.reviewerFactory != nil {
+					reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
+					if err != nil {
+						glg.Warn("Reviewer creation failed, skipping review", "error", err)
 					}
 				}
 
-				glg.Info("Grader execution complete",
-					"graders", len(allGraderResults),
-					"score", fmt.Sprintf("%.2f", agg.Score),
-					"passed", agg.Pass,
-					"gate_failed", agg.GateFailed)
-				sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
-					agg.Score*100, countPassed(allGraderResults), len(allGraderResults)))
-			}
-		}
+				if panelReviewer != nil || reviewer != nil {
+					reviewGrader = graders.NewPromptReviewGrader("ai_review", reviewer, panelReviewer)
 
-		// Capture reviewed (annotated) files from the reviewer workspace.
-		if reviewGrader != nil && reviewGrader.LastReviewWorkDir != "" {
-			reviewedFiles, rfErr := readReviewedFiles(reviewGrader.LastReviewWorkDir)
-			if rfErr == nil && len(reviewedFiles) > 0 {
-				evalReport.ReviewedFiles = reviewedFiles
-				glg.Debug("Captured reviewed files", "count", len(reviewedFiles))
-			}
-			reviewGrader.CleanupWorkspace()
-		}
+					if panelReviewer != nil {
+						models := panelReviewer.Models()
+						sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
+					} else {
+						sendEvent(progress.EventToolStart, "Single model review")
+					}
 
-		evalReport.ReviewDuration = time.Since(gradeStart).Seconds()
+					reviewResult, reviewErr := reviewGrader.Grade(ctx, graderInput)
+					if reviewErr != nil {
+						glg.Error("Review grader failed", "error", reviewErr)
+						sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", reviewErr))
+						// Add a failing result so aggregation accounts for the review attempt.
+						reviewResult = graders.GraderResult{
+							Kind:    graders.KindPromptReview,
+							Name:    "ai_review",
+							Pass:    false,
+							Score:   0,
+							Message: fmt.Sprintf("review grader error: %v", reviewErr),
+						}
+					} else {
+						if reviewGrader.LastConsolidated != nil {
+							sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed",
+								reviewGrader.LastConsolidated.OverallScore, reviewGrader.LastConsolidated.MaxScore))
+						}
+					}
+					// Apply default weight — review has weight 1.0, not a gate grader.
+					if reviewResult.Weight == 0 {
+						reviewResult.Weight = 1.0
+					}
+					allGraderResults = append(allGraderResults, reviewResult)
+
+					// Populate backward-compat report fields.
+					evalReport.ReviewPanel = reviewGrader.LastPanel
+					evalReport.Review = reviewGrader.LastConsolidated
+				}
+			}
+
+			// --- Aggregate all results and update report ---
+			if len(allGraderResults) > 0 {
+				agg, aggErr := graders.AggregateResults(allGraderResults)
+				if aggErr != nil {
+					glg.Error("Failed to aggregate grader results", "error", aggErr)
+				} else {
+					reportResults := convertGraderResults(agg.Results)
+					evalReport.GraderResults = reportResults
+					evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
+
+					if !agg.Pass && !evalFailed {
+						evalReport.Success = false
+						if evalReport.FailureReason == "" {
+							evalReport.FailureReason = "one or more graders failed"
+						}
+					}
+
+					glg.Info("Grader execution complete",
+						"graders", len(allGraderResults),
+						"score", fmt.Sprintf("%.2f", agg.Score),
+						"passed", agg.Pass)
+					sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
+						agg.Score*100, countPassed(allGraderResults), len(allGraderResults)))
+				}
+			}
+
+			// Capture reviewed (annotated) files from the reviewer workspace.
+			if reviewGrader != nil && reviewGrader.LastReviewWorkDir != "" {
+				reviewedFiles, rfErr := readReviewedFiles(reviewGrader.LastReviewWorkDir)
+				if rfErr == nil && len(reviewedFiles) > 0 {
+					evalReport.ReviewedFiles = reviewedFiles
+					glg.Debug("Captured reviewed files", "count", len(reviewedFiles))
+				}
+				reviewGrader.CleanupWorkspace()
+			}
+
+			evalReport.ReviewDuration = time.Since(gradeStart).Seconds()
+		}
 	}
 
 	// Tool usage evaluation (compare expected vs actual tools)
