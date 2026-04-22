@@ -22,6 +22,8 @@ Agent Neo initialized as Core Engine architect. Charter: evaluation pipeline, re
 
 **Key pattern:** Wiring-layer regression tests (integration via engine.Run with stubs) are mandatory for flag-driven feature work. Unit tests alone insufficient.
 
+**Grader Unification — Phase 1 Ready (2026-04-22):** All 10 schema decisions locked. Issues #624–#627 filed. Phase 1 (#624) ready for Neo pickup. Full proposal in `.squad/decisions/inbox/morpheus-grader-unification-proposal.md` (kept until Phase 1 complete). Reference `.squad/decisions.md` for locked decisions.
+
 ### Phase 6 CLI Invocation Convention (2026-04-21)
 
 **Note:** As of Phase 5, main.go was moved to repo root. All documentation should use:

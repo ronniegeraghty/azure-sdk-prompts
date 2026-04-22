@@ -2,31 +2,39 @@
 
 ## Active Decisions
 
-### Decision Inbox: Grader Unification — 10 Open Questions Awaiting Ronnie
+### Decision: Grader Unification — Locked Answers + Phase 1–4 Issues Filed (2026-04-22)
 
-**Author:** Morpheus 🕶️  
-**Date:** 2026-04-22 (recovery)  
-**Phase:** 4 (deferred implementation pending decision)  
-**Status:** ⏳ Awaiting Ronnie's decisions
+**Author:** User (Ronnie) + Morpheus 🕶️  
+**Date:** 2026-04-22  
+**Status:** ✅ Schema locked. Phase 1 (#624) ready for Neo. Phases 2–4 sequential.
 
-**Context:** Morpheus regenerated complete grader unification proposal (744 lines, post-recovery) covering schema redesign, implementation roadmap, and 10 decision points. Proposal unifies typed and untyped graders under a single config structure with optional field `Kind` to disambiguate grader types.
+**Context:** Morpheus filed 744-line grader unification proposal covering schema redesign and implementation roadmap. All 10 open questions now answered by user; schema is final and ready for implementation. Issues #624–#627 filed and labeled `squad` + `squad:neo`.
 
-**Full proposal:** `.squad/decisions/inbox/morpheus-grader-unification-proposal.md` § 6 — 10 questions with options and recommendations
+**Locked Answers (Q1–Q10):**
 
-**Open Questions (summary):**
+1. **CLI flag naming:** Keep `--criteria-dir` (no rename).
+2. **`type` placement:** Flat `type` field at entry level (not `kind`, not nested block). Prompt graders use same shape as other graders.
+3. **`Gate` on typed graders:** Hard fail (consistent with `AggregateResults`).
+4. **`isolate` on typed graders:** Load-time warning (silent ignore + warn).
+5. **Multiple same-type graders:** Allowed. Uniqueness enforced by `name`, not `type`.
+6. **`internal/criteria/` deletion:** Immediate in Phase 3. No deprecation shim.
+7. **`output_check` v1 knobs:** Ship `min_files`, `max_files`, file presence, per-file size checks. Defer globs/regex.
+8. **Verification strategy:** No golden-file or parallel-run gate. "hyoka isn't stable, so we don't care about breaking."
+9. **`Gate` on prompt graders:** Reject at load time (LLM scores too noisy).
+10. **Grader docs:** Document all graders (`prompt`, `output_check`, `action_sequence`, `tool_constraint`, etc.) in user-facing docs.
 
-1. **CLI flag naming** — Keep `--criteria-dir` or rename to `--graders-dir` with alias?
-2. **`Kind` placement** — Bare optional field on entry or nested `typed:` block?
-3. **`Gate` on typed graders** — Hard fail (consistent with `AggregateResults`) or soft warn?
-4. **`Isolate` on typed graders** — Silent ignore, load-time warning, or load-time error?
-5. **Multiple same-Kind in one file** — Allowed with unique names or rejected?
-6. **`internal/criteria/` deletion timing** — Immediate (Phase 3) or deprecation shim?
-7. **`output_check` v1 knobs** — Recommend shipping `min_files`/`min_bytes_per_file` now; defer extensions/glob.
-8. **Test strategy** — Golden-file + parallel-run both during transition (recommended).
-9. **`Gate` on prompt graders** — Reject at load time (LLM scores too noisy for gates).
-10. **`action_sequence`/`tool_constraint` docs** — Document in Advanced section.
+**Issues filed (all labeled `squad` + `squad:neo`):**
 
-**Next step:** Ronnie reviews proposal and provides decisions → Coordinator spawns Phase 1 team (Neo, Tank, Trinity) for implementation.
+| Issue | Title | 
+|-------|-------|
+| #624 | [Grader Unification] Phase 1: Unified schema + back-compat loader in internal/graders/ |
+| #625 | [Grader Unification] Phase 2: Unified execution path in engine (cut over to internal/graders/) |
+| #626 | [Grader Unification] Phase 3: Delete internal/criteria/ package |
+| #627 | [Grader Unification] Phase 4: Default output_check criteria + per-grader docs |
+
+**Full proposal reference:** `.squad/decisions/inbox/morpheus-grader-unification-proposal.md` (744 lines — kept until Neo completes Phase 1).
+
+**Next:** Coordinator hands #624 to Neo. Tank and Trinity standby for Phases 2–4.
 
 ---
 
