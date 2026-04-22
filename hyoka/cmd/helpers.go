@@ -163,7 +163,3 @@ func openInBrowser(path string) {
 		fmt.Printf("Could not open browser: %v\nOpen manually: %s\n", err, path)
 	}
 }
-
-// (parseByteSize removed in #566 amendment — was only used by the dropped
-// byte-size guardrail flag.)
-

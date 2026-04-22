@@ -572,7 +572,7 @@ func TestActionLimitSoftCap(t *testing.T) {
 // agent-output backstop.
 
 // TestWorkspaceDeltaCaptured verifies WorkspaceDelta is populated on every
-// successful eval (#566) and reaches both the report and graders.
+// successful eval (#566) and reaches the report (grader coverage via #571 nil-safety tests).
 func TestWorkspaceDeltaCaptured(t *testing.T) {
 	outputDir := t.TempDir()
 	engine := NewEngine(&manyFilesRunner{fileCount: 3}, quietOpts(EngineOptions{
