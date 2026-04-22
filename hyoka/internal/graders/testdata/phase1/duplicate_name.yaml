@@ -1,0 +1,9 @@
+graders:
+  - name: Duplicate Name Grader
+    type: prompt
+    weight: 1.0
+    prompt: First grader with this name.
+  - name: Duplicate Name Grader
+    type: prompt
+    weight: 1.0
+    prompt: Second grader with the same name — should be a load-time error.

@@ -1,0 +1,23 @@
+# Equivalent of legacy_criteria.yaml in the unified Phase-1 schema.
+# Used to assert back-compat translation produces the same graders.
+when:
+  language: python
+graders:
+  - name: DefaultAzureCredential Authentication
+    type: prompt
+    weight: 1.0
+    prompt: >
+      Uses DefaultAzureCredential or another azure-identity credential.
+  - name: Async Patterns
+    type: prompt
+    weight: 0.5
+    prompt: Uses async/await for I/O calls.
+groups:
+  - name: KeyVault Specific
+    when:
+      service: key-vault
+    graders:
+      - name: SecretClient Used
+        type: prompt
+        weight: 1.0
+        prompt: Uses azure.keyvault.secrets.SecretClient.

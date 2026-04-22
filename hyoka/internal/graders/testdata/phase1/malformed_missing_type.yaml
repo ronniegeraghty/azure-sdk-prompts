@@ -1,0 +1,4 @@
+graders:
+  - name: Missing Type Field
+    weight: 1.0
+    prompt: This entry has no type field — must fail at load.

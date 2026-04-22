@@ -1,0 +1,14 @@
+when:
+  language: python
+graders:
+  - name: DefaultAzureCredential Authentication
+    type: prompt
+    weight: 1.0
+    prompt: >
+      Uses DefaultAzureCredential or another azure-identity credential.
+  - name: Output Files Exist
+    type: output_check
+    weight: 0.5
+    details:
+      min_files: 1
+      min_bytes_per_file: 1

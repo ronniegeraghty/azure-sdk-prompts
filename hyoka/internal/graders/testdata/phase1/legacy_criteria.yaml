@@ -1,0 +1,20 @@
+# Legacy criteria.yaml shape — exactly what internal/criteria/ accepts today.
+# The new loader's back-compat path must produce equivalent in-memory graders.
+when:
+  language: python
+graders:
+  - name: DefaultAzureCredential Authentication
+    weight: 1.0
+    prompt: >
+      Uses DefaultAzureCredential or another azure-identity credential.
+  - name: Async Patterns
+    weight: 0.5
+    prompt: Uses async/await for I/O calls.
+groups:
+  - name: KeyVault Specific
+    when:
+      service: key-vault
+    graders:
+      - name: SecretClient Used
+        weight: 1.0
+        prompt: Uses azure.keyvault.secrets.SecretClient.
