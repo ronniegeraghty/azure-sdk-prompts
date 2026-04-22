@@ -532,3 +532,57 @@ PR #618 comment: posted acknowledgment
 All nits addressed. Work reflects code hygiene principles: total removal (no partial patches), cross-doc consistency, comment/code sync.
 
 **2026-04-22 (Morpheus Examples Audit):** Examples can have misleading patterns — e.g., `hierarchical-when-example.yaml` uses YAML `---` doc separator suggesting multi-doc support, but the schema requires `groups:` list (the loader silently truncates docs 2+). Oracle should audit examples during docs maintenance cycles to catch patterns that might misguide new users. PR #607 comment 3125721580 has full context.
+
+## Session: Rewrite Hierarchical When Example (Phase 6 Polish)
+
+**Date:** 2026-04-22 (follow-up to Morpheus PR #607 insight)  
+**Outcome:** ✅ Example rewritten, validate green, build green
+
+### Work Summary
+
+**Problem:** `examples/criteria/hierarchical-when-example.yaml` used YAML `---` document separators to suggest multi-doc support, but hyoka's criteria loader (`criteria.go:130-136`) only decodes the first document, silently truncating everything after `---`. This could mislead users into an incorrect pattern.
+
+**Solution:** Rewrote the example to use the correct `groups:` top-level list (canonical pattern per `hierarchical_test.go:216-246`), removed all `---` separators, and enhanced the leading comment block to clarify the correct shape.
+
+### Validation Results
+
+- ✅ `go run . validate`: All 2 criteria files valid (25 graders)
+- ✅ `go build ./...`: Build succeeds, no errors
+- ✅ Example now demonstrates:
+  - File-level `when: language: python` (applies to all graders and groups)
+  - Two groups with distinct `when` conditions: `Python Auth Group` (category: auth) and `Python CRUD Group` (category: crud)
+  - Grader-level override: "Query Efficiency" adds `plane: data-plane` on top of group conditions
+  - Clear comments showing AND semantics across levels
+
+### Pattern Documentation
+
+**Canonical `groups:` shape** (extracted for future reference):
+```yaml
+when:
+  language: python        # File-level: applies to all graders AND all groups
+graders:
+  - name: TopLevel       # Inherits file-level when
+    weight: 1.0
+groups:
+  - name: AuthGroup      # Each group has own when
+    when:
+      category: auth     # GROUP-level (ORs with file-level, combined via AND)
+    graders:
+      - name: Grader1    # Inherits file + group when
+        weight: 1.0
+      - name: Grader2
+        weight: 1.0
+        when:            # GRADER-level overrides/extends group + file
+          plane: data-plane
+```
+
+Resolution order: **FILE-level (universal baseline) → GROUP-level (domain focus) → GRADER-level (fine-grained override)**. All levels AND together to determine applicability.
+
+### Files Modified
+
+- `examples/criteria/hierarchical-when-example.yaml`: Complete rewrite
+
+### Outstanding
+
+**Underlying Loader Bug (Neo's territory):** The loader's silent truncation of docs 2+ is not fixed here (per instructions, only example rewrite). Issue remains in `criteria.go` loadFile() — should either support multi-doc properly or emit a clear error on `---` separator detection.
+

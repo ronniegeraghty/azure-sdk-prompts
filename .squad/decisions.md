@@ -3191,3 +3191,35 @@ Investigate whether `hyoka validate` checks upstream for newer versions when a c
 - `hyoka/internal/config/tool/{resolve,fetcher,entry}.go`
 
 ---
+
+### Documentation: Rewrite hierarchical-when-example.yaml to use groups: list
+
+**Date:** 2026-04-22  
+**Owner:** Oracle  
+**Status:** Implemented  
+**Related:** Morpheus PR #607 comment 3125721580
+
+#### Problem
+
+The file `examples/criteria/hierarchical-when-example.yaml` used YAML `---` document separators to suggest support for multiple group-level `when` blocks. However, hyoka's criteria loader (see `criteria.go:130-136`) decodes only the first YAML document, silently truncating everything after the separator. This misled readers into attempting an unsupported pattern.
+
+#### Solution
+
+Rewrote the example file to:
+1. Remove all `---` document separators
+2. Use the canonical `groups:` top-level list to define multiple groups with independent `when` conditions
+3. Keep all three hierarchy levels (file, group, grader) in a single document
+4. Enhance the leading comment block to explicitly note that `groups:` is the correct mechanism
+5. Cross-reference the canonical test pattern in `hierarchical_test.go`
+
+#### Validation
+
+✅ **Criteria validation:** `go run . validate` → All criteria files valid  
+✅ **Build check:** `go build ./...` → Succeeds, no errors  
+✅ **Example pattern:** Demonstrates file-level `when` (Python) + two groups (Auth, CRUD) + grader-level override (plane)
+
+#### Outstanding
+
+The underlying loader silent-truncation bug remains tracked for Neo (follow-up fix to emit error on `---` separator detection rather than silently truncating).
+
+---
