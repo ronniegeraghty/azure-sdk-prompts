@@ -596,3 +596,106 @@ Morpheus has proposed a comprehensive unification of the grading pipeline (Issue
 - **Docs opportunity:** Phase 4 ships `criteria/quality/output.yaml` + docs. Anticipate config schema documentation refresh to reflect unified pipeline.
 
 📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full spec. Awaiting team consensus and architecture sign-off.
+
+## Phase 4 Docs: Per-Grader Documentation Scaffolding (2026-04-22)
+
+**Status:** COMPLETE  
+**Branch:** ronniegeraghty/dev  
+**Commit:** 96f3f7e9
+
+Implemented Phase 4 of grader unification docs per Issue #627.
+
+### Artifacts Created
+
+**Core documentation:**
+- `docs/graders/index.md` (146 lines) — Complete reference overview
+  - Unified YAML schema with full example (prompt + typed graders mixed)
+  - Name uniqueness rule, no-gate semantics, load-time validation behavior
+  - Table linking to all 8 grader type pages
+  - Score aggregation formula and validation semantics
+
+**Fully documented (v1 ready):**
+- `docs/graders/prompt.md` (92 lines) — LLM-based review
+  - When to use (code quality, architecture, security, idioms)
+  - Config shape with full rubric example
+  - Multi-model support and reproducibility notes
+- `docs/graders/output_check.md` (124 lines) — Workspace file validation
+  - When to use (verify output generation, minimum content)
+  - Full schema (min_files, min_bytes_per_file, min_total_bytes)
+  - Examples: basic, strict, conditional
+  - "Coming in v1" section for filename checking, file pattern matching, WorkspaceDelta
+
+**Stub documentation (one-paragraph + TODO):**
+- `docs/graders/file.md` (63 lines) — File existence and content patterns
+- `docs/graders/program.md` (69 lines) — External program execution
+- `docs/graders/behavior.md` (71 lines) — Tool and action constraints
+- `docs/graders/action_sequence.md` (61 lines) — Expected action ordering
+- `docs/graders/tool_constraint.md` (78 lines) — Tool usage constraints
+- `docs/graders/prompt_review.md` (42 lines) — Internal/advanced reference
+
+**Reference updates:**
+- `docs/configuration.md` — Rephrased "Tiered Evaluation Criteria" → "Evaluation Criteria"
+  - Links to new `docs/graders/` tree
+  - Removed legacy "attribute-matched" and "review time" framing
+  - Explains unified schema and grader independence
+
+### Design Decisions Applied
+
+Per locked direction from #627:
+- **Unified `type:` field** (not `kind`) — implements decision from morpheus-grader-unification-proposal
+- **Prompt graders SAME shape as typed** — `{ name, type: prompt, details: { prompt: "..." } }`
+- **Multiple graders of same type allowed** — uniqueness by name only
+- **No gating in user docs** — emphasized graders run independently, never gate
+- **Malformed file → load-time validation** — explained error semantics
+- **Q10: EVERY grader type documented** — all 8 types have at least stub page
+
+### Content Coverage
+
+All grader types from `internal/graders/types.go` documented:
+1. `prompt` — ✅ Full (92 lines, when/config/examples)
+2. `output_check` — ✅ Full (124 lines, v1 knobs + coming-in-v1)
+3. `file` — 🟡 Stub (63 lines, schema reference)
+4. `program` — 🟡 Stub (69 lines, schema reference)
+5. `behavior` — 🟡 Stub (71 lines, schema reference)
+6. `action_sequence` — 🟡 Stub (61 lines, schema reference)
+7. `tool_constraint` — 🟡 Stub (78 lines, schema reference)
+8. `prompt_review` — 🟡 Stub (42 lines, internal reference)
+
+### Key Decisions Documented
+
+- **Graders never gate** — repeated across index, output_check, prompt
+- **Load-time validation** — explained error semantics and side effects
+- **Name uniqueness within file** — not globally unique
+- **Weighted score aggregation** — formula and defaults explained
+- **Conditional graders via `when:`** — full syntax with AND logic
+- **Result visibility** — where scores appear in reports
+
+### Pending Completion (marked "coming in v1")
+
+Tank's output_check v1 features (not yet shipped):
+- Filename presence checking (`required_files` field)
+- File pattern matching (glob filtering)
+- Updated file detection (WorkspaceDelta integration)
+
+Once shipped, `output_check.md` sections marked "(coming in v1)" will be expanded and TODO removed.
+
+### GitHub Integration
+
+- Pushed to `ronniegeraghty/dev` (no PR, direct commit per instructions)
+- Commented on Issue #627 with doc index URL and Tank/Neo/Switch follow-up work
+- All 8 grader type pages linked from index
+
+### Verification
+
+- All 9 markdown files created and committed (746 total lines)
+- Configuration.md updated with correct cross-references
+- GitHub issue #627 commented with completion status
+- Branch pushed to origin/ronniegeraghty/dev
+
+### Outstanding
+
+- Switch/Neo to expand stub files with full schema examples and cross-language patterns
+- Tank to ship output_check v1 features and complete "coming in v1" sections
+- Site build to verify all links work
+
+**Microsoft Style Guide compliance:** Tone matches existing docs/ (e.g., configuration.md). Clear, direct, task-focused.
