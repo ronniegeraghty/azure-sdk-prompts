@@ -103,3 +103,13 @@ Closed all four deferred test gaps Switch flagged on PR #609. Test-only diff, +2
 - Morpheus (arch): ⚠️ APPROVE WITH NOTES — controlled-primitive boundary (D-2026-04-21) reinforced; Wrapper idiom appropriate; pattern portable to Compare-page filter bar at near-zero per-consumer cost.
 
 **Pattern reinforced:** A tests-only PR should never silently change behavior. Locking in suspect behavior with an inline `// Note:` is the audit trail; the fix goes in a separate PR.
+
+## Team Context: Unified Grader Direction Proposed (2026-04-22)
+
+Morpheus has proposed a comprehensive unification of the grading pipeline (Issue #622):
+- **Key decision:** ONE `internal/graders/` package, ONE schema, ONE execution path
+- **Backward-compat:** Existing `criteria/*.yaml` files work without migration  
+- **Phased rollout:** 4 phases with zero-regression guarantee
+- **Implications for you:** UI/config layer may simplify (single `--criteria-dir` flag, no separate graders directory); downstream integration points stabilize
+
+📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full architectural review. Awaiting team consensus.

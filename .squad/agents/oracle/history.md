@@ -586,3 +586,13 @@ Resolution order: **FILE-level (universal baseline) → GROUP-level (domain focu
 
 **Underlying Loader Bug (Neo's territory):** The loader's silent truncation of docs 2+ is not fixed here (per instructions, only example rewrite). Issue remains in `criteria.go` loadFile() — should either support multi-doc properly or emit a clear error on `---` separator detection.
 
+
+## Team Context: Unified Grader Direction Proposed (2026-04-22)
+
+Morpheus has proposed a comprehensive unification of the grading pipeline (Issue #622):
+- **Key decision:** ONE `internal/graders/` package, ONE schema, ONE execution path
+- **Backward-compat:** Existing `criteria/*.yaml` files work without migration
+- **Phased rollout:** 4 phases, zero-regression guarantee via golden-file tests
+- **Docs opportunity:** Phase 4 ships `criteria/quality/output.yaml` + docs. Anticipate config schema documentation refresh to reflect unified pipeline.
+
+📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full spec. Awaiting team consensus and architecture sign-off.

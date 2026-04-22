@@ -365,3 +365,13 @@ Idempotence verified, `go build ./hyoka/...` clean, `go test -race ./hyoka/... -
 - Test package alignment with merge-touched files — always run tests for changed packages with `-race`
 
 **Review posted**: https://github.com/ronniegeraghty/hyoka/pull/607#issuecomment-<id>
+
+## Team Context: Unified Grader Direction Proposed (2026-04-22)
+
+Morpheus has proposed a comprehensive unification of the grading pipeline (Issue #622):
+- **Key decision:** ONE `internal/graders/` package, ONE schema, ONE execution path
+- **Backward-compat:** Existing `criteria/*.yaml` files work without migration
+- **Phased rollout:** 4 phases, zero-regression guarantee via golden-file tests
+- **Test strategy:** Phase 1-3 will require comprehensive coverage of unified schema, execution path, and backward-compatibility
+
+📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full spec. Awaiting team consensus and architecture sign-off.

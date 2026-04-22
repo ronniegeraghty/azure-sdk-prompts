@@ -427,3 +427,15 @@ Going forward (and codified in `.squad/decisions/inbox/neo-guardrail-scope-corre
 Orchestration complete. Morpheus verdict APPROVE, Oracle nits resolved, Scribe merged all inbox entries into decisions.md and cleared the inbox. Guardrail policy locked in as team guidance. Issue #619 (tool-load fast-fail) now unblocked.
 
 **2026-04-22 (Morpheus Examples & PR #607 Follow-up):** Loader silently drops YAML docs after first `---` in criteria files (`hyoka/internal/criteria/criteria.go:134-136`). Neo owns fix — strict multi-doc rejection recommended as first move (PR #607 comment 3125721580 has details). Affects example misleadingness; separate issue recommended for example rewrite using `groups:` list.
+
+## Team Context: Unified Grader Direction Proposed (2026-04-22)
+
+Morpheus has proposed a comprehensive unification of the grading pipeline (Issue #622):
+- **Key decision:** ONE `internal/graders/` package, ONE schema, ONE execution path
+- **Backward-compat:** Existing `criteria/*.yaml` files work without migration
+- **Phased rollout:** 4 phases, zero-regression guarantee via golden-file tests
+- **Your role:** Phase 1 & 2 implementation likely (unified schema + execution path)
+
+📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full spec and phased plan. Awaiting team consensus and architecture sign-off. Coordinate with Tank if implementation assigned.
+
+Reminder: Loader silent-truncation bug (#607 discovery) remains tracked as Neo follow-up.

@@ -3223,3 +3223,55 @@ Rewrote the example file to:
 The underlying loader silent-truncation bug remains tracked for Neo (follow-up fix to emit error on `---` separator detection rather than silently truncating).
 
 ---
+
+---
+
+### Decision: Unified Grader Architecture Direction & Proposal
+
+**Author:** Morpheus 🕶️ (Lead Architect)  
+**Date:** 2026-04-22  
+**Status:** PROPOSED  
+**References:** Issue #622, `morpheus-grader-unification-proposal.md` (full spec)
+
+#### Direction
+
+**ONE package (`internal/graders/`), ONE schema, ONE execution path.**
+
+- `internal/criteria/` is absorbed into `internal/graders/`. The hierarchical `when`, groups, and isolation features survive unchanged.
+- A unified `UnifiedGraderEntry` struct uses `Kind` as a discriminator: empty `Kind` = LLM-prompt grader (backward-compatible); non-empty `Kind` = typed grader (file, output_check, behavior, etc.).
+- Existing `criteria/*.yaml` files work without modification — no migration needed.
+- The engine's two-phase grading (pluggable graders + AI review) becomes a single partition-and-execute flow: prompt entries → review panel, typed entries → `NewGrader()` → `Grade()`, all results → `AggregateResults`.
+- `--criteria-dir` remains the single CLI flag. `GradersDir` engine option is removed.
+- `output_check` (and all other typed graders) become reachable from user-facing criteria YAML.
+
+#### Phased Rollout
+
+1. **Phase 1:** Unified schema in `internal/graders/` + backward-compat loader
+2. **Phase 2:** Unified execution path in `engine_eval.go`
+3. **Phase 3:** Delete `internal/criteria/` (mechanical cleanup)
+4. **Phase 4:** Ship `criteria/quality/output.yaml` + docs
+
+#### Key Constraints
+
+- Zero regression in scoring for existing criteria files (golden-file tests)
+- `KnownFields(true)` strictness preserved — new fields are additive
+- `Isolate` ignored for typed graders (they don't use sessions)
+- `Gate` supported for all grader kinds
+
+#### Scope (Full Proposal)
+
+See `.squad/decisions/inbox/morpheus-grader-unification-proposal.md` (513 lines, comprehensive architectural review including:
+- Current state assessment (criteria vs. typed graders dual pipeline)
+- Unified schema design
+- Execution path unification
+- Backward-compatibility guarantees
+- Risk mitigation (golden-file tests, phased rollout)
+- FAQ
+
+#### Next Steps
+
+1. Team review of full proposal document
+2. Architecture sign-off on unified direction
+3. Phase 1 kickoff: unified schema + loader implementation
+4. Neo / Tank assignment for implementation track
+

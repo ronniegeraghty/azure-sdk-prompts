@@ -550,3 +550,25 @@ All non-template examples are schema-valid. The single "failure" (`prompt-templa
 - **Multiple group-level `when`s** in a single criteria file are expressed via the top-level `groups:` list on `GraderConfig` (`hyoka/internal/criteria/criteria.go:61-66`). Each `GraderGroup` (`criteria.go:46-51`) carries its own optional `when` map, applied hierarchically with file-level and grader-level conditions (AND-merged via `mergeWhen`). Canonical shape demonstrated in `hyoka/internal/criteria/hierarchical_test.go:208-247`.
 - **YAML `---` document separators are silently truncated.** `loadFile` (`criteria.go:134-136`) constructs `yaml.NewDecoder` but calls `Decode` exactly once, so only the first document is parsed. Any subsequent documents are dropped without warning. This is why `hyoka validate` accepts `examples/criteria/hierarchical-when-example.yaml` cleanly even though its second document (the Rust block, lines 46-66) is unreachable.
 - **Resolution for PR #607:** Ronnie's review comment was correct. The example is misleading — it implies multi-document YAML expresses two sibling group-level `when`s, but the schema requires `groups:` for that. Replied in-thread on comment 3125681737 with file:line citations and recommended a follow-up. Dropped recommendation in decisions inbox: `morpheus-pr607-when-followup.md`.
+
+## Learnings (Grader Unification Architecture — #622)
+
+**Date:** 2026-04-22
+
+**Key insight:** The grading system has two disconnected halves:
+- `hyoka/internal/criteria/` — schema `GraderEntry{Name, Weight, Prompt, When, Isolate}`, loaded via `--criteria-dir`, only supports LLM-prompt graders, hierarchical `when` (file → group → grader). User-facing.
+- `hyoka/internal/graders/` — schema `GraderConfig{Kind, Name, Config, Weight, Gate, When}`, loaded via unwired `GradersDir` engine option (no CLI flag), supports 8 typed grader kinds. Not user-reachable.
+
+**Architecture direction (proposed):** Absorb `internal/criteria/` into `internal/graders/`. Unified `UnifiedGraderEntry` with `Kind` discriminator — empty Kind = prompt grader (backward-compat), non-empty Kind = typed grader. Hierarchical `when`, groups, isolation survive. Single `--criteria-dir` flag. 4-phase rollout: unified schema → unified execution → delete criteria pkg → ship output_check via criteria YAML.
+
+**File references:**
+- `hyoka/internal/criteria/criteria.go:29-66` — current criteria schema (GraderEntry, GraderGroup, GraderConfig)
+- `hyoka/internal/graders/types.go:46-59` — current typed graders schema (GraderConfig)
+- `hyoka/internal/graders/registry.go:10-97` — NewGrader factory for all typed kinds
+- `hyoka/internal/eval/engine.go:110-117` — CriteriaDir (wired) vs GradersDir (unwired) options
+- `hyoka/internal/eval/engine.go:140-141` — `graderConfigs` vs `pluginGraders` dual storage
+- `hyoka/internal/eval/engine_eval.go:421-516` — two-phase grading (pluggable + AI review)
+
+**Proposal:** `.squad/decisions/inbox/morpheus-grader-unification-proposal.md`
+**Direction:** `.squad/decisions/inbox/morpheus-grader-unification-direction.md`
+**Parent issue:** #622

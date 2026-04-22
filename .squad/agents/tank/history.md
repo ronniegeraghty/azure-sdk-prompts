@@ -284,3 +284,13 @@ See Neo's orchestration log: `.squad/orchestration-log/2026-04-21T23-22-02Z-neo.
 
 **Decisions captured:** `.squad/decisions.md` — docs installed-binary directive + PR #607 strategy
 
+
+## Team Context: Unified Grader Direction Proposed (2026-04-22)
+
+Morpheus has proposed a comprehensive unification of the grading pipeline (Issue #622):
+- **Key decision:** ONE `internal/graders/` package, ONE schema, ONE execution path
+- **Backward-compat:** Existing `criteria/*.yaml` files work without migration
+- **Phased rollout:** 4 phases, zero-regression guarantee via golden-file tests
+- **Your role:** Phase 1-3 implementation track (schema, execution, cleanup) — likely paired with Neo
+
+📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full spec and phased plan. Awaiting team consensus and architecture sign-off.
