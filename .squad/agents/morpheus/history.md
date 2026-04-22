@@ -585,3 +585,26 @@ All non-template examples are schema-valid. The single "failure" (`prompt-templa
 3. History context from this file's "Learnings (Grader Unification Architecture)" section
 
 **Process fix required:** Scribe must **commit inbox files before merging summaries** into `decisions.md`. The merge-then-delete workflow creates a window where the full proposal is irrecoverably lost if the session ends between merge and commit. Correct order: `git add inbox/file.md → git commit → merge summary → git commit`.
+
+## Learnings (Grader Unification — Issues Filed, 2026-04-23)
+
+**Locked schema decisions** (after Q&A with Ronnie via Copilot directives):
+- **Discriminator:** flat `type` field at entry level. Prompt graders use the SAME shape as every other grader (`type: prompt`, `type: output_check`, etc.). NO `kind`, NO nested `typed:` block.
+- **No gating, ever.** Drop `Gate` from the unified schema entirely. Every grader runs and reports its result; nothing short-circuits an eval. (Locked Q3 + Q9.)
+- **Validation:** malformed grader → file-level error at load. Eval fails ONLY if that file actually matches the prompt being evaluated. Errors on unused criteria don't block unrelated evals. (Q4.)
+- **Multiple graders of same `type` per file:** allowed. Uniqueness is by `name`. (Q5.)
+- **No deprecation shim.** Delete `internal/criteria/` immediately at end of Phase 2. (Q6.)
+- **`output_check` v1 knobs** (built on `WorkspaceDelta`): `min_files`, `max_files`, `created_only`, `must_exist[]`, `must_be_updated[]`, `min_bytes_per_file`. Yes/no per check. (Q7.)
+- **No verification ceremony.** hyoka isn't stable — ship and iterate. (Q8.)
+- **Document every grader type** in user-facing docs. (Q10.)
+- **`--criteria-dir` flag stays.** No rename. (Q1.)
+
+**Issues filed (supersede #622):**
+- #624 — Phase 1: Unified schema + back-compat loader in `internal/graders/`
+- #625 — Phase 2: Unified execution path in engine
+- #626 — Phase 3: Delete `internal/criteria/` package
+- #627 — Phase 4: Default `output_check` criteria + per-grader docs
+
+**#622 status:** closed with comment linking the new four-phase plan.
+
+**Owner for implementation:** Neo (`squad:neo` label on all four).
