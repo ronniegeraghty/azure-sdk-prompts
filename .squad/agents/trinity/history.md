@@ -113,3 +113,25 @@ Morpheus has proposed a comprehensive unification of the grading pipeline (Issue
 - **Implications for you:** UI/config layer may simplify (single `--criteria-dir` flag, no separate graders directory); downstream integration points stabilize
 
 📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full architectural review. Awaiting team consensus.
+
+---
+
+## 2025-01-style-helper — ANSI style primitives for progress renderers
+
+Created `hyoka/internal/progress/style` — a small dependency-free ANSI color helper to be consumed by the upcoming interactive and CI renderers (sprint plan item #8).
+
+**Delivered:**
+- `Styler{Enabled bool}` with `New(io.Writer)` + `NewFromEnabled(bool)` constructors.
+- Color methods: Green, Red, Yellow, Cyan, Blue, Dim, Bold, Reset.
+- Semantic helpers: OK, Fail, Warn, Info, Muted.
+- Nil-receiver safe. Zero value is a safe disabled styler.
+- Table-driven tests cover enabled/disabled paths, NO_COLOR, non-file writers, and nil receivers.
+- `go build ./...`, `go test -race`, and `go vet ./hyoka/...` all clean.
+
+### Learnings
+
+**TTY detection approach — stdlib only, no `golang.org/x/term`.** Checked `go.mod` first; `x/term` is not a dependency and the repo charter/project conventions explicitly prefer stdlib. Went with `os.File.Stat()` and `info.Mode() & os.ModeCharDevice != 0`. This is the same check Go's own stdlib uses internally and works on both Unix and Windows without a new dep or cgo. It correctly returns false for pipes, redirected files, and `bytes.Buffer` (which isn't an `*os.File` at all, short-circuiting earlier in the type assertion).
+
+Two things I deliberately baked in that the spec didn't strictly require but will save downstream headaches:
+1. **Nil-safe Styler** — `var s *Styler; s.Green("x")` returns `"x"` instead of panicking. Downstream renderers can keep a lazily-initialized field without guard checks.
+2. **NO_COLOR short-circuits before the type assertion** — so even weird writers (nil, custom wrappers) respect NO_COLOR consistently.
