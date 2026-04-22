@@ -441,3 +441,40 @@ Morpheus has proposed a comprehensive unification of the grading pipeline (Issue
 📄 See `.squad/decisions.md` "Unified Grader Architecture Direction & Proposal" for full spec and phased plan. Awaiting team consensus and architecture sign-off. Coordinate with Tank if implementation assigned.
 
 Reminder: Loader silent-truncation bug (#607 discovery) remains tracked as Neo follow-up.
+
+## 2026-04-22 — Grader Unification Phase 1 (#624) shipped
+
+**Branch:** `ronniegeraghty/dev` — direct commit, no PR.
+**Commit:** `faf556eb2bfb227c8873bed7dd92b4887a24fdbe`
+
+### Files created
+- `hyoka/internal/graders/unified_entry.go` — `UnifiedGraderEntry`, `UnifiedGraderGroup`, `UnifiedGraderConfig`, validation, `matchesUnifiedWhen`, `mergeUnifiedWhen`, `IsValidUnifiedType`.
+- `hyoka/internal/graders/unified_loader.go` — `ParseUnified`, `LoadUnifiedFile`, `LoadUnifiedDir`, `Bundle`, `FileError`, `Bundle.MatchingErrors(props)`, `translateLegacy`, `peekFileWhen`.
+- `hyoka/internal/graders/unified_entry_test.go` — validation + back-compat + deferred-error tests.
+- `hyoka/internal/graders/unified_realfixtures_test.go` — loads every real `criteria/*.yaml` via the new loader.
+
+### Final schema shape
+
+```go
+type UnifiedGraderEntry struct {
+    Type    string            `yaml:"type"`              // prompt | file | program | behavior | …
+    Name    string            `yaml:"name"`
+    Weight  float64           `yaml:"weight,omitempty"`
+    When    map[string]string `yaml:"when,omitempty"`
+    Isolate bool              `yaml:"isolate,omitempty"` // prompt-only, silently ignored for typed
+    Prompt  string            `yaml:"prompt,omitempty"`  // required iff type=prompt
+    Details yaml.Node         `yaml:"details,omitempty"` // required iff type!=prompt
+}
+```
+
+`UnifiedGraderGroup` and `UnifiedGraderConfig` unchanged from the legacy criteria.GraderGroup/GraderConfig in shape (File-level when, Graders, Groups, Source), just referencing the new entry type.
+
+### Learnings
+
+**Naming collision foresight paid off.** The proposal called for `GraderEntry` / `GraderGroup` / `GraderConfig` in `internal/graders/`. Those names are already taken by the typed-runtime config in `types.go`. Using `Unified` prefix for Phase 1 lets both shapes coexist for the duration of Phases 2-3 instead of forcing a rename + mass-update in a single commit. The prefix drops in Phase 3 when `internal/criteria/` is deleted.
+
+**`details:` over `config:` for the typed payload.** The issue allowed either. "config" is already overloaded in this codebase (YAML config files, `GraderConfig`, `ProgramConfig`, etc.). `details:` reads better in YAML and has zero naming collision risk. Locked it in the PR and documented the choice in the issue comment.
+
+**Q4 deferred-error semantics need the file-level `when:` preserved on failure.** I extended the proposed `FileErrors map[string]error` to `map[string]FileError` where `FileError` carries `Path, When, Err`. Without this, `Bundle.MatchingErrors(props)` would need a second filesystem pass per eval. The `peekFileWhen` helper uses a permissive non-strict decoder so it can extract `when:` from files whose body is broken — if even the `when:` can't be peeked, `MatchingErrors` surfaces the error universally (fail-loud default, safer than silently hiding a file that might be relevant).
+
+**Review-bucket builder deliberately deferred.** The issue listed `unified_buckets.go` as Phase 1, but nothing in Phase 1 consumes buckets — `internal/criteria/buckets.go` is still wired and still authoritative. Porting it now ships dead code. It'll land in the Phase 2 (#625) wiring commit where the engine actually starts using it, which keeps every line of `unified_buckets.go` immediately exercised in the same PR. Documented as deviation 3 in the issue comment.
