@@ -1,8 +1,11 @@
 package eval
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 )
@@ -35,6 +38,7 @@ type toolVerifier struct {
 	skillsEvtSeen  bool
 	mcpEvtSeen     bool
 	emitted        bool
+	readyChan      chan struct{} // Signals when verification is complete
 }
 
 // newToolVerifier builds a verifier keyed on expected skills (derived from
@@ -57,6 +61,7 @@ func newToolVerifier(skillDirs []string, mcpNames map[string]bool) *toolVerifier
 		expectedMCP:    mc,
 		loadedSkills:   make(map[string]bool),
 		loadedMCP:      make(map[string]bool),
+		readyChan:      make(chan struct{}),
 	}
 }
 
@@ -140,5 +145,34 @@ func (v *toolVerifier) emitIfReady() []progress.ToolStatus {
 		return tools[i].ToolName < tools[j].ToolName
 	})
 	v.emitted = true
+	close(v.readyChan) // Signal that verification is complete
 	return tools
+}
+
+// waitForToolVerification blocks until the verifier completes or the context
+// times out. Returns the verified tool statuses and any validation errors.
+// This is the blocking gate that prevents evals from proceeding with failed tools.
+func waitForToolVerification(ctx context.Context, v *toolVerifier, timeout time.Duration) ([]progress.ToolStatus, error) {
+	// If nothing is configured to verify, return immediately with no error
+	if len(v.expectedSkills) == 0 && len(v.expectedMCP) == 0 {
+		return nil, nil
+	}
+
+	// Create timeout context
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// Wait for verification to complete or timeout
+	select {
+	case <-v.readyChan:
+		// Verification complete — collect the results
+		tools := v.emitIfReady()
+		if tools == nil {
+			// This shouldn't happen if readyChan closed, but guard against it
+			return nil, fmt.Errorf("tool verification completed but no statuses were emitted")
+		}
+		return tools, nil
+	case <-timeoutCtx.Done():
+		return nil, fmt.Errorf("tool verification timeout: SDK did not confirm tool load within %v", timeout)
+	}
 }

@@ -589,6 +589,33 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	}
 	sessionID = session.SessionID
 
+	// Tool validation gate: wait for SDK to report tool load results and
+	// abort if any required tool failed to load (#347).
+	if len(verifier.expectedSkills) > 0 || len(verifier.expectedMCP) > 0 {
+		lg.Debug("Waiting for tool verification", "timeout", "10s")
+		tools, err := waitForToolVerification(genCtx, verifier, 10*time.Second)
+		if err != nil {
+			return &EvalResult{
+				Error:        fmt.Sprintf("tool verification timeout: %v", err),
+				ErrorDetails: err.Error(),
+				ErrorCategory: "tool_load_failure",
+			}, fmt.Errorf("tool verification failed: %w", err)
+		}
+		// Check for any failed tools
+		for _, t := range tools {
+			if t.Status == progress.ToolStatusFailed {
+				errMsg := fmt.Sprintf("required %s %q failed to load: %s", t.ToolKind, t.ToolName, t.Reason)
+				lg.Error("Tool load failure — aborting eval", "kind", t.ToolKind, "name", t.ToolName, "reason", t.Reason)
+				return &EvalResult{
+					Error:         errMsg,
+					ErrorDetails:  t.Reason,
+					ErrorCategory: "tool_load_failure",
+				}, fmt.Errorf("%s %q not loaded", t.ToolKind, t.ToolName)
+			}
+		}
+		lg.Info("Tool verification passed", "skills", len(verifier.expectedSkills), "mcp", len(verifier.expectedMCP))
+	}
+
 	// Send the prompt
 	if e.progressFn != nil {
 		e.progressFn(progress.ProgressEvent{

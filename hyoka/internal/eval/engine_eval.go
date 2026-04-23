@@ -153,7 +153,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	evalReport.GenerationDuration = time.Since(genStart).Seconds()
 	evalFailed := err != nil
 	if evalFailed {
-		if genCtxErr == context.Canceled {
+		// If EvalResult returned an ErrorCategory, use it; otherwise infer
+		if result != nil && result.ErrorCategory != "" {
+			evalReport.ErrorCategory = result.ErrorCategory
+			evalReport.Error = result.Error
+			evalReport.ErrorDetails = result.ErrorDetails
+			evalReport.FailureReason = result.Error // Use the error message as failure reason
+		} else if genCtxErr == context.Canceled {
 			evalReport.Error = "generation cancelled (action limit reached)"
 			evalReport.ErrorDetails = "context cancelled — the session exceeded the --max-session-actions limit"
 			evalReport.ErrorCategory = "timeout"
