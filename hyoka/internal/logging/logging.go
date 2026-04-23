@@ -7,6 +7,7 @@ package logging
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -23,6 +24,9 @@ type Options struct {
 	FilePath string
 	// Debug is a deprecated shorthand for Level="debug".
 	Debug bool
+	// SuppressConsole disables console output entirely (useful when interactive
+	// progress display is active and logging would corrupt ANSI rendering).
+	SuppressConsole bool
 }
 
 // Setup initialises the global slog.Logger and returns a closer function
@@ -51,9 +55,17 @@ func Setup(opts Options) (closer func(), err error) {
 			Level: level,
 		})
 	} else {
-		// Console destination: use human-friendly handler
-		styler := style.New(os.Stderr)
-		handler = NewConsoleHandler(os.Stderr, level, styler)
+		// Console destination: use human-friendly handler (unless suppressed).
+		// When SuppressConsole is true, we use a discard handler to prevent
+		// slog writes from corrupting interactive progress rendering.
+		if opts.SuppressConsole {
+			handler = slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
+				Level: level,
+			})
+		} else {
+			styler := style.New(os.Stderr)
+			handler = NewConsoleHandler(os.Stderr, level, styler)
+		}
 	}
 
 	slog.SetDefault(slog.New(handler))

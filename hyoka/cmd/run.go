@@ -13,6 +13,7 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
@@ -180,10 +181,29 @@ func runCmd() *cobra.Command {
 		Short: "Run evaluations",
 		Long:  "Run evaluations with optional filters against the prompt library.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
+			logFile, _ := cmd.Root().PersistentFlags().GetString("log-file")
+			
 			if f.progressMode == "auto" {
-				logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
-				logFile, _ := cmd.Root().PersistentFlags().GetString("log-file")
 				f.progressMode = resolveAutoProgress(f.workers, progress.IsTerminal(os.Stdout), logLevel, logFile)
+			}
+			
+			// If interactive progress mode is active without --log-file, suppress
+			// console logging to prevent slog writes to stderr from corrupting
+			// the ANSI in-place tail rewriting (issue: multi-line tail leak).
+			// Warnings/errors will still be written to the log file if --log-file
+			// is specified.
+			if f.progressMode == "interactive" && logFile == "" {
+				closer, err := logging.Setup(logging.Options{
+					Level:           logLevel,
+					FilePath:        logFile,
+					SuppressConsole: true,
+				})
+				if err != nil {
+					return fmt.Errorf("reconfiguring logging for interactive mode: %w", err)
+				}
+				// Update the closer in the root command's PostRun
+				cmd.Root().PersistentPostRun = func(*cobra.Command, []string) { closer() }
 			}
 
 			// Resolve all paths first, before any loading

@@ -784,21 +784,29 @@ func (r *interactiveRenderer) writeLine(s string) {
 
 // writeTail writes text as the current tail line (no trailing newline).
 // Freezes any existing tail first. kind records which section owns the tail
-// so the ticker knows whether to refresh it. Truncates to terminal width
-// to prevent line wrapping (which would break in-place rewrites — \r\033[2K
-// only clears one physical row).
+// so the ticker knows whether to refresh it. Truncates to terminal width minus
+// a safety margin to prevent line wrapping (which would break in-place rewrites
+// — \r\033[2K only clears one physical row). The margin avoids cursor-wrapping
+// ambiguity when text is exactly terminal width.
 func (r *interactiveRenderer) writeTail(kind tailKind, text string) {
 	r.freezeTail()
 	w := TermWidth()
 	if w <= 0 {
 		w = 80 // fallback
 	}
-	text = truncateToWidth(text, w)
+	// Subtract 2 columns as safety margin: avoids the "exactly terminal width"
+	// cursor wrapping ambiguity where some terminals wrap immediately while
+	// others delay until the next character.
+	maxWidth := w - 2
+	if maxWidth < 10 {
+		maxWidth = w // terminal too narrow, skip margin
+	}
+	text = truncateToWidth(text, maxWidth)
 	r.w.Write([]byte(text))
 	r.cur.tailKind = kind
 	r.cur.tailText = text
 	// Track how many physical rows this tail occupies. visibleWidth counts
-	// ANSI-stripped runes, so we compute rows as ceil(visible / width).
+	// ANSI-stripped cells, so we compute rows as ceil(visible / width).
 	visible := visibleWidth(text)
 	r.cur.tailRowCount = (visible + w - 1) / w
 	if r.cur.tailRowCount < 1 {
@@ -808,7 +816,7 @@ func (r *interactiveRenderer) writeTail(kind tailKind, text string) {
 
 // rewriteTail replaces the current tail line's content in place. No-op if
 // there is no active tail. Clears ALL physical rows the previous tail occupied
-// before writing the new content.
+// before writing the new content. Applies the same safety margin as writeTail.
 func (r *interactiveRenderer) rewriteTail(text string) {
 	if r.cur == nil || r.cur.tailKind == tailNone {
 		return
@@ -817,7 +825,12 @@ func (r *interactiveRenderer) rewriteTail(text string) {
 	if w <= 0 {
 		w = 80 // fallback
 	}
-	text = truncateToWidth(text, w)
+	// Apply the same safety margin as writeTail
+	maxWidth := w - 2
+	if maxWidth < 10 {
+		maxWidth = w
+	}
+	text = truncateToWidth(text, maxWidth)
 
 	var buf bytes.Buffer
 	// If the previous tail occupied multiple rows, we need to clear all of them.
