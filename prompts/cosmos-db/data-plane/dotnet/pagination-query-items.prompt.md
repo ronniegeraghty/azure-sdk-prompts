@@ -25,25 +25,23 @@ tags:
 ## Prompt
 
 I'm querying a Cosmos DB container with thousands of items and my query
-returns too much data at once. How do I paginate results using FeedIterator?
-1. Execute a SQL query against a container with MaxItemCount set to 50
-2. Process results page-by-page using FeedIterator
-3. Save the continuation token so I can resume the query later
-4. Track total RU consumption across all pages
+returns too much data at once. How do I paginate results in .NET?
+1. Execute a query against a container with a fixed page size
+2. Process results page by page
+3. Save a continuation token so I can resume the query later
+4. Track request unit consumption across pages
 
-Use the Microsoft.Azure.Cosmos SDK v3. Show how to configure MaxItemCount
-and explain the difference between FeedIterator and LINQ-based queries.
+Explain the difference between iterator-based and LINQ-based query
+approaches.
 
 ## Evaluation Criteria
 
-- `Container.GetItemQueryIterator<T>()` with `QueryDefinition`
-- `QueryRequestOptions.MaxItemCount` for page size control
-- `FeedIterator<T>.HasMoreResults` and `ReadNextAsync()` loop pattern
-- `FeedResponse<T>.ContinuationToken` for resumable pagination
-- Passing continuation token to resume a query
-- `FeedResponse<T>.RequestCharge` for RU tracking
-- Cross-partition query considerations
-- LINQ alternative via `GetItemLinqQueryable<T>()`
+- Executes paginated queries with configurable page size
+- Iterates through result pages using a feed iterator pattern
+- Saves and resumes queries using continuation tokens
+- Tracks request unit (RU) consumption per page
+- Handles cross-partition query considerations
+- Mentions LINQ-based query as an alternative
 
 ## Context
 

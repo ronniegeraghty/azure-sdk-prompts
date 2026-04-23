@@ -24,23 +24,22 @@ author: JonathanCrd
 ## Prompt
 
 I want to react to changes in my Cosmos DB container in near-real-time.
-How do I set up a change feed processor in C#?
-1. Create a change feed processor using the builder pattern
-2. Configure a lease container for tracking progress
-3. Handle incoming changes in a delegate
+How do I consume the change feed in .NET?
+1. Set up a processor that listens for item-level changes
+2. Track progress so I don't reprocess events after a restart
+3. Handle incoming changes as they arrive
 4. Start and stop the processor gracefully
 
-Use the Microsoft.Azure.Cosmos SDK v3. Show how the lease container works
-and what happens when my processor restarts — does it replay from the beginning?
+Explain how progress tracking works and what happens when my processor
+restarts — does it replay from the beginning?
 
 ## Evaluation Criteria
 
-- `Container.GetChangeFeedProcessorBuilder<T>()` builder pattern
-- Lease container configuration with `WithLeaseContainer()`
-- `WithInstanceName()` and `WithStartTime()` or `WithStartFromBeginning()`
-- Change handler delegate: `ChangesHandler<T>`
-- `ChangeFeedProcessor.StartAsync()` and `StopAsync()`
-- Explanation of lease-based progress tracking and multi-instance scaling
+- Sets up a change feed processor using the Cosmos DB SDK
+- Configures a lease container for progress tracking
+- Handles incoming changes via a delegate or handler
+- Supports starting, stopping, and restarting the processor
+- Explains lease-based progress tracking and multi-instance scaling
 
 ## Context
 

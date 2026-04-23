@@ -24,23 +24,23 @@ tags:
 
 ## Prompt
 
-How do I do basic CRUD operations against a Cosmos DB NoSQL container in C#?
+How do I do basic CRUD operations against a Cosmos DB NoSQL container in .NET?
 I have an existing database and container and need to:
-1. Create a CosmosClient and get a reference to my container
+1. Connect to Cosmos DB and get a reference to my container
 2. Insert a JSON item with properties: id, category, name, and quantity
 3. Read the item back by id and partition key
-4. Query items where category equals "electronics" using SQL-like syntax
+4. Query items where category equals a specific value
 
-Show required NuGet packages and proper error handling with CosmosException.
+Include proper error handling for common failure scenarios.
 
 ## Evaluation Criteria
 
 The generated code should include:
-- `Microsoft.Azure.Cosmos` NuGet package
-- `CosmosClient` creation and configuration
-- `Container.CreateItemAsync<T>()`, `ReadItemAsync<T>()`
-- `Container.GetItemQueryIterator<T>()` with `QueryDefinition`
-- `CosmosException` handling with status codes
+- Connects to Cosmos DB using the .NET SDK
+- Creates, reads, and queries items in a container
+- Uses parameterized queries for filtering
+- Handles partition keys correctly
+- Handles Cosmos DB-specific errors with status codes
 
 ## Context
 
