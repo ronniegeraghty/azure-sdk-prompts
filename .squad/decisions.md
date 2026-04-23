@@ -2,6 +2,73 @@
 
 ## Active Decisions
 
+### Decision: Agent Attempt Three-State Display — Streaming Replaced (2026-04-23)
+
+**Status:** ✅ Implemented. Commits b17f1ef5 (code) + e9d590e6 (docs). Branch: `ronniegeraghty/dev`.  
+**Directive:** User request after 4 failed attempts to fix live-tail rendering (commits 6b3d3d48, 42ea88fb, fe6efebf, 670c5dbf).  
+**Driver:** Tank 📡 (implementation) + Ronnie Geraghty (directive).
+
+#### Rationale
+
+The Agent Attempt section in the interactive renderer used a streaming tail that displayed live activity ("Running… turn X/Y, N tool calls") but suffered from persistent line-wrapping leaks caused by:
+- Wide characters (emoji, CJK) occupying 2 terminal cells
+- slog stderr foreign writes between tail updates
+- Terminal width edge cases
+- Complex multi-row clearing math
+
+Four sequential fix attempts addressed individual symptoms (multi-row clearing, truncation, cell-width, terminal margin) but failed to achieve stability. Root issue: **streaming variable-length content is fragile at terminal boundaries.**
+
+**User decision:** Accept loss of real-time detail (activity messages, duration counter, tool call count) in exchange for UX stability. Replace with simple, bounded state machine.
+
+#### Solution
+
+Three-state display:
+
+| State | When | Display |
+|---|---|---|
+| `Running` | Generator session started, no terminal event | `🔄 Running` |
+| `Completed` | Session ended successfully (no guardrail) | `✅ Completed` |
+| `Guardrail hit — {reason}` | A guardrail terminated the run | e.g., `Guardrail hit — turn limit (25)` |
+
+Single-line bounded content (max ~35 chars) eliminates line-wrapping risk. No truncation math, no multi-row tracking, no ticker dependency. State transitions are event-driven.
+
+#### Implementation
+
+**Code changes (commit b17f1ef5):**
+- Added `agentAttemptState` enum to `display_interactive.go` (Running, Completed, Guardrail)
+- Removed streaming fields from `interactiveEval`: `agentActivity`, `agentToolCalls`, `agentFileCount`, `agentTurns`, `agentDuration`
+- Added `agentState` + `agentGuardrailMsg` fields
+- Simplified `renderAgentEvent()` and `renderAgentStateLine()` (state-driven, not streaming)
+- Removed per-event updates from `tickLoop()`; three-state model is event-driven only
+- Updated `display_interactive_test.go`: changed expected output "✅ Complete" → "✅ Completed"
+- Added `GuardrailReason` field to `ProgressEvent` (events.go)
+- Added `extractGuardrailShortReason()` helper in `engine.go` to convert verbose guardrail text ("guardrail: turn count 26 exceeded limit of 25") to compact form ("turn limit (25)")
+
+**Verification:**
+- `go build ./...` — clean
+- `go test -race ./...` — all pass (24 packages)
+- Manual test: `go run ./hyoka run --prompt-id key-vault-dp-python-crud --config "baseline/claude-opus-4.6" --log-level error` — state transitions work correctly
+
+**Not yet tested (user should verify):**
+- Triggering an actual guardrail (MaxTurns, MaxFiles) to confirm message renders
+- Narrow terminal (stty cols 60) to verify no wrap
+
+#### Docs Update (commit e9d590e6)
+
+Added "Lesson: Agent Attempt UX Redesign" to architecture docs summarizing when bounded-state vs streaming is appropriate.
+
+#### Supersedes
+
+This decision **resolves and archives** all prior tail-leak fix work:
+- Tail leak v1 fix: commit 6b3d3d48 (multi-row clearing)
+- Tail leak v1 fix: commit 42ea88fb (truncation)
+- Tail leak v2 fix: commit fe6efebf (wide character cell width)
+- Tail leak v2 fix: commit 670c5dbf (foreign writes + terminal width margin)
+
+Streaming approach is officially abandoned in favor of three-state machine.
+
+---
+
 ### Decision: CLI Output UX Overhaul — Round 1–2 Stable Contracts (2026-04-22)
 
 **Status:** ✅ Schema + emitters landed on `ronniegeraghty/dev`. Renderers (round 3) in flight.
