@@ -517,3 +517,9 @@ Decisions prior to 2026-04-22 have been moved to `.squad/decisions/archive/`. Se
 2. **Plugin auto-fetch.** Today plugins must be pre-installed (via Copilot CLI `/plugin install` or manual placement) — `ResolveInstalled` is read-only. Now that `repo:` is explicit, a future `gitFetcher`-style auto-clone for plugins is a clean addition; the schema is ready for it.
 3. **Skill `@owner/repo` form.** The `name@owner/repo` shorthand for `type: skill` is preserved (it's at least explicit), but it's less idiomatic than `name + repo:` separately. Consider deprecating in a follow-up if it causes confusion.
 4. **`Version` is the git ref.** Reaffirmed: there is no separate `ref:` field. The `Version` field on `Entry` covers branches/tags/commits for both skills and plugins. Documented in `entry.go`.
+### 2026-04-23: Canonical `repo:` form is `owner/repo`
+
+**By:** Neo (requested by Ronnie)
+**What:** In configs and docs, the `repo:` field for remote plugins is now written in the short canonical form `owner/repo` (e.g. `microsoft/skills`). The longer `github.com/owner/repo` form continues to validate and resolve correctly — `SplitOwnerRepo` strips the prefix — so existing user configs are unaffected. The change is purely about which shape we recommend and ship as examples.
+**Why:** Remote plugins are GitHub-only, so the `github.com/` prefix is redundant noise. Keeping the long form supported preserves backward compatibility.
+
