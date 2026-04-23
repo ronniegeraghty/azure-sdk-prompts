@@ -57,6 +57,16 @@ const (
 	GraderResultFail = "fail"
 )
 
+// GraderPoint mirrors graders.GraderPoint inside the progress package so
+// progress events can carry per-sub-check outcomes without importing the
+// graders package (which would invert the existing layering). The engine
+// copies values across at emission time.
+type GraderPoint struct {
+	Name    string
+	Pass    bool
+	Message string
+}
+
 // ToolStatus captures the post-session-start verification outcome for a single tool.
 // Used as the element type of ProgressEvent.Tools on EventToolsVerified.
 type ToolStatus struct {
@@ -111,6 +121,14 @@ type ProgressEvent struct {
 	GraderKind string   // Grader kind / model label (e.g. "claude-opus-4.6", "output_check")
 	Result     string   // One of GraderResultPass, GraderResultFail (EventGraderComplete)
 	Score      *float64 // Optional grader score; nil means "not reported"
+
+	// Points carries per-sub-check outcomes for EventGraderComplete (Phase 2
+	// generalization). Empty / single-element slices preserve the original
+	// flat single-row render path; len(Points) > 1 triggers the nested
+	// renderer block. The progress package mirrors graders.GraderPoint to
+	// avoid a graders→progress import cycle; the engine copies values
+	// across at emission time.
+	Points []GraderPoint
 
 	// Session summary fields (EventSessionDetails).
 	Files     []string // Files written by the session

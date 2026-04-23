@@ -1002,6 +1002,13 @@ case graders.KindPromptReview, graders.KindPrompt:
 s := result.Score
 scorePtr = &s
 }
+var points []progress.GraderPoint
+if len(result.Points) > 0 {
+points = make([]progress.GraderPoint, len(result.Points))
+for i, p := range result.Points {
+points[i] = progress.GraderPoint{Name: p.Name, Pass: p.Pass, Message: p.Message}
+}
+}
 sendRawEvent(progress.ProgressEvent{
 Type:       progress.EventGraderComplete,
 GraderID:   g.Name(),
@@ -1009,5 +1016,6 @@ GraderKind: g.Kind(),
 Result:     outcome,
 Score:      scorePtr,
 Message:    result.Message,
+Points:     points,
 })
 }
