@@ -3887,3 +3887,153 @@ Both commands write to stdout uncontrollably, breaking the renderer's live displ
 **By:** Ronnie (via Copilot)
 **What:** The CLI progress renderers (`hyoka/internal/progress/display_interactive.go`, `display_ci.go`, and any future CLI output code) are CLI work and belong to Tank, NOT Trinity. Trinity should be working on the site (React SPA, reports, trends, serve command) only. The Sprint 1 misassignment of the interactive renderer to Trinity was a routing error — going forward, all `hyoka/internal/progress/` work routes to Tank.
 **Why:** User correction on routing. Aligns with routing.md which already lists "progress output" under Tank's domain. Trinity owns the site/frontend; Tank owns CLI/progress.
+
+---
+
+## 2026-04-23T02:28Z: CLI/progress ownership boundary — Tank not Trinity (re-confirmation)
+
+**By:** Ronnie Geraghty (via Copilot directive), documented by Scribe
+
+**Context:** This session's tail-leak bug fix exposed a governance misroute. The coordinator initially spawned Trinity (`trinity-tail-leak`) to fix a multi-line tail-truncation bug in the interactive progress renderer. After user correction, the coordinator re-spawned Tank (`tank-tail-leak`) to handle the same domain work.
+
+**The Directive:**
+CLI-side progress/renderer work (`hyoka/internal/progress/` — display_interactive.go, display_ci.go, style helpers, tail truncation, terminal width handling, ANSI rendering) routes to **Tank**, NOT Trinity. Trinity's domain is the **site** (reports, templates, serve, trends, rerender) — anything users see in the browser. Tank's domain is the **terminal** — anything users see in the CLI.
+
+This re-confirms the existing routing.md / charter assignments after the misroute.
+
+**Why:** User reminder on routing; aligns with existing charter (tank/charter.md L19 already lists `hyoka/internal/progress/`).
+
+**Follow-up Actions Taken (2026-04-23T~03:00Z):**
+- **routing.md tightened:** Split CLI/terminal vs. browser/site rows with explicit "where does the user see it?" rule.
+- **trinity/charter.md tightened:** Added scope rule ("my domain is the browser") and moved `internal/progress/` into the **don't handle** list.
+- **tank/charter.md tightened:** Expanded progress entry to call out tail truncation, ANSI, terminal width, and the boundary vs. Trinity.
+- These edits were committed in `fe6efebf`.
+
+**Governance Breach Record:**
+
+**Root cause:** Coordinator misrouted the initial tail-leak bug assignment.
+
+**What happened:**
+1. Coordinator spawned Trinity (`trinity-tail-leak`) for the multi-line tail-leak bug.
+2. After user correction, coordinator attempted to stop her (no `stop_agent` tool exists; `stop_bash` doesn't reach background agents) and re-spawned Tank (`tank-tail-leak`) for the same task.
+3. Trinity completed and committed her fix: `42ea88fb` (`fix(progress): clear all wrapped rows + rune-aware tail truncation`) + `ccbc7647` (docs). Logic was correct (multi-row clear framework) but counted **runes** instead of **terminal cells** — so emoji-bearing tails (🔄, ✅ are 2 cells each) still wrapped.
+4. Tank completed and committed the real fix: `fe6efebf` (`fix(progress): use proper cell width for wide characters (emoji, CJK)`) + `e5cc464c` (docs + new `ansi-terminal-output` skill). Swapped to `github.com/mattn/go-runewidth` for proper wcwidth cell counting.
+
+**Outcome:** Trinity's and Tank's commits **compose** — Trinity built the multi-row clear framework, Tank corrected the cell-width calculation. Both kept. The misroute was wasteful (duplicate cycle) but not destructive.
+
+**Pattern to Watch:** This is the second documented case of CLI/progress work landing with Trinity. Charter/routing now have explicit exclusions ("where does the user see it?" rule) to make future misroutes impossible to justify.
+
+**Tooling Gap Identified:** No mechanism to cleanly stop a misrouted background agent. Coordinator must double-check routing **before** spawning, since recovery is messy (can't stop agent → both continue → manual commit resolution).
+
+**Commits Involved:**
+- `42ea88fb` — Trinity: multi-row clear framework + rune counting
+- `ccbc7647` — Trinity: docs
+- `fe6efebf` — Tank: cell-width fix + routing doc tightening
+- `e5cc464c` — Tank: docs + ansi-terminal-output skill
+
+---
+
+## 2026-04-23T02:23Z: Multi-Row Clear Pattern for Interactive Terminal Tail Lines
+
+**By:** Trinity, documented by Scribe
+
+**Status:** ✅ IMPLEMENTED
+
+**Scope:** `hyoka/internal/progress/display_interactive.go`
+
+**Commits:** `42ea88fb` (complete implementation)
+
+### Context
+
+The interactive eval progress renderer uses an in-place rewrite pattern: a "tail line" is updated via `\r\033[2K` (carriage return + clear line) rather than printing a new line each time. This keeps the terminal output compact and avoids scrolling for rapidly-changing status (e.g., "🔄 Running… turn 3/25, 8 tool calls (00:12)").
+
+**Problem:** When the tail text exceeds terminal width, the terminal wraps it to multiple physical rows. The cursor ends up at the end of the LAST row. On the next rewrite, `\r\033[2K` moves to column 0 of THAT row and clears THAT row only — the earlier wrapped rows stay visible, creating a scrolling trail effect.
+
+### Solution: Multi-Row Clear with Row Tracking
+
+**Core insight:** Clearing must account for the PREVIOUS tail's row count, not just truncate the NEW text.
+
+**Implementation:**
+
+1. **Added `tailRowCount` field to `interactiveEval`:** Tracks how many physical rows the current tail occupies.
+   ```go
+   tailRowCount int // how many physical terminal rows the current tail occupies
+   ```
+
+2. **Added `visibleWidth()` helper:** Strips ANSI sequences, counts runes → terminal cell estimate.
+   ```go
+   func visibleWidth(s string) int {
+       stripped := ansiSeqRE.ReplaceAllString(s, "")
+       count := 0
+       for range stripped {
+           count++
+       }
+       return count
+   }
+   ```
+
+3. **Updated `writeTail()`:** Computes and stores `tailRowCount` after truncating and writing.
+   ```go
+   visible := visibleWidth(text)
+   r.cur.tailRowCount = (visible + w - 1) / w  // ceil(visible / w)
+   if r.cur.tailRowCount < 1 {
+       r.cur.tailRowCount = 1
+   }
+   ```
+
+4. **Fixed `rewriteTail()`:**
+   ```go
+   oldRows := r.cur.tailRowCount
+   if oldRows > 1 {
+       // Move cursor up to the first row of the tail.
+       fmt.Fprintf(&buf, "\x1b[%dA", oldRows-1)
+   }
+   // Clear each row from top to bottom.
+   for i := 0; i < oldRows; i++ {
+       buf.WriteString(ansiCR)
+       buf.WriteString(ansiClearLine)
+       if i < oldRows-1 {
+           buf.WriteString("\n") // move to next row
+       }
+   }
+   buf.WriteString(text) // write new tail
+   ```
+
+5. **Updated `freezeTail()`:** Resets `tailRowCount` to 0 when tail is committed (no longer the tail).
+
+### Width Calculation: Bytes vs. Runes vs. Cells
+
+- **Bytes:** Raw UTF-8 encoding length. Meaningless for terminal width (`len(string)` → WRONG).
+- **Runes:** Go's iteration unit (one per Unicode code point). Close to terminal cells for ASCII. Good enough for hyoka's use case.
+- **Terminal cells (columns):** What the terminal counts. ANSI sequences = 0 width, most runes = 1 cell, East Asian wide chars (emoji, CJK) = 2 cells.
+
+**Note:** Precise cell counting (using `golang.org/x/text/width` for East Asian detection) would require an extra dependency. This implementation counts runes + strips ANSI sequences, which is sufficient for the interactive renderer. **(Later note by Tank: this approach counts runes, not cells — emoji are still 2 cells but counted as 1 rune. Tank's follow-up fix in `fe6efebf` corrected this using `github.com/mattn/go-runewidth`.**
+
+### Pattern Summary (Reusable)
+
+When implementing in-place rewrites for terminal tail lines that may wrap:
+
+1. **Track row count:** Compute `ceil(visibleWidth(text) / termWidth)` after each write.
+2. **Clear all previous rows before rewrite:**
+   - Move cursor UP `(rows - 1)` lines via `\033[nA`.
+   - Clear each row top-to-bottom: `\r\033[2K\n` per row (no `\n` on last row).
+3. **Write new content** and update row count.
+4. **Truncate NEW text to terminal width** so it never exceeds one row going forward (defense in depth).
+5. **Fallback width:** When `term.GetSize` fails (stdout not a TTY), fall back to `COLUMNS` env var, then a sane default (80 or 120).
+
+### Testing
+
+- **Unit tests:** `truncate_test.go` covers `visibleWidth()` and `truncateToWidth()` (ANSI sequences, emoji, edge cases).
+- **Existing tests:** All progress package tests pass with `-race`.
+- **Live verification:** `COLUMNS=60 hyoka run ...` completes successfully (TTY detection prevents interactive mode in piped output, as expected).
+
+### Decision
+
+**ADOPTED:** The multi-row clear pattern is the correct approach for in-place tail line updates. The fix is committed and verified. Any future interactive terminal renderers in hyoka (or other Go tools) should follow this pattern.
+
+**Key takeaway:** `\r\033[2K` clears ONE physical row. Multi-row content requires explicit cursor navigation + per-row clearing.
+
+**Note:** Tank's follow-up in `fe6efebf` corrected the cell-width calculation (rune vs. cell) using `github.com/mattn/go-runewidth` for proper wcwidth support.
+
+---
+
