@@ -607,3 +607,31 @@ Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
 
 - **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
 - **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+
+## 2026-04-23: Phase 1 — tool-loading display polish (5 fixes shipped)
+
+Branch: `ronniegeraghty/dev` (pushed). Five surgical fixes to the live-eval interactive renderer; one logical fix per commit.
+
+- **3635a09f** `fix(progress): use config name as skill_dir parent header` — `validateSkillDirEntry` was emitting the resolved filesystem `entry.Path` as the parent label, so headers read `- /abs/path/to/gen-skills (skills dir):`. Switched to `entry.Name` so the visible header is the config name (`gen-skills`). Updated `TestValidateAndExpand_HappyPath` to pin `Parent == "gen-skills"`.
+- **582ab59f** `fix(progress): drop plugin parent Loaded/Failed badge` — `validatePluginEntry` and `emitPluginLoadedWithChildren` were emitting `emitResultWithParent(... ToolKindPlugin, ToolStatusLoaded ...)` for the plugin row itself, so the parent rendered with a `[Loaded]/[Failed]` badge alongside the child skills. Removed the three plugin-parent emits and taught `onToolsVerified`'s flip-to-Failed loop to skip `ToolKindPlugin` and any entry referenced as a parent (containers). Added `TestInteractive_PluginParentNoLoadedFailedBadge`.
+- **efe18373** `fix(progress): show kind label on grouped child tool rows` — `renderToolLine` had an `if !indented { ... }` guard that swallowed the `(skill)`/`(mcp)` label for children rendered under a plugin/skill_dir header. Removed the guard. Added `TestInteractive_ChildKindLabelShown`.
+- **9f994107** `fix(progress): rewrite frozen agent/grader rows in place` — Two related lifecycle bugs sharing one fix:
+  - **(d)** Agent Attempt status was rendering below itself stuck on "Running" because a grader Start arriving before `agentComplete` would freeze the agent's tail; `agentComplete` then fell through to `writeLine` and appended a fresh "Completed" row at the bottom.
+  - **(e)** `ai_review` grader entry was rendering twice when an unrelated event committed the grader's Running tail before its matching Complete event — `onGraderComplete` fell through to `writeLine` and produced a duplicate.
+  - Added `agentLineFrozen`/`agentLineRow`/`graderRowByID`/`pendingGraderID` state on `interactiveEval`. `freezeTail` now records the row index of the displaced agent/grader before bumping `linesWritten`. New `rewriteFrozenLine(row, text)` helper uses the same DECSC/DECRC bracketed save-restore pattern as `redrawToolsBlock`. `agentComplete` and `onGraderComplete` prefer the in-place rewrite path when the row was frozen above; fall back to `writeLine` only when no prior row exists. The grader handler is **not** locked to single-line semantics so Phase 2's Points-based rendering can extend it cleanly.
+  - Added `TestInteractive_AgentCompletedRowRewritesFrozenLine` and `TestInteractive_GraderCompleteIdempotentAfterFreeze` — both drive the displacement sequence and assert the rewrite escape (`\x1b7`) was emitted with no duplicate `writeLine` output.
+- **fbcd9f38** `refactor(eval): drop redundant tool events around AI review grader` — `engine_eval.go` was wrapping the AI review grader call in `EventToolStart("Review panel: ...")`/`EventToolComplete("Review complete: ...")`; the renderer already shows grader lifecycle via Grader events, so the extra Tool events produced an orphan "Review panel" row above the actual grader entry and contributed to (e). Replaced both with `glg.Debug` — diagnostics preserved, no progress noise.
+
+### Verification
+- `go test -race ./hyoka/internal/progress/... ./hyoka/internal/config/tool/... ./hyoka/internal/eval/...` — all green.
+- `go test ./hyoka/...` — all green.
+- Live eval: `hyoka run --prompt-id key-vault-dp-python-crud --config python-pairwise` — 3/3 passed in 192.74s. Debug log shows `Created review panel for config` debug entries where the orphan `EventToolStart` used to be. No errors, no orphan rows in the log.
+
+### Notes / Quirks
+- `bytes.Buffer` does not interpret ANSI escapes, so the (d)/(e) tests can't use `strings.Count("Completed")` to assert "no duplicate" — both pre-rewrite and post-rewrite text live in the buffer simultaneously. The tests instead assert (1) `\x1b7` (DECSC) is present (proves rewrite path was taken) AND (2) `"Completed\n"` / `"Pass (N/10)\n"` is **not** present (proves no `writeLine` fallback). This is inferential but accurate; the live-eval was the visual confirmation.
+- `validate.go` and the test files are gofmt-loose with no leading-tab indentation. `gofmt -d` shows diffs but the files build and test fine. Did not "fix" formatting — matched existing style.
+- Plugin Start event still fires (`emitStart` in `validatePluginEntry`) and creates a `loading` orphan in `toolLines`; `groupToolLines` already handles it correctly via container-discovery (`isContainer[tl.name]`).
+- `agentLineRow = linesWritten` is recorded in `freezeTail` **before** the increment, matching the `redrawToolsBlock` pattern (`up = linesWritten - toolsFirstLine`).
+
+### Out of scope (Phase 2 — Neo)
+- Grader sub-points generalization (`Points []GraderPoint` on Complete events). The (e) fix deliberately does not lock the grader handler to single-line rewriting; Phase 2 can extend the rewrite-vs-append decision without reworking this scaffolding.
