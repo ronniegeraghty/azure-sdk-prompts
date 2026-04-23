@@ -534,3 +534,53 @@ Tools:
 - Progress events support both live streaming (during resolution) and grouped display (after verification) — renderers need two code paths to handle both phases.
 - The toolLine struct serves as internal bookkeeping; ToolStatus is the external event shape. Converting between them requires helper functions.
 - CI renderer needs to handle tools too, not just graders — EventToolsVerified is emitted for all renderers.
+
+
+### Session 2026-04-24 (WU-A3 — Wait-till-known + resilient parent fan-out)
+
+**Status:** COMPLETE (commit 18d105c3 on ronniegeraghty/dev)
+
+**Issue:** Ronnie's eval run showed the Tools section with stuck "🔄 Loading…" rows for skill-dir parents and missing fan-out for plugins/skills-dirs. Two distinct bugs.
+
+**Root causes:**
+1. `onToolResolutionStart` wrote a flat "🔄 Loading…" tail line for every Start event. If a Start never received a matching Result (validate.go emits a Start for skill_dir parents but only Result events for children), the Loading line stayed committed forever.
+2. A plugin parent entered `toolLines` with `parentKind==""`, so `groupToolLines` rendered it as a top-level leaf AND as a parent group header — duplicate rows. The new `validate.go` plugin fan-out path was effectively unreachable cleanly.
+
+**Fix:**
+- Deferred emission: Start events only update internal bookkeeping. Result events commit the final line (grouped + indented for children, flat for top-level leaves, header-only for loaded plugin containers, flat-failed for failed plugin containers).
+- Added `emittedParents map[parentKey]bool` to track which parent headers have been written so the first child of each parent triggers exactly one header.
+- Reworked `groupToolLines` to detect containers (kind=plugin OR referenced as `ParentName` by at least one child) and filter orphan loading rows.
+- Removed `renderToolLineFlat` (no longer needed).
+
+**Files changed:**
+- hyoka/internal/progress/display_interactive.go (193 insertions / 79 deletions)
+- hyoka/internal/progress/display_interactive_test.go (4 new test cases + 1 rewrite of ANSI-marker test)
+
+**Testing:**
+- `go test ./internal/progress/... -race -count=1`: all 27 tests pass (23 existing + 4 new).
+- Manual demo via a DUMP_SCREENSHOT helper test produced the exact grouped shape Ronnie specified (plugin + skills-dir + top-level MCP, with mixed loaded/failed children).
+- End-to-end live run was NOT performed because the working tree contains Neo's in-flight plugin-schema refactor (`c.Plugins` removed; `plugins.go` now references missing symbols). `go build ./...` fails until Neo lands that sweep. The progress package builds and tests independently.
+
+**Coordination with Neo:**
+- My code is resilient to Neo's schema change: I consume only `ProgressEvent` fields that already exist (`ParentName`, `ParentKind`, `ToolKind`, `Status`, `Reason`). Any new fields Neo adds (e.g. `Source: remote|local`) can be rendered in `renderToolLine` in a follow-up without touching the grouping logic.
+- One upstream bug I cannot fix from the renderer: `validate.go` `validateSkillDirEntry` calls `emitStart(entry.Name, …)` but children use `ParentName=entry.Path`. The renderer treats the orphan Start as loading-and-filtered, so output is correct — but the parent header shows `entry.Path` (an absolute path) instead of `entry.Name`. Recommend Neo normalize those: either skip the Start for skill_dir parents, or have children use `ParentName=entry.Name`.
+
+**Deliverable screenshot:**
+
+```
+Tools:
+  - azure-sdk-python (plugin):
+      - skill1-from-plugin: ✅ Loaded
+      - skill2-from-plugin: ❌ Failed (fetch timeout)
+      - mcp1-from-plugin: ✅ Loaded
+  - ./skills/generator (skills dir):
+      - pyproject-authoring: ✅ Loaded
+      - sdk-smart-defaults: ✅ Loaded
+  - bicep-mcp (mcp): ✅ Loaded
+```
+
+**Learnings:**
+- **Event semantics drive rendering simplicity.** Emitting Start before Result makes sense for observability but forces the renderer to invent a "pending" state. Deferring output to Result collapses the state machine (nothing → final) and makes unmatched Starts harmless.
+- **Insertion-order bookkeeping + post-hoc grouping.** Keeping `toolLines` as a flat insertion-ordered slice and grouping only at render time made the redraw path (on `EventToolsVerified` flips) identical to the live path — no divergence between "what we wrote" and "what we'd write now".
+- **Container detection must be kind-aware AND reference-aware.** A plugin is always a container (kind=plugin); a skill_dir parent is only detectable retroactively from its children's ParentKind. Handling both in one pass in `groupToolLines` is cleaner than trying to classify up front.
+- **Orphan Starts happen.** The resolver emits `emitStart` for skill_dir parents and never a matching `emitResult`. Rather than spuriously render them as failures, filtering "loading" status from the grouped output keeps the transcript clean and lets the upstream fix happen later.
