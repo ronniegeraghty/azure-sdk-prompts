@@ -5,6 +5,7 @@ import (
 "fmt"
 "os"
 "path/filepath"
+"strconv"
 "strings"
 
 "github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
@@ -112,17 +113,12 @@ return out
 // It decouples the validator from the config package so the tool package
 // has no circular import with config.
 type ValidationInput struct {
-// Plugins is the raw list of plugin names declared in the config
-// (config.ToolConfig.Plugins). Each name must resolve to either a
-// local plugin YAML in PluginsDir or an installed plugin under
-// ~/.copilot/installed-plugins/ (via plugin.ResolveInstalled).
-Plugins []string
-
-// GeneratorTools and ReviewerTools are the already-plugin-expanded
-// tool entries from the config's generator/reviewer sections.
-// Children that originated from a plugin (determined by matching
-// (kind, name) against the plugin's ToToolEntries) are skipped by
-// the validator — the plugin block reports them instead.
+// GeneratorTools and ReviewerTools are the tool entries from the
+// config's generator/reviewer sections. Entries with Type == "plugin"
+// are expanded into their child skills + MCP servers; the plugin
+// parent and each child are reported as individual items carrying
+// ParentName/ParentKind for grouped rendering. Role ("generator" /
+// "reviewer") is inherited from which list the plugin was declared in.
 GeneratorTools []Entry
 ReviewerTools  []Entry
 
@@ -131,9 +127,14 @@ ReviewerTools  []Entry
 // case paths are resolved relative to the current working dir.
 ConfigDir string
 
-// PluginsDir is the directory containing local plugin YAML definitions
-// (typically "./plugins"). May be empty; when empty, only installed
-// plugins are considered.
+// PluginsDir is a legacy directory containing plugin YAML definitions
+// (historically `./plugins`). May be empty. The resolver also checks
+// `./.hyoka/plugins/` and the remote cache (`~/.hyoka/cache/…`,
+// `~/.copilot/installed-plugins/…`) before failing. Local plugins
+// live at `./.hyoka/plugins/<name>/plugin.yaml` (or
+// `./.hyoka/plugins/<name>.yaml`); remote plugins resolve via the
+// marketplace cache. Fetch/resolution failures are fatal — ValidateAndExpand
+// returns an error before the eval runs (fail-fast contract).
 PluginsDir string
 
 // Emit receives per-leaf progress events (ToolResolutionStart /
@@ -159,66 +160,229 @@ Emit ProgressEmitter
 func ValidateAndExpand(ctx context.Context, in ValidationInput) (*ToolLoadReport, error) {
 report := &ToolLoadReport{}
 
-// Build plugin registry (best-effort: if PluginsDir doesn't exist,
-// registry stays empty and we fall through to installed-plugins).
+// Build plugin registry (best-effort: if the legacy PluginsDir doesn't
+// exist, registry stays empty and we fall through to the local
+// `./.hyoka/plugins` tree and then the remote cache).
 reg := plugin.NewRegistry()
 if in.PluginsDir != "" {
 if _, err := os.Stat(in.PluginsDir); err == nil {
 _ = reg.LoadDir(in.PluginsDir)
 }
 }
+// Also load plugins from `./.hyoka/plugins/<name>/plugin.yaml` and
+// `./.hyoka/plugins/<name>.yaml`. This is the new convention, mirroring
+// the `./.hyoka/` project layout used by skills/configs.
+loadHyokaPluginsDir(reg, in.ConfigDir)
 
-// Track (kind, name) pairs that belong to plugin expansions so we
-// skip them when iterating Generator/Reviewer tools below.
-pluginChildKeys := map[string]bool{}
+// Resolve generator + reviewer tool entries. Plugin entries are expanded
+// into parent + children with role inherited from which list they
+// came from (no dual-role auto-append).
+validateEntries(ctx, report, in.GeneratorTools, "generator", in.ConfigDir, in.Emit, reg, in.PluginsDir)
+validateEntries(ctx, report, in.ReviewerTools, "reviewer", in.ConfigDir, in.Emit, reg, in.PluginsDir)
 
-// Resolve plugins first. Each plugin emits a parent "loaded"/"failed"
-// row followed by per-child rows keyed by ParentName=plugin.
-for _, name := range in.Plugins {
-emitStart(in.Emit, name, progress.ToolKindPlugin)
-p, ok := registryLookup(reg, name)
-if !ok {
-// Try installed plugins as an opaque skill dir.
+if err := report.FirstError(); err != nil {
+return report, err
+}
+return report, nil
+}
+
+// loadHyokaPluginsDir populates reg with plugin YAMLs under
+// `<configDir>/.hyoka/plugins/` when that directory exists. Each plugin can
+// live at `.hyoka/plugins/<name>/plugin.yaml` (directory-style, preferred)
+// or `.hyoka/plugins/<name>.yaml` (flat file). Errors are tolerated — the
+// next resolution tier (remote cache) will catch truly missing plugins.
+func loadHyokaPluginsDir(reg *plugin.Registry, configDir string) {
+base := hyokaPluginsBase(configDir)
+if base == "" {
+return
+}
+info, err := os.Stat(base)
+if err != nil || !info.IsDir() {
+return
+}
+// Flat `.yaml` files at the top of .hyoka/plugins/.
+_ = reg.LoadDir(base)
+// Directory-per-plugin: .hyoka/plugins/<name>/plugin.yaml.
+entries, err := os.ReadDir(base)
+if err != nil {
+return
+}
+for _, e := range entries {
+if !e.IsDir() {
+continue
+}
+candidate := filepath.Join(base, e.Name(), "plugin.yaml")
+if _, err := os.Stat(candidate); err != nil {
+continue
+}
+// Load by pointing a temporary dir at the file — LoadDir walks
+// the tree, so calling it on the plugin subdir picks the YAML up.
+_ = reg.LoadDir(filepath.Join(base, e.Name()))
+}
+}
+
+// hyokaPluginsBase returns the absolute path of `.hyoka/plugins` under the
+// current working directory (the project root). The isolated per-eval
+// configDir is deliberately not consulted here — local plugins live in the
+// project, not in ephemeral scratch dirs. Returns empty string when the
+// CWD cannot be determined.
+func hyokaPluginsBase(configDir string) string {
+_ = configDir // retained for signature stability; project-relative layout is canonical
+wd, err := os.Getwd()
+if err != nil {
+return ""
+}
+return filepath.Join(wd, ".hyoka", "plugins")
+}
+
+// pluginCheckedPaths enumerates every filesystem path the plugin resolver
+// inspects for `name`. Used in the fail-fast error message so operators
+// know exactly where the resolver looked.
+func pluginCheckedPaths(name, configDir, pluginsDir string) []string {
+var paths []string
+if base := hyokaPluginsBase(configDir); base != "" {
+paths = append(paths,
+filepath.Join(base, name, "plugin.yaml"),
+filepath.Join(base, name+".yaml"),
+)
+}
+if pluginsDir != "" {
+paths = append(paths, filepath.Join(pluginsDir, name+".yaml"))
+}
+home, err := os.UserHomeDir()
+if err == nil {
+paths = append(paths,
+filepath.Join(home, ".hyoka", "cache", "default", "microsoft", "skills", ".github", "plugins", trimAtRef(name)),
+filepath.Join(home, ".hyoka", "cache", "default", trimAtRef(name), "skills"),
+filepath.Join(home, ".copilot", "installed-plugins", trimAtRef(name), "skills"),
+)
+}
+return paths
+}
+
+// trimAtRef strips the "@marketplace" suffix from a plugin ref so callers
+// can build cache-path hints that point at the on-disk plugin name.
+func trimAtRef(ref string) string {
+for i := len(ref) - 1; i >= 0; i-- {
+if ref[i] == '@' {
+return ref[:i]
+}
+}
+return ref
+}
+
+func registryLookup(reg *plugin.Registry, name string) (*plugin.Plugin, bool) {
+if reg == nil {
+return nil, false
+}
+p, err := reg.Get(name)
+if err != nil {
+return nil, false
+}
+return p, true
+}
+
+func validateEntries(ctx context.Context, report *ToolLoadReport, entries []Entry, role, configDir string, emit ProgressEmitter, reg *plugin.Registry, pluginsDir string) {
+for _, entry := range entries {
+kind := entry.ResolvedType()
+switch kind {
+case progress.ToolKindSkill:
+validateSkillEntry(ctx, report, entry, role, configDir, emit)
+case progress.ToolKindMCP:
+validateMCPEntry(report, entry, role, emit)
+case TypePlugin:
+validatePluginEntry(report, entry, role, configDir, emit, reg, pluginsDir)
+}
+}
+}
+
+// validatePluginEntry resolves a `type: plugin` tool entry, fanning out to
+// its child skills + MCP servers. source: local prefers the local plugin
+// registry (`./.hyoka/plugins/` or the legacy PluginsDir); source: remote
+// prefers the marketplace cache. Unset source tries both (remote first for
+// name@marketplace refs, local first otherwise). On failure, the reason
+// enumerates every path the resolver checked so operators can diagnose
+// fast. Fetch/resolution failures are hard-fails upstream (caller returns
+// the ToolLoadError before the eval session starts).
+func validatePluginEntry(report *ToolLoadReport, entry Entry, role, configDir string, emit ProgressEmitter, reg *plugin.Registry, pluginsDir string) {
+name := entry.Name
+emitStart(emit, name, progress.ToolKindPlugin)
+
+src := entry.Source // "" | "local" | "remote"
+// Infer default: refs with an "@marketplace" suffix prefer remote.
+if src == "" {
+if trimAtRef(name) != name {
+src = SourceRemote
+} else {
+src = SourceLocal
+}
+}
+
+// Try local registry first when source == local (or unset -> inferred local).
+if src == SourceLocal {
+if p, ok := registryLookup(reg, name); ok {
+emitPluginLoadedWithChildren(report, emit, p, name, role, configDir)
+return
+}
+}
+// Try remote cache (installed plugins).
+if src == SourceRemote || src == SourceLocal {
 if dir := plugin.ResolveInstalled(name); dir != "" {
-path := dir
+// Remote plugins are delivered as an opaque skill directory.
 item := ToolLoadItem{
 Kind:       progress.ToolKindSkill,
 Name:       name,
 Parent:     name,
 ParentKind: progress.ToolParentKindPlugin,
 Status:     progress.ToolStatusLoaded,
-Path:       path,
-Role:       "plugin",
+Path:       dir,
+Role:       role,
 }
 report.Items = append(report.Items, item)
-emitResultWithParent(in.Emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
-emitResultWithParent(in.Emit, name, progress.ToolKindSkill, progress.ToolStatusLoaded, "", name, progress.ToolParentKindPlugin)
-pluginChildKeys[progress.ToolKindSkill+":"+name] = true
-continue
+emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
+emitResultWithParent(emit, name, progress.ToolKindSkill, progress.ToolStatusLoaded, "", name, progress.ToolParentKindPlugin)
+return
 }
-reason := "plugin not found in registry or installed plugins"
+// If source was explicitly remote, try local as a last-ditch fallback.
+if src == SourceRemote {
+if p, ok := registryLookup(reg, name); ok {
+emitPluginLoadedWithChildren(report, emit, p, name, role, configDir)
+return
+}
+}
+}
+
+// Hard-fail with enumerated paths.
+paths := pluginCheckedPaths(name, configDir, pluginsDir)
+reason := "plugin " + strconv.Quote(name) + " not found (source=" + src + "). Checked:"
+for _, p := range paths {
+reason += "\n  - " + p
+}
+reason += "\nInstall a local plugin at .hyoka/plugins/" + trimAtRef(name) + "/plugin.yaml, or run: /plugin install " + name
 report.Items = append(report.Items, ToolLoadItem{
 Kind:   progress.ToolKindPlugin,
 Name:   name,
 Status: progress.ToolStatusFailed,
 Reason: reason,
-Role:   "plugin",
+Role:   role,
 })
-emitResultWithParent(in.Emit, name, progress.ToolKindPlugin, progress.ToolStatusFailed, reason, "", "")
-continue
+emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusFailed, reason, "", "")
 }
-emitResultWithParent(in.Emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
-// Enumerate children.
+
+// emitPluginLoadedWithChildren records the plugin parent + each expanded
+// child (skill or MCP). Children carry ParentName/ParentKind for grouped
+// rendering. Role is inherited from the parent entry's list.
+func emitPluginLoadedWithChildren(report *ToolLoadReport, emit ProgressEmitter, p *plugin.Plugin, name, role, configDir string) {
+emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
 for _, child := range p.ToToolEntries() {
-pluginChildKeys[child.Type+":"+child.Name] = true
 childItem := ToolLoadItem{
 Kind:       child.Type,
 Name:       child.Name,
 Parent:     name,
 ParentKind: progress.ToolParentKindPlugin,
-Role:       "plugin",
+Role:       role,
 }
-emitStart(in.Emit, child.Name, child.Type)
+emitStart(emit, child.Name, child.Type)
 switch child.Type {
 case progress.ToolKindSkill:
 entry := Entry{
@@ -228,7 +392,7 @@ Source: child.Source,
 Path:   child.Path,
 Repo:   child.Repo,
 }
-path, err := validateSingleSkill(entry, in.ConfigDir)
+path, err := validateSingleSkill(entry, configDir)
 if err != nil {
 childItem.Status = progress.ToolStatusFailed
 childItem.Reason = err.Error()
@@ -247,45 +411,7 @@ default:
 childItem.Status = progress.ToolStatusLoaded
 }
 report.Items = append(report.Items, childItem)
-emitResultWithParent(in.Emit, child.Name, child.Type, childItem.Status, childItem.Reason, name, progress.ToolParentKindPlugin)
-}
-}
-
-// Resolve generator + reviewer tool entries. Skip entries that came
-// from plugin expansion (already reported as plugin children).
-validateEntries(ctx, report, in.GeneratorTools, "generator", in.ConfigDir, in.Emit, pluginChildKeys)
-validateEntries(ctx, report, in.ReviewerTools, "reviewer", in.ConfigDir, in.Emit, pluginChildKeys)
-
-if err := report.FirstError(); err != nil {
-return report, err
-}
-return report, nil
-}
-
-func registryLookup(reg *plugin.Registry, name string) (*plugin.Plugin, bool) {
-if reg == nil {
-return nil, false
-}
-p, err := reg.Get(name)
-if err != nil {
-return nil, false
-}
-return p, true
-}
-
-func validateEntries(ctx context.Context, report *ToolLoadReport, entries []Entry, role, configDir string, emit ProgressEmitter, pluginKeys map[string]bool) {
-for _, entry := range entries {
-kind := entry.ResolvedType()
-key := kind + ":" + entry.Name
-if pluginKeys[key] {
-continue
-}
-switch kind {
-case progress.ToolKindSkill:
-validateSkillEntry(ctx, report, entry, role, configDir, emit)
-case progress.ToolKindMCP:
-validateMCPEntry(report, entry, role, emit)
-}
+emitResultWithParent(emit, child.Name, child.Type, childItem.Status, childItem.Reason, name, progress.ToolParentKindPlugin)
 }
 }
 

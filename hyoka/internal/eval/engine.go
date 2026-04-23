@@ -341,9 +341,6 @@ func cloneToolConfigForModel(src config.ToolConfig, model string) config.ToolCon
 		}
 		dst.Reviewer = &rev
 	}
-	if len(src.Plugins) > 0 {
-		dst.Plugins = append([]string(nil), src.Plugins...)
-	}
 	return dst
 }
 

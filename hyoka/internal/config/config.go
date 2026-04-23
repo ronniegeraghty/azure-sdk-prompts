@@ -52,17 +52,22 @@ type SessionLimits struct {
 }
 
 // ToolConfig represents a single evaluation configuration.
+//
+// Note (schema retire, 2026-04-24): the top-level `plugins:` field has been
+// removed. Plugins are now declared as tool entries under `generator.tools`
+// (or `reviewer.tools`) with `type: plugin` and optional `source: local|remote`.
+// Any config that still carries a top-level `plugins:` field is rejected at
+// Parse time with a migration-hint error.
 type ToolConfig struct {
 	Name        string           `yaml:"name" json:"name"`
 	Description string           `yaml:"description" json:"description"`
 	Generator   *GeneratorConfig `yaml:"generator,omitempty" json:"generator,omitempty"`
 	Reviewer    *ReviewerConfig  `yaml:"reviewer,omitempty" json:"reviewer,omitempty"`
-	Plugins     []string         `yaml:"plugins,omitempty" json:"plugins,omitempty"`
 	Limits      *SessionLimits   `yaml:"limits,omitempty" json:"limits,omitempty"`
 }
 
-// Normalize resolves plugin references into generator skill directories.
-// It is idempotent — safe to call multiple times.
+// Normalize ensures non-nil Generator and Reviewer sub-configs so downstream
+// code can append to Tools without nil-checks. Idempotent.
 func (tc *ToolConfig) Normalize() {
 	if tc.Generator == nil {
 		tc.Generator = &GeneratorConfig{}
@@ -70,96 +75,6 @@ func (tc *ToolConfig) Normalize() {
 	if tc.Reviewer == nil {
 		tc.Reviewer = &ReviewerConfig{}
 	}
-
-	// Resolve installed Copilot CLI plugins to generator skills.
-	// Format: "plugin-name@marketplace" (e.g., "azure-sdk-java@skills")
-	// Resolves to: ~/.hyoka/cache/{marketplace}/{plugin}/skills/ (preferred)
-	// or ~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/ (fallback)
-	for _, p := range tc.Plugins {
-		if dir := resolveInstalledPlugin(p); dir != "" {
-			tc.Generator.Tools = append(tc.Generator.Tools, ToolEntry{
-				Name:   p,
-				Type:   "skill",
-				Source: "local",
-				Path:   dir,
-			})
-			slog.Info("Resolved plugin to skill directory", "plugin", p, "path", dir)
-		} else {
-			slog.Warn("Could not resolve installed plugin", "plugin", p)
-		}
-	}
-}
-
-// resolveInstalledPlugin resolves a plugin reference (e.g., "azure-sdk-java@skills")
-// to the local skills directory. Checks the git-clone cache first (.hyoka/cache/),
-// then falls back to ~/.copilot/installed-plugins/ for backward compatibility.
-// The format is "plugin-name@marketplace" where marketplace is the source
-// (e.g., "skills" from microsoft/skills repo).
-// Returns the path to the plugin's skills directory, or empty string if not found.
-func resolveInstalledPlugin(ref string) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-
-	// Parse "plugin@marketplace" format
-	plugin, marketplace := ref, ""
-	if idx := len(ref) - 1; idx > 0 {
-		for i := idx; i >= 0; i-- {
-			if ref[i] == '@' {
-				plugin = ref[:i]
-				marketplace = ref[i+1:]
-				break
-			}
-		}
-	}
-
-	// Special case: "name@skills" is shorthand for microsoft/skills repo
-	if marketplace == "skills" {
-		// Check .hyoka/cache/default/microsoft/skills/.github/plugins/{name}/
-		hyokaCache := filepath.Join(home, ".hyoka", "cache", "default", "microsoft", "skills")
-		skillLocations := []string{
-			filepath.Join(hyokaCache, ".github", "plugins", plugin),
-			filepath.Join(hyokaCache, ".github", "skills", plugin),
-			filepath.Join(hyokaCache, "skills", plugin),
-		}
-		for _, dir := range skillLocations {
-			if info, err := os.Stat(dir); err == nil && info.IsDir() {
-				if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err == nil {
-					return dir
-				}
-			}
-		}
-	}
-
-	// Check ~/.hyoka/cache/ for any version (prefer "default")
-	hyokaCache := filepath.Join(home, ".hyoka", "cache", "default")
-	if marketplace != "" {
-		// Try marketplace as owner/repo pattern
-		dir := filepath.Join(hyokaCache, marketplace, plugin, "skills")
-		if info, err := os.Stat(dir); err == nil && info.IsDir() {
-			return dir
-		}
-	}
-	dir := filepath.Join(hyokaCache, plugin, "skills")
-	if info, err := os.Stat(dir); err == nil && info.IsDir() {
-		return dir
-	}
-
-	// Fallback: check ~/.copilot/installed-plugins/ for backwards compatibility.
-	basePath := filepath.Join(home, ".copilot", "installed-plugins")
-	if marketplace != "" {
-		dir := filepath.Join(basePath, marketplace, plugin, "skills")
-		if info, err := os.Stat(dir); err == nil && info.IsDir() {
-			return dir
-		}
-	}
-	dir = filepath.Join(basePath, plugin, "skills")
-	if info, err := os.Stat(dir); err == nil && info.IsDir() {
-		return dir
-	}
-
-	return ""
 }
 
 // EffectiveGeneratorSkills returns the generator's skill list from the normalized config.
@@ -224,9 +139,6 @@ func Load(path string) (*ConfigFile, error) {
 	cfg, err := Parse(data)
 	if err != nil {
 		return nil, err
-	}
-	if err := cfg.ExpandPlugins(resolvePluginsDir()); err != nil {
-		return nil, fmt.Errorf("expanding plugins: %w", err)
 	}
 	cfg.ApplyVersionOverrides()
 	if err := cfg.Validate(); err != nil {
@@ -300,6 +212,14 @@ func LoadDir(dir string) (*ConfigFile, error) {
 
 // Parse parses configuration from YAML bytes.
 func Parse(data []byte) (*ConfigFile, error) {
+	// Pre-scan for retired schema fields so users get a migration hint
+	// instead of a terse "field plugins not found" yaml error. Pre-1.0
+	// there is no back-compat for the top-level `plugins:` field — it
+	// must be expressed as `type: plugin` entries under
+	// generator.tools (or reviewer.tools) instead.
+	if err := rejectRetiredPluginsField(data); err != nil {
+		return nil, err
+	}
 	var cfg ConfigFile
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
@@ -314,6 +234,43 @@ func Parse(data []byte) (*ConfigFile, error) {
 		slog.Info("Config loaded", "name", c.Name, "models", strings.Join(models, ","))
 	}
 	return &cfg, nil
+}
+
+// rejectRetiredPluginsField scans the YAML for a `plugins:` key at the
+// top level of any config entry (i.e. sibling of `generator`/`reviewer`)
+// and returns a migration-hint error when one is found. The top-level
+// `plugins:` field was retired in favor of `type: plugin` entries under
+// `generator.tools` / `reviewer.tools`.
+func rejectRetiredPluginsField(data []byte) error {
+	var raw struct {
+		Configs []map[string]yaml.Node `yaml:"configs"`
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		// Let the typed decode surface this — it will produce a proper
+		// line-numbered yaml error.
+		return nil
+	}
+	for _, c := range raw.Configs {
+		if _, ok := c["plugins"]; ok {
+			name, _ := c["name"]
+			return fmt.Errorf(
+				"config %q: the top-level `plugins:` field has been retired. "+
+					"Move each plugin under `generator.tools` (or `reviewer.tools` if needed) as:\n"+
+					"    - name: <plugin-name>\n"+
+					"      type: plugin\n"+
+					"      source: remote   # or 'local' for ./.hyoka/plugins/<name>/plugin.yaml",
+				nodeValue(name),
+			)
+		}
+	}
+	return nil
+}
+
+func nodeValue(n yaml.Node) string {
+	if n.Kind == yaml.ScalarNode {
+		return n.Value
+	}
+	return "<unnamed>"
 }
 
 // Validate checks all configs for required fields and constraint violations.
@@ -422,13 +379,12 @@ func (cf *ConfigFile) GetConfigs(names []string) ([]ToolConfig, error) {
 	return result, nil
 }
 
-// InstallSkillsAndPlugins is a no-op as of the git-clone resolver implementation.
-// Plugin resolution now happens lazily on first use via the gitFetcher, which
-// clones repos to the per-eval .skills-cache/ directory. This function remains
-// for backward compatibility but does nothing — plugins are resolved at eval time
-// by ExpandPlugins and the git-clone fetcher handles the actual git operations
-// without any stdout pollution.
+// InstallSkillsAndPlugins is a no-op retained for backward compatibility.
+// Skill/plugin resolution now happens at eval time via ValidateAndExpand
+// (plugins) and the git-clone fetcher (remote skills). This function
+// remains callable so legacy call sites keep compiling without requiring
+// a coordinated removal.
 func InstallSkillsAndPlugins(configs []ToolConfig) error {
-	// No-op: git-clone resolver handles everything lazily
+	// No-op: plugin + skill resolution is lazy.
 	return nil
 }

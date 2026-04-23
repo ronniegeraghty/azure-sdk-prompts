@@ -59,8 +59,8 @@ skills:
 	}
 	
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
-		Plugins: []string{"test-plugin"},
 		GeneratorTools: []Entry{
+			{Type: "plugin", Name: "test-plugin", Source: "local"},
 			{Type: "skill", Source: "local", Path: "skills", Name: "gen-skills", SkillDir: true},
 			{Type: "skill", Source: "local", Path: "single-skill", Name: "single"},
 			{Type: "mcp", Name: "test-mcp", Command: "npx test"},
@@ -143,7 +143,9 @@ func TestValidateAndExpand_MissingPlugin(t *testing.T) {
 	}
 	
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
-		Plugins:    []string{"nonexistent-plugin"},
+		GeneratorTools: []Entry{
+			{Type: "plugin", Name: "nonexistent-plugin", Source: "local"},
+		},
 		ConfigDir:  dir,
 		PluginsDir: pluginDir,
 	})
@@ -230,7 +232,9 @@ skills: [this is not valid yaml
 	// Plugin registry load should fail or return empty
 	// ValidateAndExpand should report plugin not found
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
-		Plugins:    []string{"bad-plugin"},
+		GeneratorTools: []Entry{
+			{Type: "plugin", Name: "bad-plugin", Source: "local"},
+		},
 		ConfigDir:  dir,
 		PluginsDir: pluginDir,
 	})
@@ -267,7 +271,9 @@ skills:
 	}
 	
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
-		Plugins:    []string{"broken-plugin"},
+		GeneratorTools: []Entry{
+			{Type: "plugin", Name: "broken-plugin", Source: "local"},
+		},
 		ConfigDir:  dir,
 		PluginsDir: pluginDir,
 	})
@@ -340,7 +346,6 @@ func TestValidateAndExpand_EmptyConfig(t *testing.T) {
 	dir := t.TempDir()
 	
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
-		Plugins:        nil,
 		GeneratorTools: nil,
 		ReviewerTools:  nil,
 		ConfigDir:      dir,

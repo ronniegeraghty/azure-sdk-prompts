@@ -172,7 +172,6 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	// report without re-resolving.
 	taggedEmit := e.buildTaggedEmit(cfg, p.ID+"/"+cfg.Name, p.ID)
 	toolReport, toolErr := tool.ValidateAndExpand(ctx, tool.ValidationInput{
-		Plugins:        cfg.Plugins,
 		GeneratorTools: cfgGeneratorTools(cfg),
 		// Reviewer tools are validated separately in cmd/run.go per-config
 		// (WU-2) so missing reviewer skills fail fast there; including them
@@ -847,7 +846,6 @@ func (e *CopilotPromptRunner) buildSessionConfigForEval(ctx context.Context, cfg
 		// producing the same SessionConfig.
 		taggedEmit := e.buildTaggedEmit(cfg, evalID, promptID)
 		if taggedEmit != nil {
-			cfg.EmitPluginResolutions(taggedEmit)
 			if cfg.Generator != nil {
 				tool.EmitMCPResolutions(cfg.Generator.Tools, taggedEmit)
 			}

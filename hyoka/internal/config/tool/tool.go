@@ -5,9 +5,10 @@ package tool
 
 // Tool type constants.
 const (
-	TypeTool  = "tool"
-	TypeMCP   = "mcp"
-	TypeSkill = "skill"
+	TypeTool   = "tool"
+	TypeMCP    = "mcp"
+	TypeSkill  = "skill"
+	TypePlugin = "plugin"
 )
 
 // Skill source constants.

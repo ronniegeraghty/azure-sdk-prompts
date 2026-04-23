@@ -185,11 +185,6 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 		dst.Reviewer = &rev
 	}
 
-	if len(src.Plugins) > 0 {
-		dst.Plugins = make([]string, len(src.Plugins))
-		copy(dst.Plugins, src.Plugins)
-	}
-
 	return dst
 }
 

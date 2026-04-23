@@ -78,6 +78,14 @@ func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 		if entry.SkillDir && entry.Repo != "" {
 			return fmt.Errorf("config %q: tools[%d] skill_dir is only valid for local skills", configName, idx)
 		}
+	case "plugin":
+		// Plugins resolve via name (Entry.Name). Optional `source: local|remote`
+		// selects between the local plugin directory and the remote marketplace
+		// cache. Unset source is inferred at resolution time (remote-first,
+		// local fallback).
+		if entry.Source != "" && entry.Source != "local" && entry.Source != "remote" {
+			return fmt.Errorf("config %q: tools[%d] plugin entry has invalid source %q (want local|remote)", configName, idx, entry.Source)
+		}
 	default:
 		return fmt.Errorf("config %q: tools[%d] has unknown type %q", configName, idx, entry.Type)
 	}

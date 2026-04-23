@@ -13,10 +13,6 @@ import (
 // Returns the absolute path to the plugin's skills directory, or "" when
 // the plugin cannot be located. This function is read-only and has no side
 // effects beyond filesystem stats.
-//
-// Mirrors the resolveInstalledPlugin helper in internal/config so the tool
-// package (which validates plugins pre-session) can resolve marketplace
-// plugin refs without importing internal/config.
 func ResolveInstalled(ref string) string {
 home, err := os.UserHomeDir()
 if err != nil {

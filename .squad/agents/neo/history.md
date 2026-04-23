@@ -1085,3 +1085,39 @@ The validator itself (`ValidateAndExpand`) is correct — it emits per-leaf even
 - `config.Load` → `cfg.ExpandPlugins(...)` (`config.go:228`) — lenient, `slog.Warn` on miss, appends children to `cfg.Generator.Tools`/`cfg.Reviewer.Tools` in-place.
 - `Runner.runEval` → `tool.ValidateAndExpand` (`eval/copilot.go:174`) — strict, hard-fail on miss. Reads `cfg.Plugins` directly (NOT the already-appended tool entries) and deduplicates plugin-child (kind,name) pairs against `GeneratorTools` to avoid double-reporting.
 - This is why migrating to `type: plugin` requires removing the config-load-time appending (or turning it off when the new type is present).
+
+---
+
+## Plugin wave close-out (2026-04-24) — schema retired
+
+Delivered WU-A1 / WU-A2 / WU-A5 on `ronniegeraghty/dev`. Summary of the final shape:
+
+### Schema
+
+- Removed `ToolConfig.Plugins []string` entirely. Top-level `plugins:` is now a **hard Parse error** with a migration-hint message pointing at the `type: plugin` tool-entry form. No deprecation sugar, no auto-rewrite.
+- Added `TypePlugin = "plugin"` to `internal/config/tool/tool.go` and a `case "plugin":` branch to `validateToolEntry` (accepts optional `source: local|remote`).
+- Plugins live where skills live — inside `generator.tools` / `reviewer.tools`. No dual-role auto-append. If a plugin is wanted on both, it must be listed twice.
+
+### Resolver
+
+- `ValidateAndExpand` no longer reads an `in.Plugins` field. It scans `GeneratorTools` + `ReviewerTools` for `type: plugin` entries and expands each into parent + children carrying `ParentName`/`ParentKind`. Role is inherited from the surrounding list.
+- Local lookup tries, in order: `./.hyoka/plugins/<name>/plugin.yaml` → `./.hyoka/plugins/<name>.yaml` → legacy `./plugins/<name>.yaml`. Remote lookup delegates to `plugin.ResolveInstalled` (hyoka cache → legacy `~/.copilot/installed-plugins/`).
+- `source: local` prefers local tiers only; `source: remote` prefers cache and falls back to local; unset source infers (marketplace `@ref` → remote-first, bare name → local-first).
+- Not-found errors enumerate every path checked, followed by an install hint (`/plugin install …`). No more "not found in registry or installed plugins".
+
+### Fail-fast
+
+- Resolution failure is a `ToolLoadError` from `ValidateAndExpand`, which `eval/copilot.go` already promotes to `ErrorCategory=tool_load_failure` **before** CreateSession. No eval runs if a plugin can't be resolved.
+
+### Config sweep
+
+- `configs/` + `.hyoka/configs/` — grepped both trees for `^plugins:` at top level. Zero hits. Both `baseline-sonnet-skills.yaml` and `python-pairwise.yaml` already used `type: plugin` under `generator.tools` (reviewer side has no plugin entries, which matches Ronnie's intent). `hyoka validate` passes for all 13 configs.
+
+## Learnings
+
+- **Gotcha (resolved):** `validate.go` in this repo has no indentation on function bodies (it still compiles because Go doesn't require it). Edits must preserve the flat style or `edit` tool `old_str` lookups fail. Do not reformat.
+- **Gotcha (resolved):** `configDir` passed into `ValidateAndExpand` from `copilot.go` is an **isolated per-eval temp dir** (`/tmp/hyoka-config-...`), not the project root. Resolving `./.hyoka/plugins/` against it surfaced `/tmp/...` paths in error messages. Fixed `hyokaPluginsBase` to always use CWD.
+- **Design note:** Kept `ResolvePluginsDir` (legacy `./plugins/`) around. Eliminating it would mean moving the Azure-Python plugin YAML into `./.hyoka/plugins/`, which is a broader migration than this wave owns.
+- **Deletion:** `plugins_emit_test.go` (obsolete — `EmitPluginResolutions` no longer exists), `ExpandPlugins` methods (both file-level and per-config), `resolveInstalledPlugin` duplicate in `config/config.go`, `Plugins` plumbing in `eval/engine.go` + `pairwise/pairwise.go`.
+- **Reviewer contract is unchanged:** `cmd/run.go` already passed reviewer tools through `ValidateAndExpand`. The new plugin-entry path works there identically.
+- **Test discipline applied:** Rewrote 5 `validate_test.go` call sites from `Plugins: []string{...}` to `GeneratorTools: []Entry{{Type: "plugin", ...}}`. Updated `TestParseGeneratorSkillsAndPlugins` + added `TestParse_RejectsRetiredTopLevelPluginsField`. Removed three `TestExpandPlugins*` tests (deprecated code path deleted).

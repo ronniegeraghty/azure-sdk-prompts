@@ -16,13 +16,15 @@ func TestCopilotRunner_ToolLoadFailure_HardFail(t *testing.T) {
 		MaxSessionActions: 50,
 	})
 	
-	// Config with a non-existent plugin
+	// Config with a non-existent plugin declared as a tool entry.
 	cfg := &config.ToolConfig{
 		Name: "test-config",
 		Generator: &config.GeneratorConfig{
 			Model: "gpt-4",
+			Tools: []config.ToolEntry{
+				{Type: "plugin", Name: "nonexistent-plugin", Source: "local"},
+			},
 		},
-		Plugins: []string{"nonexistent-plugin"},
 	}
 	
 	p := &prompt.Prompt{
