@@ -489,26 +489,119 @@ export function PromptDetailPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(showEnvToolsOnly ? correlations.byToolEnv : correlations.byToolAll).map(d => {
-                          const rateColor = d.rate >= 80 ? "text-emerald-400" : d.rate >= 60 ? "text-amber-400" : "text-red-400";
-                          return (
-                            <tr key={d.name} className="border-b border-white/5 transition hover:bg-white/[0.02]">
-                              <td className="px-3 py-2.5 text-white/70" style={{ ...mono, fontSize: 11 }}>{d.name}</td>
-                              <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{d.total}</td>
-                              <td className="px-3 py-2.5">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/10">
-                                    <div className={`h-full rounded-full ${d.rate >= 80 ? "bg-emerald-500" : d.rate >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.rate}%` }} />
+                        {(() => {
+                          // Phase 6.6: group sibling tools (e.g. azure.sdk_get_*,
+                          // azure.sdk_list_*) under their parent prefix so the
+                          // table reads as 'azure (8 tools, 78%) → individual
+                          // tools indented'. Parent is derived from the first
+                          // path segment (split on '.', '/', or '_'). When a
+                          // parent has only one child we render the child flat
+                          // — no point in a one-child group.
+                          //
+                          // Note: tool_calls today are flat strings on the wire.
+                          // Once Go ToolAvailabilityEntry carries parent linkage
+                          // we should switch this aggregator to use those
+                          // fields instead of prefix splitting.
+                          const data = (showEnvToolsOnly ? correlations.byToolEnv : correlations.byToolAll);
+
+                          const parentOf = (name: string): string | null => {
+                            const dotIdx = name.indexOf(".");
+                            if (dotIdx > 0) return name.slice(0, dotIdx);
+                            const slashIdx = name.indexOf("/");
+                            if (slashIdx > 0) return name.slice(0, slashIdx);
+                            const underIdx = name.indexOf("_");
+                            // Heuristic: only treat underscore as a separator
+                            // when the prefix is short-ish (looks like a server
+                            // name). Skips false positives like
+                            // 'azure_storage_blob_py'.
+                            if (underIdx > 1 && underIdx <= 12) return name.slice(0, underIdx);
+                            return null;
+                          };
+
+                          // Group children under each parent.
+                          type Row = typeof data[number];
+                          const groups = new Map<string, { children: Row[]; total: number; passed: number }>();
+                          const orphans: Row[] = [];
+                          for (const d of data) {
+                            const parent = parentOf(d.name);
+                            if (!parent) {
+                              orphans.push(d);
+                              continue;
+                            }
+                            if (!groups.has(parent)) groups.set(parent, { children: [], total: 0, passed: 0 });
+                            const g = groups.get(parent)!;
+                            g.children.push(d);
+                            g.total += d.total;
+                            g.passed += d.passed;
+                          }
+
+                          // Single-child groups → re-orphan so we don't render
+                          // a useless header for them.
+                          for (const [parent, g] of [...groups.entries()]) {
+                            if (g.children.length < 2) {
+                              orphans.push(...g.children);
+                              groups.delete(parent);
+                            }
+                          }
+
+                          const rows: React.ReactNode[] = [];
+                          const renderRow = (d: Row, indent = false) => {
+                            const rateColor = d.rate >= 80 ? "text-emerald-400" : d.rate >= 60 ? "text-amber-400" : "text-red-400";
+                            return (
+                              <tr key={`row-${d.name}`} className="border-b border-white/5 transition hover:bg-white/[0.02]">
+                                <td className={`px-3 py-2.5 text-white/70 ${indent ? "pl-8" : ""}`} style={{ ...mono, fontSize: 11 }}>
+                                  {indent && <span className="text-white/20 mr-1.5">└</span>}
+                                  {d.name}
+                                </td>
+                                <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{d.total}</td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/10">
+                                      <div className={`h-full rounded-full ${d.rate >= 80 ? "bg-emerald-500" : d.rate >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.rate}%` }} />
+                                    </div>
+                                    <span className={rateColor} style={{ ...mono, fontSize: 11 }}>{d.rate}%</span>
                                   </div>
-                                  <span className={rateColor} style={{ ...mono, fontSize: 11 }}>{d.rate}%</span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <DeltaIndicator rate={d.rate} baseline={correlations.overallRate} />
-                              </td>
-                            </tr>
-                          );
-                        })}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <DeltaIndicator rate={d.rate} baseline={correlations.overallRate} />
+                                </td>
+                              </tr>
+                            );
+                          };
+
+                          // Grouped first, sorted by parent name.
+                          for (const [parent, g] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+                            const aggRate = g.total > 0 ? parseFloat(((g.passed / g.total) * 100).toFixed(1)) : 0;
+                            const rateColor = aggRate >= 80 ? "text-emerald-400" : aggRate >= 60 ? "text-amber-400" : "text-red-400";
+                            rows.push(
+                              <tr key={`parent-${parent}`} className="border-b border-white/10 bg-white/[0.02]">
+                                <td className="px-3 py-2.5 text-white/80" style={{ ...mono, fontSize: 11 }}>
+                                  {parent}
+                                  <span className="ml-2 text-white/30" style={{ fontSize: 10 }}>
+                                    ({g.children.length} tools)
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{g.total}</td>
+                                <td className="px-3 py-2.5">
+                                  <span className={rateColor} style={{ ...mono, fontSize: 11 }}>{aggRate}%</span>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <DeltaIndicator rate={aggRate} baseline={correlations.overallRate} />
+                                </td>
+                              </tr>
+                            );
+                            for (const child of g.children.sort((a, b) => a.name.localeCompare(b.name))) {
+                              rows.push(renderRow(child, true));
+                            }
+                          }
+
+                          // Then orphans.
+                          for (const d of orphans.sort((a, b) => b.rate - a.rate)) {
+                            rows.push(renderRow(d, false));
+                          }
+
+                          return rows;
+                        })()}
                       </tbody>
                     </table>
                   </div>
