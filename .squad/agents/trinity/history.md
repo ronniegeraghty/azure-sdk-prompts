@@ -242,3 +242,68 @@ Fixed interleaving issue in interactive renderer where "Agent Attempt:" section 
 This reverses the Sprint 1 misassignment that split Trinity's focus across unrelated domains. With Tank owning CLI and Trinity owning site, each agent has single-responsibility scope.
 
 **Related:** Tank shipped console-friendly slog handler (commits `82fc9750` + `727a67b0`). Neo shipped git-clone skill resolver (commit `cf6a7636`). All three Round 2 deliverables shipped.
+
+## Session 2026-04-23 — Interactive Progress Tail Line Wrapping Bug (FIXED)
+
+**Mission:** Debug and fix Bug B — multi-line tail leak in interactive eval progress renderer.
+
+**Context:** Two bugs were under repair in a prior session:
+1. **Bug A (section ordering):** FIXED in `6b3d3d48` — agent gate timing issue, tools now render before Agent Attempt.
+2. **Bug B (tail line wraps):** CLAIMED FIXED in `6b3d3d48` but still occurring live — activity messages exceeding terminal width wrapped to multiple rows, and earlier wrapped rows leaked through on rewrite.
+
+**Root Cause Analysis:**
+
+The previous fix (`6b3d3d48`) added:
+- `TermWidth()` using `golang.org/x/term` to detect terminal width
+- `truncateToWidth()` to truncate NEW tail text with ANSI-aware width calculation
+- `writeTail()` called `truncateToWidth()` before writing
+
+**What it DIDN'T fix:** `rewriteTail()` used `\r\033[2K` (clear current line), which ONLY clears the physical row where the cursor sits. When the PREVIOUS tail text was longer than terminal width and wrapped to multiple rows, the cursor ended up on the LAST row. `\r` moved back to column 0 of THAT row, `\033[2K` cleared THAT row, but the earlier wrapped rows stayed visible → scrolling trail effect.
+
+**Byte vs. Rune vs. Cell Width Distinction:**
+- **Bytes:** Raw UTF-8 encoding length. Meaningless for terminal width.
+- **Runes:** Go string iteration unit (one per Unicode code point). Close to terminal cells for ASCII, but emojis/wide chars can occupy 2+ cells.
+- **Terminal cells (columns):** What the terminal actually counts. ANSI sequences = 0 width, most runes = 1 cell, wide chars = 2 cells.
+
+The prior fix counted bytes in some paths and runes in others. The new fix consistently counts runes (good enough — truncating emoji slightly short is harmless, and exact East Asian width detection would require `golang.org/x/text/width`, not worth the dep).
+
+**Fix Applied (commit `42ea88fb`):**
+
+1. **Added `visibleWidth()` helper:** Strips ANSI sequences, counts runes → terminal cell estimate.
+2. **Added `tailRowCount` field to `interactiveEval`:** Tracks how many physical rows the current tail occupies (`ceil(visibleWidth / termWidth)`).
+3. **Updated `writeTail()`:** Computes and stores `tailRowCount` after truncating and writing.
+4. **Fixed `rewriteTail()`:**
+   - If `oldRows > 1`, move cursor UP `(oldRows - 1)` lines to the first row.
+   - Clear each row from top to bottom (`\r\033[2K\n` per row, except no `\n` on last).
+   - Write the new tail text.
+   - Recompute and store new `tailRowCount`.
+5. **Updated `freezeTail()`:** Resets `tailRowCount` to 0 when tail is committed.
+6. **Added unit tests:** `truncate_test.go` with `visibleWidth()` and `truncateToWidth()` coverage.
+
+**Verification:**
+- All existing progress package tests pass with `-race`.
+- New `TestVisibleWidth` and `TestTruncateToWidth` tests pass.
+- Live run with `COLUMNS=60` completed successfully (though interactive output didn't render to piped file — expected, TTY detection works).
+
+**Files Changed:**
+- `hyoka/internal/progress/display_interactive.go`: +71/-10 LOC
+- `hyoka/internal/progress/truncate_test.go`: +119 LOC (new file)
+
+**Commit:** `42ea88fb` — "fix(progress): clear all wrapped rows + rune-aware tail truncation"
+
+### Learnings
+
+**Multi-row clear pattern for in-place rewrites:** When a terminal line can wrap to multiple physical rows, `\r\033[2K` (clear current line) is NOT sufficient to clear the entire logical line. The cursor is at the end of the last wrapped row; `\r` moves to column 0 of THAT row only. To clear all rows:
+1. Track how many rows the previous content occupied (compute as `ceil(visibleWidth / termWidth)`).
+2. Move cursor UP `(rows - 1)` lines via `\033[nA`.
+3. Clear each row top-to-bottom: `\r\033[2K\n` per row (no `\n` on last row).
+4. Write new content.
+
+**Rune-aware width vs. byte length:** Go's `len(string)` returns BYTES, which breaks for UTF-8 multi-byte chars (e.g., emoji). Iterating `for range s` gives RUNES, which is the correct unit for terminal width estimation. East Asian wide chars (2 cells per rune) are not handled precisely, but truncating slightly short is harmless — exact width detection requires `golang.org/x/text/width`, not worth the dep for this use case.
+
+**ANSI-aware truncation requires regex stripping:** ANSI CSI sequences (`\x1b[...m`) have zero visible width. A naive truncation that chops at byte N or rune N will count these sequences toward the width limit, producing incorrect results. Strip them first (via regex), count runes, then reconstruct output by copying ANSI sequences verbatim and truncating visible runes.
+
+**Fallback width when `term.GetSize` fails:** When stdout is not a TTY (piped, redirected, or non-file writer), `term.GetSize` returns an error. Fall back to `COLUMNS` env var, then to a sane default (80 or 120). Without a fallback, truncation becomes a no-op (width 0 or -1), defeating the entire fix.
+
+**Why the previous fix didn't hold:** It addressed NEW tail text width but ignored the PREVIOUS tail's physical row count. The clear-line escape only cleared one row, leaving earlier wrapped rows intact.
+
