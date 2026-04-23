@@ -149,10 +149,11 @@ type interactiveEval struct {
 
 	// Tools section.
 	toolsHeaderPrinted bool
-	toolsFirstLine     int              // linesWritten index of first tool line ("  - …")
-	toolLines          []toolLine       // one entry per emitted tool line, in order
-	toolsVerified      bool             // guard so we only redraw once
-	toolIndexByName    map[string]int   // name -> index in toolLines
+	toolsFirstLine     int                 // linesWritten index of first tool line ("  - …")
+	toolLines          []toolLine          // bookkeeping for every Start-seen tool, in order
+	toolsVerified      bool                // guard so we only redraw once
+	toolIndexByName    map[string]int      // name -> index in toolLines
+	emittedParents     map[parentKey]bool  // parent headers already written to output
 
 	// Agent Attempt section — simplified to a three-state machine (Running, Completed, Guardrail).
 	agentHeaderPrinted bool
@@ -186,6 +187,13 @@ type toolLine struct {
 	reason     string
 	parentName string // Parent container (plugin name or skills-dir path); empty = no parent
 	parentKind string // One of ToolParentKindPlugin, ToolParentKindSkillDir, or empty
+}
+
+// parentKey identifies a grouped parent (plugin or skills-dir) by (name, kind).
+// Stored in emittedParents so we only print each parent header once.
+type parentKey struct {
+	name string
+	kind string
 }
 
 // tailKind enumerates which kind of line currently owns the tail, so ticker
@@ -350,10 +358,16 @@ func (r *interactiveRenderer) ensureToolsHeader() {
 
 func (r *interactiveRenderer) onToolResolutionStart(evt ProgressEvent) {
 	r.ensureToolsHeader()
-	// Freeze whatever prior tool line held the tail (it's final: loaded/failed
-	// was set before the next Start arrived, per the sequential emission
-	// contract in neo-tool-resolution-wiring.md).
-	r.freezeTail()
+	// Wait-till-known: a Start event carries NO terminal state, so we DO NOT
+	// render anything for it. We only record the tool in internal bookkeeping
+	// so the matching Result can find it. If a Start never gets a Result
+	// (e.g. the skill_dir parent Start in validate.go, which emits children
+	// results but no parent result), the entry stays "loading" and is
+	// filtered out of rendering.
+	if _, exists := r.cur.toolIndexByName[evt.ToolName]; exists {
+		// Re-start (rare): leave the existing entry alone.
+		return
+	}
 	tl := toolLine{
 		name:       evt.ToolName,
 		kind:       evt.ToolKind,
@@ -363,21 +377,16 @@ func (r *interactiveRenderer) onToolResolutionStart(evt ProgressEvent) {
 	}
 	r.cur.toolLines = append(r.cur.toolLines, tl)
 	r.cur.toolIndexByName[evt.ToolName] = len(r.cur.toolLines) - 1
-	// During resolution, render as flat list (not grouped yet)
-	r.writeTail(tailTool, r.renderToolLineFlat(tl))
 }
 
 func (r *interactiveRenderer) onToolResolutionResult(evt ProgressEvent) {
 	idx, ok := r.cur.toolIndexByName[evt.ToolName]
 	if !ok {
-		// Result without a Start — defensive: behave like a fresh start then
-		// complete.
+		// Result without a matching Start — defensive: create the entry now.
 		r.ensureToolsHeader()
-		r.freezeTail()
 		r.cur.toolLines = append(r.cur.toolLines, toolLine{})
 		idx = len(r.cur.toolLines) - 1
 		r.cur.toolIndexByName[evt.ToolName] = idx
-		r.writeTail(tailTool, "")
 	}
 	tl := &r.cur.toolLines[idx]
 	tl.name = evt.ToolName
@@ -386,16 +395,52 @@ func (r *interactiveRenderer) onToolResolutionResult(evt ProgressEvent) {
 	tl.reason = evt.Reason
 	tl.parentName = evt.ParentName
 	tl.parentKind = evt.ParentKind
-	// Update the tail in place. The tool line IS the tail here, because
-	// ToolResolutionResult always immediately follows its Start in the same
-	// sequential tool-resolution pass.
-	if r.cur.tailKind == tailTool {
-		r.rewriteTail(r.renderToolLineFlat(*tl))
-	} else {
-		// Tail has moved on (shouldn't happen per schema, but be safe:
-		// trigger a block redraw).
-		r.redrawToolsBlock()
+
+	// Any active tail (e.g. a leftover agent line) must be frozen before we
+	// commit a new Tools-section line.
+	r.freezeTail()
+
+	// Leaf child: ensure its parent header is emitted, then write the
+	// indented child row.
+	if tl.parentKind != "" {
+		r.emitParentHeaderOnce(tl.parentName, tl.parentKind)
+		r.writeLine(r.renderToolLine(*tl, true))
+		return
 	}
+
+	// Top-level plugin: it is a container. When it loads successfully we
+	// emit a parent header (children will follow as they resolve). When it
+	// fails, we emit a single flat failed row — no children are expected.
+	if tl.kind == ToolKindPlugin {
+		if tl.status == ToolStatusLoaded {
+			r.emitParentHeaderOnce(tl.name, ToolParentKindPlugin)
+			return
+		}
+		r.writeLine(r.renderToolLine(*tl, false))
+		return
+	}
+
+	// Top-level leaf (skill or MCP).
+	r.writeLine(r.renderToolLine(*tl, false))
+}
+
+// emitParentHeaderOnce writes the "  - <name> (<kind>):" header line exactly
+// once per (name, kind) combination for the current eval.
+func (r *interactiveRenderer) emitParentHeaderOnce(name, kind string) {
+	if r.cur.emittedParents == nil {
+		r.cur.emittedParents = make(map[parentKey]bool)
+	}
+	pk := parentKey{name: name, kind: kind}
+	if r.cur.emittedParents[pk] {
+		return
+	}
+	r.cur.emittedParents[pk] = true
+	label := "plugin"
+	if kind == ToolParentKindSkillDir {
+		label = "skills dir"
+	}
+	r.freezeTail()
+	r.writeLine(fmt.Sprintf("  - %s (%s):", name, label))
 }
 
 // onToolsVerified handles the bulk post-session-start verification. This is
@@ -516,63 +561,86 @@ func (r *interactiveRenderer) redrawToolsBlock() {
 }
 
 // groupToolLines groups tool lines by parent and returns a flat list of
-// formatted lines (parent headers + indented children). Preserves insertion order.
+// formatted lines (parent headers + indented children). Preserves insertion
+// order. A top-level entry is treated as a *container* if its kind is
+// ToolKindPlugin OR if some child entry references it by ParentName — in
+// that case its own status is subsumed into the parent header (loaded →
+// just the header; failed → a single flat failed row, no children group).
+// Orphan "loading" entries (Start with no Result) are filtered out.
 func (r *interactiveRenderer) groupToolLines(toolLines []toolLine) []string {
-	type parentKey struct {
-		name string
-		kind string
+	// First pass: discover which names act as containers (referenced by at
+	// least one child's ParentName).
+	isContainer := make(map[string]bool)
+	for _, tl := range toolLines {
+		if tl.parentKind != "" && tl.parentName != "" {
+			isContainer[tl.parentName] = true
+		}
 	}
-	
-	// Track parent order and children
+
 	var parentOrder []parentKey
 	parentSeen := make(map[parentKey]bool)
 	parentChildren := make(map[parentKey][]toolLine)
+	parentOwnRow := make(map[parentKey]toolLine) // the container's own row (kind=plugin, etc.)
 	var topLevel []toolLine
-	
+
 	for _, tl := range toolLines {
-		if tl.parentKind == "" {
-			// Top-level tool (no parent)
-			topLevel = append(topLevel, tl)
-		} else {
-			// Child of a parent
+		if tl.parentKind != "" {
 			pk := parentKey{name: tl.parentName, kind: tl.parentKind}
 			if !parentSeen[pk] {
 				parentOrder = append(parentOrder, pk)
 				parentSeen[pk] = true
 			}
 			parentChildren[pk] = append(parentChildren[pk], tl)
-		}
-	}
-	
-	// Build output lines
-	var result []string
-	
-	// Top-level tools first
-	for _, tl := range topLevel {
-		result = append(result, r.renderToolLine(tl, false))
-	}
-	
-	// Then parent groups
-	for _, pk := range parentOrder {
-		children := parentChildren[pk]
-		if len(children) == 0 {
 			continue
 		}
-		
-		// Render parent header
-		parentLabel := pk.name
+		// Top-level. A plugin-kind entry is always a container.
+		// Non-plugin entries are containers only if a child references them
+		// (e.g. skill_dir parent emitted with kind=skill in validate.go).
+		if tl.kind == ToolKindPlugin || isContainer[tl.name] {
+			kind := ToolParentKindPlugin
+			if tl.kind != ToolKindPlugin {
+				kind = ToolParentKindSkillDir
+			}
+			pk := parentKey{name: tl.name, kind: kind}
+			if !parentSeen[pk] {
+				parentOrder = append(parentOrder, pk)
+				parentSeen[pk] = true
+			}
+			parentOwnRow[pk] = tl
+			continue
+		}
+		topLevel = append(topLevel, tl)
+	}
+
+	var result []string
+	for _, tl := range topLevel {
+		if tl.status == "" || tl.status == "loading" {
+			// Orphan: never got a Result. Skip — don't surface as output.
+			continue
+		}
+		result = append(result, r.renderToolLine(tl, false))
+	}
+	for _, pk := range parentOrder {
+		// If the container itself failed, render it as a single flat failed
+		// row — its children (if any) are not meaningful when the container
+		// didn't load.
+		if own, ok := parentOwnRow[pk]; ok && own.status == ToolStatusFailed {
+			result = append(result, r.renderToolLine(own, false))
+			continue
+		}
+		// Parent header.
 		kindLabel := "plugin"
 		if pk.kind == ToolParentKindSkillDir {
 			kindLabel = "skills dir"
 		}
-		result = append(result, fmt.Sprintf("  - %s (%s):", parentLabel, kindLabel))
-		
-		// Render children with extra indentation
-		for _, child := range children {
+		result = append(result, fmt.Sprintf("  - %s (%s):", pk.name, kindLabel))
+		for _, child := range parentChildren[pk] {
+			if child.status == "" || child.status == "loading" {
+				continue
+			}
 			result = append(result, r.renderToolLine(child, true))
 		}
 	}
-	
 	return result
 }
 
@@ -590,29 +658,6 @@ func (r *interactiveRenderer) groupToolLinesFromStatus(tools []ToolStatus) []str
 		}
 	}
 	return r.groupToolLines(converted)
-}
-
-// renderToolLineFlat renders a single tool line during the resolution phase
-// (before grouping happens). Shows kind label inline.
-func (r *interactiveRenderer) renderToolLineFlat(tl toolLine) string {
-	name := tl.name
-	kind := r.sty.Muted(fmt.Sprintf("(%s)", tl.kind))
-	
-	switch tl.status {
-	case "", "loading":
-		return fmt.Sprintf("  - %s %s: 🔄 %s", name, kind, r.sty.Muted("Loading…"))
-	case ToolStatusLoaded:
-		return fmt.Sprintf("  - %s %s: %s", name, kind, r.sty.OK("✅ Loaded"))
-	case ToolStatusFailed:
-		reason := tl.reason
-		if reason == "" {
-			reason = "failed"
-		}
-		return fmt.Sprintf("  - %s %s: %s %s", name, kind,
-			r.sty.Fail("❌ Failed"), r.sty.Muted("("+reason+")"))
-	default:
-		return fmt.Sprintf("  - %s %s: %s", name, kind, tl.status)
-	}
 }
 
 func (r *interactiveRenderer) renderToolLine(tl toolLine, indented bool) string {

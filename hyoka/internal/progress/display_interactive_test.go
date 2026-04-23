@@ -256,8 +256,11 @@ t.Errorf("unexpected substring %q found\n--- output ---\n%s", sub, out)
 // the constants in display_interactive.go), so they appear even when the
 // writer is a bytes.Buffer.
 func TestInteractive_ANSIMarkers(t *testing.T) {
-// (1) Tail-update escape sequence "\r\x1b[2K" must appear when a tool
-// line flips from Loading → Loaded (rewriteTail path).
+// (1) With the "wait till known" rule, a simple Loading → Loaded sequence
+// commits a single newline-terminated line on Result and never rewrites a
+// tail. The output for a clean resolution therefore contains NO mid-line
+// clear escape "\r\x1b[2K" (only emitted by tail rewrites, which are still
+// used for the Agent Attempt and Grader sections).
 var buf bytes.Buffer
 d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
 d.HandleEvent(ProgressEvent{EvalID: "t1", PromptID: "p", ConfigName: "c", Type: EventStarting})
@@ -265,9 +268,14 @@ d.HandleEvent(ProgressEvent{EvalID: "t1", Type: EventToolResolutionStart, ToolNa
 d.HandleEvent(ProgressEvent{EvalID: "t1", Type: EventToolResolutionResult, ToolName: "m", ToolKind: ToolKindMCP, Status: ToolStatusLoaded})
 d.HandleEvent(ProgressEvent{EvalID: "t1", Type: EventPassed, FileCount: 0})
 d.Finish()
-tailMarker := "\r\x1b[2K"
-if !strings.Contains(buf.String(), tailMarker) {
-t.Errorf("expected tail-update escape %q in output; got:\n%q", tailMarker, buf.String())
+out1 := buf.String()
+// The final Tools-section output must show the resolved line without any
+// intermediate "Loading…" text bleeding through.
+if strings.Contains(out1, "Loading") {
+t.Errorf("unexpected transient \"Loading\" text in tools output; got:\n%q", out1)
+}
+if !strings.Contains(out1, "✅ Loaded") {
+t.Errorf("expected resolved ✅ Loaded row in tools output; got:\n%q", out1)
 }
 
 // (2) DECSC (\x1b7) + DECRC (\x1b8) pair must bracket the tool-block
@@ -325,5 +333,127 @@ t.Errorf("expected ✅ Loaded glyph+text; got:\n%s", out)
 }
 if !strings.Contains(out, "Summary: 1/1 passed") {
 t.Errorf("expected summary; got:\n%s", out)
+}
+}
+
+// TestInteractive_WaitTillKnown verifies that no transient "Loading…" text
+// appears in the committed output between a ToolResolutionStart and its
+// matching Result — the renderer must buffer the row until terminal state.
+func TestInteractive_WaitTillKnown(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+d.HandleEvent(ProgressEvent{EvalID: "w1", PromptID: "p", ConfigName: "c", Type: EventStarting})
+// Start without an immediate Result — nothing should be written yet.
+d.HandleEvent(ProgressEvent{EvalID: "w1", Type: EventToolResolutionStart, ToolName: "mcp-a", ToolKind: ToolKindMCP})
+mid := buf.String()
+if strings.Contains(mid, "mcp-a") || strings.Contains(mid, "Loading") {
+t.Errorf("expected no tool row between Start and Result; got:\n%s", mid)
+}
+d.HandleEvent(ProgressEvent{EvalID: "w1", Type: EventToolResolutionResult, ToolName: "mcp-a", ToolKind: ToolKindMCP, Status: ToolStatusLoaded})
+d.HandleEvent(ProgressEvent{EvalID: "w1", Type: EventPassed, FileCount: 0})
+d.Finish()
+out := buf.String()
+if !strings.Contains(out, "mcp-a") || !strings.Contains(out, "✅ Loaded") {
+t.Errorf("expected resolved row for mcp-a; got:\n%s", out)
+}
+if strings.Contains(out, "Loading") {
+t.Errorf("transient Loading text leaked into final output:\n%s", out)
+}
+}
+
+// TestInteractive_PluginFanout verifies that a plugin parent renders as a
+// grouped header with its children indented beneath. Mixed loaded/failed
+// children must both appear under the same parent header.
+func TestInteractive_PluginFanout(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+d.HandleEvent(ProgressEvent{EvalID: "pf", PromptID: "p", ConfigName: "c", Type: EventStarting})
+// Plugin parent loads first.
+d.HandleEvent(ProgressEvent{EvalID: "pf", Type: EventToolResolutionStart, ToolName: "azure-sdk-python", ToolKind: ToolKindPlugin})
+d.HandleEvent(ProgressEvent{EvalID: "pf", Type: EventToolResolutionResult, ToolName: "azure-sdk-python", ToolKind: ToolKindPlugin, Status: ToolStatusLoaded})
+// Child skill: loaded.
+d.HandleEvent(ProgressEvent{EvalID: "pf", Type: EventToolResolutionStart, ToolName: "skill1", ToolKind: ToolKindSkill})
+d.HandleEvent(ProgressEvent{EvalID: "pf", Type: EventToolResolutionResult, ToolName: "skill1", ToolKind: ToolKindSkill, Status: ToolStatusLoaded, ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin})
+// Child MCP: failed.
+d.HandleEvent(ProgressEvent{EvalID: "pf", Type: EventToolResolutionStart, ToolName: "mcp1", ToolKind: ToolKindMCP})
+d.HandleEvent(ProgressEvent{EvalID: "pf", Type: EventToolResolutionResult, ToolName: "mcp1", ToolKind: ToolKindMCP, Status: ToolStatusFailed, Reason: "fetch timeout", ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin})
+d.HandleEvent(ProgressEvent{EvalID: "pf", Type: EventPassed, FileCount: 0})
+d.Finish()
+out := buf.String()
+for _, want := range []string{
+"azure-sdk-python (plugin):",
+"skill1",
+"✅ Loaded",
+"mcp1",
+"❌ Failed",
+"fetch timeout",
+} {
+if !strings.Contains(out, want) {
+t.Errorf("missing %q in plugin-fanout output:\n%s", want, out)
+}
+}
+// The header must precede the children in the transcript.
+hIdx := strings.Index(out, "azure-sdk-python (plugin):")
+cIdx := strings.Index(out, "skill1")
+if hIdx < 0 || cIdx < 0 || hIdx >= cIdx {
+t.Errorf("parent header must precede children; header@%d child@%d\n%s", hIdx, cIdx, out)
+}
+// The plugin must NOT also appear as a top-level status line
+// ("azure-sdk-python (plugin): ✅ Loaded") — that would be a duplicate.
+if strings.Contains(out, "azure-sdk-python (plugin): ✅") ||
+strings.Contains(out, "azure-sdk-python (plugin): ❌") {
+t.Errorf("plugin container must not render a leaf status row:\n%s", out)
+}
+}
+
+// TestInteractive_SkillDirFanout verifies that children tagged with
+// ParentKind=skill_dir are grouped under a synthesized parent header even
+// when the orphan parent Start event never receives a matching Result (the
+// current validate.go skill_dir behavior).
+func TestInteractive_SkillDirFanout(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+d.HandleEvent(ProgressEvent{EvalID: "sd", PromptID: "p", ConfigName: "c", Type: EventStarting})
+// Orphan parent Start (no matching Result) — mimics validate.go skill_dir flow.
+d.HandleEvent(ProgressEvent{EvalID: "sd", Type: EventToolResolutionStart, ToolName: "generator-skills", ToolKind: ToolKindSkill})
+// Children arrive with ParentKind=skill_dir and ParentName=path.
+d.HandleEvent(ProgressEvent{EvalID: "sd", Type: EventToolResolutionResult, ToolName: "skillA", ToolKind: ToolKindSkill, Status: ToolStatusLoaded, ParentName: "./skills", ParentKind: ToolParentKindSkillDir})
+d.HandleEvent(ProgressEvent{EvalID: "sd", Type: EventToolResolutionResult, ToolName: "skillB", ToolKind: ToolKindSkill, Status: ToolStatusLoaded, ParentName: "./skills", ParentKind: ToolParentKindSkillDir})
+d.HandleEvent(ProgressEvent{EvalID: "sd", Type: EventPassed, FileCount: 0})
+d.Finish()
+out := buf.String()
+for _, want := range []string{
+"./skills (skills dir):",
+"skillA",
+"skillB",
+"✅ Loaded",
+} {
+if !strings.Contains(out, want) {
+t.Errorf("missing %q in skill_dir-fanout output:\n%s", want, out)
+}
+}
+// Orphan parent Start (generator-skills) must NOT appear as a flat row.
+if strings.Contains(out, "generator-skills") {
+t.Errorf("orphan Start should be filtered out of output:\n%s", out)
+}
+}
+
+// TestInteractive_PluginFailedNoFanout verifies that a plugin that fails at
+// resolution renders a single flat failed row (no empty parent header).
+func TestInteractive_PluginFailedNoFanout(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+d.HandleEvent(ProgressEvent{EvalID: "pf2", PromptID: "p", ConfigName: "c", Type: EventStarting})
+d.HandleEvent(ProgressEvent{EvalID: "pf2", Type: EventToolResolutionStart, ToolName: "missing-plugin", ToolKind: ToolKindPlugin})
+d.HandleEvent(ProgressEvent{EvalID: "pf2", Type: EventToolResolutionResult, ToolName: "missing-plugin", ToolKind: ToolKindPlugin, Status: ToolStatusFailed, Reason: "not found"})
+d.HandleEvent(ProgressEvent{EvalID: "pf2", Type: EventPassed, FileCount: 0})
+d.Finish()
+out := buf.String()
+if !strings.Contains(out, "missing-plugin") || !strings.Contains(out, "❌ Failed") || !strings.Contains(out, "not found") {
+t.Errorf("expected flat failed row for missing-plugin; got:\n%s", out)
+}
+// Must not emit a parent header for a failed plugin (no children expected).
+if strings.Contains(out, "missing-plugin (plugin):\n") {
+t.Errorf("failed plugin must not emit a bare parent header:\n%s", out)
 }
 }
