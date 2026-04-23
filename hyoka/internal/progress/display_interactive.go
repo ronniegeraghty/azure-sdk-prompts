@@ -503,14 +503,29 @@ func (r *interactiveRenderer) onToolsVerified(evt ProgressEvent) {
 	}
 	// Tools we printed as "loaded" but the SDK didn't report must flip to
 	// failed. (See plan.md: "Loaded but not reported by SDK → Failed".)
-	for i, tl := range r.cur.toolLines {
-		if !seen[tl.name] && tl.status == ToolStatusLoaded {
-			r.cur.toolLines[i].status = ToolStatusFailed
-			if r.cur.toolLines[i].reason == "" {
-				r.cur.toolLines[i].reason = "not reported by SDK"
-			}
-			dirty = true
+	// EXCEPT for plugin parents and any container entry with at least one
+	// child reference — those are organizational headers, not SDK-loadable
+	// tools. The SDK only ever reports leaf skills/MCPs, so flipping a
+	// container would always mark it Failed even when every child loaded.
+	containerName := make(map[string]bool)
+	for _, tl := range r.cur.toolLines {
+		if tl.parentName != "" {
+			containerName[tl.parentName] = true
 		}
+	}
+	for i, tl := range r.cur.toolLines {
+		if seen[tl.name] || tl.status != ToolStatusLoaded {
+			continue
+		}
+		if tl.kind == ToolKindPlugin || containerName[tl.name] {
+			// Container parent — never SDK-reported. Skip the flip.
+			continue
+		}
+		r.cur.toolLines[i].status = ToolStatusFailed
+		if r.cur.toolLines[i].reason == "" {
+			r.cur.toolLines[i].reason = "not reported by SDK"
+		}
+		dirty = true
 	}
 	if dirty {
 		// Freeze any active tail before redrawing the tools block. The block

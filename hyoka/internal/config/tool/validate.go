@@ -369,7 +369,13 @@ if dir := plugin.ResolveInstalled(entry.Repo, name); dir != "" {
 // nothing and the post-session verifier would mark the plugin
 // failed even though every child loaded correctly.
 if children := plugin.EnumerateChildSkills(dir); len(children) > 0 {
-emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
+// NOTE: Do NOT emit a top-level Loaded result for the plugin
+// itself. The SDK never reports the plugin (it only reports
+// child skills/MCPs) so any Loaded plugin row would later be
+// flipped to Failed by the "loaded but not reported by SDK"
+// rule in display_interactive.onToolsVerified. The renderer
+// builds the plugin's "  - <name> (plugin):" header purely
+// from each child's ParentName/ParentKind.
 for _, childPath := range children {
 childName := filepath.Base(childPath)
 report.Items = append(report.Items, ToolLoadItem{
@@ -397,7 +403,9 @@ Path:       dir,
 Role:       role,
 }
 report.Items = append(report.Items, item)
-emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
+// Single-skill plugin: only emit the child. The plugin parent is
+// a container, not an SDK-reported tool — emitting a Loaded row
+// for it would be flipped to Failed by onToolsVerified.
 emitResultWithParent(emit, name, progress.ToolKindSkill, progress.ToolStatusLoaded, "", name, progress.ToolParentKindPlugin)
 return
 }
@@ -431,11 +439,14 @@ Role:   role,
 emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusFailed, reason, "", "")
 }
 
-// emitPluginLoadedWithChildren records the plugin parent + each expanded
-// child (skill or MCP). Children carry ParentName/ParentKind for grouped
-// rendering. Role is inherited from the parent entry's list.
+// emitPluginLoadedWithChildren records each expanded child (skill or MCP)
+// of a successfully-resolved plugin. Children carry ParentName/ParentKind
+// for grouped rendering. The plugin parent itself is NOT emitted as a
+// Loaded result — it is a container, and emitting Loaded for it would be
+// flipped to Failed by display_interactive.onToolsVerified (SDK never
+// reports the plugin, only its children). Role is inherited from the
+// parent entry's list.
 func emitPluginLoadedWithChildren(report *ToolLoadReport, emit ProgressEmitter, p *plugin.Plugin, name, role, configDir string) {
-emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
 for _, child := range p.ToToolEntries() {
 childItem := ToolLoadItem{
 Kind:       child.Type,

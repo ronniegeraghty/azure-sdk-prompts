@@ -106,3 +106,53 @@ func TestInteractive_WaitTillKnown_FailedEmitsReason(t *testing.T) {
 		t.Errorf("transient Loading text leaked into final output:\n%s", out)
 	}
 }
+
+// TestInteractive_PluginParentNoLoadedFailedBadge regresses issue (b):
+// the plugin parent header must never carry a Loaded or Failed badge in
+// the final output, even after EventToolsVerified flips
+// loaded-but-not-SDK-reported tools to Failed. The plugin parent is a
+// container — only its leaf children are SDK-reported.
+func TestInteractive_PluginParentNoLoadedFailedBadge(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+d.HandleEvent(ProgressEvent{EvalID: "e1", PromptID: "p", ConfigName: "c", Type: EventStarting})
+
+// Plugin Start (mirrors validate.go emitStart for the parent), then
+// only child Results arrive (the success path no longer emits a
+// parent Result).
+d.HandleEvent(ProgressEvent{EvalID: "e1", Type: EventToolResolutionStart, ToolName: "azure-sdk-python", ToolKind: ToolKindPlugin})
+d.HandleEvent(ProgressEvent{EvalID: "e1", Type: EventToolResolutionResult, ToolName: "default-azure-credential", ToolKind: ToolKindSkill, Status: ToolStatusLoaded, ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin})
+d.HandleEvent(ProgressEvent{EvalID: "e1", Type: EventToolResolutionResult, ToolName: "azure-mcp", ToolKind: ToolKindMCP, Status: ToolStatusLoaded, ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin})
+
+// SDK verification: reports only the leaf children. The plugin parent
+// must NOT be flipped to Failed by the not-reported-by-SDK rule.
+d.HandleEvent(ProgressEvent{EvalID: "e1", Type: EventToolsVerified, Tools: []ToolStatus{
+{ToolName: "default-azure-credential", ToolKind: ToolKindSkill, Status: ToolStatusLoaded, ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin},
+{ToolName: "azure-mcp", ToolKind: ToolKindMCP, Status: ToolStatusLoaded, ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin},
+}})
+
+d.HandleEvent(ProgressEvent{EvalID: "e1", Type: EventPassed, FileCount: 0})
+d.Finish()
+
+out := buf.String()
+
+if !strings.Contains(out, "azure-sdk-python (plugin):") {
+t.Fatalf("expected plugin header in output:\n%s", out)
+}
+// Plugin parent row must NOT carry any status badge.
+for _, bad := range []string{
+"azure-sdk-python (plugin): ✅",
+"azure-sdk-python (plugin): ❌",
+"azure-sdk-python (plugin): Loaded",
+"azure-sdk-python (plugin): Failed",
+"azure-sdk-python (plugin): not reported by SDK",
+} {
+if strings.Contains(out, bad) {
+t.Errorf("plugin parent must have no status badge; saw %q in:\n%s", bad, out)
+}
+}
+// Children should still report Loaded.
+if !strings.Contains(out, "default-azure-credential") || !strings.Contains(out, "Loaded") {
+t.Errorf("expected children to report Loaded:\n%s", out)
+}
+}
