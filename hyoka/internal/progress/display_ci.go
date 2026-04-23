@@ -31,6 +31,8 @@ type ciEvalState struct {
 	graderPass  int
 	graderTotal int
 	finished    bool
+	tools       []ToolStatus // tools loaded for this eval
+	toolsPrinted bool        // guard: only print tools section once
 }
 
 // ciRenderer is the append-only renderer used for ModeCI and ModeLog.
@@ -127,6 +129,8 @@ func (r *ciRenderer) handle(evt ProgressEvent) {
 	switch evt.Type {
 	case EventStarting:
 		r.onStart(evt)
+	case EventToolsVerified:
+		r.onToolsVerified(evt)
 	case EventGraderStart:
 		if s := r.evals[evt.EvalID]; s != nil {
 			s.graderTotal++
@@ -166,6 +170,97 @@ func (r *ciRenderer) onStart(evt ProgressEvent) {
 		evt.ConfigName,
 	)
 }
+
+func (r *ciRenderer) onToolsVerified(evt ProgressEvent) {
+	s := r.evals[evt.EvalID]
+	if s == nil || s.toolsPrinted || len(evt.Tools) == 0 {
+		return
+	}
+	s.toolsPrinted = true
+	s.tools = evt.Tools
+	
+	// Print Tools: header
+	fmt.Fprintln(r.w, "Tools:")
+	
+	// Group and render tools
+	grouped := r.groupToolsCI(evt.Tools)
+	for _, line := range grouped {
+		fmt.Fprintln(r.w, line)
+	}
+	fmt.Fprintln(r.w) // blank line after tools section
+}
+
+// groupToolsCI groups tools by parent for CI output (plain text, no ANSI)
+func (r *ciRenderer) groupToolsCI(tools []ToolStatus) []string {
+	type parentKey struct {
+		name string
+		kind string
+	}
+	
+	var parentOrder []parentKey
+	parentSeen := make(map[parentKey]bool)
+	parentChildren := make(map[parentKey][]ToolStatus)
+	var topLevel []ToolStatus
+	
+	for _, t := range tools {
+		if t.ParentKind == "" {
+			topLevel = append(topLevel, t)
+		} else {
+			pk := parentKey{name: t.ParentName, kind: t.ParentKind}
+			if !parentSeen[pk] {
+				parentOrder = append(parentOrder, pk)
+				parentSeen[pk] = true
+			}
+			parentChildren[pk] = append(parentChildren[pk], t)
+		}
+	}
+	
+	var result []string
+	
+	// Top-level tools
+	for _, t := range topLevel {
+		result = append(result, r.renderToolLineCI(t, false))
+	}
+	
+	// Parent groups
+	for _, pk := range parentOrder {
+		children := parentChildren[pk]
+		if len(children) == 0 {
+			continue
+		}
+		
+		kindLabel := "plugin"
+		if pk.kind == ToolParentKindSkillDir {
+			kindLabel = "skills dir"
+		}
+		result = append(result, fmt.Sprintf("  - %s (%s):", pk.name, kindLabel))
+		
+		for _, child := range children {
+			result = append(result, r.renderToolLineCI(child, true))
+		}
+	}
+	
+	return result
+}
+
+// renderToolLineCI renders a tool status line for CI output (no ANSI)
+func (r *ciRenderer) renderToolLineCI(t ToolStatus, indented bool) string {
+	indent := "  "
+	if indented {
+		indent = "      "
+	}
+	
+	statusLabel := "Loaded"
+	if t.Status == ToolStatusFailed {
+		statusLabel = "Failed"
+		if t.Reason != "" {
+			statusLabel += " (" + t.Reason + ")"
+		}
+	}
+	
+	return fmt.Sprintf("%s- %s: %s", indent, t.ToolName, statusLabel)
+}
+
 
 func (r *ciRenderer) onFinish(evt ProgressEvent, result string) {
 	s := r.evals[evt.EvalID]

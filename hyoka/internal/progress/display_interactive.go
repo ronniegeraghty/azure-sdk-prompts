@@ -180,10 +180,12 @@ type interactiveEval struct {
 // toolLine captures what we printed for a tool line, so we can compare
 // against the bulk verification event and redraw on flips.
 type toolLine struct {
-	name   string
-	kind   string
-	status string // "loading" | ToolStatusLoaded | ToolStatusFailed
-	reason string
+	name       string
+	kind       string
+	status     string // "loading" | ToolStatusLoaded | ToolStatusFailed
+	reason     string
+	parentName string // Parent container (plugin name or skills-dir path); empty = no parent
+	parentKind string // One of ToolParentKindPlugin, ToolParentKindSkillDir, or empty
 }
 
 // tailKind enumerates which kind of line currently owns the tail, so ticker
@@ -353,13 +355,16 @@ func (r *interactiveRenderer) onToolResolutionStart(evt ProgressEvent) {
 	// contract in neo-tool-resolution-wiring.md).
 	r.freezeTail()
 	tl := toolLine{
-		name:   evt.ToolName,
-		kind:   evt.ToolKind,
-		status: "loading",
+		name:       evt.ToolName,
+		kind:       evt.ToolKind,
+		status:     "loading",
+		parentName: evt.ParentName,
+		parentKind: evt.ParentKind,
 	}
 	r.cur.toolLines = append(r.cur.toolLines, tl)
 	r.cur.toolIndexByName[evt.ToolName] = len(r.cur.toolLines) - 1
-	r.writeTail(tailTool, r.renderToolLine(tl))
+	// During resolution, render as flat list (not grouped yet)
+	r.writeTail(tailTool, r.renderToolLineFlat(tl))
 }
 
 func (r *interactiveRenderer) onToolResolutionResult(evt ProgressEvent) {
@@ -379,11 +384,13 @@ func (r *interactiveRenderer) onToolResolutionResult(evt ProgressEvent) {
 	tl.kind = evt.ToolKind
 	tl.status = evt.Status
 	tl.reason = evt.Reason
+	tl.parentName = evt.ParentName
+	tl.parentKind = evt.ParentKind
 	// Update the tail in place. The tool line IS the tail here, because
 	// ToolResolutionResult always immediately follows its Start in the same
 	// sequential tool-resolution pass.
 	if r.cur.tailKind == tailTool {
-		r.rewriteTail(r.renderToolLine(*tl))
+		r.rewriteTail(r.renderToolLineFlat(*tl))
 	} else {
 		// Tail has moved on (shouldn't happen per schema, but be safe:
 		// trigger a block redraw).
@@ -410,12 +417,24 @@ func (r *interactiveRenderer) onToolsVerified(evt ProgressEvent) {
 			return
 		}
 		r.ensureToolsHeader()
+		r.freezeTail()
+		// When tools are first reported in bulk, render them grouped
+		grouped := r.groupToolLinesFromStatus(evt.Tools)
+		for _, line := range grouped {
+			r.writeLine(line)
+		}
+		// Update internal state
 		for _, t := range evt.Tools {
-			tl := toolLine{name: t.ToolName, kind: t.ToolKind, status: t.Status, reason: t.Reason}
+			tl := toolLine{
+				name:       t.ToolName,
+				kind:       t.ToolKind,
+				status:     t.Status,
+				reason:     t.Reason,
+				parentName: t.ParentName,
+				parentKind: t.ParentKind,
+			}
 			r.cur.toolLines = append(r.cur.toolLines, tl)
 			r.cur.toolIndexByName[t.ToolName] = len(r.cur.toolLines) - 1
-			r.freezeTail()
-			r.writeLine(r.renderToolLine(tl))
 		}
 		// Open the agent gate now that tools verification is complete.
 		r.openAgentGate()
@@ -483,18 +502,102 @@ func (r *interactiveRenderer) redrawToolsBlock() {
 	buf.WriteString(ansiSaveCursor)
 	fmt.Fprintf(&buf, ansiCursorUpFmt, up)
 	buf.WriteString(ansiCR)
-	for _, tl := range e.toolLines {
+	
+	// Group tools by (ParentKind, ParentName). Preserve insertion order.
+	grouped := r.groupToolLines(e.toolLines)
+	for _, line := range grouped {
 		buf.WriteString(ansiClearLine)
-		buf.WriteString(r.renderToolLine(tl))
+		buf.WriteString(line)
 		buf.WriteByte('\n')
 	}
+	
 	buf.WriteString(ansiRestoreCurs)
 	r.w.Write(buf.Bytes())
 }
 
-func (r *interactiveRenderer) renderToolLine(tl toolLine) string {
+// groupToolLines groups tool lines by parent and returns a flat list of
+// formatted lines (parent headers + indented children). Preserves insertion order.
+func (r *interactiveRenderer) groupToolLines(toolLines []toolLine) []string {
+	type parentKey struct {
+		name string
+		kind string
+	}
+	
+	// Track parent order and children
+	var parentOrder []parentKey
+	parentSeen := make(map[parentKey]bool)
+	parentChildren := make(map[parentKey][]toolLine)
+	var topLevel []toolLine
+	
+	for _, tl := range toolLines {
+		if tl.parentKind == "" {
+			// Top-level tool (no parent)
+			topLevel = append(topLevel, tl)
+		} else {
+			// Child of a parent
+			pk := parentKey{name: tl.parentName, kind: tl.parentKind}
+			if !parentSeen[pk] {
+				parentOrder = append(parentOrder, pk)
+				parentSeen[pk] = true
+			}
+			parentChildren[pk] = append(parentChildren[pk], tl)
+		}
+	}
+	
+	// Build output lines
+	var result []string
+	
+	// Top-level tools first
+	for _, tl := range topLevel {
+		result = append(result, r.renderToolLine(tl, false))
+	}
+	
+	// Then parent groups
+	for _, pk := range parentOrder {
+		children := parentChildren[pk]
+		if len(children) == 0 {
+			continue
+		}
+		
+		// Render parent header
+		parentLabel := pk.name
+		kindLabel := "plugin"
+		if pk.kind == ToolParentKindSkillDir {
+			kindLabel = "skills dir"
+		}
+		result = append(result, fmt.Sprintf("  - %s (%s):", parentLabel, kindLabel))
+		
+		// Render children with extra indentation
+		for _, child := range children {
+			result = append(result, r.renderToolLine(child, true))
+		}
+	}
+	
+	return result
+}
+
+// groupToolLines overload for []ToolStatus (from EventToolsVerified)
+func (r *interactiveRenderer) groupToolLinesFromStatus(tools []ToolStatus) []string {
+	converted := make([]toolLine, len(tools))
+	for i, t := range tools {
+		converted[i] = toolLine{
+			name:       t.ToolName,
+			kind:       t.ToolKind,
+			status:     t.Status,
+			reason:     t.Reason,
+			parentName: t.ParentName,
+			parentKind: t.ParentKind,
+		}
+	}
+	return r.groupToolLines(converted)
+}
+
+// renderToolLineFlat renders a single tool line during the resolution phase
+// (before grouping happens). Shows kind label inline.
+func (r *interactiveRenderer) renderToolLineFlat(tl toolLine) string {
 	name := tl.name
 	kind := r.sty.Muted(fmt.Sprintf("(%s)", tl.kind))
+	
 	switch tl.status {
 	case "", "loading":
 		return fmt.Sprintf("  - %s %s: 🔄 %s", name, kind, r.sty.Muted("Loading…"))
@@ -509,6 +612,37 @@ func (r *interactiveRenderer) renderToolLine(tl toolLine) string {
 			r.sty.Fail("❌ Failed"), r.sty.Muted("("+reason+")"))
 	default:
 		return fmt.Sprintf("  - %s %s: %s", name, kind, tl.status)
+	}
+}
+
+func (r *interactiveRenderer) renderToolLine(tl toolLine, indented bool) string {
+	name := tl.name
+	// Indent prefix for children under a parent group
+	indent := "  "
+	if indented {
+		indent = "      " // Extra 4 spaces for grouped children
+	}
+	
+	// For grouped children, omit the kind label since the parent header already shows context
+	var kindStr string
+	if !indented {
+		kindStr = " " + r.sty.Muted(fmt.Sprintf("(%s)", tl.kind))
+	}
+	
+	switch tl.status {
+	case "", "loading":
+		return fmt.Sprintf("%s- %s%s: 🔄 %s", indent, name, kindStr, r.sty.Muted("Loading…"))
+	case ToolStatusLoaded:
+		return fmt.Sprintf("%s- %s%s: %s", indent, name, kindStr, r.sty.OK("✅ Loaded"))
+	case ToolStatusFailed:
+		reason := tl.reason
+		if reason == "" {
+			reason = "failed"
+		}
+		return fmt.Sprintf("%s- %s%s: %s %s", indent, name, kindStr,
+			r.sty.Fail("❌ Failed"), r.sty.Muted("("+reason+")"))
+	default:
+		return fmt.Sprintf("%s- %s%s: %s", indent, name, kindStr, tl.status)
 	}
 }
 
