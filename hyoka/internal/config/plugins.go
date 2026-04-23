@@ -127,6 +127,15 @@ func (c *ToolConfig) EmitPluginResolutions(emit tool.ProgressEmitter) {
 }
 
 func resolvePluginsDir() string {
+	return ResolvePluginsDir()
+}
+
+// ResolvePluginsDir returns the first existing plugins directory candidate,
+// searching the project root and common relative fallbacks. Returns
+// "./plugins" as a final default even when no candidate exists. Exposed
+// so pre-session validators (internal/config/tool.ValidateAndExpand) can
+// locate the same registry this package uses at config load.
+func ResolvePluginsDir() string {
 	proj := DiscoverFromCWD()
 	candidates := ResolveCandidates(proj, "plugins", "./plugins", "../plugins")
 	if len(candidates) > 0 {
