@@ -305,3 +305,21 @@ Flipped `--workers` default from `runtime.NumCPU()` (capped at 8) to `1` in `eng
 - `EngineOptions.Workers` default was set inside `NewEngineWithReviewerFactory` (not at flag definition time), so the CLI flag is `0` and the engine substitutes the default. Changing the substituted default is a one-line change — no flag plumbing needed.
 - `runtime` package was only used for `NumCPU()` in engine.go; removing that call let me drop the import cleanly.
 - This is the foundational switch for the sprint's interactive-vs-CI mode split driven by worker count.
+
+## 2025 — --progress auto: worker-count-driven selection
+
+Extended `--progress auto` in `hyoka/cmd/run.go` to pick "live" or "log" from the worker count. Commit `d6fd0a59`.
+
+### Learnings
+- Final decision sequence inside the `progressMode == "auto"` block reads: (1) explicit live/log/off already wins because we only enter the block for "auto"; (2) non-TTY stdout → "off" via `progress.IsTerminal(os.Stdout)`; (3) `workers > 1` → "log"; (4) default → "live". Then a post-pass downgrades "live" → "log" when debug/info logging would corrupt ANSI unless `--log-file` is set.
+- Kept the downgrade as a separate step (not folded into the switch) so the intent — "live is fine except when stderr slog would clobber it" — stays legible. The `--log-file` exception from 3b9cbab9 survives intact.
+- `progress.IsTerminal` is already exported from `internal/progress/display.go`, so the TTY probe didn't need a new helper.
+
+## 2025 — fix: --progress auto suppressed CI mode on piped multi-worker runs
+
+Reordered the `--progress auto` switch in `hyoka/cmd/run.go` so `workers>1` short-circuits before the non-TTY check. Regression from d6fd0a59: piped multi-worker runs fell through to "off" and the CI renderer never fired (Switch capstone rows 6 & 8). Extracted the resolution into a pure `resolveAutoProgress(workers, isTerminal, logLevel, logFile)` function and added `TestResolveAutoProgress` covering the 4-combo TTY×workers matrix plus the `--log-file` exception.
+
+### Learnings
+- **Case order matters in progress-mode switches**: TTY check must come *after* the worker count, not before. The CI renderer is append-only and is specifically the one that should engage in piped/CI contexts — so "non-TTY" is a single-eval-only signal, not a global suppression. My d6fd0a59 ordering accidentally inverted this.
+- **Extract-to-pure-function for case-matrix testability**: factoring the resolution out of the cobra `RunE` closure into `resolveAutoProgress(workers, isTerminal, logLevel, logFile) string` made the regression guard a trivial table-driven test with no cobra/os.Stdout stubbing. Worth doing eagerly whenever a decision depends on >2 inputs.
+- **The `--log-file` exception from 3b9cbab9 is fragile**: it lives as a post-pass after the main switch. Preserved it verbatim in the new pure function and added test rows for it so the next refactor can't silently drop it.

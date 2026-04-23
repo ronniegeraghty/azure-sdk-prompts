@@ -147,6 +147,32 @@ func buildFilter(f *runFlags) prompt.Filter {
 	}
 }
 
+// resolveAutoProgress picks a concrete progress mode for `--progress auto`.
+//
+// Case order matters: workers>1 must be checked before the non-TTY check, because
+// the CI renderer is append-only and specifically designed to work in piped/CI
+// contexts. Suppressing progress on non-TTY only makes sense for single-eval
+// (workers==1) runs where there is no meaningful multi-eval summary to emit.
+//
+// When interactive mode is selected with verbose logging (debug/info) and no
+// --log-file, slog output on stderr would corrupt ANSI cursor redraws, so we
+// downgrade to the append-only CI renderer.
+func resolveAutoProgress(workers int, isTerminal bool, logLevel, logFile string) string {
+	var mode string
+	switch {
+	case workers > 1:
+		mode = "ci"
+	case !isTerminal:
+		mode = "off"
+	default:
+		mode = "interactive"
+	}
+	if mode == "interactive" && (logLevel == "debug" || logLevel == "info") && logFile == "" {
+		mode = "ci"
+	}
+	return mode
+}
+
 func runCmd() *cobra.Command {
 	f := &runFlags{}
 	cmd := &cobra.Command{
@@ -154,36 +180,10 @@ func runCmd() *cobra.Command {
 		Short: "Run evaluations",
 		Long:  "Run evaluations with optional filters against the prompt library.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve --progress auto based on context. The decision sequence:
-			//   1. explicit live|log|off → already honored (no change).
-			//   2. non-TTY stdout      → "off" (piped output shouldn't animate).
-			//   3. workers == 1        → "live" (interactive single-eval mode).
-			//   4. workers  > 1        → "log"  (CI-style multi-worker mode).
-			//   5. debug/info logging without --log-file downgrades "live" to "log"
-			//      so slog output on stderr doesn't corrupt ANSI cursor redraws.
-			//      When --log-file is set, slog writes to the file and stderr stays
-			//      clean, so live mode can coexist with verbose logging.
-			// The renderer swaps for the new interactive/CI modes land in later
-			// tasks; this change only picks the existing "live"/"log" string.
 			if f.progressMode == "auto" {
 				logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
 				logFile, _ := cmd.Root().PersistentFlags().GetString("log-file")
-
-				switch {
-				case !progress.IsTerminal(os.Stdout):
-					f.progressMode = "off"
-				case f.workers > 1:
-					f.progressMode = "ci"
-				default:
-					f.progressMode = "interactive"
-				}
-
-				// Verbose logging on stderr would corrupt ANSI cursor redraws
-				// in interactive mode; downgrade to the append-only CI
-				// renderer unless the user routed slog output to a file.
-				if f.progressMode == "interactive" && (logLevel == "debug" || logLevel == "info") && logFile == "" {
-					f.progressMode = "ci"
-				}
+				f.progressMode = resolveAutoProgress(f.workers, progress.IsTerminal(os.Stdout), logLevel, logFile)
 			}
 
 			// Resolve all paths first, before any loading
