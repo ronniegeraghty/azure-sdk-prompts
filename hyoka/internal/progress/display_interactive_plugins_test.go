@@ -156,3 +156,31 @@ if !strings.Contains(out, "default-azure-credential") || !strings.Contains(out, 
 t.Errorf("expected children to report Loaded:\n%s", out)
 }
 }
+
+// TestInteractive_ChildKindLabelShown regresses issue (c): children
+// rendered under a plugin/skill_dir header must still display their
+// kind label so callers can distinguish skill children from MCP
+// children at a glance.
+func TestInteractive_ChildKindLabelShown(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+d.HandleEvent(ProgressEvent{EvalID: "kc", PromptID: "p", ConfigName: "c", Type: EventStarting})
+
+// One plugin with mixed children: a skill and an MCP.
+d.HandleEvent(ProgressEvent{EvalID: "kc", Type: EventToolResolutionStart, ToolName: "azure-sdk-python", ToolKind: ToolKindPlugin})
+d.HandleEvent(ProgressEvent{EvalID: "kc", Type: EventToolResolutionResult, ToolName: "default-azure-credential", ToolKind: ToolKindSkill, Status: ToolStatusLoaded, ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin})
+d.HandleEvent(ProgressEvent{EvalID: "kc", Type: EventToolResolutionResult, ToolName: "azure-mcp", ToolKind: ToolKindMCP, Status: ToolStatusLoaded, ParentName: "azure-sdk-python", ParentKind: ToolParentKindPlugin})
+
+d.HandleEvent(ProgressEvent{EvalID: "kc", Type: EventPassed, FileCount: 0})
+d.Finish()
+
+out := buf.String()
+for _, want := range []string{
+"default-azure-credential (skill)",
+"azure-mcp (mcp)",
+} {
+if !strings.Contains(out, want) {
+t.Errorf("expected child to include kind label %q in:\n%s", want, out)
+}
+}
+}

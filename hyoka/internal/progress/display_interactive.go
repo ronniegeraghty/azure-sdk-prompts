@@ -683,11 +683,11 @@ func (r *interactiveRenderer) renderToolLine(tl toolLine, indented bool) string 
 		indent = "      " // Extra 4 spaces for grouped children
 	}
 	
-	// For grouped children, omit the kind label since the parent header already shows context
-	var kindStr string
-	if !indented {
-		kindStr = " " + r.sty.Muted(fmt.Sprintf("(%s)", tl.kind))
-	}
+	// Always render the kind label, including for grouped children. Without
+	// this, children under a plugin/skill_dir header read as bare names with
+	// no indication of skill vs MCP — visually ambiguous when the parent
+	// container mixes both.
+	kindStr := " " + r.sty.Muted(fmt.Sprintf("(%s)", tl.kind))
 	
 	switch tl.status {
 	case "", "loading":
