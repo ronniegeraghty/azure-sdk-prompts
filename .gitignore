@@ -51,3 +51,4 @@ site/dist/
 # Local Playwright debug artifacts
 .morpheus-screenshots/
 .playwright-cli/
+.trinity-screenshots/
