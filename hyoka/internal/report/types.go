@@ -366,6 +366,14 @@ type EvalReport struct {
 	// Action limit soft cap — generation stopped but review proceeds with partial results
 	ActionLimitReached bool `json:"action_limit_reached,omitempty"`
 	ActionCount        int  `json:"action_count,omitempty"`
+	// Roll-up fields populated at engine time from the unified grader
+	// aggregate (#schema_v3). The site reads these directly so it never
+	// has to recompute pass/total from GraderResults — eliminates the
+	// entire class of roll-up-divergence bugs by construction. omitempty:
+	// zero-value (e.g., evals that never ran graders) emits no field, so
+	// v2 reports round-trip unchanged.
+	GradersPassed int `json:"graders_passed,omitempty"`
+	GradersTotal  int `json:"graders_total,omitempty"`
 }
 
 // ToolLoadResult records the outcome of loading a single tool, skill, or MCP server.

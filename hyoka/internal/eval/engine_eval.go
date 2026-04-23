@@ -598,6 +598,12 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 					reportResults := convertGraderResults(agg.Results)
 					evalReport.GraderResults = reportResults
 					evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
+					// Pre-computed roll-ups (#schema_v3): site reads these
+					// directly. Counts are taken off agg.Results, which
+					// is the authoritative pre-conversion grader set —
+					// one entry per grader, including prompt_review.
+					evalReport.GradersTotal = len(agg.Results)
+					evalReport.GradersPassed = countPassed(agg.Results)
 
 					if !agg.Pass && !evalFailed {
 						evalReport.Success = false
