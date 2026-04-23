@@ -1,16 +1,55 @@
 import { useParams, Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
-import type { RunSummary, EvalResult, EvalReport } from "../data/types";
+import type { RunSummary, EvalResult, EvalReport, GraderResult } from "../data/types";
 import { CheckCircle2, XCircle, Clock, FileCode2, ArrowLeft, Loader2, Tag, Zap } from "lucide-react";
 import { GraderResultRow } from "./GraderResultRow";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
-function ScoreBadge({ passed, total }: { passed: number; total: number }) {
+// Tri-state aware pass detection. Mirrors the engine's roll-up: review graders
+// often ship `pass: null` but populate `scores.criteria` or `overall_score`.
+// Stop-gap until Phase 5 lands the schema bump that drops the review expansion.
+function isPass(g: GraderResult): boolean {
+  if (g.pass === true) return true;
+  if (g.pass === false) return false;
+  // pass is null/undefined — fall back to derived truth
+  const criteria = g.scores?.criteria;
+  if (criteria && criteria.length > 0) {
+    return criteria.every(c => c.passed);
+  }
+  if (
+    g.overall_score != null &&
+    g.max_score != null &&
+    g.max_score > 0 &&
+    g.overall_score === g.max_score
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function ScoreBadge({
+  passed,
+  total,
+  display,
+  tone,
+}: {
+  passed: number;
+  total: number;
+  display?: string;
+  tone?: "pass" | "fail" | "neutral";
+}) {
   const allPassed = passed === total && total > 0;
-  const color = allPassed ? "text-emerald-400" : "text-red-400";
-  return <span className={color} style={{ ...mono, fontSize: 13 }}>{passed}/{total}</span>;
+  const resolvedTone = tone ?? (allPassed ? "pass" : "fail");
+  const color =
+    resolvedTone === "pass"
+      ? "text-emerald-400"
+      : resolvedTone === "neutral"
+      ? "text-white/40"
+      : "text-red-400";
+  const label = display ?? `${passed}/${total}`;
+  return <span className={color} style={{ ...mono, fontSize: 13 }}>{label}</span>;
 }
 
 function formatDuration(s: number | undefined | null): string {
@@ -233,14 +272,30 @@ export function RunDetailPage() {
               </thead>
               <tbody>
                 {filtered.map((r, i) => {
-                  const gradersPassed = (r as EvalReport).grader_results?.filter(g => g.pass === true).length ?? 0;
-                  const gradersTotal = (r as EvalReport).grader_results?.length ?? 0;
-                  
                   const evalReport = r as EvalReport;
+                  const graderResults = evalReport.grader_results ?? [];
+                  const gradersTotal = graderResults.length;
+                  const gradersPassed = graderResults.filter(isPass).length;
+
+                  // When no graders ran (e.g. gpt-5.3-codex no-files case),
+                  // fall back to the engine's success bit so the row doesn't
+                  // render a misleading red `0/0`.
+                  const noGraders = gradersTotal === 0;
+                  const badgeDisplay = noGraders
+                    ? r.success
+                      ? "—"
+                      : "✗"
+                    : undefined;
+                  const badgeTone: "pass" | "fail" | "neutral" | undefined = noGraders
+                    ? r.success
+                      ? "neutral"
+                      : "fail"
+                    : undefined;
+
                   const model = evalReport.config_used?.model || evalReport.environment?.model || r.config_name;
                   const tools = evalReport.environment?.mcp_servers || [];
                   const skills = evalReport.environment?.skills_loaded || [];
-                  
+
                   return (
                     <tr 
                       key={`${r.prompt_id}-${r.config_name}-${i}`} 
@@ -248,7 +303,12 @@ export function RunDetailPage() {
                       className="cursor-pointer border-b border-white/5 transition hover:bg-white/[0.02]"
                     >
                       <td className="px-4 py-3">
-                        <ScoreBadge passed={gradersPassed} total={gradersTotal} />
+                        <ScoreBadge
+                          passed={gradersPassed}
+                          total={gradersTotal}
+                          display={badgeDisplay}
+                          tone={badgeTone}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-emerald-400/80" style={{ ...mono, fontSize: 12 }}>
