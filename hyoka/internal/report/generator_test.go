@@ -479,8 +479,8 @@ func TestMigrateToV2(t *testing.T) {
 
 	MigrateToV2(r)
 
-	if r.SchemaVersion != CurrentSchemaVersion {
-		t.Errorf("expected schema version %d, got %d", CurrentSchemaVersion, r.SchemaVersion)
+	if r.SchemaVersion != 2 {
+		t.Errorf("MigrateToV2 should land at schema version 2, got %d", r.SchemaVersion)
 	}
 	if len(r.GraderResults) != 2 {
 		t.Fatalf("expected 2 grader results (1 panel + 1 consensus), got %d", len(r.GraderResults))
@@ -491,6 +491,31 @@ func TestMigrateToV2(t *testing.T) {
 	MigrateToV2(r)
 	if r.GraderResults[0].GraderName != "modified" {
 		t.Error("MigrateToV2 should be idempotent")
+	}
+}
+
+// TestMigrateToV3 verifies that MigrateToV3 lifts a v0/v1 report through
+// v2 and lands at CurrentSchemaVersion. v2 → v3 is metadata-only so no
+// new fields appear on migrated reports — they just gain the version bump.
+func TestMigrateToV3(t *testing.T) {
+	r := &EvalReport{
+		PromptID:   "migrate-v3",
+		ConfigName: "baseline",
+		Review: &review.ReviewResult{
+			Model: "test-model", OverallScore: 3, MaxScore: 5, Summary: "S",
+		},
+	}
+	MigrateToV3(r)
+	if r.SchemaVersion != CurrentSchemaVersion {
+		t.Errorf("MigrateToV3: schema=%d, want %d", r.SchemaVersion, CurrentSchemaVersion)
+	}
+	if len(r.GraderResults) == 0 {
+		t.Error("MigrateToV3 should also lift v1 → v2 data (GraderResults populated)")
+	}
+	// Idempotent.
+	MigrateToV3(r)
+	if r.SchemaVersion != CurrentSchemaVersion {
+		t.Errorf("MigrateToV3 not idempotent: schema=%d", r.SchemaVersion)
 	}
 }
 

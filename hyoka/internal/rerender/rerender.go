@@ -148,7 +148,7 @@ func migrateReport(r *report.EvalReport, path string) (bool, error) {
 	if r.SchemaVersion >= report.CurrentSchemaVersion {
 		return false, nil
 	}
-	report.MigrateToV2(r)
+	report.MigrateToV3(r)
 	data, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return false, fmt.Errorf("marshaling migrated report: %w", err)

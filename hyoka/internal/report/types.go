@@ -16,8 +16,17 @@ import (
 type WorkspaceDelta = workspace.WorkspaceDelta
 
 // CurrentSchemaVersion is the latest report schema version.
-// v1 = legacy monolithic ReviewResult; v2 = grader-based.
-const CurrentSchemaVersion = 2
+//
+//	v1 = legacy monolithic ReviewResult.
+//	v2 = grader-based; one expanded GraderResult entry per panel member +
+//	     one consensus row for prompt_review graders.
+//	v3 = single-entry ai_review row carrying GraderPoints; ToolLoadResult
+//	     and EnvironmentInfo carry parent linkage; pre-computed roll-ups.
+//
+// v3 is a one-way cut: no de-expansion of v2 reports is attempted (the
+// expansion is too lossy to invert). v2 reports are read as-is and keep
+// their N-entry shape; freshly written reports use the v3 shape.
+const CurrentSchemaVersion = 3
 
 // GraderResult holds the output from a single grader (LLM reviewer, build check, etc.).
 type GraderResult struct {
@@ -713,15 +722,52 @@ func GraderResultsFromReview(consolidated *review.ReviewResult, panel []review.R
 	return results
 }
 
-// MigrateToV2 upgrades a v1 (or v0) EvalReport to the current v2 schema.
+// MigrateToV2 upgrades a v1 (or v0) EvalReport to the v2 schema.
 // It populates GraderResults from the existing Review/ReviewPanel fields
 // and sets SchemaVersion. The function is idempotent.
+//
+// NOTE: As of v3, MigrateToV2 only ever lifts v0/v1 to v2. The v2 → v3
+// jump is handled by MigrateToV3 (currently a no-op stub — see below).
 func MigrateToV2(r *EvalReport) {
-	if r.SchemaVersion >= CurrentSchemaVersion {
+	if r.SchemaVersion >= 2 {
 		return
 	}
 	if len(r.GraderResults) == 0 && r.Review != nil {
 		r.GraderResults = GraderResultsFromReview(r.Review, r.ReviewPanel)
 	}
+	r.SchemaVersion = 2
+}
+
+// MigrateToV3 upgrades a v2 EvalReport to v3. v3 introduced:
+//
+//   - report.GraderResult.Points (already populated by Phase 2 graders).
+//   - report.ToolLoadResult.Kind / Parent / ParentKind.
+//   - report.EnvironmentInfo.SkillGroups (sibling to flat SkillsLoaded;
+//     Option B in the Phase 5 plan — chosen because Option A's full
+//     SkillsLoaded shape change cascades into site components that are
+//     out-of-scope for this commit).
+//   - EvalReport.GradersPassed / GradersTotal pre-computed roll-ups.
+//
+// No data is migrated automatically: the v2 → v3 transformation for
+// GraderResults (collapsing the panel-member expansion back into a single
+// ai_review row carrying Points) is lossy in reverse — Points are not
+// derivable from the panel-member entries Phase 2 wrote out. Old v2
+// reports are left intact and their grader rows continue to render via
+// the legacy expansion path. Fresh v3 reports use the new single-row
+// shape from the moment they are written.
+//
+// SkillGroups intentionally has no v2 source either: skill parent linkage
+// was not persisted in v2 (it was rendered live but never stored), so a
+// migration would have to fabricate parents. We skip it.
+func MigrateToV3(r *EvalReport) {
+	if r.SchemaVersion >= CurrentSchemaVersion {
+		return
+	}
+	// First lift to v2 if needed.
+	MigrateToV2(r)
+	// v2 → v3 is a metadata-only bump. New fields (Points,
+	// SkillGroups, ToolLoadResult.Parent/ParentKind/Kind, GradersPassed,
+	// GradersTotal) all use omitempty and are simply absent on
+	// migrated-from-v2 reports.
 	r.SchemaVersion = CurrentSchemaVersion
 }

@@ -40,7 +40,7 @@ func WriteReport(r *EvalReport, outputDir string, runID string, p *prompt.Prompt
 	}
 
 	// Ensure schema version is current.
-	MigrateToV2(r)
+	MigrateToV3(r)
 
 	// Truncate verbose fields when the report is excessively large.
 	TruncateReport(r)
