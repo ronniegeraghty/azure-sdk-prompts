@@ -337,40 +337,49 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		Tools:        reportAvailableTools,
 		StarterFiles: evalReport.StarterFiles,
 	}
-	// Record configured MCP servers with details.
-	for _, entry := range task.Config.Generator.Tools {
-		if entry.ResolvedType() != "mcp" {
-			continue
-		}
-		details := entry.Command
-		if len(entry.Args) > 0 {
-			details += " " + strings.Join(entry.Args, " ")
-		}
-		setup.MCPServers = append(setup.MCPServers, report.ToolLoadResult{
-			Name:    entry.Name,
-			Status:  "configured",
-			Details: details,
-		})
-	}
-	// Record configured skills with details.
-	for _, entry := range task.Config.Generator.Tools {
-		if entry.ResolvedType() != "skill" {
-			continue
-		}
-		name := entry.Name
-		if name == "" {
-			if entry.Path != "" {
-				name = entry.Path
-			} else {
-				name = entry.Repo
+	// Prefer post-validation tool topology (carries parent linkage and
+	// runtime status) when available — falls back to the raw config entries
+	// for stub runs and any path that did not perform tool validation.
+	if result != nil && result.ToolReport != nil {
+		setup.MCPServers, setup.Skills = buildToolLoadResults(result.ToolReport, task.Config.Generator.Tools)
+	} else {
+		// Record configured MCP servers with details.
+		for _, entry := range task.Config.Generator.Tools {
+			if entry.ResolvedType() != "mcp" {
+				continue
 			}
+			details := entry.Command
+			if len(entry.Args) > 0 {
+				details += " " + strings.Join(entry.Args, " ")
+			}
+			setup.MCPServers = append(setup.MCPServers, report.ToolLoadResult{
+				Name:    entry.Name,
+				Status:  "configured",
+				Details: details,
+				Kind:    "mcp",
+			})
 		}
-		details := entry.SkillSource()
-		setup.Skills = append(setup.Skills, report.ToolLoadResult{
-			Name:    name,
-			Status:  "configured",
-			Details: details,
-		})
+		// Record configured skills with details.
+		for _, entry := range task.Config.Generator.Tools {
+			if entry.ResolvedType() != "skill" {
+				continue
+			}
+			name := entry.Name
+			if name == "" {
+				if entry.Path != "" {
+					name = entry.Path
+				} else {
+					name = entry.Repo
+				}
+			}
+			details := entry.SkillSource()
+			setup.Skills = append(setup.Skills, report.ToolLoadResult{
+				Name:    name,
+				Status:  "configured",
+				Details: details,
+				Kind:    "skill",
+			})
+		}
 	}
 	// Determine system prompt status.
 	if task.Config.Generator.SystemPrompt != "" {
@@ -654,6 +663,109 @@ func buildRerunCommand(promptID, configName string, opts EngineOptions) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// buildToolLoadResults converts a post-validation tool topology into the
+// report shape used by SessionSetupEvent. The validator emits a flat list of
+// leaves (skills, MCP servers, plugin children, skill_dir children) each
+// carrying Parent/ParentKind back-pointers; we preserve that linkage on the
+// report side so v3 JSON reports can render the same grouped view as the
+// live progress display. Configured-but-unresolved entries from the raw
+// config (e.g., a skill that failed to fetch and was filtered out before
+// validation) are not duplicated — the toolReport is authoritative for what
+// was actually attempted at session start.
+func buildToolLoadResults(toolReport *tool.ToolLoadReport, configured []config.ToolEntry) (mcpServers, skills []report.ToolLoadResult) {
+	if toolReport == nil {
+		return nil, nil
+	}
+	// Map from (kind, name) -> details from the raw config so children we
+	// emit can carry the same Details string the legacy "configured" rows
+	// surfaced (e.g., MCP command lines, skill source). Only top-level
+	// config entries are recorded here; plugin children inherit from the
+	// plugin parent's details where appropriate.
+	cfgDetails := make(map[string]string, len(configured))
+	for _, e := range configured {
+		key := e.ResolvedType() + ":" + e.Name
+		switch e.ResolvedType() {
+		case "mcp":
+			d := e.Command
+			if len(e.Args) > 0 {
+				d += " " + strings.Join(e.Args, " ")
+			}
+			cfgDetails[key] = d
+		case "skill":
+			cfgDetails[key] = e.SkillSource()
+		}
+	}
+
+	// Track which parents we've emitted so each container is recorded once.
+	emittedParent := make(map[string]bool)
+
+	for _, item := range toolReport.Items {
+		if item.Parent != "" && !emittedParent[item.ParentKind+":"+item.Parent] {
+			emittedParent[item.ParentKind+":"+item.Parent] = true
+			parentRow := report.ToolLoadResult{
+				Name: item.Parent,
+				Kind: item.ParentKind, // "plugin" | "skill_dir"
+				// Status omitted: parents have no runtime status, only
+				// their children do (the plugin/skill_dir is a container).
+			}
+			// Plugin parents may have config-side Details (the package
+			// reference), if recorded under a top-level plugin entry.
+			if d, ok := cfgDetails["plugin:"+item.Parent]; ok {
+				parentRow.Details = d
+			}
+			// Plugin parents land in the same group as their children.
+			switch item.ParentKind {
+			case progress.ToolParentKindPlugin:
+				// Plugin children can be either skills or MCP servers, so
+				// the plugin parent row is duplicated into both buckets
+				// only when the plugin actually contributed children of
+				// that kind. We resolve that lazily by inspecting child
+				// kinds in a follow-up pass below.
+				switch item.Kind {
+				case progress.ToolKindMCP:
+					mcpServers = append(mcpServers, parentRow)
+				case progress.ToolKindSkill:
+					skills = append(skills, parentRow)
+				}
+			case progress.ToolParentKindSkillDir:
+				skills = append(skills, parentRow)
+			}
+		}
+
+		row := report.ToolLoadResult{
+			Name:       item.Name,
+			Status:     item.Status,
+			Error:      item.Reason,
+			Kind:       item.Kind,
+			Parent:     item.Parent,
+			ParentKind: item.ParentKind,
+		}
+		// Carry config-side Details onto the leaf when the entry was
+		// declared at the top level (no parent).
+		if item.Parent == "" {
+			if d, ok := cfgDetails[item.Kind+":"+item.Name]; ok {
+				row.Details = d
+			}
+		}
+		switch item.Kind {
+		case progress.ToolKindMCP:
+			mcpServers = append(mcpServers, row)
+		case progress.ToolKindSkill:
+			skills = append(skills, row)
+		case progress.ToolKindPlugin:
+			// Top-level plugin rows that have not yet been emitted as a
+			// parent above (rare — usually they appear via children) are
+			// captured into both buckets so consumers see the container.
+			if !emittedParent[progress.ToolParentKindPlugin+":"+item.Name] {
+				emittedParent[progress.ToolParentKindPlugin+":"+item.Name] = true
+				skills = append(skills, row)
+				mcpServers = append(mcpServers, row)
+			}
+		}
+	}
+	return mcpServers, skills
 }
 
 // buildToolAvailability constructs a summary of tools available vs actually used

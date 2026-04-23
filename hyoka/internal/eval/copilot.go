@@ -682,6 +682,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				SessionEvents:  captured,
 				ActionTimeline: BuildActionTimeline(captured),
 				Success:        true, // Let engine.go guardrail set the proper failure
+				ToolReport:     toolReport,
 				CleanupFn:      buildCleanupFn(),
 			}, nil
 		}
@@ -693,6 +694,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			ToolCalls:      extractToolCalls(capturedEvts),
 			Error:          fmt.Sprintf("prompt send failed: %v", err),
 			ErrorDetails:   err.Error(),
+			ToolReport:     toolReport,
 			CleanupFn:      buildCleanupFn(),
 		}, fmt.Errorf("sending prompt: %w", err)
 	}
@@ -726,6 +728,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		ActionTimeline: BuildActionTimeline(capturedRecords),
 		Success:        !hasError,
 		Error:          "",
+		ToolReport:     toolReport,
 		CleanupFn:      buildCleanupFn(),
 	}, nil
 }

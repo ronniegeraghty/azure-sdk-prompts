@@ -40,6 +40,12 @@ type EvalResult struct {
 	ErrorCategory  string // e.g., "tool_load_failure", "timeout", "sdk_error"
 	IsStub         bool
 	StarterFiles   []string
+	// ToolReport carries the post-validation tool-load topology — flat list
+	// of leaves with Parent/ParentKind back-pointers — so engine_eval can
+	// persist parent linkage into report.ToolLoadResult and the new
+	// EnvironmentInfo.SkillGroups field (#schema_v3). Nil for stub runs and
+	// any caller that does not perform tool validation.
+	ToolReport *tool.ToolLoadReport
 	// CleanupFn deletes session state after the caller has consumed the
 	// workspace files. Must be called after copying generated files out
 	// of the workspace directory (#261). Nil for stub evaluators.

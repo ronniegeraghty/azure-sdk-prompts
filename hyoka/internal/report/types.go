@@ -349,11 +349,22 @@ type EvalReport struct {
 }
 
 // ToolLoadResult records the outcome of loading a single tool, skill, or MCP server.
+//
+// As of schema v3, ToolLoadResult also carries parent linkage so the report
+// can express the same grouped relationships the live renderer shows during
+// validation: a plugin or skill_dir parent emits a "container" row with
+// Status empty (parents have no runtime status), and each child carries
+// Kind / Parent / ParentKind back-pointers. All linkage fields are
+// `omitempty` so v2 reports remain valid when unmarshaled into v3 structs
+// and v3 reports without parent info round-trip identically.
 type ToolLoadResult struct {
-	Name    string `json:"name"`
-	Status  string `json:"status"` // "loaded", "failed", "configured"
-	Error   string `json:"error,omitempty"`
-	Details string `json:"details,omitempty"` // e.g., command string for MCP servers
+	Name       string `json:"name"`
+	Status     string `json:"status,omitempty"`      // omitempty: parents omit
+	Error      string `json:"error,omitempty"`
+	Details    string `json:"details,omitempty"`     // e.g., command string for MCP servers
+	Kind       string `json:"kind,omitempty"`        // "skill" | "mcp" | "plugin" | "skill_dir"
+	Parent     string `json:"parent,omitempty"`      // container this entry is a child of
+	ParentKind string `json:"parent_kind,omitempty"` // "plugin" | "skill_dir"
 }
 
 // SessionSetupEvent captures the tool/skill/MCP loading results at session start.
