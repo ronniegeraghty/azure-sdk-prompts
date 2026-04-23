@@ -7,10 +7,11 @@ package logging
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress/style"
 )
 
 // Options controls how the global logger is configured.
@@ -27,25 +28,34 @@ type Options struct {
 // Setup initialises the global slog.Logger and returns a closer function
 // that must be called to flush/close any open log file. If no log file
 // is configured the closer is a no-op.
+//
+// When log output goes to stdout/stderr (no --log-file), a console-friendly
+// handler is used that formats messages with emoji and dim attrs. When output
+// goes to a file, the structured TextHandler is used for diagnostics.
 func Setup(opts Options) (closer func(), err error) {
 	level := resolveLevel(opts)
 
-	var w io.Writer = os.Stderr
+	var handler slog.Handler
 	closer = func() {}
 
 	if opts.FilePath != "" {
+		// File destination: use structured handler for diagnostics
 		f, err := os.OpenFile(opts.FilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			return nil, fmt.Errorf("opening log file %s: %w", opts.FilePath, err)
 		}
-		// Write to both file and stderr so debug output appears on console too.
-		w = io.MultiWriter(f, os.Stderr)
 		closer = func() { f.Close() }
+
+		// Structured handler with timestamps for the log file
+		handler = slog.NewTextHandler(f, &slog.HandlerOptions{
+			Level: level,
+		})
+	} else {
+		// Console destination: use human-friendly handler
+		styler := style.New(os.Stderr)
+		handler = NewConsoleHandler(os.Stderr, level, styler)
 	}
 
-	handler := slog.NewTextHandler(w, &slog.HandlerOptions{
-		Level: level,
-	})
 	slog.SetDefault(slog.New(handler))
 	return closer, nil
 }
