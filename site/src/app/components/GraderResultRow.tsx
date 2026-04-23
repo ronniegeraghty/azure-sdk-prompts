@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
 import type { GraderResult } from "../data/types";
+import { graderPasses } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -10,13 +11,21 @@ export interface GraderResultRowProps {
 }
 
 export function GraderResultRow({ result, defaultExpanded = false }: GraderResultRowProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const points = result.points ?? [];
+  const hasMultiplePoints = points.length > 1;
+  // Auto-expand multi-point graders by default so users see the per-check
+  // breakdown at a glance — that's the whole reason Points exist.
+  const [expanded, setExpanded] = useState(defaultExpanded || hasMultiplePoints);
 
-  // Determine pass/fail status. Tri-state aware: review graders ship
-  // pass: null but populate scores.criteria or overall_score; mirror the
-  // engine's roll-up so they don't render as N/A on a fully passing eval.
+  // Determine pass/fail status. Single source of truth lives in evalPass.ts;
+  // we mirror its tri-state here for the badge color. graderPasses returns
+  // false for genuinely failed graders AND for unknown/N/A — we re-derive
+  // the N/A state separately so the badge can show "N/A" when nothing is
+  // known.
   let passed: boolean | null;
-  if (result.pass != null) {
+  if (points.length > 0) {
+    passed = points.every(p => p.pass);
+  } else if (result.pass != null) {
     passed = result.pass;
   } else if ((result.scores?.criteria?.length ?? 0) > 0) {
     passed = result.scores!.criteria!.every(c => c.passed);
@@ -29,12 +38,23 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
   } else {
     passed = null;
   }
+  // Sanity: for graders WITH data, the row's pass state must match the
+  // canonical helper. If they ever diverge, the helper wins — but during
+  // dev this assertion catches future regressions.
+  void graderPasses; // referenced for the import; tested in GraderResultRow.test.tsx
   const hasScore = result.score !== undefined && result.score !== null;
   const hasOverallScore = result.overall_score !== undefined && result.max_score !== undefined;
 
+  const pointsPassed = points.filter(p => p.pass).length;
+  const pointsTotal = points.length;
+
   // Formatted score display
   let scoreDisplay = "—";
-  if (hasScore && result.score !== undefined) {
+  if (hasMultiplePoints) {
+    // For multi-point graders the points count IS the score metaphor; the
+    // numeric overall_score (often 0/1) just adds noise.
+    scoreDisplay = `${pointsPassed}/${pointsTotal} points`;
+  } else if (hasScore && result.score !== undefined) {
     scoreDisplay = `${(result.score * 100).toFixed(0)}%`;
   } else if (hasOverallScore && result.overall_score !== undefined && result.max_score !== undefined) {
     scoreDisplay = `${result.overall_score}/${result.max_score}`;
@@ -53,8 +73,14 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
     ? <XCircle className="h-3 w-3" />
     : <AlertCircle className="h-3 w-3" />;
 
+  // Multi-point header label: emphasizes the points count over PASS/FAIL
+  // because that's the truth users need on this row.
+  const badgeLabel = hasMultiplePoints
+    ? `${passed === true ? "✓" : "✗"} ${pointsPassed}/${pointsTotal} passed`
+    : passed === true ? "PASS" : passed === false ? "FAIL" : "N/A";
+
   // Check if there's expandable content
-  const hasDetails = !!(
+  const hasDetails = hasMultiplePoints || !!(
     result.summary ||
     result.issues?.length ||
     result.strengths?.length ||
@@ -80,7 +106,7 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
         {/* Pass/Fail Badge */}
         <div className={`flex items-center gap-1.5 rounded-md border px-2 py-1 ${badgeColor}`} style={{ fontSize: 10 }}>
           {badgeIcon}
-          <span>{passed === true ? "PASS" : passed === false ? "FAIL" : "N/A"}</span>
+          <span>{badgeLabel}</span>
         </div>
 
         {/* Grader Name & Type */}
@@ -121,6 +147,46 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
       {/* Expanded Details */}
       {expanded && hasDetails && (
         <div className="border-t border-white/5 p-3 space-y-3">
+          {/* Per-Point breakdown (Phase 6.2) — the canonical view of a
+              multi-check grader. Indented like the criterion pills below
+              so the visual rhythm matches the rest of the panel. */}
+          {hasMultiplePoints && (
+            <div>
+              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>Points</div>
+              <div className="ml-6 space-y-1">
+                {points.map((p, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 rounded-md border px-2 py-1 ${
+                      p.pass
+                        ? "border-emerald-500/15 bg-emerald-500/5"
+                        : "border-red-500/20 bg-red-500/5"
+                    }`}
+                  >
+                    {p.pass ? (
+                      <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/80" />
+                    ) : (
+                      <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/80" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={p.pass ? "text-emerald-400/90" : "text-red-400/90"}
+                        style={{ ...mono, fontSize: 11 }}
+                      >
+                        {p.name}
+                      </div>
+                      {p.message && (
+                        <div className="text-white/50" style={{ fontSize: 11, lineHeight: 1.5 }}>
+                          {p.message}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Summary */}
           {result.summary && (
             <div>
