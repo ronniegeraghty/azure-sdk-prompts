@@ -360,3 +360,51 @@ Added console_handler.go and console_handler_test.go with 9 table-driven tests c
 **Scope expansion: Tank now owns `hyoka/internal/progress/`** (commits `0747aa58`, `ce9afc50`). Tank was already listed in routing.md for "progress output," but the charter now explicitly includes `display_interactive.go`, `display_ci.go`, and `style/` helpers. This correction reversed a Sprint 1 misassignment that had put CLI renderers under Trinity's scope; Tank is the CLI operator and owns all CLI-facing output.
 
 **Related:** Neo shipped git-clone skill resolver (neo commit `cf6a7636`) to replace `npx skills add`, unblocking the interactive renderer from stdout pollution. Trinity completed agent-attempt gating (commits `0747aa58` + `ce9afc50`) and handed off future CLI renderer work to Tank — a clean scope separation: Tank = CLI, Trinity = Site/React/Reports.
+
+## 2026-04-23 — fix: tail line wrapping with wide characters (emoji, CJK)
+
+The interactive renderer's multi-row tail clearing logic (commit `6b3d3d48`) had the right structure but used **rune counting** instead of proper terminal **cell width** calculation. Wide characters like emoji 🔄 and ✅ occupy **2 terminal cells** but were counted as **1 rune**, causing off-by-one or more errors in truncation and row-count logic.
+
+### Bug symptoms
+When a tail line containing emoji exceeded terminal width:
+- `truncateToWidth()` would truncate to N runes, thinking it fit in N cells
+- But the actual cell width was N+1 or N+2 (because emoji = 2 cells)
+- Line would wrap to 2 physical rows
+- `tailRowCount` would compute as 1 (based on rune count)
+- `rewriteTail()` would only clear 1 row, leaving the wrapped portion visible
+- Result: leaked wrapped content on subsequent rewrites, appearing as scrolling multi-line tail
+
+### Root cause
+```go
+// OLD (buggy) — counts runes, not cells
+func visibleWidth(s string) int {
+    stripped := ansiSeqRE.ReplaceAllString(s, "")
+    count := 0
+    for range stripped { count++ }  // ❌ 🔄 counted as 1, but occupies 2 cells
+    return count
+}
+```
+
+### Fix
+**Commit:** `fe6efebf` — fix(progress): use proper cell width for wide characters (emoji, CJK)
+
+- Added `github.com/mattn/go-runewidth` dependency
+- `visibleWidth()` now uses `runewidth.StringWidth()` for accurate cell counting
+- `truncateToWidth()` uses `runewidth.RuneWidth(r)` per-rune to check display width
+- Updated tests: `🔄` = 2 cells, `✅ Loaded` = 9 cells (2 + 1 + 6)
+- Added regression tests for wide-char truncation scenarios
+
+### Verification
+Tested with narrow-terminal live run (60 cols):
+```bash
+stty cols 60
+go run . run --prompt-id identity-dp-python-default-credential --config "baseline/claude-opus-4.6"
+```
+Tail stayed on exactly one row throughout the entire evaluation. No leaked wrapped content.
+
+### Learnings
+- **Rune vs. cell width distinction is critical for terminal rendering**: Many Unicode characters (emoji, CJK ideographs, some symbols) take 2 terminal columns, not 1. Always use a proper wcwidth-based library like `go-runewidth` for terminal layout math.
+- **Multi-row ANSI clearing requires accurate row counting**: The `\x1b[NA` (cursor up N lines) + per-row `\r\x1b[2K` (clear line) pattern only works if you know the exact number of physical rows the content occupied. Off-by-one in row count = leaked content.
+- **Test against the actual terminal behavior**: The fix for Bug A (section ordering) was verified by inspection of frozen output. Bug B (wrapping) needed a **live narrow-terminal run** to reproduce — unit tests alone wouldn't have caught the cell-width bug because test assertions used rune counts too.
+- **Progress package is now Tank's scope**: As of 2026-04-23 directive, `hyoka/internal/progress/` (including `display_interactive.go`, `display_ci.go`, and `style/` helpers) is owned by Tank, not Trinity. CLI-facing renderers = Tank; site/report HTML = Trinity.
+
