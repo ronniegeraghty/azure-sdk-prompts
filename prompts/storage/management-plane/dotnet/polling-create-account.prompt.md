@@ -25,25 +25,23 @@ tags:
 
 ## Prompt
 
-I'm creating a storage account with CreateOrUpdateAsync and it returns
-an ArmOperation. How do I properly wait for it to finish? I need to:
-1. Start the create operation using CreateOrUpdateAsync
-2. Wait for completion using WaitForCompletionAsync
+I'm creating a storage account programmatically and the operation takes
+a while to complete. How do I properly wait for long-running operations
+in the Azure management SDK for .NET? I need to:
+1. Start the create operation
+2. Wait for it to complete
 3. Handle timeout scenarios where the operation takes too long
-4. Understand the difference between WaitUntil.Completed and WaitUntil.Started
+4. Understand the different completion modes available
 
-Use Azure.ResourceManager.Storage with DefaultAzureCredential. Show required
-NuGet packages and explain the ArmOperation<T> pattern.
+Authenticate securely using identity-based credentials.
 
 ## Evaluation Criteria
 
-- `StorageAccountCollection.CreateOrUpdateAsync()` returning `ArmOperation<StorageAccountResource>`
-- `ArmOperation<T>.WaitForCompletionAsync()` for simple completion
-- `ArmOperation<T>.HasCompleted` and `UpdateStatusAsync()` for manual polling
-- `ArmOperation<T>.Value` to get the result after completion
-- Timeout handling with `CancellationToken`
-- `WaitUntil.Completed` vs `WaitUntil.Started` parameter
-- Error handling when the LRO fails
+- Creates a storage account using the management SDK
+- Waits for the long-running operation to complete
+- Supports both blocking and polling completion modes
+- Handles timeouts with cancellation tokens
+- Handles errors when the LRO fails
 
 ## Context
 

@@ -23,26 +23,24 @@ author: JonathanCrd
 
 ## Prompt
 
-I'm building an ASP.NET Core web API and need to inject a BlobServiceClient
-into my controllers. How do I register Azure SDK clients with dependency
-injection the right way?
-1. Register BlobServiceClient in Program.cs using AddAzureClients
-2. Configure it with DefaultAzureCredential
-3. Inject BlobServiceClient into a controller or service class
-4. Configure client options (retry policy, diagnostics) via DI
+I'm building an ASP.NET Core web API and need to use Azure Blob Storage
+from my controllers and services. How do I register Azure SDK clients
+with dependency injection properly?
+1. Register an Azure Storage client in the service container at startup
+2. Authenticate using identity-based credentials
+3. Inject the client into controllers or service classes
+4. Configure shared client options like retry policies
 
-Show the required NuGet packages (Microsoft.Extensions.Azure) and explain
-why I should use AddAzureClients instead of manually newing up clients.
+Explain why I should use the DI registration approach instead of
+creating clients manually.
 
 ## Evaluation Criteria
 
-- `Microsoft.Extensions.Azure` NuGet package
-- `builder.Services.AddAzureClients()` registration in Program.cs
-- `AddBlobServiceClient()` with URI
-- `UseCredential(new DefaultAzureCredential())` global credential
-- Constructor injection of `BlobServiceClient` into services/controllers
-- `ConfigureDefaults()` for shared client options
-- Explanation of singleton lifecycle and connection pooling benefits
+- Registers Azure SDK clients using the ASP.NET Core DI extensions
+- Configures identity-based authentication globally
+- Injects clients into controllers or services via constructor injection
+- Configures shared client options (retry, diagnostics) through DI
+- Explains lifecycle benefits (singleton, connection pooling)
 
 ## Context
 

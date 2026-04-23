@@ -23,27 +23,25 @@ author: JonathanCrd
 
 ## Prompt
 
-How do I send and receive messages with Azure Storage Queues in C#?
+How do I send and receive messages with Azure Storage Queues in .NET?
 I need a simple message queue and don't want the complexity of Service Bus.
-1. Create a QueueClient and ensure the queue exists
+1. Connect to a queue and ensure it exists
 2. Send a message to the queue
-3. Receive and process messages (peek vs. dequeue)
+3. Receive and process messages
 4. Delete a message after processing
 5. Handle message visibility timeout
 
-Use DefaultAzureCredential for auth. Show required NuGet packages and
-explain the difference between receiving and peeking at messages.
+Authenticate securely using identity-based credentials. Explain the
+difference between receiving and peeking at messages.
 
 ## Evaluation Criteria
 
-- `Azure.Storage.Queues` NuGet package
-- `QueueClient` creation with URI and `DefaultAzureCredential`
-- `QueueClient.CreateIfNotExistsAsync()`
-- `SendMessageAsync()` for enqueueing
-- `ReceiveMessagesAsync()` vs `PeekMessagesAsync()`
-- `DeleteMessageAsync()` with message ID and pop receipt
-- `visibilityTimeout` parameter on receive
-- Base64 encoding behavior (default in v12)
+- Connects to Azure Storage Queues using identity-based authentication
+- Creates the queue if it doesn't exist
+- Sends messages to the queue
+- Distinguishes between receiving (dequeue) and peeking at messages
+- Deletes messages after processing using message ID and pop receipt
+- Handles visibility timeout for reliable processing
 
 ## Context
 

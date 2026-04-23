@@ -25,20 +25,16 @@ tags:
 ## Prompt
 
 I have a container with about 500 old blobs I need to delete in one shot
-instead of calling DeleteBlobAsync in a loop. How do I use BlobBatchClient
-to bulk-delete them in a single HTTP request? I also need to handle partial
-failures where some deletes succeed and others fail.
-
-Show me the setup with the Azure.Storage.Blobs.Batch package.
+instead of deleting them one at a time. How do I perform bulk blob operations
+in a single HTTP request in .NET? I also need to handle partial failures
+where some operations succeed and others fail.
 
 ## Evaluation Criteria
 
-- `BlobBatchClient` from `Azure.Storage.Blobs.Batch` package
-- `BlobBatchClient.DeleteBlobsAsync()` for bulk delete
-- Custom batch via `BlobBatchClient.CreateBatch()` and `SubmitBatchAsync()`
-- Batch size limits (256 operations per batch)
-- Partial failure handling: `AggregateException` with per-operation status
-- `RequestFailedException` for individual operation failures within a batch
+- Performs bulk blob operations (delete or tier change) in batched requests
+- Handles batch size limits
+- Handles partial failures where individual operations fail within a batch
+- Uses the appropriate batch SDK package
 
 ## Context
 

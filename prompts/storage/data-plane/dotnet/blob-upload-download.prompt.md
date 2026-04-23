@@ -23,26 +23,25 @@ author: JonathanCrd
 
 ## Prompt
 
-I need to upload a local file to Azure Blob Storage and download it back.
-How do I do this with the Azure.Storage.Blobs SDK in C#?
-1. Create a BlobContainerClient and ensure the container exists
-2. Upload a file from disk using BlobClient.UploadAsync
-3. Upload a stream (e.g., a MemoryStream) as a blob
+I need to upload a local file to Azure Blob Storage and download it back
+using .NET. How do I:
+1. Connect to a blob container and ensure it exists
+2. Upload a file from disk
+3. Upload from a stream (e.g., in-memory data)
 4. Download a blob to a local file
 5. Download a blob as a stream and read its contents
 
-Use DefaultAzureCredential for auth. Show required NuGet packages and explain
-the overwrite behavior on upload.
+Authenticate securely without hardcoding credentials. Explain the
+overwrite behavior on upload.
 
 ## Evaluation Criteria
 
-- `Azure.Storage.Blobs` NuGet package
-- `BlobServiceClient` or `BlobContainerClient` creation with `DefaultAzureCredential`
-- `BlobContainerClient.CreateIfNotExistsAsync()`
-- `BlobClient.UploadAsync()` with file path and stream overloads
-- `BlobClient.DownloadToAsync()` or `DownloadContentAsync()`
-- Overwrite parameter on upload (`overwrite: true`)
-- Proper stream disposal with `using` or `await using`
+- Connects to Blob Storage using identity-based authentication
+- Creates the container if it doesn't exist
+- Uploads blobs from both file paths and streams
+- Downloads blobs to files and as streams
+- Handles overwrite behavior on upload
+- Properly disposes of streams and clients
 
 ## Context
 

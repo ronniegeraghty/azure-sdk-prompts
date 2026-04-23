@@ -23,23 +23,22 @@ tags:
 
 ## Prompt
 
-I need to create a Standard_LRS storage account in eastus using the
-Azure.ResourceManager.Storage SDK, then enable blob versioning on it
-afterward. How do I do this with the new Track 2 management SDK?
-
-Show me authentication with DefaultAzureCredential, the create call,
-and how to update properties. Include required NuGet packages.
+I need to create a storage account programmatically and then modify
+its configuration using the Azure management SDK in .NET. How do I:
+1. Authenticate and navigate the resource hierarchy
+2. Create a storage account with specific SKU and region
+3. Enable features like blob versioning after creation
+4. List and manage storage accounts
 
 ## Evaluation Criteria
 
 The generated code should include:
-- `Azure.ResourceManager.Storage` NuGet package
-- `ArmClient` and subscription/resource group navigation
-- `StorageAccountCollection.CreateOrUpdate()` with `StorageAccountCreateOrUpdateContent`
-- SKU and kind configuration (`StorageSku`, `StorageKind`)
-- Listing and getting storage accounts
-- Updating properties via `StorageAccountPatch`
-- Delete operation
+- Uses the modern track 2 Azure Resource Manager Storage SDK
+- Authenticates with identity-based credentials
+- Creates a storage account with SKU and kind configuration
+- Lists and retrieves storage accounts
+- Updates properties after creation
+- Handles deletion
 
 ## Context
 

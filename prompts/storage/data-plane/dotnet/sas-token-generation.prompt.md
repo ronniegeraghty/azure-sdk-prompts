@@ -24,23 +24,22 @@ author: JonathanCrd
 ## Prompt
 
 I need to give a third-party temporary read-only access to a specific blob
-without sharing my storage account key. How do I generate a SAS token in C#?
-1. Create a user-delegation SAS using DefaultAzureCredential (no account key needed)
-2. Set permissions to read-only with a 1-hour expiry
-3. Generate the SAS URI for a specific blob
-4. Show how to verify the SAS URI works by downloading the blob with it
+without sharing my storage account key. How do I generate a SAS token in .NET?
+1. Generate a SAS token without using the storage account key directly
+2. Scope the token to read-only access with a limited expiry
+3. Build a SAS URI for a specific blob
+4. Verify that the SAS URI works by downloading the blob with it
 
-Also explain when I'd use a user-delegation SAS vs. an account-key SAS
-and why user-delegation is preferred.
+Explain the different SAS types available and which is the most secure
+approach.
 
 ## Evaluation Criteria
 
-- `BlobSasBuilder` for defining SAS parameters
-- `BlobServiceClient.GetUserDelegationKeyAsync()` for user-delegation SAS
-- `BlobSasPermissions.Read` for read-only access
-- Setting `ExpiresOn` with a `DateTimeOffset`
-- `BlobUriBuilder` or `BlobClient.GenerateSasUri()` for URI generation
-- Explanation of user-delegation vs. account-key SAS security tradeoffs
+- Generates a user-delegation SAS using identity-based credentials (preferred)
+- Scopes permissions to read-only with a time-limited expiry
+- Builds a complete SAS URI for a specific blob
+- Explains the security tradeoffs between user-delegation and account-key SAS
+- Demonstrates verification of the generated SAS URI
 
 ## Context
 

@@ -25,17 +25,17 @@ tags:
 
 How do I properly handle errors when working with Azure Blob Storage in .NET?
 I need to understand what exceptions are thrown for common failure scenarios:
-container not found (404), access denied (403), and throttling (429).
-Show me idiomatic try/catch patterns with the Azure.Storage.Blobs SDK
-including how to extract the error code and HTTP status from RequestFailedException.
+not found (404), access denied (403), and throttling (429).
+Show me idiomatic error handling patterns including how to extract
+the error code and HTTP status from exceptions.
 
 ## Evaluation Criteria
 
-- `RequestFailedException` as the primary exception type
-- Extracting `Status` and `ErrorCode` from the exception
-- Handling specific HTTP status codes (404, 403, 409, 429)
-- Conditional request failures (ETags, leases)
-- Logging and diagnostics for troubleshooting
+- Catches the primary Azure SDK exception type for failed requests
+- Extracts HTTP status code and error code from exceptions
+- Handles specific HTTP status codes (404, 403, 409, 429)
+- Covers conditional request failures (ETags, leases)
+- Includes logging and diagnostics guidance
 
 ## Context
 
