@@ -4104,3 +4104,362 @@ When implementing in-place rewrites for terminal tail lines that may wrap:
 
 ---
 
+---
+
+## Decision: Tool Load Validation Gate — Bug #347 (2026-04-23)
+
+**Date:** 2026-04-23  
+**Status:** ✅ Implemented (WU-1, WU-3) + ✅ Tested (WU-2) + ✅ Documented (WU-4)  
+**Severity:** HIGH  
+**Issue:** #347 (tool load failures were silent; evals ran without required tools)  
+**Related Decision:** `.squad/decisions/tank-stuck-state-fix-2026-04-23.md` (concurrent work, separate concern)  
+
+### Summary
+
+Two related bugs prevented hyoka from properly validating and reporting tool/skill load failures:
+
+1. **Tool Verification Had No Enforcement:** The eval engine emitted tool verification events (`EventToolsVerified`) but never checked the status or failed the eval when required tools didn't load. Verification was purely observational (UI feedback only).
+
+2. **Skill/MCP Load Failures Silent:** Skills were resolved and passed correctly to the Copilot SDK via `SessionConfig.SkillDirectories`, but if tools failed to load at the SDK level (missing SKILL.md, permission errors, SDK bugs), the eval continued silently. This was a manifestation of bug #1.
+
+**Impact (Before Fix):**
+- Required tools could fail silently
+- Evals proceeded WITHOUT the tools
+- Agent generated code "blind" (no SDK docs, no domain skills)
+- Graders docked points for incorrect usage
+- Users had no idea WHY evals failed
+- No signal in reports that tools were missing
+
+### Root Cause Analysis (Neo's Investigation)
+
+#### Bug #1: Tool Verification Without Enforcement
+
+**Location:** `hyoka/internal/eval/copilot.go` (lines 201–212, 350–393)
+
+The tool verifier correctly tracked expected vs. loaded tools. When the SDK fired `SessionEventTypeSessionSkillsLoaded` or `SessionEventTypeSessionMcpServersLoaded`, the verifier recorded names and emitted `progress.EventToolsVerified` with `ToolStatusLoaded` or `ToolStatusFailed`. 
+
+**The Problem:** This event was consumed only by the progress renderer (`display_interactive.go`) to show ✅/❌ next to tool names. The eval engine NEVER checked tool statuses or failed the eval.
+
+#### Bug #2: SDK-Level Failures Ignored
+
+**Location:** `hyoka/internal/eval/copilot.go` (lines 792–803, 885)
+
+Skills ARE being resolved and passed to the SDK correctly. Resolution happens via `tool.ResolveSkillsWithReporter()`. However, when the SDK failed to load them, it fired `SessionEventTypeSessionSkillsLoaded` with an empty array or only successful ones. The verifier marked the skill `ToolStatusFailed`, but the eval never checked this status.
+
+**Conclusion:** The config author intends for declared tools to be required, but there's no explicit contract enforcement post-session-start.
+
+### Solution Implemented
+
+#### WU-1 + WU-3: Validation Gate (Neo)
+
+**Files Modified:**
+
+1. **`hyoka/internal/eval/tool_verification.go`**
+   - Added `readyChan chan struct{}` to `toolVerifier` struct
+   - Modified `emitIfReady()` to close `readyChan` when verification completes
+   - Added `waitForToolVerification(ctx, verifier, timeout)` helper function
+   - Channel-based signaling enables zero-CPU-overhead blocking wait with timeout support
+
+2. **`hyoka/internal/eval/copilot.go` (lines ~590-617)**
+   - Added validation gate after `CreateSession` succeeds, before `SendAndWait`
+   - Calls `waitForToolVerification(genCtx, verifier, 10*time.Second)`
+   - Checks each tool's status; aborts on first failure
+   - Returns `EvalResult` with `ErrorCategory: "tool_load_failure"` on tool failure
+   - Logs success when all tools pass
+   - Early abort before agent attempt saves cost and time
+
+3. **`hyoka/internal/eval/engine_eval.go`**
+   - Modified error handling in `runSingleEval` to check `result.ErrorCategory` first
+   - If `ErrorCategory` is set (e.g., "tool_load_failure"), preserve it instead of overwriting
+   - Uses `result.Error` and `result.ErrorDetails` directly when category exists
+
+**Key Design Decisions:**
+
+- **Timeout: 10 Seconds**
+  - Skills load instantly from local disk
+  - MCP servers spawn child processes (2–5 seconds typical)
+  - 10s provides buffer for slow systems or remote MCP configs
+  - Timeout itself is a failure — prevents indefinite hang
+
+- **Gate Placement: After CreateSession, Before SendAndWait**
+  - SDK has fired tool load events by this point
+  - Early abort if tools missing (no agent attempt cost)
+  - Closest to SDK interaction (clear error attribution)
+
+- **Error Category: `tool_load_failure`**
+  - Distinguishes tool problems from SDK bugs or timeout issues
+  - Clear signal: config was wrong, not the agent
+  - Aligns with existing category vocabulary
+
+- **Channel-Based Signaling**
+  - Zero CPU overhead (goroutine blocks on select, no polling)
+  - Instant wakeup when verification completes
+  - Clean testability (mocks can close channel)
+
+**Commits:**
+- `92a9746c` — Add tool validation gate (WU-1 + WU-3)
+- `2c3835ca` — docs(neo): document WU-1 + WU-3 implementation
+- `182f4ba4` — docs(neo): add tool validation gate decision document
+
+#### WU-2: Test Coverage (Switch)
+
+**Files Modified:** `hyoka/internal/eval/tool_verification_test.go` (added 8 comprehensive test functions, 267 lines)
+
+**Test Cases:**
+1. Happy path: all tools load successfully → validation gate allows eval to proceed
+2. Skill load failure: expected skill reports Failed → eval aborts with `tool_load_failure` error
+3. MCP load failure: expected MCP reports Failed → eval aborts
+4. Mixed failures: multiple tools, first failure detected
+5. Timeout scenario: SDK never fires events within 10s window → clear timeout error
+6. No expected tools: gate skipped, no overhead
+7. Partial event arrival: must wait for all kinds before emitting
+8. All failures: all configured tools (2 skills + 2 MCP) fail to load
+
+**Verification:**
+- ✅ All validation gate tests pass: `go test -race ./hyoka/internal/eval/... -run TestToolValidation`
+- ✅ Full eval package suite: `go test -race ./hyoka/internal/eval/...` (all tests pass)
+- ✅ No `-race` flag violations
+
+**Commit:**
+- `0bd54b6f` — test(eval): add tool validation gate tests (WU-2)
+
+#### WU-4: Documentation (Oracle)
+
+**Files Created/Modified:**
+
+1. **`docs/configuration.md` (Tool Load Validation subsection)**
+   - All configured tools are implicitly required
+   - Validation gate enforces 10-second SDK confirmation window
+   - Eval aborts with clear error if any tool fails to load
+   - Common causes: missing SKILL.md, incorrect paths, remote unavailable, MCP not found, SDK timeout
+   - Diagnostic procedure: use `--log-level debug --log-file` and grep for tool errors
+   - Forward note: `required: false` opt-out planned for Phase 2
+
+2. **`docs/troubleshooting.md` (new file, Tool Load Failure section)**
+   - Comprehensive troubleshooting workflow
+   - Diagnosis workflow using debug logs
+   - Specific subsections for each common cause:
+     * Skill not found / SKILL.md missing
+     * Glob pattern produces no matches
+     * Remote skill download fails
+     * MCP server fails to start
+     * SDK timeout edge cases
+   - Quick verification checklist
+   - Examples of actual diagnostic commands (ls, find, grep, manual command tests)
+   - Path resolution clarified: skill `path` is relative to config file directory
+   - Additional sections for other eval issues
+   - Guidance on reporting issues
+
+**Verification:**
+- ✅ Docs follow existing configuration.md style and Microsoft Style Guide conventions
+- ✅ Examples use real CLI commands and actual log format
+- ✅ No invented design decisions; content derives from Neo's investigation
+- ✅ Audience: end users running evaluations (supportive, practical tone)
+- ✅ Committed with Copilot co-author trailer
+
+**Commits:**
+- `6ca1a341` — docs(oracle): add tool load validation documentation (WU-4)
+- `d6484c02` — chore(squad): oracle session complete — tool load validation docs WU-4
+
+### Impact (After Fix)
+
+- Tool load failures immediately abort eval with clear error
+- Report shows `error_category: "tool_load_failure"`
+- Error message names specific tool and reason
+- No wasted agent attempt or cost
+- User knows to fix config or skill path
+- Debug logs show verification timeout or SDK event mismatch
+- Docs provide clear diagnostic workflow
+
+### Testing & Verification
+
+**Build + Unit Tests:**
+```bash
+go build ./...       # ✅ Passed
+go test -race ./...  # ✅ Passed (all 24 packages)
+```
+
+**Manual Verification:**
+Happy path: Tools load successfully, eval proceeds normally.
+
+Failure path (breaking skill path):
+```bash
+# Temporarily rename skill to trigger load failure
+mv skills/generator/azure-sdk-for-rust-bestpractices \
+   skills/generator/azure-sdk-for-rust-bestpractices.bak
+
+hyoka run --prompt-id identity-dp-python-default-credential \
+  --config baseline/claude-opus-4.6 \
+  --log-level debug --log-file hyoka-debug.log
+
+# Check report
+jq '.error_category, .error' reports/.../eval-report.json
+```
+
+Expected output:
+```json
+"tool_load_failure"
+"required skill \"azure-sdk-for-rust-bestpractices\" failed to load: SDK did not report skill as loaded"
+```
+
+### Work Unit Dependencies
+
+```
+Neo (Investigation) ──→ WU-1 + WU-3 (Neo)
+                    ├→ WU-2 (Switch) — blocked on WU-1
+                    └→ WU-4 (Oracle) — can proceed in parallel
+
+All tracks complete and committed to ronniegeraghty/dev
+```
+
+### Decision Rationale
+
+1. **Why channel-based blocking over polling?** Zero CPU overhead, instant wakeup on verification complete, clean testability (mocks can close channel).
+
+2. **Why validation gate placement after CreateSession?** SDK has fired tool load events by this point, early abort saves cost/time, closest to SDK interaction.
+
+3. **Why not optional tools in Phase 1?** All configured tools are implicitly required. Phase 2 can add `required: false` flag if use cases emerge.
+
+4. **Why 10-second timeout?** Skills load instantly (local disk); MCP servers spawn in 2–5s typical; 10s provides buffer for slow systems/remote MCP configs.
+
+### Open Questions (Phase 2)
+
+1. Should timeout be configurable? NO for Phase 1. If remote MCP servers are slow, that's a config problem.
+2. Should we support `required: false`? NO for Phase 1. Future enhancement after user feedback.
+
+### References
+
+- Tool verification: `hyoka/internal/eval/tool_verification.go`
+- Session events: `hyoka/internal/eval/copilot.go` (lines 201–420)
+- Tool resolution: `hyoka/internal/config/tool/resolve.go`
+- Progress events: `hyoka/internal/progress/events.go`
+- Orchestration logs: `.squad/orchestration-log/2026-04-23T13-13-28Z-{neo,switch,oracle}.md`
+- Investigation: `.squad/decisions/inbox/neo-tool-skill-investigation-2026-04-23.md` (now archived)
+- Implementation plan: `.squad/decisions/inbox/neo-tool-validation-gate-impl-2026-04-23.md` (now archived)
+- Test summary: `.squad/decisions/inbox/switch-tool-validation-tests-2026-04-23.md` (now archived)
+- Docs summary: `.squad/decisions/inbox/oracle-tool-validation-docs-2026-04-24.md` (now archived)
+
+---
+
+## Decision: Fix Stuck "Running" State in Progress Display — Deferred Terminal Events (2026-04-23)
+
+**Date:** 2026-04-23  
+**Author:** Tank  
+**Status:** ✅ Implemented  
+**Commit:** aa8c4434  
+**Related Decision:** Tool Load Validation Gate (separate concern, coordinated in same session)
+
+### Problem
+
+Two related bugs in the progress display caused "Running" states to persist even after operations completed:
+
+1. **Agent Attempt:** Stayed on "🔄 Running" even after evaluation completed — never transitioned to "✅ Completed" or "Guardrail hit". The state line just stayed as Running and the eval moved on to the next one.
+
+2. **Graders (AI Reviews):** Some grader/reviewer rows stayed in "🔄 Running…" state even after moving on to the next eval.
+
+**Class of Bug:** State-transition events that should fire on completion/guardrail/failure weren't always firing, OR they were firing but the renderer wasn't applying them.
+
+### Root Cause
+
+#### Agent Attempt Issue
+
+**Location:** `hyoka/internal/eval/engine.go` lines 580–584
+
+The eval goroutine checks for context cancellation:
+
+```go
+select {
+case sem <- struct{}{}:
+case <-ctx.Done():
+    return  // ⚠️ Exits WITHOUT sending terminal event
+}
+```
+
+When context cancelled (Ctrl+C, timeout, parent cancellation), the goroutine exited immediately WITHOUT reaching terminal event emission code at lines 665–674. This left Agent Attempt stuck in "Running" state.
+
+#### Grader Issue
+
+**Location:** `hyoka/internal/criteria/exec.go` in `RunGradersWithHooks`
+
+If `RunGradersWithHooks` was interrupted mid-grader (panic or context cancel during `g.Grade()`), the `OnComplete` hook might not fire, leaving that grader stuck in "Running" state.
+
+### Solution
+
+### 1. Agent Attempt Fix (engine.go)
+
+Added deferred handler that tracks whether a terminal event (EventPassed/EventFailed/EventError) was sent. If goroutine exits without sending one, deferred function force-sends EventError:
+
+```go
+terminalEventSent := false
+defer func() {
+    if !terminalEventSent {
+        display.HandleEvent(progress.ProgressEvent{
+            EvalID:   taskName,
+            Type:     progress.EventError,
+            Message:  "eval cancelled or interrupted",
+        })
+    }
+}()
+// ... normal evaluation flow ...
+display.HandleEvent(/* terminal event */)
+terminalEventSent = true
+```
+
+Ensures EVERY exit path (normal, error, context cancel, panic) sends terminal event.
+
+### 2. Grader Fix (criteria/exec.go)
+
+Added deferred handler in `RunGradersWithHooks` to ensure `OnComplete` fires even on grader panic or loop interruption:
+
+```go
+for _, g := range graderInstances {
+    if hooks.OnStart != nil {
+        hooks.OnStart(g)
+    }
+    
+    completeFired := false
+    defer func(grader graders.Grader) {
+        if !completeFired && hooks.OnComplete != nil {
+            hooks.OnComplete(grader, graders.GraderResult{
+                Name:    grader.Name(),
+                Kind:    grader.Kind(),
+                Pass:    false,
+                Message: "grader interrupted or panicked",
+            })
+        }
+    }(g)
+    
+    // ... grading logic ...
+    
+    if hooks.OnComplete != nil {
+        hooks.OnComplete(g, result)
+    }
+    completeFired = true
+}
+```
+
+### Verification
+
+- ✅ `go build ./...` — clean
+- ✅ `go test -race ./...` — all pass
+- ✅ Manual smoke test: Agent Attempt transitions "Running" → "Completed" on normal completion
+- ✅ Edge case: Ctrl+C during eval now shows "❌ eval cancelled or interrupted" instead of stuck
+
+### Trade-offs
+
+- **Force-send on interrupt:** When eval cancelled, we now always send error event with "eval cancelled or interrupted". This is better than stuck state, but not perfectly accurate — eval might have succeeded before being cancelled. However, EvalReport in that case would have `Error: ""` and JSON report shows true outcome. Progress display optimized for real-time feedback, so showing "interrupted" is right choice.
+
+- **Defer overhead:** Each eval goroutine and each grader now has extra defer. Negligible overhead (~nanoseconds) vs. eval runtime (seconds to minutes).
+
+### Commit
+
+- `aa8c4434` — fix(progress): ensure terminal events fire on context cancellation
+
+### Why Separate from Tool Validation?
+
+- Different root cause (progress event delivery) vs. tool validation (config checking)
+- Different code paths (engine.go + criteria/exec.go vs. copilot.go + tool_verification.go)
+- Not blocking tool validation work
+- Clear decision boundary: ship tool validation first, stuck-state fix follows in same session
+
+---
