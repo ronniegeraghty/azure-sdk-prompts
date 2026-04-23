@@ -1255,3 +1255,11 @@ Ronnie's hypothesis was *almost* right ("fanning out the plugin to its individua
 
 **Reusable rule:**
 > **Plugin = directory of skills, not a single skill.** The plugin resolver must accept both shapes (top-level SKILL.md OR `skills/<child>/SKILL.md`). Whatever the verifier ends up checking should be the leaves the SDK actually loads — never the parent container directory, which has no SKILL.md and would never appear in `SessionSkillsLoaded`.
+
+### 2026-04-23T19:42Z: Container plugin fan-out (commit `4a8c4a0d`) — closes the plugin-loading saga
+
+- **Bug:** Even after explicit `repo:` (`2c1de1c0`, `3b306c9`) and a populated cache, evals hard-failed with `tool_load_failure: plugin "azure-sdk-python" not found`. `ResolveInstalled` returned `""` for every container plugin.
+- **Root cause:** `isSkillDir` required a top-level `SKILL.md`. `microsoft/skills/azure-sdk-python` is a CONTAINER (`skills/<child>/SKILL.md` × 41), so the resolver rejected it before fan-out could happen.
+- **Fix:** widened acceptance to `isPluginDir` (top-level OR `skills/<child>/SKILL.md`); added `EnumerateChildSkills`; `validatePluginEntry` emits one `ToolLoadItem` per child with `ParentName=<plugin>`. Verifier now matches by child basename — which is what the SDK actually loads.
+- **Key insight (file under "always remember"):** **resolver shape vs verifier shape mismatch — fan-out is what bridges them.** If the SDK reports leaves, never check the container. The bug was structural: the validator was emitting at the wrong granularity. Tests added for both shapes + integration. Live verified with `hyoka run --prompt-id key-vault-dp-python-crud --config python-pairwise`: 3 errors → 0.
+- **Two follow-ups Ronnie/I flagged:** (1) no `hyoka plugin install` command — error msg misleads to Copilot CLI; (2) `pluginCheckedPaths` only lists parent dirs, not child shape. Issues filed by Scribe.

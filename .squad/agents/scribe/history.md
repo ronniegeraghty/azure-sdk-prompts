@@ -110,3 +110,7 @@ See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md`.
 
 - **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
 - **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+
+### 2026-04-23T19:42Z: Decision-log discipline — extend, don't SUPERSEDE, when a follow-up adds a contract rather than reversing one
+
+When commit `4a8c4a0d` landed (container plugin fan-out), the temptation was to mark the prior `repo:`-required entry as superseded. Wrong instinct. The earlier decision fixed the *locator* shape; this one fixes the *content* shape. Both contracts now hold simultaneously. Rule: only mark SUPERSEDED when the new decision *replaces* or *reverses* the earlier one. When it adds an orthogonal contract, the entry should explicitly say "extends, does not supersede" and cross-reference the prior commit. Readers a year later need to know both rules still apply.

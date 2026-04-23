@@ -2,6 +2,35 @@
 
 ## Active Decisions
 
+### Decision: Plugins May Be Single-Skill OR Container; Container Plugins Fan Out Per Child (2026-04-23T19:42Z)
+
+**Agent:** Neo 💊
+**Branch:** ronniegeraghty/dev
+**Commits:** `4a8c4a0d` (this fix); extends `2c1de1c0` and `3b306c9` (explicit `repo:` schema).
+**Driver:** After the explicit-`repo:` migration, evals still failed with `tool_load_failure: plugin "azure-sdk-python" ... not found` — even with the cache populated. Root cause was a shape mismatch between the resolver (looking for one skill) and the upstream layout (a container of many skills).
+
+**Finding:** `plugin.ResolveInstalled` (`hyoka/internal/plugin/installed.go:43`) used `isSkillDir`, which required a top-level `SKILL.md`. Container-style plugins (e.g. `azure-sdk-python` in `microsoft/skills`) have no top-level `SKILL.md`; they hold `skills/<child>/SKILL.md` for many children (41+ in this case). Resolver returned `""` → fan-out never ran → verifier had nothing to match against → hard fail.
+
+**Decision:**
+1. **A plugin is a directory of skills, not a single skill.** `ResolveInstalled` now accepts both shapes via a widened `isPluginDir` check: a top-level `SKILL.md` (single-skill plugin) OR a `skills/` subdirectory containing at least one `SKILL.md`-bearing child (container plugin).
+2. **New helper `plugin.EnumerateChildSkills`** returns the absolute paths of each `<dir>/skills/<child>/SKILL.md`-bearing subdir, sorted lexicographically.
+3. **`validatePluginEntry` fans containers out.** When children exist, it emits one `ToolLoadItem` per child with `ParentKind=plugin`, `ParentName=<plugin name>`, `Path=<child dir>`. Single-skill plugins emit one item as before.
+4. **The verifier matches by child basename** — which is what the SDK actually reports in `SessionSkillsLoaded`. Never match against the parent container directory; it has no `SKILL.md` and never appears in the loaded set.
+
+**Tests:** `TestResolveInstalled_ContainerPluginFanOut`, `TestResolveInstalled_SingleSkillPluginStillWorks`, `TestEnumerateChildSkills_IgnoresChildrenWithoutSkillMd`, `TestValidateAndExpand_RemoteContainerPlugin_FansOutChildren`. Full `go test ./hyoka/...` green.
+
+**Verified live:** Pre-fix `hyoka run --prompt-id key-vault-dp-python-crud --config python-pairwise` → 3/3 evals errored. Post-fix → 0 errors, all generators report `Skills loaded: ..., azure-keyvault-py, azure-identity-py, azure-storage-blob-py, ...`.
+
+**Relationship to prior decisions:** Extends — does NOT supersede — the explicit-`repo:` decision (commit `2c1de1c0`, dated 2026-04-23T18:50Z). That decision fixed the *locator* shape (where to fetch plugins from). This decision fixes the *content* shape (what a plugin actually contains on disk). Both contracts now hold simultaneously.
+
+**Follow-ups (filed as issues):**
+1. **No `hyoka plugin install` command.** When a remote plugin is missing, the validator's error message points users at Copilot CLI's `/plugin install`, which is misleading — that's a different tool. Today the cache must be populated by hand (`git clone github.com/<owner>/<repo> ~/.hyoka/cache/default/<owner>/<repo>`). Either ship a `hyoka plugin install` command or rewrite the error to document the manual steps.
+2. **`pluginCheckedPaths` enumerates only parent dirs.** When a partial cache exists (parent present but children missing), the error lists candidate parent paths but not the child shape now expected. Refine the diagnostic.
+
+**Reusable rule:** *Whatever the verifier checks must be the leaves the SDK actually loads.* If you ever introduce a new container shape, fan it out at validation time and verify the leaves — never the container.
+
+---
+
 ### Decision: Default Model Pinned to claude-opus-4.7 for All Squad Agents (2026-04-23)
 
 **By:** ronniegeraghty (via Coordinator)

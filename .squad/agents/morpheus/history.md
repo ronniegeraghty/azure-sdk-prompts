@@ -748,3 +748,7 @@ Per Ronnie directive, Neo reversed his earlier `@marketplace` validator (commit 
 ```
 
 This repo's configs (`configs/python-pairwise.yaml`, `configs/baseline-sonnet-skills.yaml`) are already migrated. Any wild config not in this repo using `name@skills` will fail validation with a migration message. See `decisions.md` entry at 2026-04-23T18:50Z for full schema and validator contracts.
+
+### 2026-04-23T19:42Z: Plugin-loading saga closed end-to-end
+
+Neo shipped `4a8c4a0d` — container plugins now fan out into per-child `ToolLoadItem`s, verifier matches by child basename. Live verified: `hyoka run` against `python-pairwise` config goes from 3/3 errors to 0/3, all 41+ azure-sdk-python children load. Combined with `2c1de1c0` (explicit `repo:`) + `3b306c9` (canonical `owner/repo` form), the plugin schema/loader story is now coherent: locator + content shape both contracted. If any prior audit referenced lingering plugin loader issues, they're resolved.
