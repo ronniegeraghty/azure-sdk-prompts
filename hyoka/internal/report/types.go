@@ -45,6 +45,22 @@ type GraderResult struct {
 	PromptDetails   *PromptGraderDetail   `json:"prompt_details,omitempty"`
 	BehaviorDetails *BehaviorGraderDetail `json:"behavior_details,omitempty"`
 	ReviewDetails   *ReviewGraderDetail   `json:"review_details,omitempty"`
+
+	// Points is the report-side mirror of graders.GraderPoint introduced in
+	// Phase 2 (#GraderPoints). Each grader emits one or more sub-checks; the
+	// site renders these directly instead of re-deriving pass/fail from the
+	// expanded review entries. Detail structs above remain populated for
+	// backward-compat with existing markdown/HTML report templates.
+	Points []GraderPoint `json:"points,omitempty"`
+}
+
+// GraderPoint mirrors graders.GraderPoint in the report layer so JSON reports
+// carry the per-sub-check rows. The eval engine copies values across at
+// report-build time.
+type GraderPoint struct {
+	Name    string `json:"name"`
+	Pass    bool   `json:"pass"`
+	Message string `json:"message,omitempty"`
 }
 
 // FileCheckDetail records the outcome of a single file check.

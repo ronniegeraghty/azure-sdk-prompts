@@ -854,6 +854,12 @@ func convertGraderResults(results []graders.GraderResult) []report.GraderResult 
 			Pass:       &pass,
 			Gate:       r.Gate,
 		}
+		if len(r.Points) > 0 {
+			rr.Points = make([]report.GraderPoint, len(r.Points))
+			for j, p := range r.Points {
+				rr.Points[j] = report.GraderPoint{Name: p.Name, Pass: p.Pass, Message: p.Message}
+			}
+		}
 		if r.FileDetails != nil {
 			checks := make([]report.FileCheckDetail, len(r.FileDetails.CheckedFiles))
 			for j, c := range r.FileDetails.CheckedFiles {
@@ -900,6 +906,12 @@ func convertGraderResults(results []graders.GraderResult) []report.GraderResult 
 // expandReviewGraderResult converts a review grader result into multiple
 // report entries — one per panel member plus the consensus. This replaces
 // the removed GraderResultsFromReview function in the main code path.
+//
+// Phase 2 cohabitation note: the consensus entry now carries the grader's
+// Points so the site can begin reading per-criterion pass/fail directly off
+// the JSON shape. Phase 5 will retire this expansion entirely (single row
+// per grader, Points-driven) and the panel-member entries will be replaced
+// by parent linkage on the consensus row.
 func expandReviewGraderResult(r graders.GraderResult) []report.GraderResult {
 	rd := r.ReviewDetails
 	var results []report.GraderResult
@@ -936,7 +948,7 @@ func expandReviewGraderResult(r graders.GraderResult) []report.GraderResult {
 			Name: c.Name, Passed: c.Passed, Reason: c.Reason,
 		})
 	}
-	results = append(results, report.GraderResult{
+	consensus := report.GraderResult{
 		GraderName:   consensusName,
 		GraderType:   "review",
 		Model:        rd.Model,
@@ -947,7 +959,14 @@ func expandReviewGraderResult(r graders.GraderResult) []report.GraderResult {
 		Issues:       rd.Issues,
 		Strengths:    rd.Strengths,
 		IsConsensus:  len(rd.PanelResults) > 0,
-	})
+	}
+	if len(r.Points) > 0 {
+		consensus.Points = make([]report.GraderPoint, len(r.Points))
+		for i, p := range r.Points {
+			consensus.Points[i] = report.GraderPoint{Name: p.Name, Pass: p.Pass, Message: p.Message}
+		}
+	}
+	results = append(results, consensus)
 
 	return results
 }
