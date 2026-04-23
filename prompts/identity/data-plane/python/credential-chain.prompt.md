@@ -31,6 +31,8 @@ tags:
 
 Create a Python project that demonstrates how to correctly build Azure credential chains tailored to different deployment environments — local development, CI/CD pipelines, and production.
 
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 The project needs:
 
 - A **credential factory module** that builds the appropriate Azure credential for each environment. For local development, it should chain together credentials that work from developer tools (CLI, VS Code, etc.). For CI pipelines, it should support credentials sourced from pipeline environment variables or Azure Pipelines service connections. For production, it should prefer managed identity (supporting both system-assigned and user-assigned, where the user-assigned identity's client ID comes from an environment variable), with workload identity as a fallback for Kubernetes scenarios. The factory should also support enabling Continuous Access Evaluation (CAE) on token requests, which lets Azure revoke tokens mid-session for security events.

@@ -23,10 +23,10 @@ tags:
 
 ## Prompt
 
-Write a script that performs
-all four CRUD operations on Azure Key Vault secrets:
-1. Create a new secret called "my-secret" with value "my-secret-value"
-2. Read the secret back and print its value
+Write a Python script that performs all four CRUD operations on Azure Key Vault secrets.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 3. Update the secret to a new value "updated-value"
 4. Delete the secret and purge it (soft-delete enabled vault)
 

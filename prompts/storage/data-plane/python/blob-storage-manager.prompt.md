@@ -32,6 +32,8 @@ tags:
 
 Create a Python project that provides a reusable Azure Blob Storage management utility.
 
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 The project needs:
 
 - A **service module** (both sync and async versions) that wraps blob operations: upload (with optional metadata and blob index tags for later querying), download, list blobs in a container, and delete. The upload method should handle large files efficiently so that uploading a multi-gigabyte file doesn't load the entire thing into memory or fail on slow connections. The service should also prevent concurrent writers from overwriting each other's changes when updating the same blob.

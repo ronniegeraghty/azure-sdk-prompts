@@ -31,6 +31,8 @@ tags:
 
 Create a Python project that implements an application configuration provider backed by Azure Key Vault.
 
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 The project needs:
 
 - A **secret provider module** (both sync and async versions) that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.

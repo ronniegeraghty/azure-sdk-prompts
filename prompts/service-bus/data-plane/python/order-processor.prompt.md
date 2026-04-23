@@ -30,6 +30,8 @@ tags:
 
 Create a Python project that implements an order processing system using Azure Service Bus.
 
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 The project needs:
 
 - A **model** for an Order with fields for order ID, customer name, product, quantity, total price, and status (pending/processing/completed/failed). It should be serializable to and from JSON. Use a dataclass or dictionary.

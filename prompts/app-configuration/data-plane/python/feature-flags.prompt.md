@@ -31,6 +31,8 @@ tags:
 
 Create a Python project that implements a feature flag and configuration management system backed by Azure App Configuration.
 
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 The project needs:
 
 - A **configuration service module** (both sync and async versions) that retrieves settings from App Configuration. It should support fetching a single setting by key, fetching a setting with a specific label (to distinguish between environments like "production" vs "staging"), and listing all settings that match a key prefix (returned as a dictionary). It should also avoid re-downloading values that haven't changed since the last read — minimize unnecessary network traffic when polling for config changes.

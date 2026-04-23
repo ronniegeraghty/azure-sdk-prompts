@@ -25,6 +25,9 @@ tags:
 
 Write a Python script that performs
 CRUD operations on Azure Blob Storage:
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 1. Create a BlobServiceClient using DefaultAzureCredential
 2. Create a container named "my-container" if it doesn't exist
 3. Upload a local file "report.csv" as a blob named "reports/report.csv"

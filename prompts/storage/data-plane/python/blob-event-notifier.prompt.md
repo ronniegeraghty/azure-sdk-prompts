@@ -29,6 +29,8 @@ tags:
 
 Create a Python project that processes Azure Blob Storage lifecycle events delivered via Event Grid.
 
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 The project needs:
 
 - An **event receiver module** (both sync and async versions) that accepts a JSON payload (as if received from an Event Grid webhook endpoint) and deserializes it into structured event objects using the Azure Event Grid SDK's built-in deserialization helpers — not manual JSON parsing. It should support both Event Grid native schema and CloudEvents 1.0 schema (since Event Grid supports both and the configured schema may vary). It should route events by type — blob-created events get processed one way, blob-deleted another, and unrecognized types are logged as warnings.

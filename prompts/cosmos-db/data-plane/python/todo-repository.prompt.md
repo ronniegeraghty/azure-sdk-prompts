@@ -32,6 +32,8 @@ tags:
 
 Create a Python project that implements a ToDo item CRUD repository backed by Azure Cosmos DB (NoSQL API).
 
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 The project needs:
 
 - A **model** (shared by both implementations) for a ToDo item with fields for id, title, description, completed status, created timestamp, and category (where category is the partition key). Use a dictionary or a dataclass.
