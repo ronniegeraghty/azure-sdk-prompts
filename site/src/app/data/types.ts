@@ -177,9 +177,33 @@ export interface PromptMetadata {
   sdk_package?: string;
 }
 
+export interface SkillGroupEntry {
+  /** Skill or MCP server name as the SDK reported it loaded. */
+  name: string;
+  /** Plugin or skill_dir this entry was contributed by; empty for top-level entries. */
+  parent?: string;
+  /** "skill" | "mcp" — what kind of leaf this is. */
+  kind?: string;
+  /** "plugin" | "skill_dir" — kind of the parent container. */
+  parent_kind?: string;
+}
+
 export interface Environment {
   model: string;
+  /**
+   * Flat list of skill names the SDK loaded for the session.
+   * Kept as `string[]` for backward compatibility with v2 reports and
+   * existing site components. v3 reports also populate `skill_groups`
+   * (sibling field) with the same set plus parent linkage — adopt that
+   * when rendering grouped views.
+   */
   skills_loaded?: string[];
+  /**
+   * Schema v3: structured view of `skills_loaded` with parent linkage
+   * (plugin / skill_dir). Empty for v2 reports and any v3 run where the
+   * tool validator did not emit topology (stub mode etc.).
+   */
+  skill_groups?: SkillGroupEntry[];
   skills_invoked?: string[];
   available_tools?: string[];
   mcp_servers?: string[];

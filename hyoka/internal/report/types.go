@@ -238,17 +238,37 @@ type EnvironmentInfo struct {
 	SkillDirectories  []string `json:"skillDirectories,omitempty"`
 	SkillsInvoked     []string `json:"skillsInvoked,omitempty"`
 	SkillsLoaded      []string `json:"skillsLoaded,omitempty"`
-	AvailableTools    []string `json:"availableTools,omitempty"`
-	ExcludedTools     []string `json:"excludedTools,omitempty"`
-	MCPServers        []string `json:"mcpServers,omitempty"`
-	MCPToolsInvoked   []string `json:"mcpToolsInvoked,omitempty"`
-	SafetyBoundaries  bool     `json:"safetyBoundaries"`
-	AllowCloud        bool     `json:"allowCloud"`
-	WorkingDirectory  string   `json:"workingDirectory"`
-	TotalInputTokens  int      `json:"totalInputTokens,omitempty"`
-	TotalOutputTokens int      `json:"totalOutputTokens,omitempty"`
-	TurnCount         int      `json:"turnCount,omitempty"`
-	ContextTruncated  bool     `json:"contextTruncated,omitempty"`
+	// SkillGroups carries the structured view of loaded skills with parent
+	// linkage (Phase 5, schema v3). It is a sibling to SkillsLoaded rather
+	// than a replacement (Plan 5.5 Option B): SkillsLoaded stays as the
+	// flat string list site components have consumed since v1, and
+	// SkillGroups is additive so consumers that want the full topology
+	// (skill name + parent plugin/skill_dir + kind) can read it without
+	// breaking older site builds. Empty / nil for v2 reports and any v3
+	// run that did not emit SDK skill events.
+	SkillGroups       []SkillLoadEntry `json:"skill_groups,omitempty"`
+	AvailableTools    []string         `json:"availableTools,omitempty"`
+	ExcludedTools     []string         `json:"excludedTools,omitempty"`
+	MCPServers        []string         `json:"mcpServers,omitempty"`
+	MCPToolsInvoked   []string         `json:"mcpToolsInvoked,omitempty"`
+	SafetyBoundaries  bool             `json:"safetyBoundaries"`
+	AllowCloud        bool             `json:"allowCloud"`
+	WorkingDirectory  string           `json:"workingDirectory"`
+	TotalInputTokens  int              `json:"totalInputTokens,omitempty"`
+	TotalOutputTokens int              `json:"totalOutputTokens,omitempty"`
+	TurnCount         int              `json:"turnCount,omitempty"`
+	ContextTruncated  bool             `json:"contextTruncated,omitempty"`
+}
+
+// SkillLoadEntry is one row in EnvironmentInfo.SkillGroups — a loaded
+// skill plus the container (plugin or skill_dir) it came from. Kind is
+// either "skill" or "mcp"; Parent / ParentKind are empty when the entry
+// was declared at the top level of the config (i.e., not via a plugin).
+type SkillLoadEntry struct {
+	Name       string `json:"name"`
+	Parent     string `json:"parent,omitempty"`
+	Kind       string `json:"kind,omitempty"`        // "skill" | "mcp"
+	ParentKind string `json:"parent_kind,omitempty"` // "plugin" | "skill_dir"
 }
 
 // ResourceStats holds per-eval peak resource utilization (#45).

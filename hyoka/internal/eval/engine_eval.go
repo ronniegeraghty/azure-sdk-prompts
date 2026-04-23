@@ -327,6 +327,36 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			}
 		}
 	}
+	// SkillGroups: enrich the flat SkillsLoaded list with parent linkage
+	// from the post-validation tool topology (Plan 5.5 Option B). The
+	// loaded set (SkillsLoaded) is authoritative for which skills the SDK
+	// actually loaded; toolReport.Items provides the parent/kind for each
+	// skill that was attempted at session start. Skills the SDK loaded
+	// without a corresponding validator entry (rare, mostly stub paths)
+	// land in SkillGroups with empty Parent/ParentKind.
+	if result != nil && result.ToolReport != nil && len(env.SkillsLoaded) > 0 {
+		topology := make(map[string]report.SkillLoadEntry, len(result.ToolReport.Items))
+		for _, item := range result.ToolReport.Items {
+			if item.Kind != progress.ToolKindSkill && item.Kind != progress.ToolKindMCP {
+				continue
+			}
+			topology[item.Name] = report.SkillLoadEntry{
+				Name:       item.Name,
+				Kind:       item.Kind,
+				Parent:     item.Parent,
+				ParentKind: item.ParentKind,
+			}
+		}
+		groups := make([]report.SkillLoadEntry, 0, len(env.SkillsLoaded))
+		for _, s := range env.SkillsLoaded {
+			if entry, ok := topology[s]; ok {
+				groups = append(groups, entry)
+			} else {
+				groups = append(groups, report.SkillLoadEntry{Name: s, Kind: progress.ToolKindSkill})
+			}
+		}
+		env.SkillGroups = groups
+	}
 	evalReport.Environment = env
 
 	// Build tool availability summary: what was available vs actually used (#348).
