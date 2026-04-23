@@ -496,48 +496,134 @@ export function EvalDetailPage() {
               <div><span className="text-white/30">Turns:</span> <span className="text-white/60" style={mono}>{envTurnCount}</span></div>
             </div>
 
-            {/* Tools Available */}
-            {(environment.available_tools?.length ?? 0) > 0 && (
-              <div className="mt-4 pt-4 border-t border-white/5">
-                <div className="mb-2 text-white/40" style={{ fontSize: 11 }}>Available Tools</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {environment.available_tools?.map(tool => {
-                    const isSkill = environment.skills_loaded?.includes(tool) ?? false;
-                    // Use prefix match (`server.tool` or `server_tool`) instead of substring
-                    // to avoid false positives where a builtin tool name happens to contain
-                    // a server name as a substring.
-                    const isMCP = environment.mcp_servers?.some(s =>
-                      tool === s || tool.startsWith(s + ".") || tool.startsWith(s + "_") || tool.startsWith(s + "/")
-                    ) ?? false;
-                    const isInvoked = environment.skills_invoked?.includes(tool) ?? false;
-                    
-                    let badge = "";
-                    let badgeColor = "";
-                    if (isSkill) {
-                      badge = "skill";
-                      badgeColor = isInvoked ? "bg-blue-500/20 text-blue-400" : "bg-blue-500/10 text-blue-400/40";
-                    } else if (isMCP) {
-                      badge = "MCP";
-                      badgeColor = "bg-purple-500/20 text-purple-400";
-                    } else {
-                      badge = "builtin";
-                      badgeColor = "bg-white/5 text-white/30";
-                    }
+            {/* Tools Available — Phase 6.3: group skills by their plugin /
+                skill_dir parent. environment.skill_groups (v3) carries the
+                parent linkage; we join by name. Builtins and MCP servers
+                stay flat below the grouped section. v2 reports without
+                skill_groups fall through to the flat layout. */}
+            {(environment.available_tools?.length ?? 0) > 0 && (() => {
+              const tools = environment.available_tools ?? [];
+              const skillGroups = environment.skill_groups ?? [];
 
-                    return (
-                      <span
-                        key={tool}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${badgeColor}`}
-                        style={{ fontSize: 10 }}
-                      >
-                        <span style={mono}>{tool}</span>
-                        <span className="opacity-60">({badge})</span>
-                      </span>
-                    );
-                  })}
+              // name -> SkillGroupEntry (linkage source)
+              const linkage = new Map(skillGroups.map(g => [g.name, g]));
+
+              const isMCPName = (name: string) =>
+                environment.mcp_servers?.some(s =>
+                  name === s || name.startsWith(s + ".") || name.startsWith(s + "_") || name.startsWith(s + "/")
+                ) ?? false;
+
+              const skillNames = new Set(environment.skills_loaded ?? []);
+              const invokedSet = new Set(environment.skills_invoked ?? []);
+
+              // Build groups: parentKey -> {parent, parentKind, children}
+              // Skills with no parent linkage land in an "Ungrouped Skills"
+              // pseudo-group so they're still visible.
+              type Group = { parent: string; parentKind: string; children: string[] };
+              const groups = new Map<string, Group>();
+              const builtins: string[] = [];
+              const mcps: string[] = [];
+
+              for (const tool of tools) {
+                if (skillNames.has(tool)) {
+                  const link = linkage.get(tool);
+                  if (link?.parent) {
+                    const key = `${link.parent_kind ?? "skill_dir"}::${link.parent}`;
+                    if (!groups.has(key)) {
+                      groups.set(key, { parent: link.parent, parentKind: link.parent_kind ?? "skill_dir", children: [] });
+                    }
+                    groups.get(key)!.children.push(tool);
+                  } else {
+                    const key = "__ungrouped__";
+                    if (!groups.has(key)) {
+                      groups.set(key, { parent: "Ungrouped skills", parentKind: "", children: [] });
+                    }
+                    groups.get(key)!.children.push(tool);
+                  }
+                } else if (isMCPName(tool)) {
+                  mcps.push(tool);
+                } else {
+                  builtins.push(tool);
+                }
+              }
+
+              const skillBadge = (name: string) =>
+                invokedSet.has(name) ? "bg-blue-500/20 text-blue-400" : "bg-blue-500/10 text-blue-400/40";
+
+              return (
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <div className="mb-2 text-white/40" style={{ fontSize: 11 }}>Available Tools</div>
+
+                  {/* Grouped skills: one parent header line per plugin /
+                      skill_dir, children indented and bordered. */}
+                  {[...groups.values()].map((g, gi) => (
+                    <div key={`g-${gi}`} className="mb-3">
+                      <div className="mb-1 flex items-center gap-2 text-white/50" style={{ fontSize: 11 }}>
+                        <span style={mono}>{g.parent}</span>
+                        {g.parentKind && (
+                          <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/30" style={{ fontSize: 9 }}>
+                            {g.parentKind}
+                          </span>
+                        )}
+                        <span className="text-white/25" style={{ fontSize: 10 }}>
+                          ({g.children.length} skill{g.children.length === 1 ? "" : "s"})
+                        </span>
+                      </div>
+                      <div className="ml-3 flex flex-wrap gap-1.5 border-l border-white/5 pl-3">
+                        {g.children.map(name => (
+                          <span
+                            key={name}
+                            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${skillBadge(name)}`}
+                            style={{ fontSize: 10 }}
+                          >
+                            <span style={mono}>{name}</span>
+                            <span className="opacity-60">(skill)</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* MCP servers: flat (no parent linkage on tool_availability today). */}
+                  {mcps.length > 0 && (
+                    <div className="mb-3">
+                      <div className="mb-1 text-white/50" style={{ fontSize: 11 }}>MCP servers</div>
+                      <div className="ml-3 flex flex-wrap gap-1.5 border-l border-white/5 pl-3">
+                        {mcps.map(name => (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-purple-500/20 px-2 py-1 text-purple-400"
+                            style={{ fontSize: 10 }}
+                          >
+                            <span style={mono}>{name}</span>
+                            <span className="opacity-60">(MCP)</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Builtins: flat. */}
+                  {builtins.length > 0 && (
+                    <div>
+                      <div className="mb-1 text-white/50" style={{ fontSize: 11 }}>Built-in tools</div>
+                      <div className="ml-3 flex flex-wrap gap-1.5 border-l border-white/5 pl-3">
+                        {builtins.map(name => (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-white/5 px-2 py-1 text-white/30"
+                            style={{ fontSize: 10 }}
+                          >
+                            <span style={mono}>{name}</span>
+                            <span className="opacity-60">(builtin)</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
