@@ -1263,3 +1263,32 @@ Ronnie's hypothesis was *almost* right ("fanning out the plugin to its individua
 - **Fix:** widened acceptance to `isPluginDir` (top-level OR `skills/<child>/SKILL.md`); added `EnumerateChildSkills`; `validatePluginEntry` emits one `ToolLoadItem` per child with `ParentName=<plugin>`. Verifier now matches by child basename — which is what the SDK actually loads.
 - **Key insight (file under "always remember"):** **resolver shape vs verifier shape mismatch — fan-out is what bridges them.** If the SDK reports leaves, never check the container. The bug was structural: the validator was emitting at the wrong granularity. Tests added for both shapes + integration. Live verified with `hyoka run --prompt-id key-vault-dp-python-crud --config python-pairwise`: 3 errors → 0.
 - **Two follow-ups Ronnie/I flagged:** (1) no `hyoka plugin install` command — error msg misleads to Copilot CLI; (2) `pluginCheckedPaths` only lists parent dirs, not child shape. Issues filed by Scribe.
+
+## Phase 2 — Grader Points generalization (complete)
+
+**Date:** 2026-04-23
+**Branch:** ronniegeraghty/dev
+**Commits:** cbaf67fb, bc4f2d2d, a812641c, 6df67540, d3f26e2d
+
+### What landed
+- `graders.GraderPoint` + `GraderResult.Points` field (data model)
+- All 8 grader implementations (file, program, output_check, behavior, action_sequence, tool_constraint, prompt LLM judge, prompt review panel + single) populate `Points`
+- `progress.GraderPoint` mirror struct + `ProgressEvent.Points` field; `emitGraderComplete` copies across (avoids progress→graders import cycle)
+- TUI renderer dispatches: `len(Points) > 1` → header `❌ N/M passed` + indented per-point rows; `<= 1` → flat legacy row (preserves quiet single-point graders)
+- `report.GraderPoint` mirror + `report.GraderResult.Points` field; `convertGraderResults` and `expandReviewGraderResult` both propagate (consensus entry anchors Points so Phase 5 can drop the expansion cleanly)
+
+### Verification
+- `go build ./...` green throughout
+- `go test -race ./hyoka/internal/criteria/graders/ ./hyoka/internal/progress/ ./hyoka/internal/eval/ ./hyoka/internal/report/` all green
+- New tests: `graders/points_test.go` (3 cases), `progress/display_interactive_points_test.go` (3 cases)
+- Live eval: `key-vault-dp-python-crud × python-pairwise` (3 evals, 3 passed). JSON inspection confirmed `output_check` row carries 2 Points, `consensus` review row carries 12 Points (one per criterion). Panel-member rows carry 0 Points (correct — they still use existing detail structs).
+
+### Phase 5 handoff (next agent)
+1. **Schema bump**: `report.CurrentSchemaVersion = 2 → 3` in `report/types.go:20`
+2. **Delete `expandReviewGraderResult`** (`engine_eval.go:903-953`). Switch `convertGraderResults` line 844 to standard path — the consensus entry already carries Points, so the single resulting row is complete.
+3. **Optional cleanup**: legacy detail structs (`FileGraderDetails`, `OutputCheckGraderDetails`, `ReviewGraderDetails`, `BehaviorGraderDetails`) can be retired alongside their report-side mirrors once site renderers consume Points exclusively.
+4. **Site-side**: `run-detail-page.tsx:236-237` filter `g.pass === true` will work correctly under v3 (no more nil-pass panel-member rows). Trinity should be coordinating the consumer-side switchover.
+
+### Commit hygiene gotcha (mention to user)
+Commit `6df67540` (renderer task) inadvertently captured Trinity's parallel site work — `ErrorBoundary.tsx` (new), `dashboard-page.tsx` (modified), `routes.ts → routes.tsx` (rename). Working tree is shared between agent sessions on the same machine; even with explicit `git add hyoka/internal/progress/` paths, those pre-staged files came along. Decided NOT to roll back — files are valid, co-authored trailer is present, and undoing risks Trinity's progress. Subsequent commit `d3f26e2d` (this task) was clean — only my 2 files. Lesson: `git status --short` before AND after staging.
+
