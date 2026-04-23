@@ -2,6 +2,64 @@
 
 ## Active Decisions
 
+### Decision: Issue #305 (Hyoka v0.3.1) Status — Keep Open (2026-04-23)
+
+**Agent:** Morpheus 🕶️  
+**Finding:** Release does not exist (no v0.3.1 tag, no GitHub Release). Phase 0–2 work merged to main; Phases 3–6 complete on dev but NOT merged.  
+**Decision:** Keep open. Issue is legitimate accountability mechanism for final integration/release steps (merge, tag, GitHub Release).
+
+#### Rationale
+
+Issue #305 was flagged as "probably stale" in prior audit. Correction: it's an active umbrella for unreleased work on dev. The absence of a tag is the core finding, not evidence of staleness. Code is phase-complete and ready for release, but the release ceremony has not happened.
+
+#### Next Steps
+
+Ronnie decides release intent:
+- **Option A:** Ship v0.3.1 now (merge dev → main, tag, GitHub Release)
+- **Option B:** Defer release to batch with Phase 7
+
+See `.squad/decisions/inbox/morpheus-issue-305-status.md` for full audit trail.
+
+---
+
+### Decision: Issue #595 (useRuns Hook) — Left Open (2026-04-23)
+
+**Agent:** Trinity 🖤  
+**Issue:** [#595 — Extract useRuns hook for dashboard/prompts pages](https://github.com/ronniegeraghty/hyoka/issues/595)  
+**Finding:** Hook does not exist. Duplicate fetch + cancellation code present in both `dashboard-page.tsx` and `prompts-page.tsx`.  
+**Decision:** Leave open. Valid pending work item with clear acceptance criteria.
+
+#### Acceptance Criteria
+
+- [ ] Create `site/src/app/hooks/useRuns.ts` with shared hook returning `{ runs, loading, error }`
+- [ ] Refactor both components to use the hook
+- [ ] `cd site && npm test` passes
+- [ ] No behavior change
+
+Hook extraction is straightforward — ready for implementation as a follow-up task.
+
+---
+
+### Decision: Issue #290 (Criteria Table Layout) — Ready to Close (2026-04-23)
+
+**Agent:** Trinity 🖤  
+**Issue:** [#290 — Criteria table: put baseline config on the left](https://github.com/ronniegeraghty/hyoka/issues/290)  
+**Finding:** Comparison matrix layout is correct. Baseline configs appear on the left (leftmost columns) in rendered reports.  
+**Decision:** Close the issue. Layout requirement satisfied.
+
+#### Evidence
+
+- Example report: `/reports/20260423-172207/summary.md` (9 configs)
+- Column order: baseline variants first, then non-baseline variants
+- Phase 4/5 eval detail page redesign (issues #358, #572, #590) achieved the goal
+- Code: `internal/report/markdown.go:410–451`, `internal/report/report_data.go:33–75`
+
+#### Proposed Close Comment
+
+> ✅ Verified complete. Phase 4/5 eval detail page redesign (#358, #572, #590) implemented criteria table improvements. Rendered reports confirm baseline configs now appear on the left (leftmost columns) in comparison tables.
+
+---
+
 ### Decision: Agent Attempt Three-State Display — Streaming Replaced (2026-04-23)
 
 **Status:** ✅ Implemented. Commits b17f1ef5 (code) + e9d590e6 (docs). Branch: `ronniegeraghty/dev`.  

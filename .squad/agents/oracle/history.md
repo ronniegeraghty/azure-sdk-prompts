@@ -48,6 +48,16 @@ Audited README.md for command accuracy and task-agnostic framing per Ronnie's di
 **Testing patterns learned:**
 - Always test commands verbatim from docs before committing
 - Flags like `--config` are often required even when docs suggest they're optional
+
+### Plugin Loading Diagnosis (2026-04-23)
+
+Neo discovered plugin loading visibility issue. Three problems identified; Oracle owns:
+- **WU-A1 (Neo):** Error message clarity — enumerate the 3 paths checked (local ./plugins/, ~/.hyoka/cache/, ~/.copilot/installed-plugins/)
+- **WU-A3 (Oracle + Neo):** Schema migration and config examples — migrate `configs/baseline-sonnet-skills.yaml` and `configs/python-pairwise.yaml` to use `type: plugin` under `generator.tools`, update architecture.md and configuration.md
+
+Awaiting Ronnie's decisions on 5 architecture questions (schema deprecation, role targeting, error message verbosity, rendering triggers, external config migration).
+
+Decision: `.squad/decisions/inbox/neo-plugin-loading-diagnosis.md` (held pending approval)
 - npm flag deprecations (like `--run`) break silently — need to verify with latest npm
 - Site has robust test suite (72 tests) — should be included in dev workflow docs
 

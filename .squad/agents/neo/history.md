@@ -42,6 +42,38 @@ Gate would block at 14:22:42 and timeout at 14:22:52, aborting before the event 
 
 **Decision:** `.squad/decisions/inbox/neo-fix-tool-gate-blocking-evals.md`
 
+### 2026-04-23: Plugin Loading Diagnosis — 3 Stacked Bugs
+
+**Status:** 🔍 Investigation complete. Awaiting Ronnie's approval on schema questions.
+
+**Scope:** Ronnie reported live eval showing plugin expansion (azure-sdk-python + children) *not* appearing in the Tools section of eval output.
+
+**Finding:** Three independent stacked bugs prevent rendered visibility:
+
+1. **Schema misalignment:** Plugins declared at top level (`plugins:` field), not as `type: plugin` under `generator.tools`. Creates dual-role assignment (appends to both generator AND reviewer tools) and two expansion call sites with different failure modes.
+
+2. **Fan-out rendering drops parent metadata:** Plugin children emitted correctly at validator layer with `ParentName`, `ParentKind`. But:
+   - Interactive renderer only groups resolved tools on `EventToolsVerified`, not during resolution phase
+   - CI renderer ignores resolution events entirely
+   - Bulk verifier event has no parent info (dropped before propagation)
+   - Result: Tools section stays flat or missing
+
+3. **Plugin not found error too vague:** Message doesn't enumerate the 3 paths checked (local `./plugins/`, `~/.hyoka/cache/`, `~/.copilot/installed-plugins/`). User can't diagnose which tier failed.
+
+**Proposed Fix Plan (ordered):**
+- A1: Error message clarity (Neo, small, independent)
+- A2: Fan-out rendering (Neo + Tank — schema-agnostic)
+- A3: Schema migration to `type: plugin` (Neo + Oracle)
+
+**Open Questions (awaiting Ronnie):**
+1. Deprecate or remove top-level `plugins:` field?
+2. Should plugins-as-generator-tool be generator-only?
+3. Enumerate paths in error (exposes implementation)?
+4. Rendering trigger: explicit `EventToolResolutionComplete` or flush on first non-tool event?
+5. Any external configs to migrate?
+
+**Decision:** `.squad/decisions/inbox/neo-plugin-loading-diagnosis.md` (kept in inbox pending Ronnie's input)
+
 ---
 
 ## Core Context
@@ -1024,3 +1056,32 @@ Commits (branch `ronniegeraghty/dev`):
 - Old `resolveLocal` / `resolveSkillDir` / `ResolveSkills` left strictly unchanged — the existing lenient contract still has one consumer (`engine_eval.go:268`) whose behavior I don't want to change in this branch. Future work can deprecate them once all callers migrate.
 - `buildSessionConfigForEval` takes `*tool.ToolLoadReport` as a new final param (nil-safe for tests). When non-nil, it skips duplicate `EmitPluginResolutions`/`EmitMCPResolutions`/`ResolveSkillsWithReporter` calls — the validator is the single source of truth for the live path.
 - Reviewer validation uses `ConfigDir=""` (not the per-eval isolated configDir) because reviewer skills are resolved relative to repo cwd, not the ephemeral session dir. Plugins dir comes from `config.ResolvePluginsDir()`.
+
+### 2026-04-24 — Diagnosis: plugin loading 3-problem investigation
+
+Ronnie ran an eval with the hard-fail gates and hit three issues. Investigation deliverable: `.squad/decisions/inbox/neo-plugin-loading-diagnosis.md`. No code changes yet — awaiting Ronnie approval.
+
+## Learnings
+
+**What "registry" means in the error "plugin not found in registry or installed plugins":**
+- Primary: local YAML plugin registry at `config.ResolvePluginsDir()` (default `./plugins/`), loaded via `plugin.Registry.LoadDir` (`internal/plugin/plugin.go:74`).
+- Fallback: `plugin.ResolveInstalled(ref)` cache walk — `~/.hyoka/cache/default/microsoft/skills/.github/plugins/<name>/` for `@skills` refs, then `~/.hyoka/cache/default/<marketplace>/<name>/skills/`, then legacy `~/.copilot/installed-plugins/<marketplace>/<name>/skills/` (`internal/plugin/installed.go:20-67`).
+- The error in `validate.go:199` fires only when BOTH tiers miss. Malformed YAML in `./plugins/` also causes a miss (yaml decoder warns and skips — `plugin.go:94`).
+
+**Fan-out is a 3-bug compound silent failure, not one bug:**
+1. `progress/display_interactive.go:367,393` renders flat during resolution phase. Grouping via `groupToolLines` (line 520) only runs from `onToolsVerified` (line 422) or `redrawToolsBlock` (triggered only on tail-moved or verify-flip).
+2. `progress/display_ci.go:128-150` has no case for `EventToolResolutionStart`/`Result` — CI mode completely ignores resolution events; tools section only appears if `EventToolsVerified` fires.
+3. `eval/tool_verification.go:110-140` — `toolVerifier.emitIfReady` rebuilds `[]ToolStatus` without `ParentName`/`ParentKind`. Even when the bulk verified event fires, parent metadata is dropped. The verifier (`newToolVerifier` line 46) was never plumbed with parent info from the `ToolLoadReport`.
+
+The validator itself (`ValidateAndExpand`) is correct — it emits per-leaf events with parent fields populated, confirmed by tests in `validate_test.go:89-105,288-289,610`.
+
+**Schema: plugin-at-top-level is legacy, should become `type: plugin` under `generator.tools`:**
+- `config.go:60` `ToolConfig.Plugins []string` is top-level, sibling of Generator/Reviewer.
+- `config/plugins.go:73-78` — `ExpandPlugins` appends plugin children to BOTH generator AND reviewer tools. No way to target one role. This dual-append also violates scoping (reviewer getting generator plugins implicitly).
+- Only two configs use it today: `configs/baseline-sonnet-skills.yaml:27`, `configs/python-pairwise.yaml:38`.
+- Migration path: add `TypePlugin` constant to `tool/tool.go`, move plugin expansion from `ValidateAndExpand` body into `validatePluginEntry` called from `validateEntries`. Retire `config.ExpandPlugins` or reduce to deprecation-shim.
+
+**Current dual expansion (lenient vs strict):**
+- `config.Load` → `cfg.ExpandPlugins(...)` (`config.go:228`) — lenient, `slog.Warn` on miss, appends children to `cfg.Generator.Tools`/`cfg.Reviewer.Tools` in-place.
+- `Runner.runEval` → `tool.ValidateAndExpand` (`eval/copilot.go:174`) — strict, hard-fail on miss. Reads `cfg.Plugins` directly (NOT the already-appended tool entries) and deduplicates plugin-child (kind,name) pairs against `GeneratorTools` to avoid double-reporting.
+- This is why migrating to `type: plugin` requires removing the config-load-time appending (or turning it off when the new type is present).

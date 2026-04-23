@@ -26,6 +26,7 @@ Agent Tank initialized as Platform Dev for hyoka. Owns CLI, config, build, repor
 - **Config migration pattern**: When removing backward compatibility code, the best approach is to update all configs first (all 8 YAML files), then delete legacy struct fields, then remove helper methods (Normalize, Effective*), then update all call sites. This ensures compiler errors guide you to every place that needs updating.
 - **Test-driven refactoring**: Large structural changes benefit from running tests after each phase (struct changes, method deletions, call site updates). The test failures become a checklist of what still needs updating.
 - **Unused function cleanup**: After removing legacy fields, helper functions like resolveSkillsDirs() that worked with those fields become unused. The compiler catches these with "declared and not used" errors.
+- **Plugin rendering visibility (2026-04-23):** Neo diagnosed three stacked bugs preventing plugin expansion from appearing in eval output: (1) schema mismatch (plugins at top level vs under tools), (2) fan-out rendering only groups on EventToolsVerified + bulk verifier drops parent metadata, (3) CI renderer doesn't listen to resolution events. Tank owns the renderer fixes (WU-A2) once Neo plumbs parent metadata through verifier. See neo/history.md for details.
 
 
 Initial setup complete. Platform is well-structured. Quick wins: fix stale path, plan main.go refactor.

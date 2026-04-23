@@ -687,3 +687,42 @@ Silent degradation turns an eval into a non-representative comparison — the ru
 - `required: false` opt-out (defer until use case appears).
 - Generator skill content (file separate issue).
 - Plugin-registry re-walk performance nit.
+
+## Learnings (Issue #305 Status Verification — 2026-04-23)
+
+**Requested by:** Ronnie (Issue triage). **Task:** Verify if v0.3.1 was released and decide whether to close issue #305.
+
+### Key Findings
+
+**Release Status:** NO GitHub Release or git tag for v0.3.1 exists. Only one release in repo: `sdk-eval v0.1.0` (tag: `tool/v0.1.0`).
+
+**Phase Completion:** All 7 phase sub-issues (#306–#312) are CLOSED. However:
+- Phases 0–2 work merged to main via PRs #558–#560
+- Phases 3–6 code exists on `ronniegeraghty/dev` branch only (NOT on main)
+- CHANGELOG.md with v0.3.1 section exists only on dev, not main
+
+**Issue Checklist:** All 7 phase items remain unchecked ([ ]) in issue body.
+
+### Decision: KEEP OPEN ✓
+
+Rationale: #305 is a legitimate tracking issue for **unreleased v0.3.1** work. The fact that phase sub-issues are closed does NOT mean the release is done — code must merge to main and be tagged. Current state:
+1. Work is tracked and phase-closed ✓
+2. Work is NOT released ✗
+3. CHANGELOG drafted on dev ✓
+
+### Prior Audit Correction
+
+The morpheus-issue-audit.md (2026-04-22) flagged #305 as "probably stale — likely shipped but no git tag found." **This was incorrect.** Investigation reveals:
+- Work genuinely exists and is phase-complete
+- But it's never been merged to main or tagged
+- Leaving it open is correct; closing without a release would lose accountability for the integration/release work
+
+### Recommendation for Ronnie
+
+1. Clarify release intent: Ship v0.3.1 now (main + tag) or defer with Phase 7?
+2. If ship now: Merge dev→main + `git tag v0.3.1 && git push origin v0.3.1` + create GitHub Release
+3. If defer: Keep #305 open; update phase checklist as phases merge to main
+4. Once tagged/released: Close #305 with tag reference
+
+### Time Spent
+~20 minutes (release verification + phase state checks + branch analysis)

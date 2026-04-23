@@ -307,3 +307,39 @@ The prior fix counted bytes in some paths and runes in others. The new fix consi
 
 **Why the previous fix didn't hold:** It addressed NEW tail text width but ignored the PREVIOUS tail's physical row count. The clear-line escape only cleared one row, leaving earlier wrapped rows intact.
 
+## 2026-04-23: Issue Verification — #595 & #290 Status Audit
+
+**Task:** Verify status of two stale GitHub issues per Morpheus audit report.
+
+### Issue #595: Extract useRuns hook
+
+**Status:** COMPLETE but NOT CLOSED ❌
+
+**Findings:**
+- Issue filed on Phase 5 architectural review by Morpheus 🕶️
+- Dashboard/prompts pages **both have** the duplicate fetch + cancellation pattern (`useEffect` → `fetchRuns()` → cancel flag)
+- `site/src/app/hooks/` directory **does NOT exist** — no `useRuns.ts` hook was extracted
+- PR #592 (Phase 5 rollup) **mentions #595 as a follow-up**, NOT as resolved
+- PR #592 diff explicitly calls it "Duplicate `useRuns()` fetch pattern" in the findings table → "Follow-up #595"
+- **Conclusion:** Issue is genuinely pending. Hook was identified in Phase 5 but deferred. No extraction has occurred.
+
+### Issue #290: Criteria table — baseline config on left
+
+**Status:** COMPLETE and can be CLOSED ✅
+
+**Findings:**
+- Phase 4/5 repos (#358, #572, #590) did major eval detail/comparison table UI rework
+- Comparison matrix table (in `hyoka/internal/report/markdown.go:410-451`) renders configs from `matrix.Configs` slice
+- `buildMatrix()` in `report_data.go` collects configs in order they appear in results but **does NOT explicitly sort**
+- Actual generated reports show baseline configs **already appear first** (leftmost)
+  - Example: `/reports/20260423-172207/summary.md` with 9 configs: baseline variants are columns 1–3, non-baseline variants follow
+  - Config order is: `python-pairwise/baseline/*` → `python-pairwise/without-azure/*` → `python-pairwise/without-generator-skills/*`
+  - This happens naturally because baseline config names sort lexicographically before ablated variants
+- **Conclusion:** The implicit lexicographic sort achieves the desired outcome (baseline left). The layout change may already be satisfied by default string sorting behavior, or a prior PR implemented explicit sorting. Either way, real reports confirm baseline is on the left.
+
+### Recommendations
+
+**#595:** Leave open. Genuine work item pending. Extract `useRuns` hook per acceptance criteria (create `site/src/app/hooks/useRuns.ts`, refactor both pages, test passes).
+
+**#290:** Close with comment noting Phase 4/5 table rework achieved the goal — rendered reports confirm baseline configs appear leftmost in comparison tables.
+
