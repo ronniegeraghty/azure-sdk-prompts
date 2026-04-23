@@ -391,3 +391,25 @@ All six Phase 4 tasks landed on `ronniegeraghty/dev`. Verified live against `rep
 - Two agents `git add`-ing into the same working tree races. The agent who calls `git commit` second can find their staged files already committed by the first agent under that first agent's commit message. **Mitigation for next time:** stage + commit in a single shell line (`git add X && git commit -m ...`) and verify `git log -1 --stat` immediately after each commit before doing more work; if the file list looks wrong, abort + re-stage.
 - Did NOT touch `hyoka/internal/...` — Neo's territory this round. The accidentally-bundled commit is annoying but the work shipped correctly; rewriting branch history while Neo was still committing would have been worse.
 - Per the user's standing instruction, did NOT start Phase 6 (depends on Neo's Phase 2 model). Stopping here.
+
+## 2026-04-23 — Phase 6: Site v3 alignment (single canonical pass helper)
+
+Aligned the React/TypeScript site with schema-v3 reports in 7 commits on `ronniegeraghty/dev`. Goal: kill the "all passed but pages disagree" bug by routing every page-level rollup through a single `evalPassFromPoints` helper, and make the new Points machinery visible everywhere.
+
+**What shipped:**
+- `site/src/app/lib/evalPass.ts` — new canonical pass helper. Precedence: (1) `graders_passed`/`graders_total` rollup if engine populated it; (2) AND of `points[*].pass` per grader; (3) `g.pass` flag; (4) derive from criteria/overall_score; (5) `r.success` legacy fallback. Exports `evalPassFromPoints`, `graderPasses` (tri-state aware single-grader rollup), `evalGraderTotals`, `evalPointTotals`. Loose `EvalPassInput` type accepts both `EvalReport` and `EvalResult` so all five page components can share one signature.
+- `data/types.ts` — added `GraderPoint`, `points?` on `GraderResult`, `ToolAvailabilityEntry` (with optional `parent`/`parent_kind`/`kind` as forward-compat — see gap below), `tool_availability?`/`graders_passed`/`graders_total`/`schema_version?` on `EvalReport`. Added camelCase aliases on Environment (`skillsLoaded`, `skillsInvoked`, `mcpServers`) — Go emits most env fields camelCase but `skill_groups` snake_case, the site needs both.
+- `GraderResultRow` — Points panel inside expanded grader body. Multi-point graders auto-expand and show a `✓ N/N passed` / `✗ M/N passed` badge plus per-point breakdown with check/X icons; flat (single-point) graders keep the legacy `PASS`/`FAIL`/`N/A` badge. Score column shows `N/M points` when point data exists.
+- `eval-detail-page` — header pass icon, error banner, score card, and Available Tools section all now use the helper. Score card renders `✓ N / N points across M graders` with a hover tooltip listing each grader's contribution. Available Tools groups skills under their plugin/skill_dir parent (joined via `environment.skill_groups` by name); MCP and builtins stay flat. Fallback path synthesizes tool rows from `skillsLoaded` + `mcpServers` so v2 reports still render.
+- `run-detail-page`, `prompt-detail-page`, `dashboard-page` — every `r.success` rollup replaced with `evalPassFromPoints(r)`. Prompt-detail's Pass-Rate-by-Tool-Used table now groups sibling tools by prefix (split on `.`/`/`/short `_`); single-child groups stay flat.
+
+**Verified live (playwright-cli against `go run . serve --site-dir site/dist`):**
+- v3 report (`reports/20260423-214602`): run-detail rows show `2/2`/`—` badges (no red on passes); eval-detail shows `Points 14 / 14 across 2 graders` with per-grader hover; grader rows expanded with check icons; Available Tools groups `azure-sdk-python` (42 skills) under "plugin" and `generator-skills` (1) under "skill_dir"; dashboard renders.
+- v2 fallback (`reports/20260423-195948`): legacy `PASS` badges still render (graders without points fall through to `g.pass`); Available Tools synthesizes from camelCase env. No crashes anywhere.
+- 10 baseline screenshots committed to `.trinity-screenshots/phase6/`.
+
+**Go-side gap to remember:** `ToolAvailabilityEntry` on the Go side (`hyoka/internal/report/types.go`) only carries `Name`/`Type`/`Available`/`Used`. Parent linkage lives **only** on `EnvironmentInfo.SkillGroups` (`SkillLoadEntry`). The site joins `tool_availability` ↔ `skill_groups` by name today. If the Go side later extends the row with `parent`/`parent_kind`/`kind` directly, swap the lookup in `eval-detail-page.tsx` to read from the row and drop the linkage map. The TS types already include those optional fields so the swap is mechanical.
+
+**Worktree:** main checkout, no split. Morpheus's unstaged `agents/morpheus/history.md` change was unrelated and left alone (per user instruction). Did NOT touch any Go files.
+
+**Commits:** `0f1347f8` types, `a28f4b42` helper, `47490751` grader-row points, `86980fbe` plugin grouping, `438edaf4` score card, `163e2883` prompt tool grouping, plus the bug-fix follow-up wiring Available Tools to the real data shape with screenshot baselines.
