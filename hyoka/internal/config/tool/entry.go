@@ -25,11 +25,11 @@ type Entry struct {
 	Path     string `yaml:"path,omitempty" json:"path,omitempty"`
 	Repo     string `yaml:"repo,omitempty" json:"repo,omitempty"`
 	SkillDir bool   `yaml:"skill_dir,omitempty" json:"skill_dir,omitempty"` // true = path is a directory of skills, false = path is a single skill
-	// Version pins a remote skill to a specific git ref (branch, tag, or
-	// commit). Empty means "default" (whatever the fetcher's default is —
-	// for the npx fetcher, that's the repo's default branch). Can be set on
-	// the entry directly or via tool_version_override at the top of a
-	// config file.
+	// Version pins a remote skill or plugin to a specific git ref (branch,
+	// tag, or commit). Empty means "default" (whatever the fetcher's default
+	// is — for the git fetcher, that's the repo's default branch). Can be
+	// set on the entry directly or via tool_version_override at the top of a
+	// config file. This is the ONLY ref field — there is no separate `ref:`.
 	Version string `yaml:"version,omitempty" json:"version,omitempty"`
 }
 

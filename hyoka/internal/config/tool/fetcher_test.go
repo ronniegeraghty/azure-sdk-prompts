@@ -296,14 +296,6 @@ wantRepo       string
 wantSkillName  string
 }{
 {
-name:          "name@skills shorthand",
-repo:          "",
-skillName:     "azure-sdk-python@skills",
-wantOwner:     "microsoft",
-wantRepo:      "skills",
-wantSkillName: "azure-sdk-python",
-},
-{
 name:          "name@owner/repo format",
 repo:          "",
 skillName:     "myskill@acme/widgets",
@@ -328,12 +320,20 @@ wantRepo:      "tools",
 wantSkillName: "",
 },
 {
-name:          "microsoft shorthand",
+name:          "name@bare-repo (malformed) returns owner-empty",
 repo:          "",
 skillName:     "example@copilot",
-wantOwner:     "microsoft",
-wantRepo:      "copilot",
+wantOwner:     "copilot",
+wantRepo:      "",
 wantSkillName: "example",
+},
+{
+name:          "github.com prefix is stripped",
+repo:          "github.com/microsoft/skills",
+skillName:     "azure-sdk-python",
+wantOwner:     "microsoft",
+wantRepo:      "skills",
+wantSkillName: "azure-sdk-python",
 },
 }
 for _, tc := range cases {

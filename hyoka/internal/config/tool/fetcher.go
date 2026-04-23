@@ -183,7 +183,6 @@ const defaultFetcherName = "git"
 // gitFetcher is the built-in Fetcher that clones Git repositories directly
 // instead of shelling out to npx. It replaces the historical npxFetcher to
 // avoid stdout pollution from npm plugin auto-install. Skill specs are parsed:
-//   - "name@skills" → clone microsoft/skills, look for skill "name"
 //   - "name@owner/repo" → clone owner/repo, look for skill "name"
 //   - Bare "owner/repo" → clone repo, return root if no name specified
 // Caches under <baseDir>/.skills-cache/<version>/<owner>/<repo>/.
@@ -204,7 +203,7 @@ func (gitFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, err
 		versionSegment = "default"
 	}
 
-	// Parse skill spec: handle "name@skills" shorthand for microsoft/skills
+	// Parse skill spec from explicit repo + name fields.
 	owner, repo, skillName := parseSkillSpec(entry.Repo, entry.Name)
 
 	// Cache path: <baseDir>/.skills-cache/<version>/<owner>/<repo>/
@@ -242,16 +241,12 @@ func (gitFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, err
 }
 
 // parseSkillSpec parses skill specifications:
-//   - If repo is empty and name contains "@skills", name is "skillname@skills" → (microsoft, skills, skillname)
 //   - If name contains "@", split at last @ to get skillname and owner/repo
-//   - Otherwise, repo is "owner/repo" format and name is the skill name
+//   - Otherwise, repo is "owner/repo" (or "github.com/owner/repo") and name is the skill name
+//
+// The legacy "name@skills" shorthand for microsoft/skills has been removed.
+// Callers must declare the source repo explicitly via the entry's repo: field.
 func parseSkillSpec(repo, name string) (owner, repoName, skillName string) {
-	// Handle "azure-sdk-python@skills" syntax (repo is empty, name has @skills)
-	if repo == "" && strings.HasSuffix(name, "@skills") {
-		skillName = strings.TrimSuffix(name, "@skills")
-		return "microsoft", "skills", skillName
-	}
-
 	// Handle "name@owner/repo" format
 	if idx := strings.LastIndex(name, "@"); idx > 0 {
 		skillName = name[:idx]
@@ -260,15 +255,16 @@ func parseSkillSpec(repo, name string) (owner, repoName, skillName string) {
 		if len(parts) == 2 {
 			return parts[0], parts[1], skillName
 		}
-		// If no slash, treat it as microsoft/repo shorthand
-		return "microsoft", ownerRepo, skillName
+		// Malformed — return owner empty so it fails downstream with a clear path.
+		return ownerRepo, "", skillName
 	}
 
-	// Standard "owner/repo" with separate name
-	parts := strings.SplitN(repo, "/", 2)
+	// Standard "owner/repo" with separate name. Strip optional github.com/ prefix.
+	r := strings.TrimPrefix(repo, "github.com/")
+	parts := strings.SplitN(r, "/", 2)
 	if len(parts) != 2 {
 		// Malformed repo — return as-is, will fail downstream
-		return repo, "", name
+		return r, "", name
 	}
 	return parts[0], parts[1], name
 }

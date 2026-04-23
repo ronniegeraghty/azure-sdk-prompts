@@ -180,7 +180,7 @@ configs:
     generator:
       model: "gpt-4"
     plugins:
-      - "azure-sdk-python@skills"
+      - "azure-sdk-python"
 `)
 	_, err := Parse(data)
 	if err == nil {

@@ -1,7 +1,7 @@
 # Baseline with Claude Sonnet 4.5 + SDK skills — no MCP servers
 # Uses installed Copilot CLI plugin skills for code generation guidance.
-# Install plugins: /plugin install azure-sdk-java@skills
-# Missing plugins are skipped gracefully with a warning.
+# Install plugins: /plugin install azure-sdk-java (from microsoft/skills)
+# Each remote plugin must declare its source repo explicitly via `repo:`.
 configs:
   - name: baseline-skills/claude-sonnet-4.5
     description: "Baseline + Skills — Claude Sonnet 4.5 with SDK plugin skills"
@@ -13,21 +13,26 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/generator"
-        - name: azure-sdk-java@skills
+        - name: azure-sdk-java
           type: plugin
           source: remote
-        - name: azure-sdk-python@skills
+          repo: github.com/microsoft/skills
+        - name: azure-sdk-python
           type: plugin
           source: remote
-        - name: azure-sdk-dotnet@skills
+          repo: github.com/microsoft/skills
+        - name: azure-sdk-dotnet
           type: plugin
           source: remote
-        - name: azure-sdk-typescript@skills
+          repo: github.com/microsoft/skills
+        - name: azure-sdk-typescript
           type: plugin
           source: remote
-        - name: azure-sdk-rust@skills
+          repo: github.com/microsoft/skills
+        - name: azure-sdk-rust
           type: plugin
           source: remote
+          repo: github.com/microsoft/skills
     reviewer:
       models:
         - "claude-opus-4.6"

@@ -238,7 +238,7 @@ return filepath.Join(wd, ".hyoka", "plugins")
 // pluginCheckedPaths enumerates every filesystem path the plugin resolver
 // inspects for `name`. Used in the fail-fast error message so operators
 // know exactly where the resolver looked.
-func pluginCheckedPaths(name, configDir, pluginsDir string) []string {
+func pluginCheckedPaths(name, repo, configDir, pluginsDir string) []string {
 var paths []string
 if base := hyokaPluginsBase(configDir); base != "" {
 paths = append(paths,
@@ -251,24 +251,18 @@ paths = append(paths, filepath.Join(pluginsDir, name+".yaml"))
 }
 home, err := os.UserHomeDir()
 if err == nil {
+owner, repoName := plugin.SplitOwnerRepo(repo)
+if owner != "" && repoName != "" {
 paths = append(paths,
-filepath.Join(home, ".hyoka", "cache", "default", "microsoft", "skills", ".github", "plugins", trimAtRef(name)),
-filepath.Join(home, ".hyoka", "cache", "default", trimAtRef(name), "skills"),
-filepath.Join(home, ".copilot", "installed-plugins", trimAtRef(name), "skills"),
+filepath.Join(home, ".hyoka", "cache", "default", owner, repoName, ".github", "plugins", name),
+filepath.Join(home, ".hyoka", "cache", "default", owner, repoName, ".github", "skills", name),
+filepath.Join(home, ".hyoka", "cache", "default", owner, repoName, "skills", name),
+filepath.Join(home, ".copilot", "installed-plugins", owner+"-"+repoName, name, "skills"),
 )
 }
+paths = append(paths, filepath.Join(home, ".copilot", "installed-plugins", name, "skills"))
+}
 return paths
-}
-
-// trimAtRef strips the "@marketplace" suffix from a plugin ref so callers
-// can build cache-path hints that point at the on-disk plugin name.
-func trimAtRef(ref string) string {
-for i := len(ref) - 1; i >= 0; i-- {
-if ref[i] == '@' {
-return ref[:i]
-}
-}
-return ref
 }
 
 func registryLookup(reg *plugin.Registry, name string) (*plugin.Plugin, bool) {
@@ -299,39 +293,52 @@ validatePluginEntry(report, entry, role, configDir, emit, reg, pluginsDir)
 // validatePluginEntry resolves a `type: plugin` tool entry, fanning out to
 // its child skills + MCP servers. source: local prefers the local plugin
 // registry (`./.hyoka/plugins/` or the legacy PluginsDir); source: remote
-// prefers the marketplace cache. Unset source tries both (remote first for
-// name@marketplace refs, local first otherwise). On failure, the reason
-// enumerates every path the resolver checked so operators can diagnose
-// fast. Fetch/resolution failures are hard-fails upstream (caller returns
-// the ToolLoadError before the eval session starts).
+// uses the explicit `repo:` field to locate the plugin in the marketplace
+// cache (`~/.hyoka/cache/default/<owner>/<repo>/...`). On failure, the
+// reason enumerates every path the resolver checked so operators can
+// diagnose fast. Fetch/resolution failures are hard-fails upstream (caller
+// returns the ToolLoadError before the eval session starts).
 func validatePluginEntry(report *ToolLoadReport, entry Entry, role, configDir string, emit ProgressEmitter, reg *plugin.Registry, pluginsDir string) {
 name := entry.Name
 emitStart(emit, name, progress.ToolKindPlugin)
 
+// Reject the retired @marketplace shorthand outright. The full repo
+// locator goes in `repo:`, not stitched into the name.
+if strings.Contains(name, "@") {
+reason := fmt.Sprintf(
+"plugin name %q contains '@' — the @marketplace shorthand has been removed. "+
+"Set the plugin name to the bare identifier (e.g. %q) and declare the source repo "+
+"explicitly via repo: (e.g. repo: github.com/microsoft/skills).",
+name, strings.SplitN(name, "@", 2)[0],
+)
+report.Items = append(report.Items, ToolLoadItem{
+Kind:   progress.ToolKindPlugin,
+Name:   name,
+Status: progress.ToolStatusFailed,
+Reason: reason,
+Role:   role,
+})
+emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusFailed, reason, "", "")
+return
+}
+
 src := entry.Source // "" | "local" | "remote"
-// Infer default: refs with an "@marketplace" suffix prefer remote.
 if src == "" {
-if trimAtRef(name) != name {
+// Default: local if no repo, remote if repo is set.
+if entry.Repo != "" {
 src = SourceRemote
 } else {
 src = SourceLocal
 }
 }
 
-// Remote plugins require an explicit marketplace locator encoded in the
-// name (e.g. "azure-sdk-python@skills" for microsoft/skills). Without it,
-// hyoka has no way to know where to resolve the plugin from — the bare
-// name would only match if something had already placed it at that exact
-// path under ~/.hyoka/cache/default/ or ~/.copilot/installed-plugins/.
-// Fail fast with a clear fix-it message instead of dumping a checked-path
-// list that doesn't explain the real problem.
-if src == SourceRemote && trimAtRef(name) == name {
+// Remote plugins require an explicit repo: locator. There are no magic
+// aliases — hyoka must be told exactly where to fetch from.
+if src == SourceRemote && entry.Repo == "" {
 reason := fmt.Sprintf(
-"plugin %q declares source: remote but name has no marketplace locator. "+
-"Append a marketplace suffix so hyoka knows where to resolve it from "+
-"(e.g. %q for plugins published in microsoft/skills). "+
-"Bare names with source: remote can't be auto-resolved.",
-name, name+"@skills",
+"plugin %q declares source: remote but has no repo: field. "+
+"Add repo: github.com/microsoft/skills (or your fork) so hyoka knows where to fetch it from.",
+name,
 )
 report.Items = append(report.Items, ToolLoadItem{
 Kind:   progress.ToolKindPlugin,
@@ -351,9 +358,9 @@ emitPluginLoadedWithChildren(report, emit, p, name, role, configDir)
 return
 }
 }
-// Try remote cache (installed plugins).
+// Try remote cache (installed plugins) using the explicit repo.
 if src == SourceRemote || src == SourceLocal {
-if dir := plugin.ResolveInstalled(name); dir != "" {
+if dir := plugin.ResolveInstalled(entry.Repo, name); dir != "" {
 // Remote plugins are delivered as an opaque skill directory.
 item := ToolLoadItem{
 Kind:       progress.ToolKindSkill,
@@ -379,12 +386,16 @@ return
 }
 
 // Hard-fail with enumerated paths.
-paths := pluginCheckedPaths(name, configDir, pluginsDir)
-reason := "plugin " + strconv.Quote(name) + " not found (source=" + src + "). Checked:"
+paths := pluginCheckedPaths(name, entry.Repo, configDir, pluginsDir)
+reason := "plugin " + strconv.Quote(name) + " not found (source=" + src
+if entry.Repo != "" {
+reason += ", repo=" + entry.Repo
+}
+reason += "). Checked:"
 for _, p := range paths {
 reason += "\n  - " + p
 }
-reason += "\nInstall a local plugin at .hyoka/plugins/" + trimAtRef(name) + "/plugin.yaml, or run: /plugin install " + name
+reason += "\nInstall a local plugin at .hyoka/plugins/" + name + "/plugin.yaml, or run: /plugin install " + name
 report.Items = append(report.Items, ToolLoadItem{
 Kind:   progress.ToolKindPlugin,
 Name:   name,

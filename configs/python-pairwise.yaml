@@ -4,9 +4,8 @@
 # scored by the same reviewer panel. Pair with `--pairwise` (-P) for tool ablation.
 #
 # Plugin source: https://github.com/microsoft/skills/tree/main/.github/plugins/azure-sdk-python
-# The `@skills` suffix on the plugin name is the locator — it tells hyoka to
-# resolve from the microsoft/skills marketplace cache. Plugins without a
-# marketplace suffix and source: remote are rejected at validation time.
+# The `repo:` field on each remote plugin tells hyoka exactly where to fetch
+# the plugin from. There is no implicit marketplace — declare it explicitly.
 configs:
   - name: python-pairwise
     description: "Azure MCP + azure-sdk-python plugin — Opus 4.6, Sonnet 4.5, GPT-5.3 Codex"
@@ -26,9 +25,10 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/generator"
-        - name: azure-sdk-python@skills
+        - name: azure-sdk-python
           type: plugin
           source: remote
+          repo: github.com/microsoft/skills
     reviewer:
       models:
         - "claude-opus-4.6"

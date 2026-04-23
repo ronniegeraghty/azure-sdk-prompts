@@ -1164,3 +1164,40 @@ Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
 
 - **Model default:** Every squad agent now runs on **claude-opus-4.7** (set via `defaultModel` in `.squad/config.json`) until the user clears the preference. Layer 0 override.
 - **Plugin schema gap fixed (my commit `769dea69`):** Remote plugin entries require an explicit locator — `@marketplace` suffix on `name` (e.g. `azure-sdk-python@skills`). `validatePluginEntry` now fails fast when a `source: remote` entry lacks the suffix. Regression test: `TestValidateAndExpand_RemotePluginMissingLocator`. Renamed 6 entries across `configs/python-pairwise.yaml` and `configs/baseline-sonnet-skills.yaml`. Reusable rule: **any tool entry referencing remote content must carry an explicit locator**; validation rejects unlocated remote entries instead of letting the resolver dump its candidate-path list.
+
+---
+
+### 2026-04-23: Reversal — `@skills` magic removed, `repo:` is now required
+
+**Context:** Ronnie pushed back HARD on commit `769dea69`. Two problems:
+1. The remote-plugin schema still didn't declare *where* a plugin came from — `source: remote` told you the source kind, not the source location.
+2. Worse, the `@skills` suffix was a **hardcoded magic alias** to `microsoft/skills` (see the deleted `if marketplace == "skills"` block in `installed.go:28-40`). His words: *"so not obvious and no one will be able to infer that … I want to be explicit when configs are written."*
+
+**What I did (single commit, BREAKING CHANGE):**
+
+1. **Deleted the `microsoft/skills` magic** from `plugin.ResolveInstalled`. The function now takes an explicit `(repo, name)` pair and resolves under `~/.hyoka/cache/default/<owner>/<repo>/...`. New helper `plugin.SplitOwnerRepo` accepts `owner/repo`, `github.com/owner/repo`, or `https://github.com/owner/repo[.git]`.
+2. **Reversed the `@marketplace` validator** added in `769dea69`. `validatePluginEntry` now:
+   - Rejects any plugin name containing `@` with a migration message pointing at `repo:`.
+   - For `source: remote`, requires `repo:` and fails fast if missing.
+3. **`pluginCheckedPaths`** now derives cache paths from `entry.Repo` (when present) — no more `microsoft/skills` baked in.
+4. **`parseSkillSpec`** dropped the `name@skills → microsoft/skills` shortcut; remote skills must use the explicit `repo:` field. The `name@owner/repo` form is preserved (it's at least explicit).
+5. **Configs:** Both `configs/python-pairwise.yaml` and `configs/baseline-sonnet-skills.yaml` rewritten — names are bare (`azure-sdk-python`, etc.) and every remote plugin carries `repo: github.com/microsoft/skills`. Removed the misleading top-of-file comment about `@skills`.
+6. **Docs:** `docs/configuration.md` plugin section rewritten with explicit `repo:` form, table now documents `repo` and `version` fields, plus a callout that the `@skills` magic was removed.
+7. **Tests:**
+   - Deleted `TestValidateAndExpand_RemotePluginMissingLocator` (the `@skills`-as-fix test from 769dea69).
+   - Added `TestValidateAndExpand_RemotePluginMissingRepo` (asserts the new error references `repo:` and `github.com/microsoft/skills`).
+   - Added `TestValidateAndExpand_PluginNameWithAt_Rejected` (asserts `@`-in-name fails with the migration message).
+   - Updated `TestValidateAndExpand_MissingPlugin_ErrorEnumeratesEveryCheckedPath` for the local case (4 paths, no cache); added `TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo` for the remote case (per-repo cache paths).
+   - `TestParseSkillSpec` — dropped the `@skills` shortcut case; added a `github.com/` prefix-stripping case and a malformed `name@bare-repo` case.
+   - Other test files (`tool_load_hardfail_schema_test.go`, `plugin_migration_test.go`, `console_handler_test.go`) updated to use the new explicit form.
+
+**Verification:**
+- `go build ./...` ✅
+- `go test ./hyoka/internal/plugin/... ./hyoka/internal/config/tool/...` ✅
+- `go test ./...` — every package passes (the previously-flaky `serve` and `validate` packages were green this run).
+- `hyoka validate` — 89 prompts, 13 configs, 3 criteria files all valid.
+
+**Reusable rule (replaces the one from `769dea69`):**
+> **No magic aliases. Remote tools must declare `repo:` explicitly.** A `source` field tells hyoka the *kind* of source; a `repo` field tells it the *location*. Both are required for any remote entry. Implicit defaults to `microsoft/skills` (or any other repo) are forbidden — the writer of the config must spell out the source so the next reader has zero inference to do.
+
+**Why a BREAKING CHANGE instead of a deprecation path:** Pre-1.0. The whole point of the reversal is that the implicit form is wrong; keeping it warmly deprecated would entrench the magic Ronnie objected to.

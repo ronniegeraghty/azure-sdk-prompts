@@ -622,13 +622,12 @@ func TestValidateAndExpand_GlobExpansion(t *testing.T) {
 	}
 }
 
-// TestValidateAndExpand_RemotePluginMissingLocator verifies that a plugin
-// entry with source: remote but no "@marketplace" suffix in the name is
-// rejected with a clear error message pointing at the locator syntax. Bare
-// remote names have no way to be resolved — the resolver would look for an
-// exact path under ~/.hyoka/cache/default/ or ~/.copilot/installed-plugins/
-// that only exists if someone already placed it there manually.
-func TestValidateAndExpand_RemotePluginMissingLocator(t *testing.T) {
+// TestValidateAndExpand_RemotePluginMissingRepo verifies that a plugin
+// entry with source: remote but no repo: field is rejected with a clear
+// error message. The @marketplace shorthand has been removed entirely;
+// every remote plugin must declare its source repo explicitly so hyoka
+// knows where to fetch it from.
+func TestValidateAndExpand_RemotePluginMissingRepo(t *testing.T) {
 dir := t.TempDir()
 
 report, err := ValidateAndExpand(context.Background(), ValidationInput{
@@ -639,7 +638,7 @@ ConfigDir: dir,
 })
 
 if err == nil {
-t.Fatal("expected error for source: remote plugin without marketplace locator")
+t.Fatal("expected error for source: remote plugin without repo: field")
 }
 toolErr, ok := err.(*ToolLoadError)
 if !ok {
@@ -651,9 +650,46 @@ t.Errorf("expected Kind=plugin, got %q", toolErr.Kind)
 if toolErr.Name != "azure-sdk-python" {
 t.Errorf("expected Name=azure-sdk-python, got %q", toolErr.Name)
 }
-// Reason should mention the fix: the @skills suffix.
-if toolErr.Reason == "" || !strings.Contains(toolErr.Reason, "@skills") {
-t.Errorf("expected reason to suggest @skills locator, got: %s", toolErr.Reason)
+// Reason should mention the fix: add a repo: field.
+for _, want := range []string{"repo:", "github.com/microsoft/skills"} {
+if !strings.Contains(toolErr.Reason, want) {
+t.Errorf("expected reason to contain %q, got: %s", want, toolErr.Reason)
+}
+}
+if !report.Failed() {
+t.Error("expected report.Failed() == true")
+}
+}
+
+// TestValidateAndExpand_RemotePluginNameWithAt verifies that the retired
+// @marketplace shorthand is rejected with a clear migration message —
+// names must be plain identifiers, never name@marketplace.
+func TestValidateAndExpand_PluginNameWithAt_Rejected(t *testing.T) {
+dir := t.TempDir()
+
+report, err := ValidateAndExpand(context.Background(), ValidationInput{
+GeneratorTools: []Entry{
+{Type: "plugin", Name: "azure-sdk-python@skills", Source: "remote"},
+},
+ConfigDir: dir,
+})
+
+if err == nil {
+t.Fatal("expected error for plugin name containing '@'")
+}
+toolErr, ok := err.(*ToolLoadError)
+if !ok {
+t.Fatalf("expected *ToolLoadError, got %T", err)
+}
+if toolErr.Kind != progress.ToolKindPlugin {
+t.Errorf("expected Kind=plugin, got %q", toolErr.Kind)
+}
+// Reason must explain the @marketplace shorthand was removed and point
+// callers at repo:.
+for _, want := range []string{"@marketplace shorthand has been removed", "repo:"} {
+if !strings.Contains(toolErr.Reason, want) {
+t.Errorf("expected reason to contain %q, got: %s", want, toolErr.Reason)
+}
 }
 if !report.Failed() {
 t.Error("expected report.Failed() == true")

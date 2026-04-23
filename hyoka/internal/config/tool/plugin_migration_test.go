@@ -57,17 +57,16 @@ func TestValidateAndExpand_MissingPlugin_ErrorEnumeratesEveryCheckedPath(t *test
 	}
 
 	home, _ := os.UserHomeDir()
+	// source: local with no repo declared — the resolver only checks the
+	// local plugin registry locations + the legacy ~/.copilot/installed-plugins/<name>/skills.
+	// Cache paths under ~/.hyoka/cache/default/<owner>/<repo>/ are only
+	// enumerated when repo: is declared (see the remote-plugin variant).
 	wantPaths := []string{
-		filepath.Join(prevWD, ".hyoka", "plugins", name, "plugin.yaml"),
-		filepath.Join(prevWD, ".hyoka", "plugins", name+".yaml"),
+		filepath.Join(dir, ".hyoka", "plugins", name, "plugin.yaml"),
+		filepath.Join(dir, ".hyoka", "plugins", name+".yaml"),
 		filepath.Join(pluginsDir, name+".yaml"),
-		filepath.Join(home, ".hyoka", "cache", "default", "microsoft", "skills", ".github", "plugins", name),
-		filepath.Join(home, ".hyoka", "cache", "default", name, "skills"),
 		filepath.Join(home, ".copilot", "installed-plugins", name, "skills"),
 	}
-	// hyokaPluginsBase uses os.Getwd() which we set to `dir` above; override the cwd-derived paths.
-	wantPaths[0] = filepath.Join(dir, ".hyoka", "plugins", name, "plugin.yaml")
-	wantPaths[1] = filepath.Join(dir, ".hyoka", "plugins", name+".yaml")
 
 	for _, p := range wantPaths {
 		if !strings.Contains(reason, p) {
@@ -84,6 +83,60 @@ func TestValidateAndExpand_MissingPlugin_ErrorEnumeratesEveryCheckedPath(t *test
 	}
 	if distinct < len(wantPaths) {
 		t.Errorf("expected all %d paths enumerated, matched %d", len(wantPaths), distinct)
+	}
+}
+
+// TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo
+// verifies that a remote plugin with an explicit repo: that fails to
+// resolve enumerates the per-repo cache paths in the error reason.
+func TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo(t *testing.T) {
+	dir := t.TempDir()
+	prevHome := os.Getenv("HOME")
+	prevWD, _ := os.Getwd()
+	t.Cleanup(func() {
+		_ = os.Setenv("HOME", prevHome)
+		_ = os.Chdir(prevWD)
+	})
+	cleanHome := t.TempDir()
+	_ = os.Setenv("HOME", cleanHome)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := ValidateAndExpand(context.Background(), ValidationInput{
+		GeneratorTools: []Entry{
+			{Type: TypePlugin, Name: "ghost-plugin", Source: "remote", Repo: "github.com/microsoft/skills"},
+		},
+		ConfigDir: dir,
+	})
+	if err == nil {
+		t.Fatal("expected hard-fail for uncached remote plugin")
+	}
+	if !report.Failed() {
+		t.Fatal("expected report.Failed() == true")
+	}
+
+	var reason string
+	for _, item := range report.Items {
+		if item.Kind == progress.ToolKindPlugin && item.Status == progress.ToolStatusFailed {
+			reason = item.Reason
+			break
+		}
+	}
+	if reason == "" {
+		t.Fatal("no failed plugin item in report")
+	}
+
+	wantPaths := []string{
+		filepath.Join(cleanHome, ".hyoka", "cache", "default", "microsoft", "skills", ".github", "plugins", "ghost-plugin"),
+		filepath.Join(cleanHome, ".hyoka", "cache", "default", "microsoft", "skills", ".github", "skills", "ghost-plugin"),
+		filepath.Join(cleanHome, ".hyoka", "cache", "default", "microsoft", "skills", "skills", "ghost-plugin"),
+		filepath.Join(cleanHome, ".copilot", "installed-plugins", "microsoft-skills", "ghost-plugin", "skills"),
+	}
+	for _, p := range wantPaths {
+		if !strings.Contains(reason, p) {
+			t.Errorf("missing per-repo cache path in error reason: %q\nFull reason:\n%s", p, reason)
+		}
 	}
 }
 
@@ -466,7 +519,7 @@ func TestValidateAndExpand_RemotePlugin_MissingCache_HardFails(t *testing.T) {
 
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
 		GeneratorTools: []Entry{
-			{Type: TypePlugin, Name: "never-cached@skills", Source: "remote"},
+			{Type: TypePlugin, Name: "never-cached", Source: "remote", Repo: "github.com/microsoft/skills"},
 		},
 		ConfigDir: dir,
 	})

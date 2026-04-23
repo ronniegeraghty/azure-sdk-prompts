@@ -83,10 +83,10 @@ func TestConsoleHandler_Handle(t *testing.T) {
 			level: slog.LevelWarn,
 			msg:   "Plugin not found, skipping",
 			attrs: []slog.Attr{
-				slog.String("plugin", "azure-sdk-java@skills"),
+				slog.String("plugin", "azure-sdk-java"),
 				slog.String("config", "baseline-skills/claude-sonnet-4.5"),
 			},
-			want: "⚠️  Plugin not found, skipping (plugin=azure-sdk-java@skills config=baseline-skills/claude-sonnet-4.5)\n",
+			want: "⚠️  Plugin not found, skipping (plugin=azure-sdk-java config=baseline-skills/claude-sonnet-4.5)\n",
 		},
 		{
 			name:  "ERROR no attrs no color",
