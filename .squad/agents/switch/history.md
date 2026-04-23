@@ -682,3 +682,66 @@ Created 4 tests for reviewer factory per-config isolation:
 
 **Table-driven vs standalone:** Used standalone test functions (not a single table-driven switch) because each scenario has distinct fixture setup (temp dirs, plugin YAMLs, skill structures). Tried to avoid over-mocking — real filesystem operations, real YAML parsing, real ValidateAndExpand calls.
 
+
+## 2026-04-24: Plugin Schema Migration — Test Coverage (Wave 3)
+
+### Context
+Neo retired the top-level `plugins:` YAML field and moved plugins to tool entries (`type: plugin`, `ref`, `source: local|remote`) under `generator.tools` / `reviewer.tools`. Neo also enhanced the missing-plugin error to enumerate every filesystem path checked. Tank wired a "wait till known" renderer model that buffers ToolResolutionStart and commits only on Result. Commits on `ronniegeraghty/dev`: `18d105c3` (Tank renderer), `bc06fb8f` (Neo schema).
+
+### Work Completed
+Added **17 new test functions** (≈29 cases counting sweep subtests) across 5 files:
+
+**`hyoka/internal/config/plugin_migration_test.go`** (5 tests):
+- `TestParse_PluginTypeEntry_SourceOmitted` — parses with no source; field preserved empty
+- `TestParse_PluginTypeEntry_ExplicitLocalSource` — `source: local` round-trips
+- `TestParse_PluginInGeneratorOnly_NotAutoAppendedToReviewer` — reviewer.tools stays empty
+- `TestParse_PluginInBothRoles_BothPreserved` — explicit dual-role survives parse
+- `TestParse_RejectsRetiredTopLevelPluginsField_PointsToMigration` — error contains `retired`, `generator.tools`, `type: plugin`, `source:`
+
+**`hyoka/internal/config/configs_sweep_test.go`** (1 test, 13 subtests):
+- `TestConfigSweep_AllRepoConfigsParseUnderNewSchema` — every YAML in repo `configs/` parses; no top-level `plugins:`; reviewer never gets plugin entries it didn't declare.
+
+**`hyoka/internal/config/tool/plugin_migration_test.go`** (7 tests):
+- `TestValidateAndExpand_MissingPlugin_ErrorEnumeratesEveryCheckedPath` — **every** path from `pluginCheckedPaths` must appear in the reason (6 distinct paths: `.hyoka/plugins/<n>/plugin.yaml`, `.hyoka/plugins/<n>.yaml`, legacy pluginsDir, 3 cache/installed paths)
+- `TestValidateAndExpand_PluginFanOut_TwoSkillsOneMCP` — plugin with 2 skills + 1 MCP → exactly 3 child items AND 3 emitted Result events, all with `ParentName=multi-child`, `ParentKind=plugin`
+- `TestValidateAndExpand_PluginOnlyInGenerator_ReviewerUntouched` — resolver twin of no-auto-append
+- `TestValidateAndExpand_PluginInBothRoles_ChildrenResolveInBoth` — dual-role has `Role=generator` AND `Role=reviewer` children
+- `TestValidateAndExpand_SkillDir_ThreeSubdirs_ProducesThreeChildren` — literal (non-glob) skill_dir fan-out; complements existing `GlobExpansion` test
+- `TestValidateAndExpand_LocalPlugin_ResolvesFromHyokaPluginsDir` — `.hyoka/plugins/<name>/plugin.yaml` resolves with empty PluginsDir
+- `TestValidateAndExpand_RemotePlugin_MissingCache_HardFails` — remote source with empty HOME cache returns `*ToolLoadError` and enumerates cache paths
+
+**`hyoka/internal/eval/tool_load_hardfail_schema_test.go`** (2 tests):
+- `TestCopilotRunner_ToolLoadFailure_RemotePluginUncached` — remote plugin, no cache → `ErrorCategory=tool_load_failure`, 0 generated files (no session)
+- `TestCopilotRunner_ToolLoadFailure_PluginOnlyInGenerator_ReviewerUnaffected` — failed generator plugin aborts; error mentions plugin name
+
+**`hyoka/internal/progress/display_interactive_plugins_test.go`** (2 tests):
+- `TestInteractive_TwoPluginsDistinctHeaders` — two plugins' fan-outs don't interleave; no flat leaf duplication; each child appears under correct parent header
+- `TestInteractive_WaitTillKnown_FailedEmitsReason` — complements Tank's `WaitTillKnown`: failed Result commits both ❌ marker and reason text; no transient "Loading" leaks
+
+### Results
+- ✅ `go test -race ./hyoka/...` all packages green
+- ✅ Baseline (Neo's `bc06fb8f` + Tank's `18d105c3`) commits verified locally — all new tests pass against landed code
+- ✅ Zero flakes
+
+### Coverage Map (Mission → Tests)
+| Scope item | Covered by |
+|---|---|
+| 1.a top-level plugins rejected with migration hint | `TestParse_RejectsRetiredTopLevelPluginsField_PointsToMigration` |
+| 1.b `type: plugin, ref` parses | `TestParse_PluginTypeEntry_SourceOmitted`, `…_ExplicitLocalSource`, existing `TestParseGeneratorSkillsAndPlugins` |
+| 1.c source defaults when omitted | `TestParse_PluginTypeEntry_SourceOmitted` (parse preserves empty; resolver infers) |
+| 1.d no auto-append to reviewer | `TestParse_PluginInGeneratorOnly_NotAutoAppendedToReviewer`, `TestValidateAndExpand_PluginOnlyInGenerator_ReviewerUntouched`, sweep test |
+| 1.e explicit dual-role | `TestParse_PluginInBothRoles_BothPreserved`, `TestValidateAndExpand_PluginInBothRoles_ChildrenResolveInBoth` |
+| 2.a local from `.hyoka/plugins/{name}/` default | `TestValidateAndExpand_LocalPlugin_ResolvesFromHyokaPluginsDir` |
+| 2.b remote fetches + caches | `TestValidateAndExpand_RemotePlugin_MissingCache_HardFails` (miss path; mocking a successful remote fetch requires a real fetcher seam — left for future wave) |
+| 2.c missing plugin enumerates paths | `TestValidateAndExpand_MissingPlugin_ErrorEnumeratesEveryCheckedPath` (**asserts each of 6 paths**) |
+| 2.d fetch failure pre-session | `TestCopilotRunner_ToolLoadFailure_RemotePluginUncached` |
+| 2.e plugin fan-out 2+1 with parent metadata | `TestValidateAndExpand_PluginFanOut_TwoSkillsOneMCP` |
+| 3. skill-dir fan-out with 3 children | `TestValidateAndExpand_SkillDir_ThreeSubdirs_ProducesThreeChildren` (non-glob), existing `GlobExpansion` (glob) |
+| 4. wait-till-known buffer/emit | Tank's `WaitTillKnown`/`PluginFanout`/`SkillDirFanout`/`PluginFailedNoFanout` + my `WaitTillKnown_FailedEmitsReason`, `TwoPluginsDistinctHeaders` |
+| 5. config-sweep smoke test | `TestConfigSweep_AllRepoConfigsParseUnderNewSchema` (13 YAML files) |
+
+### Learnings
+- **Don't trust remote-tracking**: I spent 15 minutes polling `origin/ronniegeraghty/dev` before realizing Neo's and Tank's commits were already on the *local* `ronniegeraghty/dev` (unpushed). Next time, check `git log ronniegeraghty/dev` directly before polling the remote.
+- **Enumerated-path assertion pattern**: asserting all 6 paths (not just "contains /plugins") caught a subtle thing — `hyokaPluginsBase` uses `os.Getwd()` not `ConfigDir`, so the test has to `os.Chdir` into a temp dir (and restore) to get deterministic paths. Documented with a comment so future authors know why the test fiddles with cwd.
+- **Remote plugin testing without a real fetcher**: `plugin.ResolveInstalled` is a pure-local cache walk. Redirecting `HOME` to a clean temp dir is sufficient to exercise the cache-miss hard-fail path without mocking network. Actual fetch success remains untested at the unit level — would require a `FetcherInterface` seam.
+- **Sweep test guardrail**: the reviewer-tools invariant ("reviewer with no YAML tools block must have no plugin entries after parse") is the cleanest way to catch reintroduction of cross-role auto-append without needing to diff YAML vs parsed struct.
