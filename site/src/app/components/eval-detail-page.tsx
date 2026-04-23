@@ -382,12 +382,30 @@ export function EvalDetailPage() {
   // Grader results (Phase 3) or legacy review (backward compat)
   const graderResults: GraderResult[] = r.grader_results || [];
   const hasGraders = graderResults.length > 0;
-  
+
   const review = r.review || {};
   const overallScore = review.overall_score ?? 0;
   const maxScore = review.max_score ?? 100;
-  const scorePct = maxScore > 0 ? (overallScore / maxScore) * 100 : 0;
-  const scoreColor = scorePct >= 80 ? "text-emerald-400" : scorePct >= 60 ? "text-amber-400" : "text-red-400";
+
+  // Phase 6.5 score-card metaphor: AND of every Point across every grader.
+  // This is the dominant card; it reads true to the actual evaluation
+  // ("did everything we checked pass?") instead of the legacy review-only
+  // 12/12 number that ignored file/program/behavior graders.
+  const evalPassed = evalPassFromPoints(r);
+  const pointTotals = evalPointTotals(r);
+  const graderTotals = evalGraderTotals(r);
+
+  // Per-grader breakdown (used in the score card detail row + run-detail
+  // tooltip). Each entry: name + points-passed + points-total + pass.
+  const perGraderBreakdown = graderResults.map(g => {
+    const pts = g.points ?? [];
+    return {
+      name: g.grader_name,
+      pass: graderPasses(g),
+      passed: pts.length > 0 ? pts.filter(p => p.pass).length : (graderPasses(g) ? 1 : 0),
+      total: pts.length > 0 ? pts.length : 1,
+    };
+  });
 
   // Session events may come from the individual eval or from the summary result
   const sessionEvents: SessionEvent[] = r.session_events || [];
@@ -421,7 +439,7 @@ export function EvalDetailPage() {
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mb-2 flex items-center gap-3">
-              {r.success ? <CheckCircle2 className="h-5 w-5 text-emerald-400" /> : <XCircle className="h-5 w-5 text-red-400" />}
+              {evalPassed ? <CheckCircle2 className="h-5 w-5 text-emerald-400" /> : <XCircle className="h-5 w-5 text-red-400" />}
               <h1 className="text-white" style={{ ...mono, fontSize: "clamp(1.1rem, 2.5vw, 1.5rem)" }}>
                 {r.prompt_id}
               </h1>
@@ -439,17 +457,47 @@ export function EvalDetailPage() {
               )}
             </div>
           </div>
-          <div className={`rounded-xl border px-6 py-3 text-center ${r.success ? "border-emerald-500/20 bg-emerald-500/10" : "border-red-500/20 bg-red-500/10"}`}>
-            <div className="mb-1 text-white/40" style={{ fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase" }}>
-              Review Score
+          {/* Phase 6.5: Points-metaphor score card. Replaces the
+              review-only 12/12 number which ignored file/program/behavior
+              graders. The dominant number is `N / N points`, qualified by
+              `across M graders`. The hover tooltip lists per-grader
+              breakdown so users can drill down without scrolling. */}
+          {hasGraders ? (
+            <div
+              className={`rounded-xl border px-6 py-3 text-center ${evalPassed ? "border-emerald-500/20 bg-emerald-500/10" : "border-red-500/20 bg-red-500/10"}`}
+              title={
+                "Per grader:\n" +
+                perGraderBreakdown
+                  .map(b => `${b.pass ? "✓" : "✗"} ${b.name} — ${b.passed}/${b.total}`)
+                  .join("\n")
+              }
+            >
+              <div className="mb-1 text-white/40" style={{ fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                Points
+              </div>
+              <div className={evalPassed ? "text-emerald-400" : "text-red-400"} style={{ ...mono, fontSize: 32 }}>
+                {pointTotals.passed} / {pointTotals.total}
+              </div>
+              <div className="text-white/30" style={{ fontSize: 11 }}>
+                across {graderTotals.total} grader{graderTotals.total === 1 ? "" : "s"}
+              </div>
             </div>
-            <div className={`${scoreColor}`} style={{ ...mono, fontSize: 32 }}>{overallScore}</div>
-            <div className="text-white/30" style={{ fontSize: 11 }}>/ {maxScore}</div>
-          </div>
+          ) : (
+            // No graders ran (e.g. error rows, v2 reports without grader
+            // results). Fall back to the legacy review score so the card
+            // still has a number.
+            <div className={`rounded-xl border px-6 py-3 text-center ${evalPassed ? "border-emerald-500/20 bg-emerald-500/10" : "border-red-500/20 bg-red-500/10"}`}>
+              <div className="mb-1 text-white/40" style={{ fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                Review Score
+              </div>
+              <div className={evalPassed ? "text-emerald-400" : "text-red-400"} style={{ ...mono, fontSize: 32 }}>{overallScore}</div>
+              <div className="text-white/30" style={{ fontSize: 11 }}>/ {maxScore}</div>
+            </div>
+          )}
         </div>
 
         {/* Error banner */}
-        {!r.success && errorMsg && (
+        {!evalPassed && errorMsg && (
           <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/[0.05] p-4">
             <div className="mb-1 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-400" />
