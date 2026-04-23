@@ -1215,3 +1215,43 @@ Ronnie wanted the short `owner/repo` form to be the recommended/canonical shape 
 - `fetcher_test.go` left untouched — its `"github.com prefix is stripped"` case is the deliberate backward-compat coverage. `installed.go` doc comment also left untouched (it intentionally documents both forms).
 
 `go build ./...`, the targeted test packages, and `hyoka validate` all green.
+
+### 2026-04-23: Plugin container fan-out — children get loaded, not parent
+
+**Symptom:** After the schema reversal (`2c1de1c0`, `3b306c9`), Ronnie ran `hyoka run --prompt-id key-vault-dp-python-crud --config python-pairwise` and every eval errored with `tool_load_failure: plugin "azure-sdk-python" not found ...`. Even after populating the cache (`git clone microsoft/skills` into `~/.hyoka/cache/default/microsoft/skills`), the failure persisted with the same enumerated paths.
+
+**Diagnosis (trace the lifecycle):**
+1. `validatePluginEntry` (validate.go:362) called `plugin.ResolveInstalled("microsoft/skills", "azure-sdk-python")`.
+2. `ResolveInstalled` checks each candidate dir with `isSkillDir(dir)` — which requires a top-level `SKILL.md`.
+3. The microsoft/skills layout for `azure-sdk-python` is a CONTAINER:
+   ```
+   .../plugins/azure-sdk-python/
+     ├── .claude-plugin/plugin.json
+     ├── README.md          ← no SKILL.md at root
+     └── skills/
+         ├── azure-keyvault-py/SKILL.md
+         ├── azure-identity-py/SKILL.md
+         └── ... (41 children)
+   ```
+4. `isSkillDir` returns false for all candidates → `ResolveInstalled` returns "" → hard-fail.
+
+Ronnie's hypothesis was *almost* right ("fanning out the plugin to its individual skills, but checking for the parent name"). The real shape was simpler: **the fan-out wasn't happening at all**. The resolver rejected the container before fan-out could be considered. The verifier check was fine — it just never had any children to look for, because the validator emitted a single skill row whose Path was `dir` (which would have been the container, but `dir` was always "").
+
+**Fix (single commit, 2 logical pieces):**
+1. **`plugin.ResolveInstalled`** (`installed.go`): widened the "is this a plugin?" check from `isSkillDir` to `isPluginDir` — accepts EITHER a top-level SKILL.md (single-skill plugin) OR a `skills/` subdirectory with at least one SKILL.md-bearing child (container plugin).
+2. **New helper `plugin.EnumerateChildSkills`**: returns the absolute paths of each `<dir>/skills/<child>/SKILL.md`-bearing subdir, sorted lexicographically.
+3. **`validatePluginEntry`** (`validate.go`): after a successful `ResolveInstalled`, calls `EnumerateChildSkills`. If children exist (container case), emits one `ToolLoadItem` per child with `ParentName=plugin`, `ParentKind=plugin`, `Path=<child dir>`. Single-skill case unchanged. The verifier now sees one expected skill per child (basenames like `azure-keyvault-py`), and the SDK reports those same names — so the verification matches.
+
+**Tests added:**
+- `TestResolveInstalled_ContainerPluginFanOut` (plugin pkg) — builds a fake microsoft/skills layout, asserts the container is found and 2 children enumerate in sorted order.
+- `TestResolveInstalled_SingleSkillPluginStillWorks` — regression guard for top-level SKILL.md plugins.
+- `TestEnumerateChildSkills_IgnoresChildrenWithoutSkillMd` — empty subdirs and loose files are skipped.
+- `TestValidateAndExpand_RemoteContainerPlugin_FansOutChildren` (config/tool pkg) — full validator integration: 3 child rows in the report, each parented to the plugin, `GeneratorSkillDirs()` returns per-child paths, all loaded.
+
+**Verification (live run):**
+- Pre-fix `hyoka run`: `Errors: 3`, every `report.json` had `tool_load_failure: plugin "azure-sdk-python" not found`.
+- Post-fix: `Errors: 0`, all 3 generator models succeeded, `Skills loaded` log line shows all 41+ children loaded by name (`azure-keyvault-py, azure-identity-py, azure-storage-blob-py, ...`).
+- Full `go test ./hyoka/...` green.
+
+**Reusable rule:**
+> **Plugin = directory of skills, not a single skill.** The plugin resolver must accept both shapes (top-level SKILL.md OR `skills/<child>/SKILL.md`). Whatever the verifier ends up checking should be the leaves the SDK actually loads — never the parent container directory, which has no SKILL.md and would never appear in `SessionSkillsLoaded`.

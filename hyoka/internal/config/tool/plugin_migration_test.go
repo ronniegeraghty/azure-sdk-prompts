@@ -547,3 +547,116 @@ func TestValidateAndExpand_RemotePlugin_MissingCache_HardFails(t *testing.T) {
 		t.Errorf("remote plugin error should enumerate cache paths; got: %s", reason)
 	}
 }
+
+// TestValidateAndExpand_RemoteContainerPlugin_FansOutChildren is the
+// end-to-end regression for the microsoft/skills container plugin layout
+// (`.github/plugins/<name>/skills/<child>/SKILL.md`).
+//
+// Pre-fix: ResolveInstalled returned "" because the plugin directory had
+// no top-level SKILL.md, so the validator hard-failed with "plugin not
+// found" even when the cache was correctly populated. Post-fix, the
+// validator emits one report row per child skill, with ParentName=plugin
+// and ParentKind=plugin, so the SDK loads them and the post-session
+// verifier matches by child basename.
+func TestValidateAndExpand_RemoteContainerPlugin_FansOutChildren(t *testing.T) {
+prevHome := os.Getenv("HOME")
+prevWD, _ := os.Getwd()
+t.Cleanup(func() {
+_ = os.Setenv("HOME", prevHome)
+_ = os.Chdir(prevWD)
+})
+
+cleanHome := t.TempDir()
+_ = os.Setenv("HOME", cleanHome)
+wd := t.TempDir()
+if err := os.Chdir(wd); err != nil {
+t.Fatal(err)
+}
+
+// Mirror microsoft/skills' layout for azure-sdk-python (truncated to
+// 3 children for the test).
+pluginDir := filepath.Join(cleanHome, ".hyoka", "cache", "default",
+"microsoft", "skills", ".github", "plugins", "azure-sdk-python")
+if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+t.Fatal(err)
+}
+// README at root, no top-level SKILL.md (this is what fooled the old check).
+if err := os.WriteFile(filepath.Join(pluginDir, "README.md"), []byte("readme"), 0o644); err != nil {
+t.Fatal(err)
+}
+children := []string{"azure-keyvault-py", "azure-identity-py", "azure-storage-blob-py"}
+for _, c := range children {
+cd := filepath.Join(pluginDir, "skills", c)
+if err := os.MkdirAll(cd, 0o755); err != nil {
+t.Fatal(err)
+}
+if err := os.WriteFile(filepath.Join(cd, "SKILL.md"), []byte("# "+c), 0o644); err != nil {
+t.Fatal(err)
+}
+}
+
+report, err := ValidateAndExpand(context.Background(), ValidationInput{
+GeneratorTools: []Entry{
+{Type: TypePlugin, Name: "azure-sdk-python", Source: "remote", Repo: "microsoft/skills"},
+},
+ConfigDir: wd,
+})
+if err != nil {
+t.Fatalf("ValidateAndExpand returned error for valid container plugin: %v", err)
+}
+if report.Failed() {
+t.Fatalf("report has failed items: %+v", report.Items)
+}
+
+// Expect: one skill row per child (3 total), all parented to the plugin.
+skillRows := []ToolLoadItem{}
+for _, it := range report.Items {
+if it.Kind == progress.ToolKindSkill {
+skillRows = append(skillRows, it)
+}
+}
+if len(skillRows) != len(children) {
+t.Fatalf("got %d skill rows, want %d: %+v", len(skillRows), len(children), skillRows)
+}
+
+gotNames := map[string]bool{}
+for _, row := range skillRows {
+if row.Parent != "azure-sdk-python" {
+t.Errorf("child %q has Parent=%q, want %q", row.Name, row.Parent, "azure-sdk-python")
+}
+if row.ParentKind != progress.ToolParentKindPlugin {
+t.Errorf("child %q has ParentKind=%q, want %q", row.Name, row.ParentKind, progress.ToolParentKindPlugin)
+}
+if row.Status != progress.ToolStatusLoaded {
+t.Errorf("child %q status=%q, want %q (reason: %s)", row.Name, row.Status, progress.ToolStatusLoaded, row.Reason)
+}
+if row.Path == "" {
+t.Errorf("child %q has empty Path", row.Name)
+}
+if row.Role != "generator" {
+t.Errorf("child %q role=%q, want %q", row.Name, row.Role, "generator")
+}
+gotNames[row.Name] = true
+}
+for _, want := range children {
+if !gotNames[want] {
+t.Errorf("missing child skill row %q in report", want)
+}
+}
+
+// GeneratorSkillDirs feeds SessionConfig.SkillDirectories — must
+// expose the per-child paths so the SDK loads each leaf, not the
+// container directory.
+dirs := report.GeneratorSkillDirs()
+if len(dirs) != len(children) {
+t.Errorf("GeneratorSkillDirs returned %d paths, want %d: %v", len(dirs), len(children), dirs)
+}
+for _, d := range dirs {
+if !strings.HasPrefix(d, pluginDir) {
+t.Errorf("path %q not under plugin dir %q", d, pluginDir)
+}
+if filepath.Base(filepath.Dir(d)) != "skills" {
+t.Errorf("path %q parent is not 'skills' (likely returned container dir, not child)", d)
+}
+}
+}

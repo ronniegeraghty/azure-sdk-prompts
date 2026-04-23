@@ -203,3 +203,121 @@ func TestPluginToToolEntries(t *testing.T) {
 		t.Errorf("expected MCP entry for azure-cli, got %+v", entries[2])
 	}
 }
+
+// TestResolveInstalled_ContainerPluginFanOut verifies the regression for
+// the microsoft/skills `.github/plugins/<name>/skills/<child>/SKILL.md`
+// layout. Before the fix, ResolveInstalled required a SKILL.md at the
+// plugin directory root and returned "" for container plugins (which
+// caused tool_load_failure even after the cache was populated). The
+// fix accepts container directories and a sibling EnumerateChildSkills
+// returns one path per child — the validator emits one report row per
+// child so the SDK loads them and the verifier checks the right names.
+func TestResolveInstalled_ContainerPluginFanOut(t *testing.T) {
+home := t.TempDir()
+t.Setenv("HOME", home)
+
+// Build a fake cache mirroring microsoft/skills' layout:
+//   ~/.hyoka/cache/default/microsoft/skills/.github/plugins/azure-sdk-python/
+//     ├── README.md            (no SKILL.md at the root)
+//     └── skills/
+//         ├── azure-keyvault-py/SKILL.md
+//         └── azure-identity-py/SKILL.md
+pluginDir := filepath.Join(home, ".hyoka", "cache", "default",
+"microsoft", "skills", ".github", "plugins", "azure-sdk-python")
+if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+t.Fatal(err)
+}
+// README.md at the root, deliberately NOT a SKILL.md — this is what
+// fooled the old isSkillDir check into returning false.
+if err := os.WriteFile(filepath.Join(pluginDir, "README.md"), []byte("plugin readme"), 0o644); err != nil {
+t.Fatal(err)
+}
+for _, child := range []string{"azure-keyvault-py", "azure-identity-py"} {
+childDir := filepath.Join(pluginDir, "skills", child)
+if err := os.MkdirAll(childDir, 0o755); err != nil {
+t.Fatal(err)
+}
+if err := os.WriteFile(filepath.Join(childDir, "SKILL.md"), []byte("# "+child), 0o644); err != nil {
+t.Fatal(err)
+}
+}
+
+got := ResolveInstalled("microsoft/skills", "azure-sdk-python")
+if got == "" {
+t.Fatal("ResolveInstalled returned empty for a container plugin (regression: pre-fix behavior)")
+}
+if got != pluginDir {
+t.Errorf("ResolveInstalled returned %q, want %q", got, pluginDir)
+}
+
+children := EnumerateChildSkills(got)
+if len(children) != 2 {
+t.Fatalf("EnumerateChildSkills returned %d children, want 2: %v", len(children), children)
+}
+// Sorted lexicographically: azure-identity-py < azure-keyvault-py
+wantBases := []string{"azure-identity-py", "azure-keyvault-py"}
+for i, child := range children {
+if filepath.Base(child) != wantBases[i] {
+t.Errorf("children[%d] base = %q, want %q", i, filepath.Base(child), wantBases[i])
+}
+if _, err := os.Stat(filepath.Join(child, "SKILL.md")); err != nil {
+t.Errorf("child %q missing SKILL.md: %v", child, err)
+}
+}
+}
+
+// TestResolveInstalled_SingleSkillPluginStillWorks verifies the fix did
+// not regress the single-skill plugin layout (top-level SKILL.md, no
+// `skills/` subdirectory). EnumerateChildSkills must return nil so the
+// validator falls back to recording one skill row named after the plugin.
+func TestResolveInstalled_SingleSkillPluginStillWorks(t *testing.T) {
+home := t.TempDir()
+t.Setenv("HOME", home)
+
+pluginDir := filepath.Join(home, ".hyoka", "cache", "default",
+"acme", "skills", ".github", "plugins", "solo")
+if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+t.Fatal(err)
+}
+if err := os.WriteFile(filepath.Join(pluginDir, "SKILL.md"), []byte("# solo"), 0o644); err != nil {
+t.Fatal(err)
+}
+
+got := ResolveInstalled("acme/skills", "solo")
+if got != pluginDir {
+t.Errorf("ResolveInstalled returned %q, want %q", got, pluginDir)
+}
+if children := EnumerateChildSkills(got); children != nil {
+t.Errorf("EnumerateChildSkills returned %v for a single-skill plugin, want nil", children)
+}
+}
+
+// TestEnumerateChildSkills_IgnoresChildrenWithoutSkillMd ensures the
+// fan-out helper does not report directories that are missing SKILL.md
+// (e.g. a `__pycache__` dir or a child that's been partially deleted).
+func TestEnumerateChildSkills_IgnoresChildrenWithoutSkillMd(t *testing.T) {
+dir := t.TempDir()
+mustMkdir := func(p string) {
+if err := os.MkdirAll(p, 0o755); err != nil {
+t.Fatal(err)
+}
+}
+mustMkdir(filepath.Join(dir, "skills", "good"))
+if err := os.WriteFile(filepath.Join(dir, "skills", "good", "SKILL.md"), []byte("# good"), 0o644); err != nil {
+t.Fatal(err)
+}
+// Empty subdir — no SKILL.md.
+mustMkdir(filepath.Join(dir, "skills", "empty"))
+// File at the top of skills/ — should be skipped (not a dir).
+if err := os.WriteFile(filepath.Join(dir, "skills", "loose.md"), []byte("loose"), 0o644); err != nil {
+t.Fatal(err)
+}
+
+got := EnumerateChildSkills(dir)
+if len(got) != 1 {
+t.Fatalf("got %d children, want 1: %v", len(got), got)
+}
+if filepath.Base(got[0]) != "good" {
+t.Errorf("got child %q, want basename %q", got[0], "good")
+}
+}

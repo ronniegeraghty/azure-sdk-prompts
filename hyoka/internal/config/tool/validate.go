@@ -361,7 +361,32 @@ return
 // Try remote cache (installed plugins) using the explicit repo.
 if src == SourceRemote || src == SourceLocal {
 if dir := plugin.ResolveInstalled(entry.Repo, name); dir != "" {
-// Remote plugins are delivered as an opaque skill directory.
+// Container plugins (the standard Copilot
+// `.github/plugins/<name>/skills/<child>/SKILL.md` layout, used
+// by microsoft/skills) fan out to one report row per child
+// skill. The parent directory has no SKILL.md of its own, so
+// recording it as a single skill would cause the SDK to load
+// nothing and the post-session verifier would mark the plugin
+// failed even though every child loaded correctly.
+if children := plugin.EnumerateChildSkills(dir); len(children) > 0 {
+emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusLoaded, "", "", "")
+for _, childPath := range children {
+childName := filepath.Base(childPath)
+report.Items = append(report.Items, ToolLoadItem{
+Kind:       progress.ToolKindSkill,
+Name:       childName,
+Parent:     name,
+ParentKind: progress.ToolParentKindPlugin,
+Status:     progress.ToolStatusLoaded,
+Path:       childPath,
+Role:       role,
+})
+emitResultWithParent(emit, childName, progress.ToolKindSkill, progress.ToolStatusLoaded, "", name, progress.ToolParentKindPlugin)
+}
+return
+}
+// Single-skill plugin: the resolved dir has its own SKILL.md
+// (no children). One skill row, named after the plugin.
 item := ToolLoadItem{
 Kind:       progress.ToolKindSkill,
 Name:       name,
