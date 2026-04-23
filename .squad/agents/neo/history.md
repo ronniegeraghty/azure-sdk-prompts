@@ -796,3 +796,39 @@ All green. No pre-existing test failures touched.
 - **Skill spec parsing is more flexible than the original npx path.** The `@skills` shorthand (e.g., `azure-sdk-python@skills` → microsoft/skills repo) simplifies config YAMLs. The `name@owner/repo` format enables arbitrary repo sources without expanding the YAML schema.
 - **Silent git operations are critical for renderer stability.** Capturing stdout/stderr to a buffer and only logging stderr on failure keeps the CLI output clean. The interactive renderer depends on this — any stray git progress output would stomp the live display.
 - **Cache reuse via `git fetch` is faster than re-cloning.** The new fetcher checks for a `.git` directory first; if present, runs `git fetch --all --tags` and `git checkout <version>` instead of cloning. Version-pinned caches in separate directories prevent poisoning across evals.
+
+## 2026-04-23: Grader Coverage Investigation
+
+**Branch:** `ronniegeraghty/dev` (local commit 0c20df51)
+**Task:** Investigate user report: "Graders aren't running on all evals"
+
+**Findings:**
+- NO BUG FOUND. Graders are running as designed post-#625 unification.
+- The two grader types (typed + prompt) both execute correctly.
+- Auto-discovery of `--criteria-dir` works (finds `./criteria` or `../criteria` automatically).
+- User observation likely stemmed from:
+  1. Old reports (pre-#625, before unified system landed)
+  2. Using `--skip-review` which skips prompt-type graders
+  3. Evals that failed during generation (never reached grading phase)
+  4. Prompts with no matching graders (correct behavior per `when:` filters)
+
+**Evidence:**
+- Ran 3 test evals with different flags:
+  - Without `--criteria-dir`: 1 grader (auto-discovered criteria/)
+  - With `--criteria-dir --skip-review`: 1 typed grader only
+  - With `--criteria-dir` (no skip): 1 typed + review with prompt criteria
+- Traced code: `loadBundle()` → `matchedForEval()` → `PartitionMatched()` → typed + prompt execution paths
+
+**Changes Made:**
+- Added observability logs in `engine_eval.go:454-468`:
+  - `glg.Info("Matched graders for eval", ...)` — shows total/typed/prompt counts
+  - `glg.Warn("No graders matched", ...)` — warns when zero matches with prompt properties
+  - `glg.Info("Prompt-type graders matched but review is disabled", ...)` — hints to omit `--skip-review`
+- Committed: `0c20df51` with logging improvements
+
+**Recommendations (for user):**
+1. **Documentation** (Oracle): Explain typed vs. prompt grader types, when they run
+2. **UX improvement** (Tank): Add `--show-graders` to `hyoka list` command
+3. **Defer** (#622): Typed grader CLI surface (not urgent)
+
+**Outcome:** Issue is UX/observability, not a bug. Logging improvements will help users understand grader matching behavior. Full investigation report in `.squad/agents/neo/grader-coverage-investigation.md`.
