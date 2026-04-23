@@ -135,7 +135,17 @@ export function RunsPage() {
                 {filteredRuns.map((run, i) => {
               const passed = run.passed ?? 0;
               const total = run.total_evaluations ?? 0;
-              const rate = total > 0 ? ((passed / total) * 100).toFixed(1) : "0.0";
+              const errors = run.errors ?? 0;
+              // Errored evaluations never produced a result — exclude from
+              // the denominator so an all-errored run doesn't render as a
+              // smug emerald `0.0%`. Falls back to total when no errors.
+              const effectiveTotal = Math.max(total - errors, 0);
+              const rate = effectiveTotal > 0
+                ? ((passed / effectiveTotal) * 100).toFixed(1)
+                : "0.0";
+              const hasErrors = errors > 0;
+              const barColor = hasErrors ? "bg-amber-500" : "bg-emerald-500";
+              const rateColor = hasErrors ? "text-amber-300" : "text-white/50";
               return (
                 <motion.div
                   key={run.run_id}
@@ -149,8 +159,17 @@ export function RunsPage() {
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex-1">
-                        <div className="mb-1 text-white/80" style={{ fontSize: 15 }}>
+                        <div className="mb-1 flex items-center gap-2 text-white/80" style={{ fontSize: 15 }}>
                           {formatTimestamp(run.timestamp)}
+                          {hasErrors && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/[0.08] px-1.5 py-0.5 text-amber-300"
+                              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+                            >
+                              <AlertTriangle className="h-2.5 w-2.5" />
+                              run errored
+                            </span>
+                          )}
                         </div>
                         <p className="text-white/40" style={{ fontSize: 12 }}>
                           {run.total_evaluations} evaluations
@@ -177,9 +196,9 @@ export function RunsPage() {
 
                         <div className="hidden items-center gap-2 sm:flex">
                           <div className="h-2 w-24 overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${rate}%` }} />
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${rate}%` }} />
                           </div>
-                          <span className="text-white/50" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                          <span className={rateColor} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {rate}%
                           </span>
                         </div>
