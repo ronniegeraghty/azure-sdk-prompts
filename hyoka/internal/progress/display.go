@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/term"
 )
 
 // ProgressMode controls the rendering strategy.
@@ -586,8 +589,21 @@ func IsTerminal(f *os.File) bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
-// TermWidth returns the assumed terminal width.
-func TermWidth() int { return 120 }
+// TermWidth returns the terminal width in columns. Detects via stdout fd
+// using golang.org/x/term, falls back to the COLUMNS env var, then to 120.
+// Used by interactive renderers to truncate live tail lines so they don't
+// wrap and break in-place rewrites (\r\033[2K only clears one physical row).
+func TermWidth() int {
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+		return w
+	}
+	if v := os.Getenv("COLUMNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 120
+}
 
 func fmtDuration(d time.Duration) string {
 	secs := d.Seconds()

@@ -4,11 +4,63 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"sync"
 	"time"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress/style"
 )
+
+// ansiSeqRE matches ANSI CSI escape sequences (color/style/cursor codes) so we
+// can compute the visible width of a styled string and truncate it without
+// chopping in the middle of an escape sequence.
+var ansiSeqRE = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
+
+// truncateToWidth returns s truncated so its visible width is at most max
+// columns. ANSI escape sequences are preserved (zero width). If s already
+// fits, it's returned unchanged. The truncation appends an ellipsis "…"
+// when content was dropped.
+func truncateToWidth(s string, max int) string {
+	if max <= 0 {
+		return s
+	}
+	// Fast path: if there are no ANSI codes and length already fits.
+	if len(s) <= max && !ansiSeqRE.MatchString(s) {
+		return s
+	}
+	visible := 0
+	out := make([]byte, 0, len(s))
+	i := 0
+	for i < len(s) {
+		// Match ANSI sequence at position i.
+		if loc := ansiSeqRE.FindStringIndex(s[i:]); loc != nil && loc[0] == 0 {
+			out = append(out, s[i:i+loc[1]]...)
+			i += loc[1]
+			continue
+		}
+		// Each rune counts as 1 column for our purposes (good enough — emoji
+		// may differ but truncating slightly short is harmless).
+		r, size := decodeRune(s[i:])
+		if visible+1 > max-1 { // leave 1 col for ellipsis
+			out = append(out, []byte("…")...)
+			// Append ANSI reset to avoid bleeding styles past the truncation.
+			out = append(out, []byte("\x1b[0m")...)
+			return string(out)
+		}
+		out = append(out, []byte(string(r))...)
+		visible++
+		i += size
+	}
+	return string(out)
+}
+
+func decodeRune(s string) (rune, int) {
+	for i, r := range s {
+		_ = i
+		return r, len(string(r))
+	}
+	return 0, 0
+}
 
 // interactiveRenderer implements the "interactive" progress display described
 // in the sprint plan: a per-eval transcript where only the TAIL line is ever
@@ -719,9 +771,12 @@ func (r *interactiveRenderer) writeLine(s string) {
 
 // writeTail writes text as the current tail line (no trailing newline).
 // Freezes any existing tail first. kind records which section owns the tail
-// so the ticker knows whether to refresh it.
+// so the ticker knows whether to refresh it. Truncates to terminal width
+// to prevent line wrapping (which would break in-place rewrites — \r\033[2K
+// only clears one physical row).
 func (r *interactiveRenderer) writeTail(kind tailKind, text string) {
 	r.freezeTail()
+	text = truncateToWidth(text, TermWidth())
 	r.w.Write([]byte(text))
 	r.cur.tailKind = kind
 	r.cur.tailText = text
@@ -733,6 +788,7 @@ func (r *interactiveRenderer) rewriteTail(text string) {
 	if r.cur == nil || r.cur.tailKind == tailNone {
 		return
 	}
+	text = truncateToWidth(text, TermWidth())
 	// Move to column 0, clear the line, rewrite. Cursor stays on the same
 	// physical row — linesWritten is unchanged because we never committed
 	// a newline.
