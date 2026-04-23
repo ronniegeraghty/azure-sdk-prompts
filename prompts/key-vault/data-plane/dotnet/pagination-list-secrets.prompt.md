@@ -24,22 +24,21 @@ tags:
 ## Prompt
 
 My Key Vault has hundreds of secrets and I need to enumerate them all
-without loading everything into memory. How do I paginate through them?
-1. Use SecretClient with DefaultAzureCredential
-2. Iterate through secrets page-by-page using AsyncPageable
+without loading everything into memory. How do I paginate through them
+in .NET?
+1. Connect to Key Vault with identity-based authentication
+2. Iterate through secrets page by page
 3. Print the name, content type, and enabled status of each secret
 4. Handle the case where some secrets are disabled
 
-I want to understand how AsyncPageable<T> and AsPages() work
-for large result sets. Show required NuGet packages.
+I want to understand how async pagination works for large result sets.
 
 ## Evaluation Criteria
 
-- `SecretClient.GetPropertiesOfSecretsAsync()` returning `AsyncPageable<SecretProperties>`
-- `await foreach` pattern for async iteration
-- `AsPages()` for explicit page-by-page control
-- Accessing `SecretProperties` fields (Name, ContentType, Enabled, CreatedOn)
-- Error handling during pagination
+- Lists secret properties using async pagination
+- Supports both simple async iteration and explicit page-by-page control
+- Accesses secret metadata (name, content type, enabled status)
+- Handles errors during pagination
 
 ## Context
 

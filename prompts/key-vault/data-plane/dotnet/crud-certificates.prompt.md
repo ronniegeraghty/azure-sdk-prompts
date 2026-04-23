@@ -23,24 +23,23 @@ author: JonathanCrd
 
 ## Prompt
 
-I need to manage TLS certificates in Azure Key Vault using C#.
-How do I use the CertificateClient to:
+I need to manage TLS certificates in Azure Key Vault using .NET.
+How do I:
 1. Create a self-signed certificate for testing
-2. Wait for the certificate creation to complete (it's an LRO)
-3. Download the certificate with its private key as an X509Certificate2
+2. Wait for the certificate creation to complete (it's a long-running operation)
+3. Download the certificate with its private key so I can use it in my app
 4. Import an existing PFX certificate into Key Vault
 
-Use DefaultAzureCredential for authentication. Show required NuGet packages.
+Authenticate securely using identity-based credentials.
 
 ## Evaluation Criteria
 
-- `Azure.Security.KeyVault.Certificates` NuGet package
-- `CertificateClient` creation with vault URI and credential
-- `StartCreateCertificateAsync()` with `CertificatePolicy.Default`
-- `WaitForCompletionAsync()` on the certificate operation
-- `CertificateClient.DownloadCertificateAsync()` returning `X509Certificate2`
-- `ImportCertificateAsync()` with `ImportCertificateOptions`
-- `RequestFailedException` handling
+- Uses the Key Vault Certificates SDK to create, download, and import certificates
+- Handles the long-running operation pattern for certificate creation
+- Downloads the certificate with its private key in a usable format
+- Imports an existing PFX certificate
+- Authenticates with `DefaultAzureCredential` or identity-based credentials
+- Handles errors appropriately
 
 ## Context
 
