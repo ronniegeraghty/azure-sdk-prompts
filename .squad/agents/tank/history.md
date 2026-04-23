@@ -352,3 +352,11 @@ Added console_handler.go and console_handler_test.go with 9 table-driven tests c
 - **Style package integration**: The existing progress/style package with its NO_COLOR + TTY detection made color support trivial — just wrap text in styler.Red() or styler.Dim().
 - **Handler selection at Setup time**: Choosing handler based on whether --log-file is set keeps the decision in one place (logging.Setup). No need for runtime handler swapping.
 - **Snapshot testing with ANSI codes**: Testing ANSI sequences in strings is readable with \x1b[31m etc. inline in want strings. NO_COLOR tests verify by checking for absence of \x1b[ prefix.
+
+### Session 2026-04-23 — CLI Output UX Sprint Round 2 (slog + renderer ownership)
+
+**Console-friendly slog handler shipped** (2026-04-23T01:22Z, commits `82fc9750` + `727a67b0`). Interactive renderer now displays clean human-readable logs instead of JSON-style structured format.
+
+**Scope expansion: Tank now owns `hyoka/internal/progress/`** (commits `0747aa58`, `ce9afc50`). Tank was already listed in routing.md for "progress output," but the charter now explicitly includes `display_interactive.go`, `display_ci.go`, and `style/` helpers. This correction reversed a Sprint 1 misassignment that had put CLI renderers under Trinity's scope; Tank is the CLI operator and owns all CLI-facing output.
+
+**Related:** Neo shipped git-clone skill resolver (neo commit `cf6a7636`) to replace `npx skills add`, unblocking the interactive renderer from stdout pollution. Trinity completed agent-attempt gating (commits `0747aa58` + `ce9afc50`) and handed off future CLI renderer work to Tank — a clean scope separation: Tank = CLI, Trinity = Site/React/Reports.

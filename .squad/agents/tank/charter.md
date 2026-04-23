@@ -15,7 +15,7 @@
 - Configuration system (`hyoka/internal/config/`, `configs/`)
 - Environment checking and validation (`hyoka/internal/checkenv/`, `hyoka/internal/validate/`)
 - Clean command (`hyoka/internal/clean/`)
-- Progress/UX output (`hyoka/internal/progress/`)
+- Progress/UX output (`hyoka/internal/progress/`) — display_interactive.go, display_ci.go, style helpers
 - Build pipeline and `go.work` workspace management (`hyoka/internal/build/`)
 - PID file management (`hyoka/internal/pidfile/`)
 - Manifest handling (`hyoka/internal/manifest/`)

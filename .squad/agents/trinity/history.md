@@ -233,4 +233,12 @@ Fixed interleaving issue in interactive renderer where "Agent Attempt:" section 
 - CI renderer doesn't have this issue — it's append-only with no Tools/Agent detail during the run, just start/finish timestamps and a final summary table.
 - `EventToolsVerified` is the bulk verification signal emitted at `hyoka/internal/eval/copilot.go:413-420` after all tool kinds (skills, plugins, MCP servers) have reported. It's always emitted in production, but tests may skip it — hence the safety fallback.
 
-**Decision filed:** `.squad/decisions/inbox/trinity-attempt-gating.md`
+### Session 2026-04-23 — CLI Output UX Sprint Round 2 (Gating + Scope Handoff)
+
+**Agent Attempt gating shipped** (2026-04-23T01:22Z, commits `0747aa58` + `ce9afc50`). Prevents visual jitter during rapid tool-resolution events.
+
+⚠️ **Scope shift: Trinity hands off CLI renderers to Tank.** The agent-attempt gating work served as the handoff point. Tank was already scoped for CLI in routing.md; the charter and Trinity's history now reflect the correction. Trinity's scope is now **site/serve/reports/trends only** (React SPA, report generation, trends visualization). All future CLI renderer work (display_interactive.go, display_ci.go, style/) routes to Tank.
+
+This reverses the Sprint 1 misassignment that split Trinity's focus across unrelated domains. With Tank owning CLI and Trinity owning site, each agent has single-responsibility scope.
+
+**Related:** Tank shipped console-friendly slog handler (commits `82fc9750` + `727a67b0`). Neo shipped git-clone skill resolver (commit `cf6a7636`). All three Round 2 deliverables shipped.
