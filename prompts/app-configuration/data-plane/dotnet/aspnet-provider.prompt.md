@@ -23,26 +23,23 @@ author: JonathanCrd
 
 ## Prompt
 
-I want to use Azure App Configuration as the configuration source for my
-ASP.NET Core web app so settings update without redeploying. How do I:
-1. Add the Azure App Configuration provider in Program.cs
-2. Connect using a connection string or DefaultAzureCredential
-3. Select which keys to load using key filters and labels
-4. Enable dynamic refresh so settings update automatically
-5. Use the refreshed settings in a controller via IOptionsSnapshot<T>
-
-Show the required NuGet packages (Microsoft.Extensions.Configuration.AzureAppConfiguration)
-and explain the sentinel key pattern for triggering refreshes.
+I'm building an ASP.NET Core web app and want to use Azure App Configuration
+as my centralized configuration source. My settings need to update at runtime
+without redeploying the application. How do I:
+1. Wire up my app to pull configuration from App Configuration at startup
+2. Authenticate securely without hardcoding credentials
+3. Load only specific keys and labels relevant to my environment
+4. Have configuration values refresh automatically when they change in the store
+5. Access the latest configuration values in my controllers and services
 
 ## Evaluation Criteria
 
-- `Microsoft.Extensions.Configuration.AzureAppConfiguration` NuGet package
-- `builder.Configuration.AddAzureAppConfiguration()` in Program.cs
-- `options.Connect()` with connection string or `DefaultAzureCredential`
-- `options.Select()` for key filtering with labels
-- `options.ConfigureRefresh()` with sentinel key and cache expiration
-- `app.UseAzureAppConfiguration()` middleware for dynamic refresh
-- `IOptionsSnapshot<T>` or `IOptionsMonitor<T>` for refreshed values
+- Integrates App Configuration into the ASP.NET Core configuration pipeline
+- Uses `DefaultAzureCredential` or identity-based authentication
+- Configures key filtering with labels for environment separation
+- Implements dynamic refresh with a sentinel key pattern
+- Exposes refreshed configuration via ASP.NET Core options patterns (e.g., `IOptionsSnapshot<T>` or `IOptionsMonitor<T>`)
+- Includes the appropriate NuGet package for the App Configuration provider
 
 ## Context
 

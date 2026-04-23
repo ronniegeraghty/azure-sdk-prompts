@@ -22,24 +22,23 @@ author: JonathanCrd
 
 ## Prompt
 
-I want to use Azure App Configuration to manage feature flags for my .NET app.
-How do I:
-1. Create a feature flag in App Configuration using ConfigurationClient
-2. Read the feature flag and check if it's enabled
-3. Use Microsoft.FeatureManagement to evaluate feature flags in code
-4. Wire up feature flag evaluation from App Configuration in ASP.NET Core
+I want to use Azure App Configuration to manage feature flags for my .NET
+application. How do I:
+1. Store and manage feature flags in App Configuration
+2. Read a feature flag and determine whether it is enabled
+3. Evaluate feature flags in application code at runtime
+4. Integrate feature flag evaluation into an ASP.NET Core app
 
-Show the required NuGet packages and explain the difference between storing
-feature flags via ConfigurationClient vs. evaluating them with FeatureManager.
+Explain the difference between storing feature flags and evaluating them
+in code.
 
 ## Evaluation Criteria
 
-- `FeatureFlagConfigurationSetting` for creating feature flags via SDK
-- `ConfigurationClient.SetConfigurationSetting()` with feature flag settings
-- `Microsoft.FeatureManagement` NuGet package for evaluation
-- `IFeatureManager.IsEnabledAsync()` for checking flags in code
-- `.featureManagement` key prefix convention
-- Integration with ASP.NET Core via `AddFeatureManagement()`
+- Stores feature flags using the App Configuration SDK (e.g., `FeatureFlagConfigurationSetting`)
+- Evaluates feature flags at runtime using a feature management library
+- Distinguishes between the storage model and the evaluation model
+- Integrates feature flag evaluation into ASP.NET Core dependency injection
+- Uses the `.featureManagement` key prefix convention
 
 ## Context
 
