@@ -251,6 +251,86 @@ generator:
 
 > **Important:** The `mcp_tools` field must be set (typically `["*"]`) for the MCP server's tools to be registered with the agent. Without it, the server starts but its tools won't be available.
 
+### Plugins
+
+Plugins bundle related skills, MCP servers, and hooks into a single reusable YAML definition. Declare plugins as tool entries with `type: plugin` under `generator.tools` or `reviewer.tools`. Each plugin can contain:
+
+- **Skills** — Local or remote Copilot skills
+- **MCP Servers** — MCP server configurations
+- **Hooks** — Pre/post tool-use hooks for custom logic
+
+#### Plugin Declaration
+
+```yaml
+generator:
+  tools:
+    - name: azure-sdk-python
+      type: plugin
+      source: remote
+    - name: my-plugin
+      type: plugin
+      source: local
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Plugin identifier (marketplace name for remote, filename without `.yaml` for local) |
+| `type` | yes | — | Must be `"plugin"` |
+| `source` | yes | — | `local` or `remote` |
+
+#### Local Plugins
+
+Local plugins are YAML files placed in the `.hyoka/plugins/` directory. Each plugin file defines a bundle of tools (skills + MCPs).
+
+```yaml
+generator:
+  tools:
+    - name: my-plugin
+      type: plugin
+      source: local
+```
+
+hyoka resolves this by looking for `.hyoka/plugins/my-plugin.yaml`. If found, the plugin is parsed and its child tools (skills and MCP servers) are registered with the generator session.
+
+#### Remote Plugins
+
+Remote plugins are fetched from the GitHub Copilot CLI plugin marketplace and cached locally.
+
+```yaml
+generator:
+  tools:
+    - name: azure-sdk-python
+      type: plugin
+      source: remote
+```
+
+On first use, hyoka fetches the plugin definition and caches it under `.hyoka/cache/plugins/`. Subsequent runs use the cached version. To update to the latest version, delete the cache and re-run.
+
+#### Dual-Role Plugins
+
+If you want a plugin available to both the generator and reviewer environments, declare it in both `generator.tools` and `reviewer.tools`:
+
+```yaml
+generator:
+  tools:
+    - name: my-plugin
+      type: plugin
+      source: local
+reviewer:
+  tools:
+    - name: my-plugin
+      type: plugin
+      source: local
+```
+
+There is no automatic sharing between generator and reviewer tools — each environment receives only the tools explicitly declared for it.
+
+#### Hard-Fail Semantics
+
+- **Fetch errors** (remote plugins) fail before session creation, preventing partial or incorrect evaluations.
+- **Missing tools** in a plugin are reported at pre-session validation time (`EventToolsVerified`), not during eval.
+- The evaluation aborts immediately if any plugin fails to load.
+
 ### Tool Load Validation
 
 All tools declared in `generator.tools` or `reviewer.tools` are **implicitly required**. Before attempting code generation, hyoka performs a **pre-session static validation** to resolve every declared plugin, skill directory, and MCP server. If any tool fails to resolve, the evaluation aborts immediately with a `tool_load_failure` error — the generator is never invoked.
@@ -271,12 +351,12 @@ During `hyoka run`, each configured tool is resolved and reported in the **Tools
 
 ```
 Tools:
-  ✓ Loaded      generator-plugin (1 tool)
-  ✓ Loaded        ├── tool-1
-  ✓ Loaded        └── tool-2
-  ✓ Loaded      skills-dir (2 skills)
-  ✓ Loaded        ├── skill-A
-  ✗ Failed         └── skill-B (missing SKILL.md)
+  ✓ Loaded      azure-sdk-python (plugin)
+  ✓ Loaded        ├── skill-azure-sdk-patterns
+  ✓ Loaded        └── mcp-azure-resource-tools
+  ✓ Loaded      generator-skills (skills dir)
+  ✓ Loaded        ├── coding-standards
+  ✗ Failed         └── sdk-version-check (missing SKILL.md)
   ✓ Loaded      azure-mcp
 ```
 
@@ -446,10 +526,12 @@ For authoring criteria files, hierarchical organization, and advanced patterns, 
 
 ## Plugins
 
-Plugins bundle related skills, MCP servers, and hooks into a single reusable YAML definition. Place plugin files in the `plugins/` directory. Each plugin can declare:
+**For declaring plugins in your config, see [Plugins](#plugins) under Configuration Fields above.**
+
+Plugin YAML definitions are stored in the `.hyoka/plugins/` directory for local plugins. Each plugin file (e.g., `.hyoka/plugins/my-plugin.yaml`) declares:
 
 - **Skills** — Local or remote Copilot skills
 - **MCP Servers** — MCP server configurations
 - **Hooks** — Pre/post tool-use hooks for custom logic
 
-Use `hyoka tools` (or `hyoka plugins`) to list all discovered plugins and skills.
+Use `hyoka tools` (or `hyoka plugins`) to list all discovered plugins, skills, and MCP servers.

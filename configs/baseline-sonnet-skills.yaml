@@ -13,6 +13,21 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/generator"
+        - name: azure-sdk-java
+          type: plugin
+          source: remote
+        - name: azure-sdk-python
+          type: plugin
+          source: remote
+        - name: azure-sdk-dotnet
+          type: plugin
+          source: remote
+        - name: azure-sdk-typescript
+          type: plugin
+          source: remote
+        - name: azure-sdk-rust
+          type: plugin
+          source: remote
     reviewer:
       models:
         - "claude-opus-4.6"
@@ -24,9 +39,3 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/reviewer"
-    plugins:
-      - "azure-sdk-java@skills"
-      - "azure-sdk-python@skills"
-      - "azure-sdk-dotnet@skills"
-      - "azure-sdk-typescript@skills"
-      - "azure-sdk-rust@skills"
