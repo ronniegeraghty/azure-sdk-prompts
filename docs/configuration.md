@@ -253,52 +253,73 @@ generator:
 
 ### Tool Load Validation
 
-All tools declared in `generator.tools` or `reviewer.tools` are **implicitly required**. When hyoka starts an evaluation, it waits up to 10 seconds for the Copilot SDK to confirm that all configured tools have loaded successfully.
+All tools declared in `generator.tools` or `reviewer.tools` are **implicitly required**. Before attempting code generation, hyoka performs a **pre-session static validation** to resolve every declared plugin, skill directory, and MCP server. If any tool fails to resolve, the evaluation aborts immediately with a `tool_load_failure` error — the generator is never invoked.
 
-**What happens if a tool fails to load:**
+#### Hard-Fail Contract
 
-If any tool fails to load within the 10-second window, hyoka will immediately abort the evaluation with a clear error message before attempting to generate code:
+hyoka hard-fails (with `error_category: "tool_load_failure"`) when:
+
+- **Plugin not found** — A configured plugin is not in the plugin registry and hasn't been installed locally
+- **Skill path missing** — A local skill's `path` points to a non-existent directory
+- **Missing `SKILL.md`** — A configured skill directory exists but doesn't contain a required `SKILL.md` file
+- **Empty skill directory** — A skill directory glob pattern (`glob: "..."`) matches zero SKILL.md files
+- **MCP server unavailable** — The `command` (for local) or `url` (for remote) specified for an MCP server is invalid or unreachable
+
+#### Tools Progress Output
+
+During `hyoka run`, each configured tool is resolved and reported in the **Tools** progress section. Plugins and skill directories are **expanded into their children** — each child (individual skill or tool from a plugin) reports its load status individually:
 
 ```
-Error: required skill 'generator-skills' failed to load: SDK did not report skill as loaded
+Tools:
+  ✓ Loaded      generator-plugin (1 tool)
+  ✓ Loaded        ├── tool-1
+  ✓ Loaded        └── tool-2
+  ✓ Loaded      skills-dir (2 skills)
+  ✓ Loaded        ├── skill-A
+  ✗ Failed         └── skill-B (missing SKILL.md)
+  ✓ Loaded      azure-mcp
 ```
 
-or
+This grouped display lets you see at a glance which children succeeded and which failed, making diagnostics faster.
 
+#### Error Reporting in EvalReport JSON
+
+When a tool load fails, the evaluation report includes:
+
+```json
+{
+  "error": "tool_load_failure: skill directory './skills/gen' missing SKILL.md in ./skills/gen/my-skill",
+  "error_category": "tool_load_failure",
+  "error_details": "skill directory './skills/gen' missing SKILL.md in ./skills/gen/my-skill"
+}
 ```
-Error: required mcp 'azure' failed to load: SDK did not report MCP server as loaded
-```
 
-This behavior prevents silent failures where code generation happens without the intended tools, leading to misleading pass/fail results from graders.
+#### Config Scoping
 
-**Common causes of tool load failures:**
+Reviewer tool validation is **scoped per-config**. When running multiple configs in a single `hyoka run` invocation (e.g., `--config "config-a,config-b"`), each config's `reviewer.tools` are validated independently. This prevents skills configured for one config from accidentally leaking into another.
 
-- **Missing `SKILL.md`** — A configured skill directory doesn't contain a required `SKILL.md` file
-- **Incorrect skill path** — The `path` field points to a directory that doesn't exist or isn't accessible
-- **Remote skill unavailable** — A remote skill (from a GitHub repository) cannot be fetched due to network issues or authentication problems
-- **MCP server not found** — The `command` specified for an MCP server is not available (e.g., `npx` not in PATH or package not installed)
-- **SDK timeout** — The Copilot SDK failed to initialize the tool within 10 seconds (rare; usually indicates a deeper issue)
+#### Diagnosing Tool Load Failures
 
-**Diagnosing tool load failures:**
-
-Re-run your evaluation with debug logging to see detailed tool load diagnostics:
+Re-run your evaluation with debug logging:
 
 ```bash
 hyoka run --prompt-id <prompt-id> --config <config> \
   --log-level debug --log-file hyoka-debug.log
 ```
 
-Then grep the log for tool-related messages:
+Then check the report and logs for details:
 
 ```bash
-grep -i "tool\|skill\|mcp\|verifier" hyoka-debug.log
+# View the error in the eval report
+cat reports/<eval-id>/report.json | jq '.error, .error_category'
+
+# Grep logs for tool-resolution details
+grep -i "tool\|skill\|mcp" hyoka-debug.log
 ```
 
-Look for lines containing `"SDK did not report"` or `"failed to load"` to pinpoint which tool(s) failed and why.
+#### Future: Optional Tools
 
-**Future: Optional tools**
-
-In a future release, you may be able to mark specific tools as optional using `required: false`. For now, all configured tools are required.
+In a future release, you may be able to mark specific tools as optional using `optional: true`. For now, all configured tools are required.
 
 ## Limits
 

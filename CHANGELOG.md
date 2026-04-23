@@ -17,9 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Embedded asset freshness policy** — site/dist must be rebuilt and committed whenever site/src changes
 - **Installed-binary documentation form** — all documentation updated to use `hyoka` command form instead of `go run` for clarity
 - **Post-architecture examples audit (WI-058)** — new examples demonstrating hierarchical `when:` syntax, prompt-level `graders:` frontmatter, and overall examples documentation (examples/README.md)
+- **Tool load failure error category** — evals now report `error_category: "tool_load_failure"` when any configured tool fails to resolve before session creation
+- **Grouped Tools progress output** — plugins and skill directories now expand to show each child tool/skill individually in the Tools progress section (e.g., `plugin-name (2 tools) ├── tool-1 └── tool-2`), enabling faster diagnostics
 
 ### Changed
 
+- **Tool load validation now hard-fails before code generation** — evals abort immediately when any required plugin, skill directory, or MCP server fails to resolve, preventing silent failures with incomplete tool stacks
 - **Site rebranded** — from Azure SDK code-generation evaluation to general-purpose AI agent evaluation platform
 - **Example configs migrated** — `examples/configs/example-full.yaml` now reflects Phase 3 unified grading architecture (single results list, no separate review block)
 - **Homepage, features, and documentation** — rewritten to describe general-purpose AI agent evaluation rather than Azure SDK code generation
@@ -30,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reviewer skill resolution cross-config leakage** — reviewer tool validation is now scoped per-config, preventing skills from one config accidentally being used in another during multi-config runs
 - **False-positive MaxOutputSize failures on large starter projects** — large starter codebases no longer incorrectly trigger guardrail failures when copied into workspace before generation
 - **Silent zero-render bug from Go↔TypeScript field drift** — Phase 3 unified grading now properly serialized to reports; eval detail page gracefully handles legacy reports with missing grader_results field
 - **README and AGENTS docs:** — updated build/test commands to use `./...` glob instead of old `./hyoka/...` paths
