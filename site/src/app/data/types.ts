@@ -91,6 +91,16 @@ export interface ReviewGraderDetail {
   panel_results?: ReviewPanelEntry[];
 }
 
+// GraderPoint mirrors hyoka/internal/graders.GraderPoint and the report-side
+// `points` array introduced in schema v3 (Phase 2). Each grader emits one or
+// more sub-checks; the site renders these directly instead of re-deriving
+// pass/fail from the legacy expanded review entries. Empty for v2 reports.
+export interface GraderPoint {
+  name: string;
+  pass: boolean;
+  message?: string;
+}
+
 export interface GraderResult {
   grader_name: string;
   grader_type: string;
@@ -112,6 +122,12 @@ export interface GraderResult {
   prompt_details?: PromptGraderDetail;
   behavior_details?: BehaviorGraderDetail;
   review_details?: ReviewGraderDetail;
+  /**
+   * Per-sub-check rows from the grader. Populated in v3 reports. The site
+   * AND-rolls these to derive overall pass/fail (see lib/evalPass.ts) so
+   * eval-detail and run-detail never disagree on a grader's verdict.
+   */
+  points?: GraderPoint[];
 }
 
 // ── Workspace Delta types (#566) ──────────────────────────────────
@@ -175,6 +191,28 @@ export interface PromptMetadata {
   difficulty: string;
   tags?: string[];
   sdk_package?: string;
+}
+
+/**
+ * One row of `eval.tool_availability`. Records whether a specific
+ * tool/skill/MCP server was available to the agent and whether it was
+ * actually used. Mirrors hyoka/internal/report.ToolAvailabilityEntry.
+ *
+ * `parent` / `parent_kind` / `kind` are forward-compat optionals: today the
+ * Go side only carries linkage on `environment.skill_groups`, but the site
+ * accepts them on this shape so when the Go layer extends the row we won't
+ * have to re-ship types. Until then the eval-detail "Available Tools"
+ * panel joins these rows against `environment.skill_groups` by name to
+ * pick up parent/plugin context.
+ */
+export interface ToolAvailabilityEntry {
+  name: string;
+  type: string; // "tool" | "skill" | "mcp"
+  available: boolean;
+  used: boolean;
+  parent?: string;
+  parent_kind?: string; // "plugin" | "skill_dir"
+  kind?: string;        // "skill" | "mcp" | "plugin" | "skill_dir"
 }
 
 export interface SkillGroupEntry {
@@ -303,6 +341,26 @@ export interface EvalReport {
   config_used?: { model: string; name: string };
   rerunCommand?: string;
   guardrail_abort_reason?: string;
+  /**
+   * `tool_availability` rows from the Go report (#348). Populated in v2
+   * and v3. v3 may eventually include parent linkage on each entry.
+   */
+  tool_availability?: ToolAvailabilityEntry[];
+  /**
+   * Schema v3 roll-up totals computed engine-side from the unified
+   * grader aggregate. When present, the site reads these directly so it
+   * never has to recompute pass/total from grader_results — eliminating
+   * the entire class of roll-up-divergence bugs by construction. Zero
+   * value (no graders ran) is omitted, so v2 reports unmarshal safely.
+   */
+  graders_passed?: number;
+  graders_total?: number;
+  /**
+   * Report schema marker. v3 = single ai_review entry + Points + roll-up
+   * totals. v2 reports omit this field entirely. Number on the wire
+   * (matches the Go side which emits an int).
+   */
+  schema_version?: number;
 }
 
 export interface DocEntry {
