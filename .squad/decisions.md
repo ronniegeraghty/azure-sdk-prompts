@@ -4463,3 +4463,123 @@ for _, g := range graderInstances {
 - Clear decision boundary: ship tool validation first, stuck-state fix follows in same session
 
 ---
+## Decision: Tool Load Hard-Fail — Static Validation + Reviewer Factory Isolation (Neo, 2026-04-23)
+
+**Status:** ✅ Implemented (commits acd36cde–0131f35d on `ronniegeraghty/dev`)  
+**Work Units:** WU-1 (ValidateAndExpand validation) + WU-2 (reviewer factory per-config isolation)  
+**Successor to:** Morpheus plugin-loader-plan (diagnosis + design)
+
+### Scope
+
+Implemented hard-fail tool validation. Tool load failures now block eval **before model invocation** instead of silently degrading to zero effective tools. Reviewer tools validated per-config in factory closure to prevent cross-config skill leakage.
+
+### Strict vs Lenient Contract
+
+**Strict path (new, hard-fail):**
+- Single entry point: `tool.ValidateAndExpand(ctx, ValidationInput) (*ToolLoadReport, error)`
+- Returns non-nil error on any failed item; callers return EvalResult with `ErrorCategory="tool_load_failure"` and abort before CreateSession
+
+**Lenient path (unchanged):**
+- `tool.ResolveSkills` / `ResolveSkillsWithReporter` — still return `(nil, nil)` on missing paths with `slog.Warn`
+- One caller remains: `engine_eval.go:268` (post-run reporting path that populates SkillDirectories even on failed eval — losing this would produce confusing "zero skills" reports)
+
+### Where ValidateAndExpand Runs
+
+1. **`copilot.go` Run()** — validates generator tools + plugins after `NewIsolatedConfigDir`, before `buildSessionConfigForEval`. ReviewerTools omitted here to avoid double-emission.
+
+2. **`cmd/run.go` reviewerFactory closure** — each call validates only `cfg.Reviewer.Tools` for that specific config. This closure design kills cross-config leakage (no pooled slice to leak from).
+
+### Report Role Attribution
+
+Every `ToolLoadItem` carries a `Role` field: `"generator"`, `"reviewer"`, or `"plugin"`. Report helpers `GeneratorSkillDirs()` / `ReviewerSkillDirs()` filter by role so cmd/run.go can extract reviewer skills without seeing generator skills.
+
+### Event-Shape Contract (Tank Dependency)
+
+Committed standalone as `acd36cde` so Tank could rebase cleanly. Added fields to `progress.ProgressEvent` and `progress.ToolStatus`:
+
+```go
+ParentName string // plugin name, skills-dir path, or "" (no container)
+ParentKind string // "plugin", "skill_dir", or ""
+```
+
+ValidateAndExpand emits these for grouped rendering (WU-3).
+
+### What Was Not Done (Phase 2 candidates)
+
+- SDK post-SendAndWait verification gate (still disabled from 4b593d3b — Phase 2)
+- `optional: true` escape hatch on tool entries (Phase 2)
+- Plugin-registry walk deduplication (13 re-walks per invocation — cosmetic)
+- Rename `resolve*` helpers to "internal" (tests still green; defer)
+
+### Commits
+
+1. acd36cde — Event shape contract (ProgressEvent parent fields)
+2. 5c75b47c — ValidateAndExpand core implementation
+3. 8c947c8a — ReviewerFactory hard-fail isolation
+4. 0131f35d — cmd/run.go wiring + tests
+5. e6271eeb — Cleanup
+
+### Tests
+
+Covered by WU-4 (Switch) table-driven test suite: 23 tests across 3 files, all passing with -race.
+
+---
+
+## Decision: Plugin / Skill / MCP Loader Diagnosis + Design Plan (Morpheus, 2026-04-23)
+
+**Status:** 📋 Proposed (design doc; implementation delegated to Neo as WU-1/WU-2 above)  
+**Author:** Morpheus 🕶️  
+**Relates to:** Issue #347, prior disabled verification gate (commit 4b593d3b)
+
+### Problem Statement
+
+The eval pipeline **appears** to load plugins/skills/MCP servers but silently degrades to zero effective tools. Failure modes:
+
+| Call site | What it does | Failure behavior |
+|---|---|---|
+| `config.ExpandPlugins` | Resolve `plugins:` → tool entries | `slog.Warn("Plugin not found, skipping")` — eval proceeds with 0 entries |
+| `tool.ResolveSkillsWithReporter` | Expand local/remote skills | Missing path → `slog.Warn` + returns `(nil, nil)` |
+| `cmd/run.go` reviewer wiring | Pass reviewer skill path to reviewer | Raw path only — no resolution, no glob, no skill_dir expansion |
+
+The tool verification gate (`waitForToolVerification`) that should catch this is **disabled** due to SDK event-timing deadlock (commit 4b593d3b). **No hard-fail path exists.**
+
+### Root Cause Analysis
+
+1. **Fragmented loader flow** — four independent call sites, each with different contract (warn vs. error)
+2. **Silent degradation** — missing tools cause warnings, not failures; evals proceed with zero effective tools
+3. **Disabled verification gate** — SDK event-timing mismatch prevents post-session tool verification
+4. **No per-config reviewer isolation** — reviewer tools passed as raw paths; no factory-per-config pattern to prevent cross-config leakage
+
+### Design Solution
+
+**Phase 1 (Morpheus plan, Neo implementation):**
+- Reverse implicit contract: tool load failures must hard-fail eval before model invocation
+- Introduce ValidateAndExpand() as single pre-session validation entry point
+- Implement per-config reviewer factory closure to prevent cross-config leakage
+- Add role attribution (generator/reviewer/plugin) to ToolLoadReport for clean filtering
+
+**Phase 2 (Deferred):**
+- Re-enable SDK post-SendAndWait verification gate (requires SDK timing fix or polling wrapper)
+- Add `optional: true` escape hatch for optional tools
+- Dedupe plugin-registry walks
+
+### Approved Variants
+
+Neo's implementation chose single ValidateAndExpand entry point over per-helper opt-in flags:
+- **Chosen:** One API, clear semantics, fewer surface area changes
+- **Alternative:** Optional `strict` flags on `resolveLocal`, `resolveSkillDir` — more flexible but more API surface to maintain
+
+Both approaches achieve goal (strict caller = hard-fail, lenient caller = warn). Single entry point chosen for simplicity.
+
+### Exit Criteria (Phase 1)
+
+- ✅ Tool load validation runs pre-session
+- ✅ Hard-fail on any missing tool (plugin, skill dir, MCP server)
+- ✅ Reviewer tools validated per-config (no cross-config leakage)
+- ✅ ToolLoadReport includes role attribution for filtering
+- ✅ ProgressEvent includes parent fields for grouped rendering (WU-3 dependency)
+- ✅ Comprehensive test coverage (WU-4)
+- ✅ Documentation complete (WU-5)
+
+---
+

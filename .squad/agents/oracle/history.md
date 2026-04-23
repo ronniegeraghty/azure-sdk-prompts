@@ -824,3 +824,31 @@ My documentation task (WU-4) was to explain this new behavior to users.
 **Status:** ✅ Gate disabled, evals running. Verified with live eval (88s, passed). Observability maintained via event logging.
 
 **Decision:** Gate remains observational pending SDK event lifecycle documentation and architectural review. Options for future re-enablement documented in decisions.md.
+
+## Tool Load Hard-Fail & Grouped Tools Output Documentation (2026-04-24)
+
+**Neo's Implementation (WU-1, WU-2):**
+Neo shipped pre-session static tool validation with hard-fail semantics:
+1. `tool.ValidateAndExpand()` resolves every declared plugin, skill dir, MCP server **before** session creation
+2. Failure aborts eval with `error_category="tool_load_failure"` — generator never invoked
+3. Plugins and skill dirs now expand to children in progress output (ParentName/ParentKind fields)
+4. Reviewer tool validation moved to per-config closure in cmd/run.go — eliminates cross-config leakage bug
+
+**Documentation Task (WU-5):**
+Updated `docs/configuration.md` "Tool Load Validation" section to replace post-hoc SDK timeout docs with user-facing behavior:
+- Hard-fail contract: what triggers tool_load_failure (plugin not found, skill path missing, missing SKILL.md, empty skill dir, MCP unavailable)
+- Tools progress output example showing grouped expansion (parent with children indented/connected)
+- Error reporting format in EvalReport JSON (error, error_category, error_details fields)
+- Config scoping explanation (reviewer tools validated independently per config)
+- Updated diagnostics workflow (check report JSON + grep logs for tool details)
+
+Updated `CHANGELOG.md` Unreleased section:
+- **Added:** tool_load_failure error category + grouped Tools output
+- **Changed:** tool load validation now hard-fails before generation
+- **Fixed:** reviewer skill resolution cross-config leakage
+
+**Key Learning:** Neo's decision memo (neo-tool-load-hardfail.md) describes the implementation contract in implementation terms (ValidateAndExpand, ToolLoadReport, Role field filtering). User docs need a different framing: focus on observable behavior (hard-fail prevents silent failures, grouped output enables diagnostics, per-config validation prevents leakage). Translate internal abstractions (e.g., role-based filtering) to user-visible consequences.
+
+**Commit:** `557bb83b` — "docs: tool-load hard-fail and grouped Tools output"
+
+**Status:** ✅ Complete. User-facing documentation for tool-load validation behavior now accurately reflects Neo's WU-1/WU-2 implementation.

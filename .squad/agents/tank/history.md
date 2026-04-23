@@ -502,3 +502,34 @@ Related commits: fe6efebf (wide char), 6b3d3d48 (multi-row clearing), 42ea88fb (
 **Status:** ✅ Gate disabled, evals running. Verified with live eval (88s, passed). Observability maintained via event logging.
 
 **Decision:** Gate remains observational pending SDK event lifecycle documentation and architectural review. Options for future re-enablement documented in decisions.md.
+
+### Session 2026-04-23 (WU-3 — Grouped Tool Display)
+
+**Status:** COMPLETE (commit 42c243f9, pushed to ronniegeraghty/dev)
+
+Implemented grouped tool display for progress renderers. Consumes ParentName/ParentKind fields added by Neo in commit acd36cde to group leaf tools (plugin children, skill_dir children) under their container.
+
+**Changes:**
+- Extended `toolLine` struct with `parentName` and `parentKind` fields
+- Interactive renderer: During resolution, tools render flat with live tail updates. On EventToolsVerified or redraw, the full block is re-rendered grouped by parent.
+- CI renderer: Added EventToolsVerified handler that emits a Tools: section with plain-text grouped output.
+- Created `groupToolLines()` helper to group by (ParentKind, ParentName), preserving insertion order.
+- Created `renderToolLineFlat()` for resolution-phase rendering (pre-grouping).
+- Created `renderToolLine(tl, indented)` for grouped rendering with conditional indentation.
+
+**Format:**
+```
+Tools:
+  - <parent-name> (plugin | skills dir):
+      - <child>: Loaded | Failed (reason)
+```
+
+**Testing:**
+- All existing tests pass with `-race` flag.
+- End-to-end verified with `--progress interactive` mode on azure-mcp-skills config.
+- Top-level tools (no parent) render as before.
+
+**Learnings:**
+- Progress events support both live streaming (during resolution) and grouped display (after verification) — renderers need two code paths to handle both phases.
+- The toolLine struct serves as internal bookkeeping; ToolStatus is the external event shape. Converting between them requires helper functions.
+- CI renderer needs to handle tools too, not just graders — EventToolsVerified is emitted for all renderers.
