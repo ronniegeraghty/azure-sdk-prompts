@@ -16,6 +16,18 @@ import (
 // chopping in the middle of an escape sequence.
 var ansiSeqRE = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
 
+// visibleWidth returns the visible width of s in terminal columns, stripping
+// ANSI escape sequences and counting runes.
+func visibleWidth(s string) int {
+	// Strip ANSI sequences first.
+	stripped := ansiSeqRE.ReplaceAllString(s, "")
+	count := 0
+	for range stripped {
+		count++
+	}
+	return count
+}
+
 // truncateToWidth returns s truncated so its visible width is at most max
 // columns. ANSI escape sequences are preserved (zero width). If s already
 // fits, it's returned unchanged. The truncation appends an ellipsis "…"
@@ -131,8 +143,9 @@ type interactiveEval struct {
 
 	// Tail state. Only one line at a time can be the tail. Freezing the tail
 	// means writing "\n" and setting tailKind = tailNone.
-	tailKind tailKind
-	tailText string // raw text of tail (for bookkeeping; re-emit on update)
+	tailKind     tailKind
+	tailText     string // raw text of tail (for bookkeeping; re-emit on update)
+	tailRowCount int    // how many physical terminal rows the current tail occupies
 
 	// Tools section.
 	toolsHeaderPrinted bool
@@ -776,28 +789,65 @@ func (r *interactiveRenderer) writeLine(s string) {
 // only clears one physical row).
 func (r *interactiveRenderer) writeTail(kind tailKind, text string) {
 	r.freezeTail()
-	text = truncateToWidth(text, TermWidth())
+	w := TermWidth()
+	if w <= 0 {
+		w = 80 // fallback
+	}
+	text = truncateToWidth(text, w)
 	r.w.Write([]byte(text))
 	r.cur.tailKind = kind
 	r.cur.tailText = text
+	// Track how many physical rows this tail occupies. visibleWidth counts
+	// ANSI-stripped runes, so we compute rows as ceil(visible / width).
+	visible := visibleWidth(text)
+	r.cur.tailRowCount = (visible + w - 1) / w
+	if r.cur.tailRowCount < 1 {
+		r.cur.tailRowCount = 1
+	}
 }
 
 // rewriteTail replaces the current tail line's content in place. No-op if
-// there is no active tail.
+// there is no active tail. Clears ALL physical rows the previous tail occupied
+// before writing the new content.
 func (r *interactiveRenderer) rewriteTail(text string) {
 	if r.cur == nil || r.cur.tailKind == tailNone {
 		return
 	}
-	text = truncateToWidth(text, TermWidth())
-	// Move to column 0, clear the line, rewrite. Cursor stays on the same
-	// physical row — linesWritten is unchanged because we never committed
-	// a newline.
+	w := TermWidth()
+	if w <= 0 {
+		w = 80 // fallback
+	}
+	text = truncateToWidth(text, w)
+
 	var buf bytes.Buffer
-	buf.WriteString(ansiCR)
-	buf.WriteString(ansiClearLine)
+	// If the previous tail occupied multiple rows, we need to clear all of them.
+	// The cursor is currently at the end of the last row. Move back to the start
+	// of the first row and clear each row.
+	oldRows := r.cur.tailRowCount
+	if oldRows > 1 {
+		// Move cursor up (oldRows - 1) lines to the start of the tail.
+		fmt.Fprintf(&buf, "\x1b[%dA", oldRows-1)
+	}
+	// Now at the start row. Clear each row from top to bottom.
+	for i := 0; i < oldRows; i++ {
+		buf.WriteString(ansiCR)
+		buf.WriteString(ansiClearLine)
+		if i < oldRows-1 {
+			buf.WriteString("\n") // move to next row
+		}
+	}
+	// Cursor is now at column 0 of the last (bottom) row, all old content cleared.
+	// Write the new tail.
 	buf.WriteString(text)
 	r.w.Write(buf.Bytes())
 	r.cur.tailText = text
+
+	// Update row count for the new tail.
+	visible := visibleWidth(text)
+	r.cur.tailRowCount = (visible + w - 1) / w
+	if r.cur.tailRowCount < 1 {
+		r.cur.tailRowCount = 1
+	}
 }
 
 // freezeTail commits the current tail line with a trailing newline, so it
@@ -810,6 +860,7 @@ func (r *interactiveRenderer) freezeTail() {
 	r.cur.linesWritten++
 	r.cur.tailKind = tailNone
 	r.cur.tailText = ""
+	r.cur.tailRowCount = 0
 }
 
 // --- Finish / counters ---
