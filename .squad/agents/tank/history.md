@@ -584,3 +584,26 @@ Tools:
 - **Insertion-order bookkeeping + post-hoc grouping.** Keeping `toolLines` as a flat insertion-ordered slice and grouping only at render time made the redraw path (on `EventToolsVerified` flips) identical to the live path — no divergence between "what we wrote" and "what we'd write now".
 - **Container detection must be kind-aware AND reference-aware.** A plugin is always a container (kind=plugin); a skill_dir parent is only detectable retroactively from its children's ParentKind. Handling both in one pass in `groupToolLines` is cleaner than trying to classify up front.
 - **Orphan Starts happen.** The resolver emits `emitStart` for skill_dir parents and never a matching `emitResult`. Rather than spuriously render them as failures, filtering "loading" status from the grouped output keeps the transcript clean and lets the upstream fix happen later.
+
+---
+
+## Wave Completion: Plugin Loading Fix (2026-04-23)
+
+The four-agent plugin-loading-fix wave (Neo, Tank, Oracle, Switch) completed successfully. Commits landed on ronniegeraghty/dev:
+- **Neo (bc06fb8f):** Retired top-level `plugins:` field; plugins now under generator.tools/reviewer.tools as `type: plugin`
+- **Tank (18d105c3, 5216678a):** Wait-till-known rendering; fan-out deduplication; parent header emitted once
+- **Oracle (1e5c3b66):** docs/configuration.md plugin section; CHANGELOG breaking-change notice; config migrations
+- **Switch (fb70d4c4):** 17 test functions (~29 cases); 5 new test files; full -race suite passes
+
+**Orchestration logs:** `.squad/orchestration-log/2026-04-23T17-{44,45,46,47}Z-{neo,tank,oracle,switch}.md`  
+**Session log:** `.squad/log/2026-04-23-plugin-loading-fix-wave.md`  
+**Decision entries:** Merged from inbox into `.squad/decisions.md` (5 entries: Ronnie directive + 4 wave decisions)
+
+Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.

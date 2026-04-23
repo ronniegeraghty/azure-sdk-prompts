@@ -862,3 +862,78 @@ Updated `CHANGELOG.md` Unreleased section:
 **Commit:** `557bb83b` — "docs: tool-load hard-fail and grouped Tools output"
 
 **Status:** ✅ Complete. User-facing documentation for tool-load validation behavior now accurately reflects Neo's WU-1/WU-2 implementation.
+
+---
+
+## Work Unit 3: Plugin Field Migration & Schema Documentation
+
+**Date:** 2026-04-24  
+**Status:** ✅ Complete  
+**User Request:** "Make sure our docs are updated to reflect the new schema" (plugin field retirement)
+
+**Context:** Neo is retiring the top-level `plugins:` field in pre-1.0. All configs migrate to `generator.tools: [{type: plugin, ...}]` in a single commit. No deprecation path.
+
+**Deliverables Completed:**
+
+1. **Config file migration:**
+   - `configs/baseline-sonnet-skills.yaml` — migrated `plugins: [...]` entries to `generator.tools` with `type: plugin` and `source: remote`
+   - `configs/python-pairwise.yaml` — migrated `azure-sdk-python@skills` to generator.tools entry
+
+2. **Documentation updates (docs/configuration.md):**
+   - Added new **Plugins** subsection (after MCP Servers) documenting:
+     * Plugin declaration syntax: `type: plugin`, `source: local|remote`
+     * Local plugin resolution: `.hyoka/plugins/{name}.yaml` default path
+     * Remote plugin behavior: fetched + cached under `.hyoka/cache/plugins/`
+     * Dual-role semantics: explicit declaration needed in both generator AND reviewer (no auto-share)
+     * Hard-fail semantics: fetch errors fail before session; missing tools fail at validation time
+   - Updated Tools Progress Output example to show grouped plugin + skill dir display with children
+   - Updated final "Plugins" section to reference the new location in schema docs
+
+3. **CHANGELOG.md:**
+   - Added **Breaking Changes** section with:
+     * Clear statement: "Retired top-level `plugins:` field — Pre-1.0, no deprecation path"
+     * Before/after migration example (OLD `plugins:` vs NEW `generator.tools`)
+     * List of affected config files
+
+4. **Validation:**
+   - Both migrated configs validated as correct YAML
+   - No remaining `plugins:` field references in docs or config examples (only in CHANGELOG and plan)
+
+**Key Learnings:**
+
+- **Schema migration clarity:** Users need explicit examples of the old vs new shape, not just abstract descriptions. Before/after YAML snippets in CHANGELOG are critical for seamless adoption.
+- **Dual-role surprise:** The fact that plugins are NOT auto-shared between generator/reviewer environments needs prominence in docs — it's a breaking change from the previous implicit dual-role behavior.
+- **Tools output parity:** Updated example output to match Ronnie's requested format (plugin names with child tools indented), consistent with skill dir grouping.
+
+**Commit:** `1e5c3b66` — "docs: migrate plugins: field to generator.tools with type: plugin"
+
+**Files touched:**
+- `configs/baseline-sonnet-skills.yaml` — config migration
+- `configs/python-pairwise.yaml` — config migration
+- `docs/configuration.md` — 70 new lines documenting plugin schema + updates to output examples + final section redirect
+- `CHANGELOG.md` — Breaking Changes section with migration guidance
+
+**Status:** ✅ Complete. All docs reflect new plugin schema. Configs migrated. Ronnie can push to ship.
+
+---
+
+## Wave Completion: Plugin Loading Fix (2026-04-23)
+
+The four-agent plugin-loading-fix wave (Neo, Tank, Oracle, Switch) completed successfully. Commits landed on ronniegeraghty/dev:
+- **Neo (bc06fb8f):** Retired top-level `plugins:` field; plugins now under generator.tools/reviewer.tools as `type: plugin`
+- **Tank (18d105c3, 5216678a):** Wait-till-known rendering; fan-out deduplication; parent header emitted once
+- **Oracle (1e5c3b66):** docs/configuration.md plugin section; CHANGELOG breaking-change notice; config migrations
+- **Switch (fb70d4c4):** 17 test functions (~29 cases); 5 new test files; full -race suite passes
+
+**Orchestration logs:** `.squad/orchestration-log/2026-04-23T17-{44,45,46,47}Z-{neo,tank,oracle,switch}.md`  
+**Session log:** `.squad/log/2026-04-23-plugin-loading-fix-wave.md`  
+**Decision entries:** Merged from inbox into `.squad/decisions.md` (5 entries: Ronnie directive + 4 wave decisions)
+
+Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.

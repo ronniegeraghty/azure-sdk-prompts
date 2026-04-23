@@ -1157,3 +1157,10 @@ Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
 - `hyoka/internal/config/tool/fetcher.go:248` — parseSkillSpec (analogous `@skills` parser for type: skill)
 
 **Design note:** For `type: skill`, the `Entry.Repo` field provides a full locator and a git-fetcher clones it on demand. For `type: plugin`, there is no equivalent auto-fetch — remote plugins must be pre-installed (via Copilot CLI `/plugin install name@skills`). If auto-fetch for plugins is ever added, the natural shape is a new `repo:` (and `ref:`) field on plugin entries, mirroring the skill flow. Today the `@marketplace` name suffix is the only supported locator.
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model + Plugin Schema Follow-up
+
+- **Model default:** Every squad agent now runs on **claude-opus-4.7** (set via `defaultModel` in `.squad/config.json`) until the user clears the preference. Layer 0 override.
+- **Plugin schema gap fixed (my commit `769dea69`):** Remote plugin entries require an explicit locator — `@marketplace` suffix on `name` (e.g. `azure-sdk-python@skills`). `validatePluginEntry` now fails fast when a `source: remote` entry lacks the suffix. Regression test: `TestValidateAndExpand_RemotePluginMissingLocator`. Renamed 6 entries across `configs/python-pairwise.yaml` and `configs/baseline-sonnet-skills.yaml`. Reusable rule: **any tool entry referencing remote content must carry an explicit locator**; validation rejects unlocated remote entries instead of letting the resolver dump its candidate-path list.

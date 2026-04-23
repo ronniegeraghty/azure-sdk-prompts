@@ -103,3 +103,10 @@ Sprint closed at HEAD `2d38533f` on `ronniegeraghty/dev`. 15 commits total acros
 **Key reconciliation:** Updated the round-1/2 table in `.squad/decisions.md` to reflect that `82cd8590` (Neo's original ToolsVerified emission) never merged; behavior re-landed via Switch's `25ce00a7`. Added a Known Issues section containing the preexisting `hyoka clean` non-interactive-stdin bug.
 
 See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md`.
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.

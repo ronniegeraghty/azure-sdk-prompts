@@ -745,3 +745,26 @@ Added **17 new test functions** (≈29 cases counting sweep subtests) across 5 f
 - **Enumerated-path assertion pattern**: asserting all 6 paths (not just "contains /plugins") caught a subtle thing — `hyokaPluginsBase` uses `os.Getwd()` not `ConfigDir`, so the test has to `os.Chdir` into a temp dir (and restore) to get deterministic paths. Documented with a comment so future authors know why the test fiddles with cwd.
 - **Remote plugin testing without a real fetcher**: `plugin.ResolveInstalled` is a pure-local cache walk. Redirecting `HOME` to a clean temp dir is sufficient to exercise the cache-miss hard-fail path without mocking network. Actual fetch success remains untested at the unit level — would require a `FetcherInterface` seam.
 - **Sweep test guardrail**: the reviewer-tools invariant ("reviewer with no YAML tools block must have no plugin entries after parse") is the cleanest way to catch reintroduction of cross-role auto-append without needing to diff YAML vs parsed struct.
+
+---
+
+## Wave Completion: Plugin Loading Fix (2026-04-23)
+
+The four-agent plugin-loading-fix wave (Neo, Tank, Oracle, Switch) completed successfully. Commits landed on ronniegeraghty/dev:
+- **Neo (bc06fb8f):** Retired top-level `plugins:` field; plugins now under generator.tools/reviewer.tools as `type: plugin`
+- **Tank (18d105c3, 5216678a):** Wait-till-known rendering; fan-out deduplication; parent header emitted once
+- **Oracle (1e5c3b66):** docs/configuration.md plugin section; CHANGELOG breaking-change notice; config migrations
+- **Switch (fb70d4c4):** 17 test functions (~29 cases); 5 new test files; full -race suite passes
+
+**Orchestration logs:** `.squad/orchestration-log/2026-04-23T17-{44,45,46,47}Z-{neo,tank,oracle,switch}.md`  
+**Session log:** `.squad/log/2026-04-23-plugin-loading-fix-wave.md`  
+**Decision entries:** Merged from inbox into `.squad/decisions.md` (5 entries: Ronnie directive + 4 wave decisions)
+
+Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.

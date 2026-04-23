@@ -343,3 +343,10 @@ The prior fix counted bytes in some paths and runes in others. The new fix consi
 
 **#290:** Close with comment noting Phase 4/5 table rework achieved the goal — rendered reports confirm baseline configs appear leftmost in comparison tables.
 
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.

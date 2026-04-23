@@ -726,3 +726,10 @@ The morpheus-issue-audit.md (2026-04-22) flagged #305 as "probably stale — lik
 
 ### Time Spent
 ~20 minutes (release verification + phase state checks + branch analysis)
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
