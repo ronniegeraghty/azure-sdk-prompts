@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
@@ -619,4 +620,42 @@ func TestValidateAndExpand_GlobExpansion(t *testing.T) {
 	if matchedCount != 3 {
 		t.Errorf("expected 3 glob-matched skills, got %d", matchedCount)
 	}
+}
+
+// TestValidateAndExpand_RemotePluginMissingLocator verifies that a plugin
+// entry with source: remote but no "@marketplace" suffix in the name is
+// rejected with a clear error message pointing at the locator syntax. Bare
+// remote names have no way to be resolved — the resolver would look for an
+// exact path under ~/.hyoka/cache/default/ or ~/.copilot/installed-plugins/
+// that only exists if someone already placed it there manually.
+func TestValidateAndExpand_RemotePluginMissingLocator(t *testing.T) {
+dir := t.TempDir()
+
+report, err := ValidateAndExpand(context.Background(), ValidationInput{
+GeneratorTools: []Entry{
+{Type: "plugin", Name: "azure-sdk-python", Source: "remote"},
+},
+ConfigDir: dir,
+})
+
+if err == nil {
+t.Fatal("expected error for source: remote plugin without marketplace locator")
+}
+toolErr, ok := err.(*ToolLoadError)
+if !ok {
+t.Fatalf("expected *ToolLoadError, got %T", err)
+}
+if toolErr.Kind != progress.ToolKindPlugin {
+t.Errorf("expected Kind=plugin, got %q", toolErr.Kind)
+}
+if toolErr.Name != "azure-sdk-python" {
+t.Errorf("expected Name=azure-sdk-python, got %q", toolErr.Name)
+}
+// Reason should mention the fix: the @skills suffix.
+if toolErr.Reason == "" || !strings.Contains(toolErr.Reason, "@skills") {
+t.Errorf("expected reason to suggest @skills locator, got: %s", toolErr.Reason)
+}
+if !report.Failed() {
+t.Error("expected report.Failed() == true")
+}
 }

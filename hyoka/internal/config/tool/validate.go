@@ -318,6 +318,32 @@ src = SourceLocal
 }
 }
 
+// Remote plugins require an explicit marketplace locator encoded in the
+// name (e.g. "azure-sdk-python@skills" for microsoft/skills). Without it,
+// hyoka has no way to know where to resolve the plugin from — the bare
+// name would only match if something had already placed it at that exact
+// path under ~/.hyoka/cache/default/ or ~/.copilot/installed-plugins/.
+// Fail fast with a clear fix-it message instead of dumping a checked-path
+// list that doesn't explain the real problem.
+if src == SourceRemote && trimAtRef(name) == name {
+reason := fmt.Sprintf(
+"plugin %q declares source: remote but name has no marketplace locator. "+
+"Append a marketplace suffix so hyoka knows where to resolve it from "+
+"(e.g. %q for plugins published in microsoft/skills). "+
+"Bare names with source: remote can't be auto-resolved.",
+name, name+"@skills",
+)
+report.Items = append(report.Items, ToolLoadItem{
+Kind:   progress.ToolKindPlugin,
+Name:   name,
+Status: progress.ToolStatusFailed,
+Reason: reason,
+Role:   role,
+})
+emitResultWithParent(emit, name, progress.ToolKindPlugin, progress.ToolStatusFailed, reason, "", "")
+return
+}
+
 // Try local registry first when source == local (or unset -> inferred local).
 if src == SourceLocal {
 if p, ok := registryLookup(reg, name); ok {

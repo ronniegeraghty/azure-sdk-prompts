@@ -1121,3 +1121,39 @@ Delivered WU-A1 / WU-A2 / WU-A5 on `ronniegeraghty/dev`. Summary of the final sh
 - **Deletion:** `plugins_emit_test.go` (obsolete — `EmitPluginResolutions` no longer exists), `ExpandPlugins` methods (both file-level and per-config), `resolveInstalledPlugin` duplicate in `config/config.go`, `Plugins` plumbing in `eval/engine.go` + `pairwise/pairwise.go`.
 - **Reviewer contract is unchanged:** `cmd/run.go` already passed reviewer tools through `ValidateAndExpand`. The new plugin-entry path works there identically.
 - **Test discipline applied:** Rewrote 5 `validate_test.go` call sites from `Plugins: []string{...}` to `GeneratorTools: []Entry{{Type: "plugin", ...}}`. Updated `TestParseGeneratorSkillsAndPlugins` + added `TestParse_RejectsRetiredTopLevelPluginsField`. Removed three `TestExpandPlugins*` tests (deprecated code path deleted).
+
+---
+
+## Wave Completion: Plugin Loading Fix (2026-04-23)
+
+The four-agent plugin-loading-fix wave (Neo, Tank, Oracle, Switch) completed successfully. Commits landed on ronniegeraghty/dev:
+- **Neo (bc06fb8f):** Retired top-level `plugins:` field; plugins now under generator.tools/reviewer.tools as `type: plugin`
+- **Tank (18d105c3, 5216678a):** Wait-till-known rendering; fan-out deduplication; parent header emitted once
+- **Oracle (1e5c3b66):** docs/configuration.md plugin section; CHANGELOG breaking-change notice; config migrations
+- **Switch (fb70d4c4):** 17 test functions (~29 cases); 5 new test files; full -race suite passes
+
+**Orchestration logs:** `.squad/orchestration-log/2026-04-23T17-{44,45,46,47}Z-{neo,tank,oracle,switch}.md`  
+**Session log:** `.squad/log/2026-04-23-plugin-loading-fix-wave.md`  
+**Decision entries:** Merged from inbox into `.squad/decisions.md` (5 entries: Ronnie directive + 4 wave decisions)
+
+Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
+
+## Learnings
+
+### 2026-04-27 — Remote plugin source schema gap
+
+**Finding:** `configs/python-pairwise.yaml` and `configs/baseline-sonnet-skills.yaml` had plugin entries like `{name: azure-sdk-python, type: plugin, source: remote}` with no locator field. Ronnie correctly noticed there's no `repo:` / `url:` property telling hyoka where to pull from.
+
+**Root cause:** The "locator" for remote plugins isn't a separate field — it's encoded as an `@marketplace` suffix on the `name`. `plugin.ResolveInstalled` parses `name@skills` to mean "look in the microsoft/skills marketplace cache". A bare name with `source: remote` falls through to `~/.hyoka/cache/default/<name>/skills` and `~/.copilot/installed-plugins/<name>/skills` — paths that only exist if someone already placed the plugin there manually. No validation rejected this, so the failure surfaced only at eval time with a noisy "Checked:" path dump.
+
+**Fix shape (schema gap, NOT missing feature):**
+1. `hyoka/internal/config/tool/validate.go:validatePluginEntry` — added early fail-fast: if `source: remote` and name has no `@marketplace` suffix, reject with a clear error pointing at the `@skills` syntax.
+2. `configs/python-pairwise.yaml`, `configs/baseline-sonnet-skills.yaml` — renamed plugin entries to `azure-sdk-<lang>@skills`.
+3. `hyoka/internal/config/tool/validate_test.go` — new `TestValidateAndExpand_RemotePluginMissingLocator` covering the guard.
+
+**Key files:**
+- `hyoka/internal/plugin/installed.go` — ResolveInstalled, parses `@marketplace` suffix
+- `hyoka/internal/config/tool/validate.go:307` — validatePluginEntry (new guard at top)
+- `hyoka/internal/config/tool/fetcher.go:248` — parseSkillSpec (analogous `@skills` parser for type: skill)
+
+**Design note:** For `type: skill`, the `Entry.Repo` field provides a full locator and a git-fetcher clones it on demand. For `type: plugin`, there is no equivalent auto-fetch — remote plugins must be pre-installed (via Copilot CLI `/plugin install name@skills`). If auto-fetch for plugins is ever added, the natural shape is a new `repo:` (and `ref:`) field on plugin entries, mirroring the skill flow. Today the `@marketplace` name suffix is the only supported locator.

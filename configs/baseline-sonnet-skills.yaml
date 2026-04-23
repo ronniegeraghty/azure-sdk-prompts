@@ -13,19 +13,19 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/generator"
-        - name: azure-sdk-java
+        - name: azure-sdk-java@skills
           type: plugin
           source: remote
-        - name: azure-sdk-python
+        - name: azure-sdk-python@skills
           type: plugin
           source: remote
-        - name: azure-sdk-dotnet
+        - name: azure-sdk-dotnet@skills
           type: plugin
           source: remote
-        - name: azure-sdk-typescript
+        - name: azure-sdk-typescript@skills
           type: plugin
           source: remote
-        - name: azure-sdk-rust
+        - name: azure-sdk-rust@skills
           type: plugin
           source: remote
     reviewer:
