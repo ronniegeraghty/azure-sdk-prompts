@@ -403,3 +403,87 @@ func writeTail(w io.Writer, text string, termWidth int, state *tailState) {
 ---
 
 **Key Takeaway:** Terminal renderers must OWN the output stream. Any code writing to the same TTY outside the renderer will corrupt tracking state. Either suppress, redirect, or downgrade to append-only mode.
+
+## When to Give Up on Streaming UX (Decision Framework)
+
+**Context:** hyoka Agent Attempt tail-streaming experienced four sequential fix attempts (commits 6b3d3d48, 42ea88fb, fe6efebf, 670c5dbf) addressing different facets of line-wrapping leaks (multi-row clearing, wide chars, foreign writes, terminal width edge cases). Despite each fix resolving a specific symptom, complete stability remained elusive. Final resolution: delete streaming, replace with three-state machine (commit b17f1ef5).
+
+### Red Flags for Abandoning Streaming
+
+1. **Multiple fix attempts on the same root cause**
+   - If you've addressed cell width, truncation, multi-row clearing, and foreign writes and issues persist, the problem is fundamental — not fixable with better math.
+
+2. **Complexity scales faster than value**
+   - Streaming adds ~150 lines of logic (row tracking, truncation, ticker, per-event updates).
+   - If the streaming content is "nice-to-have" (e.g., live duration counter, activity messages) rather than "essential" (e.g., "is it running?", "did it finish?"), the complexity isn't justified.
+
+3. **Terminal environment is uncontrollable**
+   - Foreign writers (slog stderr, other processes) inject lines between your tail updates.
+   - Terminal width changes dynamically (user resizes window).
+   - Wide character handling varies by terminal emulator.
+   - If you can't control these, defensive truncation and margin logic become never-ending whack-a-mole.
+
+4. **Test scenarios don't cover real-world variability**
+   - Unit tests with fixed terminal widths pass, but real runs fail.
+   - You can't easily reproduce edge cases (exact-width wrapping, emoji at truncation boundary, slog warning at exact moment of tail rewrite).
+
+### Alternative: Bounded-State Displays
+
+**Pattern:** Replace streaming variable-length content with a fixed set of short states.
+
+**Example (hyoka Agent Attempt):**
+- Old: `🔄 Running… turn X/Y, N tool calls (MM:SS)` (variable length, wraps on narrow terminals, rewritten per-second + per-event)
+- New: `🔄 Running` | `✅ Completed` | `Guardrail hit — turn limit (25)` (bounded length, fits in any standard terminal, event-driven transitions)
+
+**Benefits:**
+- **Zero wrapping risk:** Content is short by design, no truncation math needed.
+- **Simpler code:** Single-line state transitions vs. row tracking + per-event updates.
+- **Future-proof:** If requirements change, you can add states without re-engineering the entire tail mechanism.
+
+**Trade-offs:**
+- Lose granular real-time feedback (activity messages, live counters).
+- Gain reliability and maintainability.
+
+### Decision Criteria
+
+| Factor | Continue Streaming | Switch to Bounded States |
+|--------|-------------------|--------------------------|
+| **Essential info** | Live updates are semantically critical (e.g., "3/10 files processed") | States cover essential info (e.g., "Running" → "Completed") |
+| **Fix attempts** | First or second attempt; clear path to resolution | Three or more attempts; root cause unclear |
+| **Environment control** | Dedicated terminal, no foreign writes, predictable width | Shared TTY, foreign writers, dynamic width |
+| **Complexity trend** | Fixes are additive, scoped | Fixes are multiplicative, cross-cutting |
+| **Test coverage** | Edge cases reproducible in unit tests | Edge cases only emerge in production |
+
+### Lessons from hyoka Agent Attempt
+
+**What streaming cost:**
+- Four separate fix commits addressing different facets of the same problem.
+- Persistent UX bugs visible to users despite each fix passing tests.
+- ~150 lines of truncation, row tracking, ticker, and per-event update logic.
+
+**What bounded states bought:**
+- Complete elimination of line-wrapping class of bugs (content is short → never wraps).
+- Net deletion of ~100 lines (removed streaming logic, added state enum).
+- Event-driven state transitions (no ticker needed for agent section).
+
+**User-visible difference:**
+- Lost: Live activity messages ("bash tool call", "writing file X"), live duration counter, real-time tool call count.
+- Kept: Essential status ("Running" vs "Completed"), guardrail failure reasons, overall outcome.
+- User feedback: Preferred loss of detail over persistent UX bug.
+
+### When Streaming Is Still Worth It
+
+- **Long-running operations** where users need granular progress (e.g., "downloading 3/10 files (25 MB/100 MB)").
+- **Intermediate state changes are semantically important** (e.g., "compiling…" → "linking…" → "packaging…").
+- **Controlled terminal environment** (dedicated CLI app, no foreign writers, you own the TTY).
+- **Value >> complexity** (users explicitly request live updates, no other way to convey progress).
+
+### Recommended Approach
+
+1. **Start with bounded states** for new progress displays.
+2. **Only add streaming** if users report that static states are insufficient.
+3. **Stop after two fix attempts** if streaming proves fragile — revert to states.
+4. **Document the trade-off** in team decisions so future contributors know why streaming was avoided.
+
+**Golden rule:** If you're writing `truncateToWidth()`, `visibleWidth()`, and `tailRowCount` for the third time, you've already lost. Switch to states.
+

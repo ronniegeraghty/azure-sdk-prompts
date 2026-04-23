@@ -19,6 +19,8 @@ Agent Tank initialized as Platform Dev for hyoka. Owns CLI, config, build, repor
 
 ## Learnings
 
+- **Agent Attempt Tail-Streaming Deleted (2026-04-23):** After four failed attempts to fix line-wrapping leaks (commits 6b3d3d48, 42ea88fb, fe6efebf, 670c5dbf), replaced the streaming tail with a three-state machine: Running, Completed, or Guardrail hit — {reason}. The single-line bounded status eliminates all wrapping math and foreign-write contamination risks. Commit b17f1ef5.
+
 - **Config migration pattern**: When removing backward compatibility code, the best approach is to update all configs first (all 8 YAML files), then delete legacy struct fields, then remove helper methods (Normalize, Effective*), then update all call sites. This ensures compiler errors guide you to every place that needs updating.
 - **Test-driven refactoring**: Large structural changes benefit from running tests after each phase (struct changes, method deletions, call site updates). The test failures become a checklist of what still needs updating.
 - **Unused function cleanup**: After removing legacy fields, helper functions like resolveSkillsDirs() that worked with those fields become unused. The compiler catches these with "declared and not used" errors.
@@ -439,4 +441,52 @@ Tail stayed on exactly one row throughout the entire evaluation. No leaked wrapp
 - **Terminal cursor wrapping is non-standard**: When you write exactly N chars to N-column terminal, cursor position is ambiguous (column N vs column 0 of next row). Only safe approach: never write exactly termWidth chars.
 
 Related commits: fe6efebf (wide char), 6b3d3d48 (multi-row clearing), 42ea88fb (truncation base)
+
+
+### Session 2026-04-23 (Agent Attempt Three-State Implementation)
+
+**Status:** COMPLETE (commit b17f1ef5)
+**Issue:** Multiple failed attempts to fix tail-streaming line-wrapping leaks
+
+**Root decision:** After four attempts to fix the streaming tail (commits 6b3d3d48, 42ea88fb, fe6efebf, 670c5dbf), the user directed a pivot: delete the tail-streaming code path and replace with a simple three-state machine.
+
+**Three states:**
+1. **Running** — Agent session started, shows "🔄 Running" (no streaming content, no duration)
+2. **Completed** — Session ended successfully, shows "✅ Completed"
+3. **Guardrail hit** — Guardrail terminated the run, shows "Guardrail hit — {reason}" where reason is short-form extracted from `evalReport.GuardrailAbortReason` (e.g., "turn limit (25)", "file limit (50)")
+
+**Implementation:**
+- Added `agentAttemptState` enum to `display_interactive.go` (Running, Completed, Guardrail)
+- Removed all streaming tail logic: activity counters (`agentToolCalls`, `agentActivity`), duration display, per-event tail rewrites
+- Added `GuardrailReason` field to `ProgressEvent` (events.go) to propagate guardrail info from eval to display
+- Wired guardrail reason extraction in `engine.go` via `extractGuardrailShortReason()` helper
+- Updated `agentComplete()` to accept guardrail reason and set final state
+- Removed ticker loop updates for Agent Attempt (ticker still exists but is now a no-op for agent section)
+- Updated tests in `display_interactive_test.go` to expect "✅ Completed" instead of "✅ Complete" / "❌ Failed"
+
+**Files changed:**
+- `hyoka/internal/progress/events.go` — added GuardrailReason field
+- `hyoka/internal/progress/display_interactive.go` — three-state machine + removed tail streaming
+- `hyoka/internal/progress/display_interactive_test.go` — updated test expectations
+- `hyoka/internal/eval/engine.go` — wired guardrail reason extraction and emission
+
+**Verification:**
+- `go build ./...` — clean
+- `go test -race ./...` — all pass
+- Manual run: `go run ./hyoka run --prompt-id key-vault-dp-python-crud --config "baseline/claude-opus-4.6"` — confirmed Agent Attempt shows "Running" then "Completed"
+- `hyoka clean` — cleaned 6 orphaned sessions
+
+**Learnings:**
+- **When to give up on streaming UX:** After multiple fix attempts fail on the same root cause (line wrapping from wide chars, foreign writes, terminal width edge cases), a bounded-state display is safer than continued iteration on truncation math. The single-line three-state model eliminates an entire class of bugs by removing variability.
+- **State machines > streaming for bounded-duration phases:** Agent Attempt is inherently bounded (starts, runs, ends). Streaming the "inside" is nice-to-have but risky; the states (Running, Completed, Guardrail) carry the essential info without wrapping risk.
+- **Guardrail propagation via progress events:** The `evalReport.GuardrailAbortReason` was already being set in `engine_eval.go` but wasn't flowing to the display. Adding `GuardrailReason` to `ProgressEvent` and wiring it through `engine.go` made the guardrail state viable.
+- **Ticker simplification:** With no dynamic content in Agent Attempt, the ticker loop became a no-op for that section. Left the ticker infrastructure in place in case we add grader progress indicators later, but removed the agent-specific refresh logic.
+
+**Not tested end-to-end by me:**
+- Triggering an actual guardrail (MaxTurns, MaxFiles) to verify the Guardrail state renders correctly. The logic is wired and the reason extraction helper is in place, but I couldn't easily trigger a guardrail in test. User should test: set MaxTurns very low (e.g., 3) via prompt frontmatter or config override, run a prompt, confirm "Guardrail hit — turn limit (3)" appears.
+
+**Next:** User should sanity-check:
+1. Run a normal prompt → confirm "Running" → "Completed" transition
+2. Trigger a guardrail scenario → confirm "Guardrail hit — {reason}" displays
+3. Check that no line wrapping occurs even on narrow terminals (`stty cols 60`)
 
