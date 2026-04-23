@@ -101,6 +101,12 @@ type interactiveEval struct {
 	agentTurns         int
 	agentDuration      time.Duration
 
+	// Agent attempt buffering — hold back rendering until tools are verified.
+	// If no tool events arrive before the first agent-attempt event, we treat
+	// this as a no-tools config and flush immediately.
+	agentEventsBuffered []ProgressEvent
+	agentGateOpen       bool // true once tools verification completes (or no tools detected)
+
 	// Session Details section.
 	sessionPrinted bool
 
@@ -333,6 +339,8 @@ func (r *interactiveRenderer) onToolsVerified(evt ProgressEvent) {
 		// No Tools section was ever rendered — nothing to redraw. We still
 		// emit a header + lines for any reported tools if there are any.
 		if len(evt.Tools) == 0 {
+			// Open the agent gate now that tools verification is complete.
+			r.openAgentGate()
 			return
 		}
 		r.ensureToolsHeader()
@@ -343,6 +351,8 @@ func (r *interactiveRenderer) onToolsVerified(evt ProgressEvent) {
 			r.freezeTail()
 			r.writeLine(r.renderToolLine(tl))
 		}
+		// Open the agent gate now that tools verification is complete.
+		r.openAgentGate()
 		return
 	}
 	// Merge verification results into existing toolLines. Any flips mark the
@@ -373,8 +383,15 @@ func (r *interactiveRenderer) onToolsVerified(evt ProgressEvent) {
 		}
 	}
 	if dirty {
+		// Freeze any active tail before redrawing the tools block. The block
+		// redraw logic assumes the cursor is at a known position (column 0 of
+		// the line after the last committed line), and an active tail would
+		// break that calculation.
+		r.freezeTail()
 		r.redrawToolsBlock()
 	}
+	// Open the agent gate now that tools verification is complete.
+	r.openAgentGate()
 }
 
 // redrawToolsBlock performs a DECSC/DECRC-bracketed rewrite of every tool
@@ -431,6 +448,27 @@ func (r *interactiveRenderer) renderToolLine(tl toolLine) string {
 
 // --- Agent Attempt section ---
 
+// openAgentGate unblocks the Agent Attempt section rendering and flushes any
+// buffered agent-attempt events. Called when EventToolsVerified arrives OR
+// when we detect a no-tools config (first agent event with no prior tool events).
+func (r *interactiveRenderer) openAgentGate() {
+	if r.cur.agentGateOpen {
+		return
+	}
+	r.cur.agentGateOpen = true
+	// Flush buffered events in order.
+	for _, e := range r.cur.agentEventsBuffered {
+		r.renderAgentEvent(e)
+	}
+	r.cur.agentEventsBuffered = nil
+}
+
+// detectNoTools returns true if no tool events have been seen yet for this
+// eval AND no tools section has been printed. This signals a no-tools config.
+func (r *interactiveRenderer) detectNoTools() bool {
+	return !r.cur.toolsHeaderPrinted && len(r.cur.toolLines) == 0
+}
+
 func (r *interactiveRenderer) ensureAgentHeader() {
 	if r.cur.agentHeaderPrinted {
 		return
@@ -445,14 +483,39 @@ func (r *interactiveRenderer) onPhaseChange(evt ProgressEvent) {
 	// Phase events are informational in interactive mode — activity/agent
 	// framing is already driven by tool/file/reasoning events.
 	if evt.Phase == PhaseGenerating {
-		r.ensureAgentHeader()
-		if r.cur.tailKind != tailAgent {
-			r.writeTail(tailAgent, r.renderAgentTail())
+		// Buffer or render immediately based on whether gate is open.
+		if !r.cur.agentGateOpen {
+			// No tools verification yet. Check if this is a no-tools config.
+			if r.detectNoTools() {
+				r.openAgentGate()
+			} else {
+				// Tools expected — buffer this event.
+				r.cur.agentEventsBuffered = append(r.cur.agentEventsBuffered, evt)
+				return
+			}
 		}
+		r.renderAgentEvent(evt)
 	}
 }
 
 func (r *interactiveRenderer) onAgentActivity(evt ProgressEvent) {
+	// Buffer or render immediately based on whether gate is open.
+	if !r.cur.agentGateOpen {
+		// No tools verification yet. Check if this is a no-tools config.
+		if r.detectNoTools() {
+			r.openAgentGate()
+		} else {
+			// Tools expected — buffer this event.
+			r.cur.agentEventsBuffered = append(r.cur.agentEventsBuffered, evt)
+			return
+		}
+	}
+	r.renderAgentEvent(evt)
+}
+
+// renderAgentEvent performs the actual rendering for an agent-attempt event.
+// Factored out so both buffered-flush and direct rendering use the same logic.
+func (r *interactiveRenderer) renderAgentEvent(evt ProgressEvent) {
 	r.ensureAgentHeader()
 	// Update rolling activity counters.
 	if evt.Type == EventToolStart {
@@ -600,6 +663,11 @@ func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 // --- Terminal events ---
 
 func (r *interactiveRenderer) onPassed(evt ProgressEvent) {
+	// Safety: if tools verification never arrived, open the gate now so any
+	// buffered agent events are flushed before we finalize.
+	if !r.cur.agentGateOpen {
+		r.openAgentGate()
+	}
 	r.agentComplete(evt.FileCount, true)
 	r.completed++
 	r.passed++
@@ -608,6 +676,10 @@ func (r *interactiveRenderer) onPassed(evt ProgressEvent) {
 }
 
 func (r *interactiveRenderer) onFailed(evt ProgressEvent) {
+	// Safety: if tools verification never arrived, open the gate now.
+	if !r.cur.agentGateOpen {
+		r.openAgentGate()
+	}
 	r.agentComplete(evt.FileCount, false)
 	r.completed++
 	r.failed++
@@ -623,6 +695,10 @@ func (r *interactiveRenderer) onFailed(evt ProgressEvent) {
 }
 
 func (r *interactiveRenderer) onError(evt ProgressEvent) {
+	// Safety: if tools verification never arrived, open the gate now.
+	if !r.cur.agentGateOpen {
+		r.openAgentGate()
+	}
 	r.agentComplete(0, false)
 	r.completed++
 	r.errors++
