@@ -552,3 +552,705 @@ Decisions prior to 2026-04-22 have been moved to `.squad/decisions/archive/`. Se
 **What:** In configs and docs, the `repo:` field for remote plugins is now written in the short canonical form `owner/repo` (e.g. `microsoft/skills`). The longer `github.com/owner/repo` form continues to validate and resolve correctly — `SplitOwnerRepo` strips the prefix — so existing user configs are unaffected. The change is purely about which shape we recommend and ship as examples.
 **Why:** Remote plugins are GitHub-only, so the `github.com/` prefix is redundant noise. Keeping the long form supported preserves backward compatibility.
 
+
+---
+
+## Session 2026-04-23: Grader Points Rethink
+
+Decisions merged from inbox during cleanup pass after 6-phase autopilot session.
+
+### Decision: # Report data model review — fan-out + grader-Points alignment (2026-04-23T20:45Z)
+
+**By:** Morpheus 🏗️
+
+
+**Date:** 2026-04-23
+**Branch:** `ronniegeraghty/dev` (read-only review, no edits)
+**Requested by:** ronniegeraghty
+**Trinity inbox:** _not yet present at write time — link when filed_
+
+---
+
+## TL;DR
+
+The "all passed at the top, inconsistent per-row/per-page" symptom is a real bug, fully reproducible against `reports/20260423-195948`. Root cause is **two divergent roll-up paths**:
+
+1. The **engine** computes `EvalReport.Success` from a single unified `agg.Pass` over the *internal* grader list (one entry per grader, `Pass bool`).
+2. The **site** computes a per-row "graders passed" by counting `r.grader_results.filter(g => g.pass === true)` over the *report* list — which has been **expanded** by `convertGraderResults` so that one passing AI-review grader becomes 3 entries (panel members + consensus) all with `pass: null`.
+
+Result: engine-truth `success=true`, site-derived `1/4` displayed in red on every row. Plus the "no files → grading skipped → empty grader_results, but Success=true" path produces `0/0` red badges for any config that produced no files.
+
+The plugin / skill_dir fan-out makes the data-model gap worse: `report.SessionSetup` and `Environment` are both flat lists of names with no parent/child linkage, so the new "no plugin status, only child statuses" model cannot be expressed faithfully on disk yet.
+
+---
+
+## 1. Discrepancy reproduction
+
+**Run:** `reports/20260423-195948` — 12 evals across 4 config groups, summary says `passed: 12, failed: 0, errors: 0` (i.e. 100%).
+
+**Pages that disagree** (screenshots in `/tmp/morpheus-site-review/`):
+
+| File | What it shows |
+|---|---|
+| `01-run-detail-header-vs-rows.png` | Run detail page: header shows `12 Passed`, but every visible table row shows a red `1/4` or `0/0` score badge. |
+| `02-eval-detail-success-but-na-graders.png` | Eval detail page: green `✅ key-vault-dp-python-crud` headline (engine truth), then a `Grader Results (4)` section with `PASS / N/A / N/A / N/A` badges. |
+| `03-run-detail-top.png` | Run detail header summary cards (12 passed, 100% pass rate) above the inconsistent rows. |
+
+Concrete grader payload from one eval (`baseline/claude-sonnet-4.5/report.json`):
+
+```json
+"success": true,
+"grader_results": [
+  {"grader_name":"Output Files Exist", "grader_type":"output_check", "pass":true,  "score":1},
+  {"grader_name":"claude-opus-4.6",    "grader_type":"review",       "pass":null, "score":null},
+  {"grader_name":"gpt-4.1",            "grader_type":"review",       "pass":null, "score":null},
+  {"grader_name":"consensus",          "grader_type":"review",       "pass":null, "score":null}
+]
+```
+
+For the three `gpt-5.3-codex` configs in this run, `grader_results` is `[]` while `success` is still `true` (no files were generated, so the grading pipeline was skipped — see `engine_eval.go:433`).
+
+---
+
+## 2. Root cause(s)
+
+### 2a. The site invents its own roll-up that disagrees with the engine
+
+`site/src/app/components/run-detail-page.tsx:236`:
+
+```ts
+const gradersPassed = (r as EvalReport).grader_results?.filter(g => g.pass === true).length ?? 0;
+const gradersTotal  = (r as EvalReport).grader_results?.length ?? 0;
+```
+
+`<ScoreBadge passed={gradersPassed} total={gradersTotal} />` → green only when `passed === total && total > 0`. With `pass:null` review entries this condition is mathematically impossible whenever an AI-review grader was run.
+
+This is a roll-up that **does not exist on the engine side** — the engine's truth is `EvalReport.Success`, set from `agg.Pass` (`hyoka/internal/criteria/graders/grader.go:222-252`) over the *internal* grader list which has one entry per grader (`Pass bool`, never null).
+
+### 2b. The expansion from internal-grader → report-grader is destructive
+
+`hyoka/internal/eval/engine_eval.go:840-953`:
+
+- `convertGraderResults` iterates `agg.Results` (each entry `Pass bool`, e.g. `ai_review` with `Pass=true`).
+- For each `KindPromptReview` entry it calls `expandReviewGraderResult`, which **discards** the unified `Pass` and emits one `report.GraderResult` per panel member + one for consensus, **all with `Pass: nil`** and `Score: 0` — only `OverallScore` / `MaxScore` carry the actual review numbers.
+- For typed graders (output_check, file, program, behavior) the conversion preserves `Pass` correctly (`engine_eval.go:847-855`).
+
+So the on-disk shape of a single passing `ai_review` grader is *N indistinguishable-from-failing rows*. The engine's `agg.Pass=true` survives only as the top-level `EvalReport.Success` boolean — it is not represented inside `grader_results` at all.
+
+### 2c. Empty-graders path leaks "success" without evidence
+
+`engine_eval.go:433` (`if len(generatedFiles) > 0`): if no files were generated, the entire grading block is skipped. `EvalReport.Success` defaults to whatever the generator set — typically `true` from `engine.go:74` unless something later flipped it. Result: `success=true`, `grader_results=[]`. The site row renders `0/0` (red) and the eval-detail header renders ✅. Both are arguably wrong for different reasons.
+
+### 2d. Where the roll-up is computed (audit)
+
+| Location | Source of truth | Honors `EvalReport.Success`? |
+|---|---|---|
+| `engine_eval.go:191, 396, 423, 442, 564` | sets `Success` from `agg.Pass` and guardrails | n/a (this is the writer) |
+| `report/summary_stats.go:116, 123, 131` | counts `r.Success` for config/prompt pass rates | ✅ |
+| `report/markdown.go:29, 153, 437, 459` | renders pass/fail icons on Markdown reports | ✅ |
+| `report/report_data.go:56` | builds `MatrixCell.Success` for cross-config matrix | ✅ |
+| `serve/dashboard.go` | API endpoints: passes report objects through unchanged | ✅ (no roll-up) |
+| `site/run-detail-page.tsx:76` (header summary) | `run.passed` from `summary.json` | ✅ |
+| `site/run-detail-page.tsx:85-86` (filter) | `r.success` | ✅ |
+| `site/run-detail-page.tsx:236` (row badge) | `grader_results.filter(g => g.pass === true)` | ❌ **DISAGREES** |
+| `site/run-detail-page.tsx:360` (per-config card) | `result.success` | ✅ |
+| `site/eval-detail-page.tsx:423, 441, 448` | `r.success` | ✅ |
+| `site/GraderResultRow.tsx:16` (per-grader badge) | `result.pass` (null → "N/A") | ⚠ correct given the data, but the data is wrong |
+
+**Only `run-detail-page.tsx:236-237` invents its own roll-up.** Everywhere else trusts `EvalReport.Success`.
+
+---
+
+## 3. Schema impact of the plugin / skill_dir fan-out
+
+The Phase-1 display change (Tank, in flight) plus the already-shipped artifact-graph fan-out (commits `4a8c4a0d`, `370295d0`) push the report schema past what it can model.
+
+### 3a. Today's `report.SessionSetup` is flat, parent-less
+
+`hyoka/internal/report/types.go:326-341`:
+
+```go
+type ToolLoadResult struct {
+    Name    string `json:"name"`
+    Status  string `json:"status"`  // "loaded", "failed", "configured"
+    Error   string `json:"error,omitempty"`
+    Details string `json:"details,omitempty"`
+}
+
+type SessionSetupEvent struct {
+    MCPServers   []ToolLoadResult `json:"mcp_servers,omitempty"`
+    Skills       []ToolLoadResult `json:"skills,omitempty"`
+    Tools        []string         `json:"tools_available,omitempty"`
+    SystemPrompt string           `json:"system_prompt_status"`
+    StarterFiles []string         `json:"starter_files,omitempty"`
+}
+```
+
+Concrete observation from a real report: `session_setup.skills` has `[{name:"generator-skills", status:"configured"}]` (the parent skill_dir) while `environment.skillsLoaded` has 44 child skill names. The two lists are **not cross-referenced anywhere** — there's no record that the 44 children belong to `generator-skills`.
+
+After Tank's Phase 1, plugin parents will have no Loaded/Failed status (only children carry status). The current `ToolLoadResult.Status` for a plugin parent has no valid value to write — `"configured"` is the closest fit but already gets used for skill_dirs.
+
+### 3b. Required schema additions to `ToolLoadResult`
+
+```go
+type ToolLoadResult struct {
+    Name       string `json:"name"`
+    Status     string `json:"status,omitempty"`     // ← omitempty: parents can omit
+    Error      string `json:"error,omitempty"`
+    Details    string `json:"details,omitempty"`
+
+    // NEW: parent/child linkage for fan-out
+    Kind       string `json:"kind,omitempty"`       // "skill" | "mcp" | "plugin" | "skill_dir"
+    Parent     string `json:"parent,omitempty"`     // name of the container this is a child of
+    ParentKind string `json:"parent_kind,omitempty"`// "plugin" | "skill_dir"
+}
+```
+
+Children carry `Status` and a `Parent`/`ParentKind` back-pointer; container parents emit a single row with `Status` empty (or a new `"container"` value) and no error semantics. Old reports remain valid because all new fields are `omitempty`.
+
+### 3c. `Environment.skills_loaded` (site-side mirror) needs the same shape
+
+`site/src/app/data/types.ts:180-192` — `skills_loaded` is `string[]`. The site classifies tools via `environment.skills_loaded.includes(tool)` (`eval-detail-page.tsx:501`). Once parent and child names both appear, exact-match classification loses the parent → child relationship.
+
+Two viable options:
+
+- **Option A (preferred):** change `skills_loaded` to `Array<{name: string, parent?: string, kind?: string}>` and bump the Go struct in `report/types.go` (`EnvironmentInfo.SkillsLoaded`) similarly. Requires site-side migration but expresses the truth.
+- **Option B (cheap, less truthful):** keep `skills_loaded` flat, add a sibling `skill_groups: Array<{parent: string, children: string[]}>`. Site prefers `skill_groups` when present, falls back to flat list for old reports.
+
+Either way, the migration story for already-on-disk reports is "fields default to empty / no grouping" — the site must handle absence gracefully.
+
+### 3d. Migration path
+
+- No `CurrentSchemaVersion` bump required for additive optional fields. Old reports load and render the same way they do today.
+- A `MigrateToV2`-style migrator is **not** needed for the fan-out additions — there's no information in old reports that we can synthesize parent linkage from (parents are determined by config-time validation, which old reports didn't capture).
+
+---
+
+## 4. Schema impact of the grader `Points` field (Phase 2)
+
+> Coordinating: the data model and the renderer; Trinity owns the visual presentation. This proposal is the data-side decision; Trinity will likely want to negotiate how Points render inside `GraderResultRow`.
+
+### 4a. Drop-in field is safe and back-compat
+
+```go
+type GraderResult struct {
+    // ... existing fields preserved ...
+    Points []GraderPoint `json:"points,omitempty"`
+}
+
+type GraderPoint struct {
+    Name    string `json:"name"`
+    Pass    bool   `json:"pass"`
+    Message string `json:"message,omitempty"`
+}
+```
+
+`omitempty` keeps old reports byte-identical when re-encoded. No `SchemaVersion` bump strictly required.
+
+### 4b. **However — Phase 2 should also fix the "expand into N entries" anti-pattern**
+
+If Phase 2 just adds `Points` *next to* the existing expansion, we still emit 4 row-shaped entries per `ai_review` (with `Pass:nil` and `Score:0`). The 1/4 bug stays. The Points field becomes ornamental.
+
+**Recommendation:** in Phase 2, change `convertGraderResults` for `KindPromptReview`:
+
+- Emit **one** `report.GraderResult{GraderName: "ai_review", GraderType: "prompt_review", Pass: &aggregatedPass, Score: aggregatedScore, Points: <one per criterion>, ReviewDetails: <existing struct unchanged>}`.
+- `ReviewDetails.PanelResults` and `ReviewDetails.Criteria` stay populated for the static Markdown/HTML templates that already iterate them.
+- The site reads `Points` when present and falls back to `ReviewDetails.Criteria` for old reports.
+
+This ALSO fixes the "1/4 in red" bug structurally, because `ai_review` becomes one passing row instead of three nil-pass rows.
+
+### 4c. `EvalReport.SchemaVersion` bump?
+
+If we change the *number of entries* in `grader_results` for the same input data (1 entry instead of N), that is a semantics change that older code paths could trip on. I'd bump to **v3** specifically to mark "review graders are no longer expanded; per-criterion data is in `Points`." `MigrateToV2` becomes `MigrateToV3` and old v2 reports keep their expanded shape on read (no de-expansion attempted — too lossy).
+
+### 4d. Engine wiring for Points
+
+Each `graders.GraderResult` needs to grow a `Points []GraderPoint` field upstream of the report layer (per the plan doc). The conversion in `convertGraderResults` then copies it into `report.GraderResult.Points`. Typed graders that today have only a single binary outcome populate one Point; output_check populates one per knob, file populates one per file checked, behavior one per constraint, prompt_review one per criterion. This matches the plan doc's table verbatim.
+
+---
+
+## 5. Recommended fixes (prioritized)
+
+### Must-fix bugs (separate from Phase 2 — short, surgical commits)
+
+1. **Site row-badge roll-up disagrees with engine truth.** `site/src/app/components/run-detail-page.tsx:236-237`. Either:
+   - Show `r.success ? "✓" : "✗"` instead of a fraction (simplest, mirrors eval-detail header), OR
+   - Count `g => g.pass !== false` (treats null as "not failed") so review rows don't drag the count down, OR
+   - Surface `score_breakdown.final_score_pct` directly (most truthful — the engine already computed it).
+   My pick: **show pass/fail icon mirroring `r.success`**, and if a numeric "X/N graders passed" is desired keep it as a *secondary* tooltip/sub-text using `pass !== false`. Single source of truth wins.
+
+2. **Empty-graders → red `0/0` badge.** Same site location. When `grader_results.length === 0`, render `r.success ? "✓" : "✗"` rather than `0/0`. Optional second-step: have the engine refuse to set `Success=true` when no graders ran AND no files were generated — that's a separate engine fix worth filing.
+
+3. **`GraderResultRow` showing `N/A` for review entries.** Cosmetic, but: until Phase 2 consolidates the expansion, render review-type entries with the `OverallScore/MaxScore` pair as a numeric badge (e.g. `8/10`) rather than `N/A`. The data is there.
+
+### Schema evolutions (Phase 2 work — coordinate with Tank + Trinity)
+
+4. **Stop expanding `ai_review` into N report entries.** Replace `expandReviewGraderResult` with a single-entry mapping that sets `Pass`, `Score`, `Points`, and keeps `ReviewDetails` populated. Bump `CurrentSchemaVersion` to 3. Site renders `Points` when present.
+
+5. **Add `Points []GraderPoint` to `report.GraderResult`** and to the upstream `graders.GraderResult`. Each grader implementation populates at least one Point (per the plan doc table). Existing typed-detail structs stay alongside Points.
+
+6. **Add `Parent`, `ParentKind`, `Kind` to `report.ToolLoadResult`.** Parents emit a row with `Status` empty (or new `"container"`), children carry runtime status + back-pointer. Old reports remain valid. Coordinate the rollout with Tank's display Phase 1 so the live renderer and the persisted schema land together.
+
+7. **Enrich `report.EnvironmentInfo.SkillsLoaded` with parent linkage** (Option A or B from §3c). Surface in `site/src/app/data/types.ts` Environment type. Site classification (`eval-detail-page.tsx:501-507`) becomes group-aware.
+
+### Nice-to-haves
+
+8. **Single source of truth for the per-eval pass count.** Add `EvalReport.GradersPassed int` and `EvalReport.GradersTotal int` populated at engine time from `agg.Results` (BEFORE expansion). The site reads these directly instead of recomputing. Eliminates the entire class of roll-up-divergence bugs by construction. Trivial to add and `omitempty`-safe.
+
+9. **Audit `success=true` semantics for the no-files case.** `engine_eval.go:433` skips grading when `generatedFiles == 0`. There's no positive evidence of success in that case — `Success` is only `true` because nothing flipped it `false`. Worth a separate decision: do we treat "agent produced nothing" as a hard fail, or do we keep the soft-pass for prompts that legitimately have no expected output? Today it leaks through as "passing."
+
+---
+
+## 6. Open questions for the user
+
+1. **Run-detail row badge — what number do you actually want there?** Options: (a) just a pass/fail icon, (b) the score breakdown percentage, (c) a `passed/total` fraction that treats nil-pass review entries as passing. I'd go with (a) for clarity but (b) is the most informative.
+
+2. **`success=true` with zero graders run** — bug or feature? Today, configs that produce no files end up green at the engine level. If you want them to fail loudly, that's a one-line engine fix; if you want to keep "no expected output → neutral pass," we should at least mark them in the report (`graders_skipped: true`) so the site can render them distinctly.
+
+3. **Phase 2 ordering** — are we OK bumping `SchemaVersion` to v3 and breaking de-expansion for old `v2` reports (i.e. v2 reports keep their N-entry shape forever, v3 reports use the new 1-entry-with-Points shape)? The alternative (write a migrator that re-collapses N entries) is doable but loses the panel-member detail unless we carefully reconstruct it from `panel_results`.
+
+4. **Plugin parent in `session_setup`** — when Tank's Phase 1 lands and the parent emits no status, do you want the parent to appear in the JSON at all (as a `Status:""` row that the site can use to draw the group header), or only in the children's `Parent` back-pointer? The former is friendlier to consumers that want to render the group as a tree; the latter is simpler.
+
+---
+
+## Boundary with Trinity
+
+Per spawn instructions: I own the data model and roll-up logic. Trinity owns site UX (templates, CSS, page-by-page presentation). Where we overlap:
+
+- The **fix to `run-detail-page.tsx:236`** is mine to recommend, hers to implement (it's a presentation choice masquerading as a data choice — the underlying fix is "stop expanding," but until that ships the site needs a behavior).
+- The **`GraderResultRow` rendering of Points** is hers — I'm only saying that the Points field will exist and what it carries.
+- The **session_setup → site Environment** structural change requires both: I propose the JSON shape, she chooses how to render the parent → child grouping in the tools-available list and any session-setup card.
+
+Will link to her inbox file when it appears (none present at write time).
+
+---
+
+## Files cited
+
+- `hyoka/internal/eval/engine_eval.go:191, 396, 423, 433, 442, 564, 826-953`
+- `hyoka/internal/criteria/graders/grader.go:206-252`
+- `hyoka/internal/report/types.go:22-48, 326-341, 700-711`
+- `hyoka/internal/report/report_data.go:56`
+- `hyoka/internal/report/summary_stats.go:116, 123, 131`
+- `hyoka/internal/report/markdown.go:29, 153, 437, 459`
+- `hyoka/internal/serve/dashboard.go:41-61`
+- `site/src/app/components/run-detail-page.tsx:76, 85-86, 236-237, 360`
+- `site/src/app/components/eval-detail-page.tsx:382, 423, 441, 448, 501-507`
+- `site/src/app/components/GraderResultRow.tsx:16`
+- `site/src/app/data/types.ts:180-192, 259-282`
+
+Screenshots: `/tmp/morpheus-site-review/01-run-detail-header-vs-rows.png`, `02-eval-detail-success-but-na-graders.png`, `03-run-detail-top.png`.
+
+### Decision: # Plugin tool-load assertions check leaves, not parents (2026-04-23T19:40Z)
+
+**By:** Neo 💊
+
+
+**Date:** 2026-04-23
+
+**Decision:** When a remote plugin has the standard Copilot container layout (`<plugin>/skills/<child>/SKILL.md`), the validator MUST fan out into one report row per child skill. Tool-load assertions then check that each child loaded — never the parent plugin directory, which has no SKILL.md of its own and will never appear in the SDK's `SessionSkillsLoaded` event.
+
+**Why:** The microsoft/skills `azure-sdk-python` plugin is a directory of 41 child skills, not a single skill. Asserting "did the plugin load?" by looking for the plugin's name in the SDK's loaded-skills list would always fail: the SDK loads the children, by their child basenames. The fan-out is what makes the assertion meaningful.
+
+**Scope:** Applies to `plugin.ResolveInstalled` + `validatePluginEntry`. Single-skill plugins (top-level SKILL.md) keep the one-row-per-plugin behavior. Container plugins fan out.
+
+**Reference:** Fix commit, plus `TestValidateAndExpand_RemoteContainerPlugin_FansOutChildren` for the regression guard.
+
+### 2026-04-23T21:09Z: Phase 1 tool-loading display polish shipped
+**By:** Tank (CLI/UX)
+**What:** Five fixes shipped to `ronniegeraghty/dev` (3635a09f, 582ab59f, efe18373, 9f994107, fbcd9f38) covering: skill_dir parent name, plugin parent badge removal, child kind labels, frozen agent/grader row in-place rewrite, and removal of redundant tool events around the AI review grader. Phase 1 design intentionally keeps the grader handler open to Phase 2's `Points []GraderPoint` extension — Neo's work is not blocked.
+**Why:** Make the live-eval interactive renderer match the design spec in `plan/2026-04/tool-loading-display-polish.md`. Validated via unit tests (race-clean) plus a 3/3 live eval run.
+
+
+### Decision: # Site UX Review — pass/fail rendering against real "all passed" run (2026-04-23T20:46Z)
+
+**By:** Trinity 🖤
+
+
+**Date:** 2026-04-23
+**Anchor run:** `reports/20260423-195948` — `passed=12 / failed=0 / errors=0` at the top, but per-eval pages contradict the verdict in three different places.
+**Method:** Read `hyoka/internal/serve/` + `site/src/`, ran `go run . serve --port 8088`, drove with `playwright-cli`. Screenshots in `/tmp/trinity-site-review/`.
+**Scope:** Presentation/UX only. Data-model and roll-up logic critique is Morpheus's territory — link to `morpheus-report-architecture-review.md` once it lands; flagged data shape gaps are listed in §5 below.
+
+---
+
+## 1. Discrepancy walk-through — one run, three contradictions
+
+The anchor run's `summary.json` is unambiguous: `"passed": 12, "failed": 0, "errors": 0`, and every result's `success: true`. The site agrees at the top of the funnel and contradicts itself on the way down.
+
+### 1a. `/runs` — the run card looks correct
+*Screenshot:* `01-runs-list.png`, `07-runs-page.png`
+
+```
+Apr 23, 2026, 07:59 PM    12 evaluations    ✓ 12  ✗ 0    100.0%
+```
+Fine. `runs-page.tsx:136-138` divides `passed/total` from `summary.json` top-level. Honest.
+
+### 1b. `/runs/20260423-195948` — every row claims **1/4** or **0/0** in red
+*Screenshot:* `02-run-detail-table.png`
+
+| Score (rendered) | Prompt | Model | Duration |
+|---|---|---|---|
+| **1/4** 🟥 | key-vault-dp-python-crud | claude-sonnet-4.5 | 101.4s |
+| **0/0** 🟥 | key-vault-dp-python-crud | gpt-5.3-codex | 42.3s |
+| **0/0** 🟥 | key-vault-dp-python-crud | gpt-5.3-codex | 19.6s |
+| **1/4** 🟥 | key-vault-dp-python-crud | claude-opus-4.6 | 66.5s |
+| … (rest mixed 1/4 and 0/0) | | | |
+
+**Cause** — `run-detail-page.tsx:236-237`:
+```ts
+const gradersPassed = (r as EvalReport).grader_results?.filter(g => g.pass === true).length ?? 0;
+const gradersTotal  = (r as EvalReport).grader_results?.length ?? 0;
+```
+Two compounding bugs:
+1. **Tri-state collapse.** Strict `g.pass === true` excludes `pass: null`. In the JSON, `output_check` is the only grader whose backend sets `pass`. The three `review`-type graders (`claude-opus-4.6`, `gpt-4.1`, `consensus`) all have `pass: null` even though every criterion under them is `passed: true` and `overall_score === max_score`. So a fully-green eval renders as **1/4**.
+2. **Schema drift.** The `gpt-5.3-codex` rows are stored without a `grader_results` array on the summary endpoint (`/api/runs/20260423-195948`) — confirmed via curl (see §5). Filter returns 0, total returns 0, ScoreBadge renders `0/0` and colours it red because `passed === total && total > 0` is false.
+
+`ScoreBadge` (`run-detail-page.tsx:10-13`) is the wrong colour metaphor here regardless: it's already disagreeing with the per-row `r.success` boolean that lives one column to the right (er, would, if the table even showed `success` — see 1c).
+
+### 1c. `/runs/.../eval/.../baseline/claude-sonnet-4.5` — header says 12/12 ✅, grader rows say **N/A** ⚪
+*Screenshot:* `03-eval-detail-header.png`, `08-eval-detail-full.png`, `08b-eval-grader-section.png`
+
+The hero score box shows `12 / 12` on an emerald-bordered card with a green check (line 423/441), driven by `r.success` and `review.overall_score / review.max_score`. Then below:
+
+```
+Grader Results (4)
+  [PASS] Output Files Exist                Output Check        100%
+  [N/A]  claude-opus-4.6                   Review • opus-4.6   6/6
+  [N/A]  gpt-4.1                           Review • gpt-4.1    6/6
+  [N/A]  consensus                         Review • consensus  12/12
+```
+
+Same root cause as 1b plus a UX choice: `GraderResultRow.tsx:16,29-39,68` has explicit tri-state (`true/false/null`) → `PASS/FAIL/N/A`. With three `pass: null` graders that scored `6/6` and `12/12`, the row literally renders `N/A` in grey. The user reads "PASS for output check, no opinion on the review graders" — but the score column directly to the right says `12/12`. The page is internally inconsistent in two consecutive flexbox cells.
+
+### 1d. `/dashboard` — uncaught crash
+*Screenshot:* `06-dashboard.png`, `09-dashboard-crash.png`
+
+```
+Unexpected Application Error!
+Cannot read properties of undefined (reading 'toFixed')
+TypeError: Cannot read properties of undefined (reading 'toFixed')
+   at … index-Br3u5NeB.js:365:33160
+   at Array.map …
+```
+React Router's default ErrorBoundary catches it; the user sees a stack trace. Reproducible by clicking "Dashboard" from the navbar at any moment — the navbar advertises a page that crashes. Not directly the same root bug as 1a–1c but it's the user's third click and shapes the impression that pass/fail data is unstable across the site.
+
+### 1e. `/runs` rate column — error rows render as `0.0%` red
+*Screenshot:* `11-runs-listing-bad-rows.png*
+
+```
+Apr 23, 2026, 07:21 PM    3 evaluations    0  0  3    0.0%
+Apr 23, 2026, 07:19 PM    3 evaluations    0  0  3    0.0%
+```
+Three rows of `passed=0 failed=0 errors=3` — runs that errored before any grader ran. The card shows `0.0%` in the same emerald-fill bar as a successful run, just empty. Errors are aggregated into the denominator (`passed/total`), so an all-error run is indistinguishable visually from an all-fail run. There's also no badge/tag on the card saying "errored" — only a small amber count next to the X icon.
+
+---
+
+## 2. Page inventory — every site surface that touches grader/tools data
+
+| Page | Component | Reads `success` | Reads `pass` | Reads `grader_results` | Reads tools | Plugin/skill-dir aware? | Issues |
+|------|-----------|-----------------|--------------|-----------------------|-------------|-------------------------|--------|
+| `/runs` | `runs-page.tsx` | indirectly via `summary.passed` | no | no | no | n/a | 1e: errors fold into denominator with no visual signal |
+| `/runs/:id` | `run-detail-page.tsx` | yes (filter, line 85-86) | **yes (strict `=== true`)** | yes (per-row count) | shows top-2 mcp + top-1 skill flat | **no** | 1b: bad denominator + tri-state collapse |
+| `/runs/:id/eval/...` | `eval-detail-page.tsx` | yes (header card, line 423/441) | via GraderResultRow | yes (full list) | flat skill/MCP/builtin tag per tool (line 495-535) | **no** | 1c: header agrees with `success`, rows disagree |
+| `/runs/:id/eval/...` (Grader rows) | `GraderResultRow.tsx` | no | yes, tri-state | yes | n/a | n/a | tri-state UX correct in isolation, but every review-type grader currently lands on N/A |
+| `/prompts` | `prompts-page.tsx` | computed pass-rate | no | no | no | n/a | leaks one-shot config names like `neo-test/missing-plugin` into "Worst" stat |
+| `/prompts/:id` | `prompt-detail-page.tsx` | uses summary.passed | no | no | aggregates `Pass Rate by Tool Used` from invoked tools | **no** | "Pass Rate by Tool Used" lists tools as flat names — no plugin grouping (`azure.sdk_*` siblings show as separate rows) |
+| `/dashboard` | `dashboard-page.tsx` | n/a | n/a | n/a | n/a | n/a | 1d: hard crash on `.toFixed` of undefined |
+| `/pairwise` | `pairwise-page.tsx` | uses `success` | no | no | no | n/a | renders, but uses same `success` semantics as above; would inherit any roll-up change |
+| `/compare` | `comparison-page.tsx` | uses `success` | no | no | no | n/a | same as pairwise |
+| `/runs/:id` (tools cell) | inside `run-detail-page.tsx:264-279` | n/a | n/a | n/a | yes — top-2 mcp + top-1 skill | **no** | flat name list; would need plugin parent grouping post-Phase-1 too |
+
+**Two structural gaps the templates can't currently see:**
+1. Nothing in `site/src/app/data/types.ts` describes a plugin parent or skill-dir parent. `tool_availability` from the JSON is a flat array (`{name,type:"skill"|"mcp",available,used}`). No `parent_kind`, no `parent_name`, no children grouping. The renderer has no input from which to draw the parent/child distinction Phase-2 demands.
+2. Grader rows have no `Points []` field on the wire today. Two existing structs (`OutputCheckGraderDetails.SubChecks`, `ReviewGraderDetails.criteria`) carry the underlying truth, but the unified `Points` shape from plan.md Phase 2 isn't represented in the TS types yet, and no template surfaces the per-criterion list anywhere except the giant criterion-by-criterion render at the bottom of the eval page (lines 615-660).
+
+---
+
+## 3. Pre-Phase-2 quick wins (independent of data-model changes)
+
+These ship before Points lands and remove the false-negative impressions today.
+
+### Q1. `run-detail-page.tsx:236-237` — stop counting `pass === true`; use the same truth the header uses
+
+Today:
+```ts
+const gradersPassed = (r as EvalReport).grader_results?.filter(g => g.pass === true).length ?? 0;
+const gradersTotal  = (r as EvalReport).grader_results?.length ?? 0;
+```
+**Fix (presentation-only, mirrors what `success` already represents):**
+```ts
+const isPass = (g: GraderResult) =>
+  g.pass === true ||
+  // tri-state-null with full criteria → AND of criteria
+  (g.pass == null && (g.scores?.criteria?.length ?? 0) > 0 &&
+                     g.scores!.criteria!.every(c => c.passed)) ||
+  // tri-state-null with overall score === max → pass
+  (g.pass == null && g.overall_score != null && g.max_score != null &&
+                     g.max_score > 0 && g.overall_score === g.max_score);
+
+const gradersPassed = (r.grader_results ?? []).filter(isPass).length;
+const gradersTotal  = (r.grader_results ?? []).length;
+// fall back to r.success when no graders ran (gpt-5.3-codex case)
+const display = gradersTotal > 0 ? `${gradersPassed}/${gradersTotal}` : (r.success ? "—" : "✗");
+```
+Same `ScoreBadge` colour rule, but now anchored to the same `success` truth as the header card. `0/0` red boxes go away.
+
+> **Note:** this is a stop-gap for the rendering layer. The right fix is for graders to set `pass` correctly server-side — but that's Morpheus's call.
+
+### Q2. `GraderResultRow.tsx:16` — same fallback so review graders stop showing N/A
+
+```ts
+// before
+const passed = result.pass !== null && result.pass !== undefined ? result.pass : null;
+// after
+const passed =
+  result.pass != null ? result.pass :
+  (result.scores?.criteria?.length ?? 0) > 0
+    ? result.scores!.criteria!.every(c => c.passed)
+    : (result.overall_score != null && result.max_score != null && result.max_score > 0
+        ? result.overall_score === result.max_score
+        : null);
+```
+Three review rows on the anchor eval flip from `N/A` (grey) to `PASS` (emerald) without touching backend.
+
+### Q3. `dashboard-page.tsx` — guard the `.toFixed` site
+
+Add `?? 0` (or skip the row) where the runtime hits `undefined.toFixed`. Even a friendlier ErrorBoundary message is better than the React default. I haven't traced the exact line because the bundle is minified — a 5-min un-minified rebuild + repro would pinpoint it. **Asking Switch or Tank to bisect since the dashboard is shipping a stack trace today.**
+
+### Q4. `runs-page.tsx:136-138` — distinguish "errored" from "failed"
+
+Two narrow choices, pick one:
+- (a) Compute `effectiveTotal = total - errors` and `rate = passed / effectiveTotal`. Make the bar amber instead of empty-emerald when `errors > 0`.
+- (b) Add a tag/strip to the card: `⚠ run errored (3/3)` instead of a `0.0%` rate.
+
+Either keeps the user from confusing "this run was bad" with "this run never finished".
+
+### Q5. `runs-page.tsx` — surface the in-progress / partial run dir
+
+The newest entry on `/runs` was the not-yet-finished `20260423-203921` and rendered as `Unknown … evaluations … 0.0% N/A`. Either filter dirs that have no `summary.json` yet, or render `In progress` with a spinner — the current "Unknown / N/A" in the same shape as a finished run muddies the list.
+
+### Q6. `eval-detail-page.tsx:441-444` — score-card legend
+
+The big `12 / 12` card in the header is `review.overall_score / review.max_score`, which is the *review-grader-only* score, not the unified eval verdict. After Q1+Q2 land, `review.overall_score` will still be present but conceptually subsumed by Points. Two options for the interim:
+- (a) Re-label the card "Review Score 12/12" so the grader rows below stop looking like they're contradicting it.
+- (b) Compute a `pointsPassed/pointsTotal` synthesis from existing criteria (`output_check.SubChecks` count + `review.scores.criteria` count) and show that under the score number as `(15/15 points across 4 graders)`.
+
+I recommend (a) for now — it's the smaller change and aligns with Morpheus's likely structural fix.
+
+---
+
+## 4. Phase-2 UX proposals (after Points lands)
+
+All wireframes below stay inside the existing visual language: same `mono` font, `rounded-xl border border-white/8 bg-white/[0.03]` card chrome, emerald/red/amber accents from Tailwind tokens already in use.
+
+### 4a. Plugin parent — header-only group, children carry status
+
+**Today** (eval-detail "Available Tools", lines 495-535) — flat row of pill tags:
+```
+[azure (MCP)] [azure-keyvault-py (skill)] [azure-cosmos-py (skill)] … (40 more)
+```
+
+**Proposed** — group by `parent_kind/parent_name`, parent renders as a header without a status pill:
+
+```
+Available Tools
+
+  azure-sdk-python  (plugin)            ← header only, no pass/fail badge
+  ├─ azure-keyvault-py        (skill)   ✓ used
+  ├─ azure-cosmos-py          (skill)
+  ├─ azure-identity-py        (skill)
+  └─ azure-eventhub-py        (skill)
+  …41 children…
+
+  generator-skills  (skills dir)        ← header uses config `name`, not path
+  ├─ python-script-quality    (skill)
+  └─ python-readme            (skill)
+
+  azure              (mcp)              ← top-level, unchanged from today
+```
+
+Markup sketch (reusing existing `inline-flex … rounded-md px-2 py-1 bg-…/10 text-…/40` tag chrome):
+
+```tsx
+{Object.entries(toolsByParent).map(([parentKey, group]) => (
+  <div key={parentKey} className="mb-3">
+    {group.parent && (
+      <div className="mb-1.5 flex items-center gap-1.5 text-white/50" style={{ ...mono, fontSize: 11 }}>
+        <span>{group.parent.name}</span>
+        <span className="text-white/30">({group.parent.kind})</span>
+        {/* deliberately NO status pill on parent */}
+      </div>
+    )}
+    <div className={`flex flex-wrap gap-1.5 ${group.parent ? "ml-4 border-l border-white/5 pl-3" : ""}`}>
+      {group.children.map(child => <ToolTag key={child.name} tool={child} />)}
+    </div>
+  </div>
+))}
+```
+
+The `ml-4 border-l pl-3` indent matches what the run-detail-page table already does for nested filter rows — visual language stays consistent.
+
+**Skill-dir parent** uses `entry.Name` from config (which the validator change in plan.md Phase 1 already routes through) — so the header reads `generator-skills (skills dir)` not `./skills/generator (skills dir)`. No template change needed for that — purely a data-shape ask: the JSON needs `parent_name` populated from config.Name (Morpheus territory).
+
+### 4b. Grader card — header + N indented points
+
+**Today** (`GraderResultRow` collapsed):
+```
+[N/A] consensus                Review • consensus            12/12
+```
+
+**Proposed post-Points** (collapsed):
+```
+[✓ 12/12 passed] consensus                Review • consensus
+```
+
+**Expanded:**
+```
+[✓ 12/12 passed] consensus                Review • consensus       ▼
+  ✓ DefaultAzureCredential Authentication
+  ✓ Installing azure-keyvault-secrets and azure-identity packages
+  ✓ Creating a SecretClient with vault URL and credential
+  ✓ set_secret(), get_secret(), begin_delete_secret(), purge_deleted_secret()
+  …
+  ✗ paginates list_secrets                                           (if any failed)
+```
+
+Markup, reusing GraderResultRow's existing chrome + the criterion pill style already used on line 615-660 for review criteria:
+
+```tsx
+const passCount = (result.points ?? []).filter(p => p.pass).length;
+const totalCount = (result.points ?? []).length;
+const allPass = totalCount > 0 && passCount === totalCount;
+const noneRan = totalCount === 0;
+
+// Header badge:
+<div className={`flex items-center gap-1.5 rounded-md border px-2 py-1 ${badgeColor}`} style={{ fontSize: 10 }}>
+  {badgeIcon}
+  <span>
+    {noneRan ? (passed === true ? "PASS" : passed === false ? "FAIL" : "N/A")
+             : `${passCount}/${totalCount} passed`}
+  </span>
+</div>
+
+// Expanded body — one row per point, indented:
+{(result.points ?? []).map(p => (
+  <div key={p.name} className="ml-6 flex items-start gap-2 py-1" style={{ fontSize: 12 }}>
+    {p.pass
+      ? <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />
+      : <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400" />}
+    <div className="flex-1">
+      <div className={p.pass ? "text-white/70" : "text-red-400/80"}>{p.name}</div>
+      {p.message && <div className="text-white/40" style={{ fontSize: 11 }}>{p.message}</div>}
+    </div>
+  </div>
+))}
+```
+
+Existing `ChevronDown / ChevronRight` toggle stays. The `ml-6` indent matches the criterion list rendering already shipped at eval-detail-page.tsx:615-660.
+
+When `len(points) <= 1`, fall back to today's flat row with a real PASS/FAIL badge — matches what the CLI renderer plans to do per plan.md.
+
+### 4c. Roll-up — one rule, applied everywhere
+
+Add a single helper `isEvalPass(eval)` and use it on **every** surface that paints emerald-vs-red:
+
+```ts
+function evalPassFromPoints(r: EvalReport): boolean {
+  // Phase 2: every grader emits Points; eval passes iff every point passes
+  if (r.grader_results?.length) {
+    return r.grader_results.every(g =>
+      (g.points?.length ?? 0) === 0
+        ? g.pass === true
+        : g.points!.every(p => p.pass));
+  }
+  // No graders ran (e.g. errored generation) → fall back to existing flag
+  return r.success === true;
+}
+
+function runPassFromEvals(run: RunSummary): { passed: number; failed: number; errored: number } {
+  // ... aggregates evalPassFromPoints across run.results
+}
+```
+
+Apply to:
+- `runs-page.tsx` rate calculation
+- `run-detail-page.tsx` `gradersPassed/gradersTotal` cell (replace strict `=== true` filter)
+- `eval-detail-page.tsx` header score card (replace `r.success` direct read)
+- `prompt-detail-page.tsx` "Pass Rate by Config" / "by Tool" aggregations
+- `pairwise-page.tsx` and `comparison-page.tsx` per-cell win/loss
+
+Once the rule lives in one place, no surface can drift again.
+
+### 4d. Score-card and counts the user actually wants
+
+For the eval-detail header (replacing the `12/12` review-only card):
+
+```
+   ┌────────────────────────────┐
+   │     ✓ 15 / 15  points      │   ← AND of every Point across all graders
+   │     across 4 graders       │
+   └────────────────────────────┘
+```
+
+For the run-detail row (replacing `1/4` red):
+
+```
+   Score
+   ┌──────┐
+   │ 4/4  │   ← graders, not points (concise enough for a table cell)
+   └──────┘
+   tooltip: "15/15 points (4 graders) — output_check, opus-4.6, gpt-4.1, consensus"
+```
+
+Two-tier display: granularity at the eval, summary at the run. Both honest, both green when the answer is green.
+
+---
+
+## 5. Coordination with Morpheus
+
+Morpheus has `phase4-pw-final-summary.md` in his folder but no `morpheus-report-architecture-review.md` in `.squad/decisions/inbox/` as of writing. **Will link when it lands.** Boundary respected: this report doesn't propose data-model changes — only flags what the templates need from the wire.
+
+**Data fields the site needs from the JSON that aren't there today** (Morpheus to weigh in on shape):
+1. **`parent_kind` + `parent_name` on every `tool_availability` entry.** Today's flat array can't express plugin/skill-dir grouping. Without this the renderer in §4a is impossible.
+2. **`Points []GraderPoint{Name, Pass, Message}` on `GraderResult`** — already in plan.md Phase 2; confirming the site needs it on the JSON for §4b.
+3. **`pass: boolean` populated correctly on every grader** — including review-type graders. Today the strict `pass === true` filter excludes review graders entirely. If the backend continues returning `pass: null` for review graders, the site will keep needing the fallback in Q1/Q2; cleaner if the engine sets `pass = points.every(p => p.pass)` once Points lands.
+4. **`overall_pass: boolean` on `EvalReport`** — currently we lean on `success` (success of *generation*, I think?) and re-derive from grader_results. A canonical eval-level boolean computed by the engine from Points would let every site surface stop reinventing the rule.
+5. **`overall_passed` / `pass_rate_excluding_errors` on `RunSummary`** — to fix §1e without each surface re-deriving. Already pre-computed server-side in `summary.go`?
+
+If any of these change shape, ping Trinity — site types live in `site/src/app/data/types.ts`.
+
+---
+
+## 6. Open questions for the user (Ronnie)
+
+1. **For review graders (LLM-as-panel), what's the canonical pass definition?** Today: `criteria.every(c => c.passed)` is implicitly true on the anchor run, but `pass` on the wire is `null`. Should the engine just write `pass = AND(criteria)` for review graders? Or do you want the consensus grader to use a different rule (e.g. quorum)? This determines whether Q1/Q2 are temporary or load-bearing.
+
+2. **Score-card metaphor on the eval page.** Pre-Points the `12/12` is "reviewer agreement". Post-Points it could be "points passed / points total" (granular, true) or "graders passed / graders total" (concise, less true). Which do you want as the dominant number?
+
+3. **In-progress runs on `/runs`.** The list currently shows the partial `20260423-203921` as "Unknown 0.0% N/A". Hide it, or render it as `In progress`?
+
+4. **Errored runs on `/runs`.** Should I split the rate column into `passed | failed | errored` instead of folding errors into the denominator?
+
+5. **Dashboard page priority.** It's been crashing for some unknown number of commits. Pull a fix into the same wave as the grader render fixes, or carve a separate session?
+
+6. **Plugin parent click target.** Should the parent header in §4a be expandable/collapsable (hide the 41 children behind a `▶` toggle), or always-expanded? On a prompt that loads the full `azure-sdk-python` plugin the children take ~6 visual rows of pills.
+
+---
+
+## Appendix — quick reference
+
+- **Anchor JSON**: `/home/rgeraghty/projects/hyoka/reports/20260423-195948/results/key-vault/data-plane/python/crud/key-vault-dp-python-crud/python-pairwise/baseline/claude-sonnet-4.5/report.json`
+- **Screenshots**: `/tmp/trinity-site-review/01-runs-list.png` … `11-runs-listing-bad-rows.png`
+- **Files cited**:
+  - `hyoka/internal/serve/serve.go:142-178` (route map)
+  - `site/src/app/components/runs-page.tsx:136-198` (run cards, errored-row issue)
+  - `site/src/app/components/run-detail-page.tsx:236-256` (table score cell — primary bug)
+  - `site/src/app/components/eval-detail-page.tsx:382-461,495-560,615-660` (header card, tools, graders, criteria render)
+  - `site/src/app/components/GraderResultRow.tsx:16,29-39,68` (tri-state badge logic)
+  - `site/src/app/components/dashboard-page.tsx` (crash site, line not yet bisected)
+  - `site/src/app/data/types.ts` (no `parent_kind`/`parent_name`/`points` types yet)
+- **Plan reference**: session-state plan at `/home/rgeraghty/.copilot/session-state/87e98ab8-…/plan.md` Phase 1 + Phase 2.
+
+Read-only review — no templates, CSS, types, or data files were modified. No commits, no pushes.
+
