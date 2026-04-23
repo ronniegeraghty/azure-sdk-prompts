@@ -758,3 +758,59 @@ Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total acros
 **Your commits this sprint:** `32f4e6c9` docs refresh (README + `docs/getting-started.md` + `docs/cli-reference.md`) covering workers=1 default, `--progress` values + aliases, auto-selection matrix, NO_COLOR behavior as an OR condition.
 
 See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.
+
+## Session: Tool Load Validation Documentation (WU-4)
+
+**Date:** 2026-04-24  
+**Work:** Documented the new tool load validation behavior shipping with Neo's tool verification fixes.
+
+### Task: WU-4 from Neo's Fix Plan
+
+Neo's investigation identified that tool load failures were silent — if a configured skill or MCP server failed to load, the eval would continue without the tool, leading to misleading pass/fail results. The fix implements a 10-second validation gate that aborts the eval immediately if any configured tool fails to load.
+
+My documentation task (WU-4) was to explain this new behavior to users.
+
+### Files Changed
+
+1. **docs/configuration.md**
+   - Added new "Tool Load Validation" subsection under the Tools section (after MCP Servers, before Limits)
+   - Explains that all configured tools in `generator.tools` and `reviewer.tools` are implicitly required
+   - Documents the 10-second timeout and abort-before-generation behavior
+   - Lists common causes: missing SKILL.md, incorrect paths, remote skill unavailable, MCP server not found, SDK timeout
+   - Explains how to diagnose with `--log-level debug --log-file` and grep for tool errors
+   - Forward-looking note about future `required: false` opt-out (Phase 2, not in this release)
+
+2. **docs/troubleshooting.md** (new file)
+   - Comprehensive "Tool Load Failures" section as primary content
+   - Explains diagnosis: use debug logging and grep for "tool|skill|mcp|verifier|failed"
+   - Dedicated subsections for each common cause with specific fixes:
+     * **Skill not found or SKILL.md missing** — check directories, verify paths are relative to config file, test with absolute path
+     * **Glob pattern produces no matches** — verify glob syntax and that all matched dirs contain SKILL.md
+     * **Remote skill download fails** — test GitHub access (`gh repo view`), check auth (`gh auth status`), manually test `npx skills add`
+     * **MCP server fails to start** — verify command in PATH, test manually, ensure `mcp_tools` field is set
+     * **SDK timeout (10 seconds)** — verify network, pre-download remote skills, check system resources
+   - Quick checklist for users to verify all tools before re-running
+   - Additional troubleshooting sections for other issues (timeouts, model not found, session init failures)
+   - Guidance on getting help: check logs, check reports via `hyoka serve`, open a GitHub issue
+
+### Style & References
+
+- All docs follow existing Microsoft Style Guide conventions (technical accuracy, clear task-focused language)
+- Examples use real command structures from the codebase and CLI
+- Diagnostic workflows match the actual log format and tool names from Neo's verifier implementation
+- No invented design decisions — all content derives from Neo's investigation doc (.squad/decisions/inbox/neo-tool-skill-investigation-2026-04-23.md)
+
+### Commit
+
+- Commit: `6ca1a341` — "docs(oracle): add tool load validation documentation — WU-4"
+- Includes Copilot co-author trailer
+- Pushed to `origin/ronniegeraghty/dev` (no PR per instructions)
+
+### Notes
+
+- The actual validation gate implementation (WU-1 + WU-3) is Neo's responsibility
+- Test cases (WU-2) will be Switch's responsibility
+- My docs are written to match Neo's decision (Option A: validation in copilot.go after session start) and assume the error message format from the verifier: `"required {kind} '{name}' failed to load: {reason}"` where reason is "SDK did not report skill/mcp as loaded"
+- If Neo modifies the error message format, these docs can be easily updated in a follow-up
+
+**Status:** ✅ Complete. Tool load validation behavior is now documented for users.
