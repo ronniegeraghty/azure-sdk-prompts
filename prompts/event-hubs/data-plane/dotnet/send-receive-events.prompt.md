@@ -26,25 +26,24 @@ tags:
 
 I need to send a batch of events to Azure Event Hubs and then process
 them reliably with checkpointing. How do I set up both the producer
-and consumer sides in C#?
-1. Create an EventHubProducerClient and send a batch of events
-2. Use EventProcessorClient with Blob Storage checkpointing to receive events
-3. Register ProcessEventAsync and ProcessErrorAsync handlers
-4. Implement checkpointing with ProcessEventArgs.UpdateCheckpointAsync()
-5. Handle proper disposal of clients
+and consumer sides in .NET?
+1. Send a batch of events to an Event Hub
+2. Receive and process events reliably with checkpoint-based tracking
+3. Handle processing errors gracefully
+4. Ensure proper resource cleanup
 
-Show required NuGet packages (Azure.Messaging.EventHubs and
-Azure.Messaging.EventHubs.Processor).
+Explain how checkpointing works and why it's needed for reliable
+event processing.
 
 ## Evaluation Criteria
 
 The generated code should include:
-- `Azure.Messaging.EventHubs` and `Azure.Messaging.EventHubs.Processor` NuGet packages
-- `EventHubProducerClient` with `CreateBatchAsync()` and `SendAsync()`
-- `EventDataBatch.TryAdd()` for adding events to a batch
-- `EventProcessorClient` with `BlobContainerClient` for checkpointing
-- Event handler delegates and `ProcessEventArgs`
-- `UpdateCheckpointAsync()` for reliable processing
+- Sends events in batches with size validation
+- Receives events with checkpoint-based progress tracking
+- Uses a durable checkpoint store (e.g., blob storage)
+- Registers event and error handlers
+- Checkpoints after processing to avoid reprocessing
+- Properly disposes of clients and resources
 
 ## Context
 

@@ -24,23 +24,23 @@ author: JonathanCrd
 ## Prompt
 
 I'm using Event Hubs in an enterprise setting and need to enforce schemas
-on my events. How do I use Azure Schema Registry with Avro serialization in C#?
-1. Register an Avro schema with the Schema Registry client
-2. Serialize an event using SchemaRegistryAvroSerializer before sending
-3. Send the serialized event to Event Hubs
-4. Deserialize the received event back using the schema from the registry
+on my events. How do I use Azure Schema Registry with Avro serialization
+in .NET?
+1. Register an Avro schema with the Schema Registry
+2. Serialize an event using the registered schema before sending to Event Hubs
+3. Send the serialized event to an Event Hub
+4. Deserialize a received event back into a typed object using the registry
 
-Show the required NuGet packages (Microsoft.Azure.Data.SchemaRegistry.ApacheAvro
-and Azure.Data.SchemaRegistry) and explain the schema ID embedding model.
+Explain how schema IDs are embedded in event data and how consumers
+resolve them.
 
 ## Evaluation Criteria
 
-- `Azure.Data.SchemaRegistry` and `Microsoft.Azure.Data.SchemaRegistry.ApacheAvro` NuGet packages
-- `SchemaRegistryClient` creation with endpoint and credential
-- `SchemaRegistryAvroSerializer` for Avro serialization/deserialization
-- `SerializeAsync()` to create `EventData` with embedded schema ID
-- `DeserializeAsync<T>()` to reconstruct the typed object
-- Schema group and schema name concepts
+- Uses the Schema Registry SDK to register and retrieve schemas
+- Serializes events using an Avro serializer backed by the registry
+- Embeds schema IDs in event data transparently
+- Deserializes received events back into typed objects
+- Explains schema group and schema naming concepts
 
 ## Context
 
