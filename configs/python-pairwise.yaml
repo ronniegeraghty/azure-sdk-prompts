@@ -1,0 +1,41 @@
+# Azure MCP + azure-sdk-python plugin — single config, multiple generator models
+# Each model in `generator.models` runs the prompt independently against the same
+# tool stack (Azure MCP + generator skills + azure-sdk-python plugin) and is
+# scored by the same reviewer panel. Pair with `--pairwise` (-P) for tool ablation.
+#
+# Plugin source: https://github.com/microsoft/skills/tree/main/.github/plugins/azure-sdk-python
+# Install once before running: /plugin install azure-sdk-python@skills
+configs:
+  - name: python-pairwise
+    description: "Azure MCP + azure-sdk-python plugin — Opus 4.6, Sonnet 4.5, GPT-5.3 Codex"
+    generator:
+      models:
+        - "claude-opus-4.6"
+        - "claude-sonnet-4.5"
+        - "gpt-5.3-codex"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start"]
+          mcp_tools: ["*"]
+        - name: generator-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/generator"
+    reviewer:
+      models:
+        - "claude-opus-4.6"
+        - "gemini-3-pro-preview"
+        - "gpt-4.1"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    plugins:
+      - "azure-sdk-python@skills"
+    limits:
+      max_turns: 100

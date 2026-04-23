@@ -38,12 +38,12 @@ func TestVisibleWidth(t *testing.T) {
 		{
 			name:  "emoji",
 			input: "🔄",
-			want:  1,
+			want:  2, // wide char, takes 2 terminal columns
 		},
 		{
 			name:  "mix of text and emoji with ANSI",
 			input: "\x1b[32m✅ Loaded\x1b[0m",
-			want:  8, // ✅ (1) + space (1) + Loaded (6) = 8 runes
+			want:  9, // ✅ (2) + space (1) + Loaded (6) = 9 cells
 		},
 	}
 
@@ -105,6 +105,18 @@ func TestTruncateToWidth(t *testing.T) {
 			input: "hello",
 			max:   1,
 			want:  "…\x1b[0m",
+		},
+		{
+			name:  "wide char emoji truncated correctly",
+			input: "🔄 hello world",
+			max:   10,
+			want:  "🔄 hello …\x1b[0m", // 🔄(2) + space(1) + hello(5) + space(1) + …(1) = 10 cells
+		},
+		{
+			name:  "wide char truncation preserves ANSI",
+			input: "\x1b[32m🔄 Running\x1b[0m",
+			max:   8,
+			want:  "\x1b[32m🔄 Runn…\x1b[0m", // 🔄(2) + space(1) + Runn(4) + …(1) = 8 cells
 		},
 	}
 

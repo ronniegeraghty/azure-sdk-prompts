@@ -15,7 +15,7 @@
 - Configuration system (`hyoka/internal/config/`, `configs/`)
 - Environment checking and validation (`hyoka/internal/checkenv/`, `hyoka/internal/validate/`)
 - Clean command (`hyoka/internal/clean/`)
-- Progress/UX output (`hyoka/internal/progress/`) — display_interactive.go, display_ci.go, style helpers
+- **Terminal/CLI output** (`hyoka/internal/progress/`) — display_interactive.go, display_ci.go, style helpers, tail truncation, ANSI rendering, terminal width detection, progress event handling. Anything users see in the terminal during `hyoka run` belongs to me (NOT Trinity — she owns the browser/site only).
 - Build pipeline and `go.work` workspace management (`hyoka/internal/build/`)
 - PID file management (`hyoka/internal/pidfile/`)
 - Manifest handling (`hyoka/internal/manifest/`)

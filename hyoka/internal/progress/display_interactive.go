@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattn/go-runewidth"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress/style"
 )
 
@@ -17,21 +18,19 @@ import (
 var ansiSeqRE = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
 
 // visibleWidth returns the visible width of s in terminal columns, stripping
-// ANSI escape sequences and counting runes.
+// ANSI escape sequences and using proper cell width calculation (accounts for
+// wide characters like emoji and CJK that occupy 2 cells).
 func visibleWidth(s string) int {
 	// Strip ANSI sequences first.
 	stripped := ansiSeqRE.ReplaceAllString(s, "")
-	count := 0
-	for range stripped {
-		count++
-	}
-	return count
+	return runewidth.StringWidth(stripped)
 }
 
 // truncateToWidth returns s truncated so its visible width is at most max
-// columns. ANSI escape sequences are preserved (zero width). If s already
-// fits, it's returned unchanged. The truncation appends an ellipsis "…"
-// when content was dropped.
+// columns. ANSI escape sequences are preserved (zero width). Uses proper cell
+// width calculation (wide chars like emoji count as 2). If s already fits, it's
+// returned unchanged. The truncation appends an ellipsis "…" when content was
+// dropped.
 func truncateToWidth(s string, max int) string {
 	if max <= 0 {
 		return s
@@ -50,17 +49,18 @@ func truncateToWidth(s string, max int) string {
 			i += loc[1]
 			continue
 		}
-		// Each rune counts as 1 column for our purposes (good enough — emoji
-		// may differ but truncating slightly short is harmless).
+		// Decode the next rune and get its display width.
 		r, size := decodeRune(s[i:])
-		if visible+1 > max-1 { // leave 1 col for ellipsis
+		w := runewidth.RuneWidth(r)
+		// Check if adding this rune would exceed the limit (leaving 1 col for ellipsis).
+		if visible+w > max-1 {
 			out = append(out, []byte("…")...)
 			// Append ANSI reset to avoid bleeding styles past the truncation.
 			out = append(out, []byte("\x1b[0m")...)
 			return string(out)
 		}
 		out = append(out, []byte(string(r))...)
-		visible++
+		visible += w
 		i += size
 	}
 	return string(out)
