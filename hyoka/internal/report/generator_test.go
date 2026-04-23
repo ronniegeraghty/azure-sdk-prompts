@@ -494,6 +494,60 @@ func TestMigrateToV2(t *testing.T) {
 	}
 }
 
+// TestV2ReportReadByV3Code ensures that a v2 report serialized to disk
+// (with the legacy expanded-review row shape) can be deserialized by v3
+// code without loss. v3 readers must NOT attempt to de-expand the panel
+// rows back into a single ai_review entry — that mapping is lossy and
+// the v2 → v3 migration is metadata-only by design. The fixture lives
+// at testdata/v2_report.json and represents the worst case: a 3-panel
+// review that fanned out into one row per panel + a consensus row.
+func TestV2ReportReadByV3Code(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "v2_report.json"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var r EvalReport
+	if err := json.Unmarshal(data, &r); err != nil {
+		t.Fatalf("unmarshal v2 fixture: %v", err)
+	}
+	if r.SchemaVersion != 2 {
+		t.Fatalf("fixture should be schema 2, got %d", r.SchemaVersion)
+	}
+	// Count expanded review rows — should be 3 (panel-a, panel-b, consensus).
+	reviewRows := 0
+	for _, gr := range r.GraderResults {
+		if gr.GraderType == "review" {
+			reviewRows++
+		}
+	}
+	if reviewRows != 3 {
+		t.Errorf("v2 fixture: expected 3 expanded review rows, got %d", reviewRows)
+	}
+
+	// Migrate to v3 — metadata-only: schema bumps, rows untouched.
+	MigrateToV3(&r)
+	if r.SchemaVersion != CurrentSchemaVersion {
+		t.Errorf("after MigrateToV3: schema=%d, want %d", r.SchemaVersion, CurrentSchemaVersion)
+	}
+	postReviewRows := 0
+	for _, gr := range r.GraderResults {
+		if gr.GraderType == "review" {
+			postReviewRows++
+		}
+	}
+	if postReviewRows != reviewRows {
+		t.Errorf("v2 → v3 migration must not collapse expanded review rows: had %d, now %d",
+			reviewRows, postReviewRows)
+	}
+	// Roll-up fields are deliberately absent on migrated v2 reports —
+	// the migration cannot reconstruct an unambiguous count from the
+	// already-expanded shape.
+	if r.GradersTotal != 0 || r.GradersPassed != 0 {
+		t.Errorf("v2 → v3 must not invent roll-ups: passed=%d total=%d",
+			r.GradersPassed, r.GradersTotal)
+	}
+}
+
 // TestMigrateToV3 verifies that MigrateToV3 lifts a v0/v1 report through
 // v2 and lands at CurrentSchemaVersion. v2 → v3 is metadata-only so no
 // new fields appear on migrated reports — they just gain the version bump.

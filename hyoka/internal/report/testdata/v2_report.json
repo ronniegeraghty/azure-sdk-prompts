@@ -1,0 +1,66 @@
+{
+  "schema_version": 2,
+  "prompt_id": "legacy-v2",
+  "config_name": "baseline",
+  "model": "claude-sonnet-4.5",
+  "success": true,
+  "score": 0.85,
+  "grader_results": [
+    {
+      "grader_name": "files_present",
+      "grader_type": "files_present",
+      "pass": true,
+      "score": 1.0,
+      "weight": 1.0,
+      "message": "all files present"
+    },
+    {
+      "grader_name": "ai_review (panel-a)",
+      "grader_type": "review",
+      "pass": true,
+      "score": 0.8,
+      "weight": 1.0,
+      "message": "Panel A review",
+      "review_details": {
+        "model": "panel-a",
+        "panel_index": 0,
+        "score": 4,
+        "max_score": 5,
+        "summary": "Looks good"
+      }
+    },
+    {
+      "grader_name": "ai_review (panel-b)",
+      "grader_type": "review",
+      "pass": true,
+      "score": 0.9,
+      "weight": 1.0,
+      "message": "Panel B review",
+      "review_details": {
+        "model": "panel-b",
+        "panel_index": 1,
+        "score": 4,
+        "max_score": 5,
+        "summary": "Also good"
+      }
+    },
+    {
+      "grader_name": "ai_review (consensus)",
+      "grader_type": "review",
+      "pass": true,
+      "score": 0.85,
+      "weight": 1.0,
+      "message": "Consensus",
+      "review_details": {
+        "model": "consensus",
+        "score": 4,
+        "max_score": 5,
+        "summary": "Consensus summary"
+      }
+    }
+  ],
+  "environment": {
+    "model": "claude-sonnet-4.5",
+    "skills_loaded": ["skill-a", "skill-b"]
+  }
+}
