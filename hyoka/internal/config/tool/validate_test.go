@@ -104,6 +104,10 @@ skills:
 			if item.ParentKind != progress.ToolParentKindSkillDir {
 				t.Errorf("skill1 should have ParentKind=skill_dir, got %q", item.ParentKind)
 			}
+			// Parent must be the config-file `name:` value (issue (a) regression).
+			if item.Parent != "gen-skills" {
+				t.Errorf("skill1 Parent should be entry.Name=%q, got %q", "gen-skills", item.Parent)
+			}
 		}
 	}
 	if !foundSkill1 {

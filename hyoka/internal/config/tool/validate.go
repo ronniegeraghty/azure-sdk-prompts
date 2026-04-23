@@ -661,10 +661,15 @@ subDir := filepath.Join(resolved, e.Name())
 if _, err := os.Stat(filepath.Join(subDir, "SKILL.md")); err != nil {
 continue
 }
+// Parent is the config-file `name:` value (e.g. "generator-skills"),
+// NOT the on-disk directory path. The interactive renderer builds the
+// parent header from this field; using the path would surface the
+// implementation detail (`./skills/generator`) instead of the
+// human-meaningful identifier the user wrote in their config.
 childRows = append(childRows, ToolLoadItem{
 Kind:       progress.ToolKindSkill,
 Name:       e.Name(),
-Parent:     entry.Path,
+Parent:     entry.Name,
 ParentKind: progress.ToolParentKindSkillDir,
 Status:     progress.ToolStatusLoaded,
 Path:       subDir,
