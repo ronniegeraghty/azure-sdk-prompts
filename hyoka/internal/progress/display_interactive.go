@@ -912,6 +912,15 @@ func (r *interactiveRenderer) onGraderStart(evt ProgressEvent) {
 
 func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 	r.ensureGradersHeader()
+
+	// Multi-point graders render as a header line + one indented row per
+	// point. Single- or zero-point graders fall back to the legacy flat
+	// row to preserve existing UX.
+	if len(evt.Points) > 1 {
+		r.renderGraderWithPoints(evt)
+		return
+	}
+
 	score := ""
 	if evt.Score != nil {
 		score = fmt.Sprintf(" (%s/10)", formatScore(*evt.Score))
@@ -956,6 +965,67 @@ func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 	// No prior row for this grader at all — append fresh.
 	r.freezeTail()
 	r.writeLine(line)
+}
+
+// renderGraderWithPoints emits a multi-line block for a grader that reported
+// multiple Points: a header line summarizing the aggregate (e.g. "❌ 2/3 passed")
+// followed by one indented row per Point. Reuses the same in-place rewrite
+// scaffolding as the single-row path so the header replaces the original
+// "Running…" row when one was previously frozen.
+func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
+	passed := 0
+	for _, p := range evt.Points {
+		if p.Pass {
+			passed++
+		}
+	}
+	total := len(evt.Points)
+	allPassed := passed == total
+	badge := r.sty.Fail(fmt.Sprintf("❌ %d/%d passed", passed, total))
+	if allPassed {
+		badge = r.sty.OK(fmt.Sprintf("✅ %d/%d passed", passed, total))
+	}
+	header := fmt.Sprintf("  - %s %s: %s",
+		evt.GraderID,
+		r.sty.Muted("("+evt.GraderKind+")"),
+		badge)
+
+	// Place the header. Three cases mirror the flat path:
+	//   1. This grader still owns the tail — rewrite tail then freeze.
+	//   2. The Running row was frozen above — rewrite in place.
+	//   3. No prior row — append fresh.
+	switch {
+	case r.cur.tailKind == tailGrader && r.cur.pendingGraderID == evt.GraderID:
+		r.rewriteTail(header)
+		r.freezeTail()
+		if r.cur.graderRowByID != nil {
+			delete(r.cur.graderRowByID, evt.GraderID)
+		}
+	default:
+		if row, ok := r.cur.graderRowByID[evt.GraderID]; ok {
+			r.freezeTail()
+			r.rewriteFrozenLine(row, header)
+			delete(r.cur.graderRowByID, evt.GraderID)
+		} else {
+			r.freezeTail()
+			r.writeLine(header)
+		}
+	}
+
+	// One indented row per point under the header.
+	for _, p := range evt.Points {
+		var status string
+		if p.Pass {
+			status = r.sty.OK("✅ Pass")
+		} else {
+			status = r.sty.Fail("❌ Fail")
+		}
+		line := fmt.Sprintf("    - %s: %s", p.Name, status)
+		if !p.Pass && p.Message != "" {
+			line += " " + r.sty.Muted("— "+p.Message)
+		}
+		r.writeLine(line)
+	}
 }
 
 // --- Terminal events ---

@@ -70,24 +70,26 @@ export function DashboardPage() {
     );
 
     for (const run of runs) {
-      totalEvals += run.total_evaluations;
-      totalPassed += run.passed;
-      totalDuration += run.duration_seconds;
+      // Crashed/aborted runs may be missing total_evaluations / duration_seconds.
+      // Guard with `?? 0` so the aggregations never become NaN.
+      totalEvals += run.total_evaluations ?? 0;
+      totalPassed += run.passed ?? 0;
+      totalDuration += run.duration_seconds ?? 0;
 
       for (const result of run.results || []) {
-        const meta = result.prompt_metadata;
-        
+        const meta = result.prompt_metadata ?? ({} as typeof result.prompt_metadata);
+
         // Track models (use config_name as proxy for model if not available)
         models.add(result.config_name);
 
         // Service stats
-        const service = meta.service || "unknown";
+        const service = meta?.service || "unknown";
         if (!serviceStats[service]) serviceStats[service] = { total: 0, passed: 0 };
         serviceStats[service].total++;
         if (result.success) serviceStats[service].passed++;
 
         // Language stats
-        const lang = meta.language || "unknown";
+        const lang = meta?.language || "unknown";
         if (!langStats[lang]) langStats[lang] = { total: 0, passed: 0 };
         langStats[lang].total++;
         if (result.success) langStats[lang].passed++;
@@ -102,11 +104,11 @@ export function DashboardPage() {
           id: `${run.run_id.slice(0, 8)}-${result.prompt_id.slice(0, 12)}`,
           runId: run.run_id,
           prompt: result.prompt_id,
-          lang: result.prompt_metadata.language || "unknown",
+          lang: result.prompt_metadata?.language || "unknown",
           config: result.config_name,
           score: result.review?.overall_score || 0,
           pass: result.success,
-          duration: `${result.duration_seconds?.toFixed(1) || 0}s`,
+          duration: `${(result.duration_seconds ?? 0).toFixed(1)}s`,
           files: result.generated_files?.length || 0,
         });
       }
@@ -119,7 +121,7 @@ export function DashboardPage() {
     const passRateByService = Object.entries(serviceStats)
       .map(([name, stats]) => ({
         name,
-        rate: parseFloat(((stats.passed / stats.total) * 100).toFixed(1)),
+        rate: stats.total > 0 ? parseFloat(((stats.passed / stats.total) * 100).toFixed(1)) : 0,
         total: stats.total,
       }))
       .sort((a, b) => b.rate - a.rate);
@@ -127,18 +129,23 @@ export function DashboardPage() {
     const passRateByLang = Object.entries(langStats)
       .map(([name, stats]) => ({
         name,
-        rate: parseFloat(((stats.passed / stats.total) * 100).toFixed(1)),
+        rate: stats.total > 0 ? parseFloat(((stats.passed / stats.total) * 100).toFixed(1)) : 0,
         total: stats.total,
       }))
       .sort((a, b) => b.rate - a.rate);
 
-    // Duration trend (last 10 runs)
-    const durationTrend = sortedRuns.slice(0, 10).reverse().map((run, idx) => ({
-      run: run.run_id.slice(0, 8),
-      duration: parseFloat(run.duration_seconds.toFixed(1)),
-      gen: parseFloat((run.avg_generation_duration_seconds || 0).toFixed(1)),
-      review: parseFloat((run.avg_review_duration_seconds || 0).toFixed(1)),
-    }));
+    // Duration trend (last 10 runs). Skip runs that never produced a
+    // duration_seconds (crashed before summary finalized).
+    const durationTrend = sortedRuns
+      .filter(run => run.duration_seconds != null)
+      .slice(0, 10)
+      .reverse()
+      .map(run => ({
+        run: run.run_id.slice(0, 8),
+        duration: parseFloat((run.duration_seconds ?? 0).toFixed(1)),
+        gen: parseFloat((run.avg_generation_duration_seconds ?? 0).toFixed(1)),
+        review: parseFloat((run.avg_review_duration_seconds ?? 0).toFixed(1)),
+      }));
 
     const lastUpdated = sortedRuns.length > 0 ? sortedRuns[0].timestamp : null;
 

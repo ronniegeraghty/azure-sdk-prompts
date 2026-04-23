@@ -11,6 +11,7 @@ import { PromptDetailPage } from "./components/prompt-detail-page";
 import { EvalDetailPage } from "./components/eval-detail-page";
 import { PairwisePage } from "./components/pairwise-page";
 import { ComparisonPage } from "./components/comparison-page";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 export const router = createBrowserRouter([
   {
@@ -19,7 +20,14 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: HomePage },
       { path: "how-it-works", Component: HowItWorksPage },
-      { path: "dashboard", Component: DashboardPage },
+      {
+        path: "dashboard",
+        element: (
+          <ErrorBoundary surface="Dashboard">
+            <DashboardPage />
+          </ErrorBoundary>
+        ),
+      },
       { path: "pairwise", Component: PairwisePage },
       { path: "compare", Component: ComparisonPage },
       { path: "docs", Component: DocsPage },
