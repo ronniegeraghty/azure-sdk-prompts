@@ -251,6 +251,55 @@ generator:
 
 > **Important:** The `mcp_tools` field must be set (typically `["*"]`) for the MCP server's tools to be registered with the agent. Without it, the server starts but its tools won't be available.
 
+### Tool Load Validation
+
+All tools declared in `generator.tools` or `reviewer.tools` are **implicitly required**. When hyoka starts an evaluation, it waits up to 10 seconds for the Copilot SDK to confirm that all configured tools have loaded successfully.
+
+**What happens if a tool fails to load:**
+
+If any tool fails to load within the 10-second window, hyoka will immediately abort the evaluation with a clear error message before attempting to generate code:
+
+```
+Error: required skill 'generator-skills' failed to load: SDK did not report skill as loaded
+```
+
+or
+
+```
+Error: required mcp 'azure' failed to load: SDK did not report MCP server as loaded
+```
+
+This behavior prevents silent failures where code generation happens without the intended tools, leading to misleading pass/fail results from graders.
+
+**Common causes of tool load failures:**
+
+- **Missing `SKILL.md`** — A configured skill directory doesn't contain a required `SKILL.md` file
+- **Incorrect skill path** — The `path` field points to a directory that doesn't exist or isn't accessible
+- **Remote skill unavailable** — A remote skill (from a GitHub repository) cannot be fetched due to network issues or authentication problems
+- **MCP server not found** — The `command` specified for an MCP server is not available (e.g., `npx` not in PATH or package not installed)
+- **SDK timeout** — The Copilot SDK failed to initialize the tool within 10 seconds (rare; usually indicates a deeper issue)
+
+**Diagnosing tool load failures:**
+
+Re-run your evaluation with debug logging to see detailed tool load diagnostics:
+
+```bash
+hyoka run --prompt-id <prompt-id> --config <config> \
+  --log-level debug --log-file hyoka-debug.log
+```
+
+Then grep the log for tool-related messages:
+
+```bash
+grep -i "tool\|skill\|mcp\|verifier" hyoka-debug.log
+```
+
+Look for lines containing `"SDK did not report"` or `"failed to load"` to pinpoint which tool(s) failed and why.
+
+**Future: Optional tools**
+
+In a future release, you may be able to mark specific tools as optional using `required: false`. For now, all configured tools are required.
+
 ## Limits
 
 Guardrail limits can be set at multiple levels with the following resolution order:
