@@ -626,3 +626,64 @@ All non-template examples are schema-valid. The single "failure" (`prompt-templa
 **Process takeaway:** When a locked directive arrives mid-rollout and some phases have already shipped, the replan commit for Phase N+1 should explicitly map each shipped commit to "still correct" vs "needs rewrite" — saves the next implementer from guessing which earlier work is safe to build on.
 
 **Plan:** `.squad/decisions/inbox/morpheus-option-a-replan.md`. Awaiting Ronnie approval before restart.
+
+---
+
+## Learnings (Plugin/Skill/MCP Loader Diagnosis — 2026-04-23)
+
+**Requested by:** Ronnie. Symptom: "plugins and skills never seem to successfully load." Deliverable: diagnosis + work-item plan (no implementation). Plan saved to `.squad/decisions/inbox/morpheus-plugin-loader-plan.md`.
+
+### Loader flow map (end-to-end)
+
+```
+YAML → config.ExpandPlugins (silent WARN on miss)
+     → copilot.go buildSessionConfig:
+         - EmitPluginResolutions (progress only, read-only)
+         - EmitMCPResolutions (static field validation)
+         - ResolveSkillsWithReporter (generator only; silent WARN + nil,nil on miss)
+     → client.CreateSession → SDK indexes skills/spawns MCP
+     → OnEvent(SessionSkillsLoaded/SessionMcpServersLoaded) → verifier records load
+     → [DISABLED 4b593d3b] waitForToolVerification gate
+     → SendAndWait
+Reviewer skill path: cmd/run.go passes entry.Path raw to SetSkillDirectories —
+  no ResolveSkills, no glob, no skill_dir expansion. Cross-config leakage
+  (reviewer paths pooled across all matched configs, not scoped per-config).
+```
+
+### Failure modes observed in live runs
+
+1. **Plugin refs like `azure-sdk-python@skills`** — marketplace naming, never present in local `plugins/*.yaml` (which defines only `azure-python`), and `~/.copilot/installed-plugins/` is empty on this machine. All 6 plugin refs across baseline-skills and python-pairwise configs silently skipped on every invocation.
+2. **Generator skill `azure-sdk-for-rust-bestpractices`** loads on every eval regardless of prompt language. Python prompt with Rust skill → 0 `skill.invoked` events across 4 turns.
+3. **Extra skill `customize-cloud-agent`** reported as loaded — SDK builtin leaking past the "isolated ConfigDir" (#21) comment. Not a config bug, but the verifier's loose name-matching hides it.
+4. **Verification gate disabled** (commit 4b593d3b). The SDK emits `SessionSkillsLoaded`/`SessionMcpServersLoaded` only AFTER `SendAndWait` begins; the original gate blocked BEFORE `SendAndWait`, causing a 10s timeout deadlock on every eval. Neo disabled observationally; no post-session fallback was added. Today tool load failures are logged (WARN) but never block.
+5. **Every `hyoka list` / `hyoka run`** reloads all 13 configs and re-walks `plugins/` 13 times. Warnings for configs not even selected fire on every invocation. Noisy, not broken.
+6. **Reviewer skill resolution gap**: `cmd/run.go:378` loops over ALL configs (not the selected one) and passes raw `entry.Path` strings to `SetSkillDirectories`. `skill_dir: true` is silently ignored. Missing paths produce no error.
+
+### Silent-failure inventory
+
+10 distinct silent-WARN-continue points traced (F1–F10 in the plan). Every one must be either converted to a structured error OR stop claiming the load happened.
+
+### Hard-fail decision rationale
+
+Silent degradation turns an eval into a non-representative comparison — the run "passes" but measures a different experiment than the config declared. That's worse than a failed eval because it corrupts trend data. The prior gate was a bad implementation (timing mismatch with SDK events), not a bad idea. The fix is **static pre-session validation** (we know at config-load time whether a plugin exists, a skill dir has SKILL.md, an MCP server has its command) plus keep the post-session SDK-event verifier as secondary confirmation. Hard-fail by default; add `required: false` opt-out only if a real use case demands it.
+
+### Plan structure (summary)
+
+- **WU-1 (Neo)** — `tool.ValidateAndExpand` with structured `ToolLoadReport` + `ToolLoadError`, wired into `copilot.go buildSessionConfig` before `CreateSession`. Returns `error_category: "tool_load_failure"`.
+- **WU-2 (Neo)** — Reviewer skill resolution parity; move resolution inside per-config `reviewerFactory` closure.
+- **WU-3 (Tank)** — Expanded Tools display grouping leaves under parent plugin/skill_dir.
+- **WU-4 (Switch)** — Table-driven tests for each failure mode + golden render tests.
+- **WU-5 (Oracle)** — Docs for hard-fail semantics + Tools format + plugin-install guidance.
+
+### Schema findings
+
+- `plugins:` uses marketplace syntax (`name@skills`) but the local registry uses plain names. No adapter bridges them. Either install into `~/.copilot/installed-plugins/` or rename local YAMLs to match — neither is done today, so every `plugins:` entry silently skips.
+- `plugins/azure-python.yaml` is defined but referenced by nothing.
+- `skills/generator/` contains one Rust skill, fired for all languages. Content-library problem, not a loader problem (flagged as out-of-scope).
+
+### Out of scope recorded
+
+- Re-enabling the SDK-event post-`SendAndWait` gate (defer to Phase 2).
+- `required: false` opt-out (defer until use case appears).
+- Generator skill content (file separate issue).
+- Plugin-registry re-walk performance nit.

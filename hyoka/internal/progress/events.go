@@ -42,6 +42,15 @@ const (
 	ToolStatusFailed = "failed"
 )
 
+// Tool parent-kind constants used with ParentKind fields on ProgressEvent /
+// ToolStatus. An empty ParentKind means the tool has no parent container
+// (it was declared directly in the config). A non-empty ParentKind groups
+// the leaf under its container for display.
+const (
+	ToolParentKindPlugin   = "plugin"
+	ToolParentKindSkillDir = "skill_dir"
+)
+
 // Grader result constants used with the Result field.
 const (
 	GraderResultPass = "pass"
@@ -51,10 +60,12 @@ const (
 // ToolStatus captures the post-session-start verification outcome for a single tool.
 // Used as the element type of ProgressEvent.Tools on EventToolsVerified.
 type ToolStatus struct {
-	ToolName string // Tool identifier (skill name, plugin name, MCP server name)
-	ToolKind string // One of ToolKindSkill, ToolKindPlugin, ToolKindMCP
-	Status   string // One of ToolStatusLoaded, ToolStatusFailed
-	Reason   string // Optional human-readable reason (typically for failures)
+	ToolName   string // Tool identifier (skill name, plugin name, MCP server name)
+	ToolKind   string // One of ToolKindSkill, ToolKindPlugin, ToolKindMCP
+	Status     string // One of ToolStatusLoaded, ToolStatusFailed
+	Reason     string // Optional human-readable reason (typically for failures)
+	ParentName string // Parent container identifier (plugin name or skills-dir path); empty = no parent
+	ParentKind string // One of ToolParentKindPlugin, ToolParentKindSkillDir, or empty
 }
 
 // Phase identifies which stage an eval is in.
@@ -88,6 +99,12 @@ type ProgressEvent struct {
 	Status   string       // One of ToolStatusLoaded, ToolStatusFailed (single-tool events)
 	Reason   string       // Optional explanation, typically for failures
 	Tools    []ToolStatus // Bulk verification payload for EventToolsVerified
+
+	// Parent grouping for grouped display. When set, the renderer may
+	// indent this leaf under a parent row keyed by (ParentKind, ParentName).
+	// Empty ParentKind / ParentName means the leaf has no container.
+	ParentName string // Parent container identifier (plugin name or skills-dir path)
+	ParentKind string // One of ToolParentKindPlugin, ToolParentKindSkillDir, or empty
 
 	// Grader lifecycle fields (EventGraderStart, EventGraderComplete).
 	GraderID   string   // Grader identifier (e.g. "prompt_review", "no_secrets")
