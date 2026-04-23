@@ -163,7 +163,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	}
 	defer os.RemoveAll(configDir)
 
-	sessionCfg := e.buildSessionConfig(ctx, cfg, workDir, configDir, mergePromptProperties(p))
+	sessionCfg := e.buildSessionConfigForEval(ctx, cfg, workDir, configDir, mergePromptProperties(p), p.ID+"/"+cfg.Name, p.ID)
 
 	// Subscribe to events with detailed capture and debug logging.
 	// This MUST be set before CreateSession — the SDK reads OnEvent during
@@ -751,15 +751,41 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 }
 
 func (e *CopilotPromptRunner) buildSessionConfig(ctx context.Context, cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
+	return e.buildSessionConfigForEval(ctx, cfg, workDir, configDir, promptProps, "", "")
+}
+
+// buildSessionConfigForEval is the same as buildSessionConfig but tags
+// tool-resolution progress events with the given evalID/promptID so the
+// interactive renderer can route them to the active eval block. Without
+// this routing information, the renderer drops the events as "unknown
+// eval" and the Tools section never renders before the Agent Attempt
+// header (the events arrive late from the SDK verifier instead).
+func (e *CopilotPromptRunner) buildSessionConfigForEval(ctx context.Context, cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string, evalID, promptID string) *copilot.SessionConfig {
+	configName := ""
+	if cfg != nil {
+		configName = cfg.Name
+	}
+	taggedEmit := tool.ProgressEmitter(nil)
+	if e.progressFn != nil {
+		fn := e.progressFn
+		taggedEmit = func(evt progress.ProgressEvent) {
+			if evt.EvalID == "" {
+				evt.EvalID = evalID
+				evt.PromptID = promptID
+				evt.ConfigName = configName
+			}
+			fn(evt)
+		}
+	}
 	// Emit tool-resolution progress events so the interactive renderer can
 	// render the Tools block before the Copilot session starts. Ordering is
 	// plugin → MCP → skill, matching the read order of a user scanning a
 	// config's tool stack. Emission is a no-op when progressFn is nil (e.g.
 	// tests, CI-only runs that don't care about the per-tool lines).
-	if e.progressFn != nil {
-		cfg.EmitPluginResolutions(tool.ProgressEmitter(e.progressFn))
+	if taggedEmit != nil {
+		cfg.EmitPluginResolutions(taggedEmit)
 		if cfg.Generator != nil {
-			tool.EmitMCPResolutions(cfg.Generator.Tools, tool.ProgressEmitter(e.progressFn))
+			tool.EmitMCPResolutions(cfg.Generator.Tools, taggedEmit)
 		}
 	}
 
@@ -768,7 +794,7 @@ func (e *CopilotPromptRunner) buildSessionConfig(ctx context.Context, cfg *confi
 	// and warns about empty/missing directories (#291).
 	var skillDirs []string
 	if cfg.Generator != nil {
-		resolved, err := tool.ResolveSkillsWithReporter(ctx, cfg.Generator.Tools, configDir, tool.ProgressEmitter(e.progressFn))
+		resolved, err := tool.ResolveSkillsWithReporter(ctx, cfg.Generator.Tools, configDir, taggedEmit)
 		if err != nil {
 			slog.Warn("Failed to resolve generator skill directories", "error", err)
 		} else {

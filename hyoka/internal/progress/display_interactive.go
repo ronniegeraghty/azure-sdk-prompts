@@ -480,22 +480,15 @@ func (r *interactiveRenderer) ensureAgentHeader() {
 }
 
 func (r *interactiveRenderer) onPhaseChange(evt ProgressEvent) {
-	// Phase events are informational in interactive mode — activity/agent
-	// framing is already driven by tool/file/reasoning events.
-	if evt.Phase == PhaseGenerating {
-		// Buffer or render immediately based on whether gate is open.
-		if !r.cur.agentGateOpen {
-			// No tools verification yet. Check if this is a no-tools config.
-			if r.detectNoTools() {
-				r.openAgentGate()
-			} else {
-				// Tools expected — buffer this event.
-				r.cur.agentEventsBuffered = append(r.cur.agentEventsBuffered, evt)
-				return
-			}
-		}
-		r.renderAgentEvent(evt)
-	}
+	// Phase events are pure metadata in interactive mode. They fire BEFORE
+	// tool resolution begins (engine_eval.go calls sendPhase(PhaseGenerating)
+	// before evaluator.Run, which is where buildSessionConfig emits tool
+	// events). If we treat PhaseChange as agent activity it opens the gate
+	// prematurely via detectNoTools() and causes the Agent Attempt header
+	// to print before the Tools section. Activity framing is driven by
+	// real session events (sending prompt, reasoning, tool calls) — not
+	// phase transitions. So this handler is intentionally a no-op.
+	_ = evt
 }
 
 func (r *interactiveRenderer) onAgentActivity(evt ProgressEvent) {
