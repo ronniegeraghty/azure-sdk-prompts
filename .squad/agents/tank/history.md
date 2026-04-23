@@ -635,3 +635,77 @@ Branch: `ronniegeraghty/dev` (pushed). Five surgical fixes to the live-eval inte
 
 ### Out of scope (Phase 2 — Neo)
 - Grader sub-points generalization (`Points []GraderPoint` on Complete events). The (e) fix deliberately does not lock the grader handler to single-line rewriting; Phase 2 can extend the rewrite-vs-append decision without reworking this scaffolding.
+
+## 2026-04-23: Phase 5 — Report schema v3 (6 commits shipped)
+
+Branch: `ronniegeraghty/dev`. Six commits replace the v2 expanded-grader-row model with a single `ai_review` row that carries `Points`, plus structural metadata that makes the report shape match what the live progress renderer already shows. No PRs — direct commits per project workflow.
+
+Commits (oldest → newest):
+
+- **2feabc8b** `feat(report): bump schema to v3 with MigrateToV3 stub` — `CurrentSchemaVersion: 2 → 3`. Refactored `MigrateToV2` to lift only to v2 (idempotent there); added `MigrateToV3` that calls v1→v2 then bumps the version. v2 → v3 is metadata-only by design — the expanded-row shape is too lossy to de-expand. `WriteReport` and `rerender.migrateReport` both call `MigrateToV3`. `TestMigrateToV2` updated to assert schema=2; new `TestMigrateToV3`.
+- **(Neo's earlier d3f26e2d)** `feat(report): add Points to GraderResult` — already shipped in Phase 2, marked todo done with no extra commit.
+- **b8b04c2f** `feat(report): add parent linkage to ToolLoadResult` — `Kind`/`Parent`/`ParentKind` fields added to `report.ToolLoadResult` (all `omitempty`); `Status` also gained `omitempty` so container parent rows render without a status badge. `EvalResult` gained `ToolReport *tool.ToolLoadReport`; `copilot.go` populates it on all 3 return paths from `tool.ValidateAndExpand`. New `buildToolLoadResults` helper in `engine_eval.go` consumes the toolReport and emits parent rows + child rows with linkage; falls back to legacy "configured" entries when toolReport is nil. The setup-builder uses it via `setup.MCPServers, setup.Skills = buildToolLoadResults(...)`.
+- **992ed39e** `refactor(eval): drop expandReviewGraderResult, single ai_review entry` — Deleted the panel-row fan-out function. Rewrote `convertGraderResults` to emit one row per grader; for `KindPromptReview` it sets `GraderName="ai_review"`, `GraderType="prompt_review"`, copies `ReviewDetails` verbatim, and inherits `Points` directly from the grader aggregate. `TestReviewResultsAppendedNotOverwritten` accepts both `"review"` (legacy) and `"prompt_review"` (v3).
+- **d64f1d29** `feat(report): structured EnvironmentInfo.SkillGroups (Option B)` — **Option B chosen.** Two site components (`run-detail-page.tsx:297`, `eval-detail-page.tsx:504`) consume `skills_loaded` as `string[]`. Replacing it (Option A) would break the build for components Trinity owns in Phase 6. Instead added a sibling `SkillGroups []SkillLoadEntry` field that intersects the SDK-loaded set with the validator topology. `site/src/app/data/types.ts` mirrors the new shape via `SkillGroupEntry` + optional `skill_groups`; `skills_loaded` is untouched. Loaded skills with no validator entry fall back to `{Name, Kind: "skill"}` with empty parent linkage.
+- **5698f803** `feat(report): pre-computed graders_passed/graders_total roll-ups` — Added `EvalReport.GradersPassed` and `GradersTotal` (both `int` with `omitempty`). Populated in `engine_eval.go` from the unified grader aggregate (`agg.Results`) — the authoritative pre-conversion grader set. The site can read these directly instead of recomputing from `GraderResults` (which now hides the panel under one `ai_review` row). `omitempty` so v2 reports round-trip identically.
+- **03159a3e** `test(report): v2-read v3-write migration coverage` — `testdata/v2_report.json` fixture (3 expanded review rows + consensus). `TestV2ReportReadByV3Code` pins down: v3 code reads v2 without panic; expanded rows are preserved across `MigrateToV3` (no de-expansion); migrated v2 reports MUST NOT invent roll-ups (graders_passed/total stay zero). Plus live verification via `hyoka run` of key-vault-dp-python-crud.
+
+### Live verification (capture from /tmp/tank-p5-verify.log run)
+
+```json
+{
+  "schema_version": 3,
+  "graders_passed": 2,
+  "graders_total": 2,
+  "grader_results": [
+    {"grader_name":"files_present", "grader_type":"files_present", "pass":true},
+    {"grader_name":"ai_review", "grader_type":"prompt_review", "pass":true, "points":[...], "review_details":{...}}
+  ],
+  "environment": {
+    "skill_groups": [
+      {"name":"azure-keyvault-py", "parent":"azure-sdk-python", "kind":"skill", "parent_kind":"plugin"},
+      {"name":"customize-cloud-agent", "kind":"skill"}
+    ]
+  },
+  "action_timeline": {
+    "session_setup": {
+      "skills": [
+        {"name":"azure-sdk-python", "kind":"plugin"},
+        {"name":"azure-keyvault-py", "status":"loaded", "kind":"skill", "parent":"azure-sdk-python", "parent_kind":"plugin"}
+      ],
+      "mcp_servers": [
+        {"name":"azure", "status":"loaded", "details":"npx -y @azure/mcp@latest server start", "kind":"mcp"}
+      ]
+    }
+  }
+}
+```
+
+### Phase 6 handoff to Trinity
+
+**Site changes Trinity owns:**
+- `site/src/app/data/types.ts` already updated additively — `SkillGroupEntry` interface + optional `Environment.skill_groups`. No existing components broke.
+- The grader-results table previously walked expanded review rows. v3 reports now emit ONE `ai_review` row carrying `Points`. Trinity needs to render the row with an expandable Points panel (Phase 4 already has the `Points` field — see Neo's history). Old v2 reports on disk will still contain expanded rows; Trinity's renderer must handle both shapes (detect `grader_type === "prompt_review"` as v3, fall back to `"review"` rows for v2).
+- New `EvalReport.graders_passed` / `graders_total` fields are available — use these as the canonical roll-up; do NOT recompute from `grader_results` (which mixes shapes across schema versions).
+- New `Environment.skill_groups` provides parent linkage for the skill-loading UI. `skills_loaded` (flat `string[]`) is preserved for fallback; if `skill_groups` is present and non-empty, prefer it for grouped rendering.
+- `tool_availability` (different struct from `ToolLoadResult`) was not modified — its `Kind`/`Parent`/`ParentKind` columns will be null in v3 reports because the parent linkage lives in `action_timeline.session_setup.skills/mcp_servers` instead. If Trinity needs grouped rendering on the run-detail tool table, source it from `session_setup`.
+
+**Decision: Option B (sibling field) instead of Option A (replace).** Documented in the d64f1d29 commit message. The driver was that `eval-detail-page.tsx:504` calls `.includes(tool)` on `skills_loaded` and `run-detail-page.tsx:297` calls `.map`. Either change would have forced site-side work that Phase 5 was explicitly NOT scoped for. Option B keeps the cut additive.
+
+**Anchor screenshots dirs:** `.playwright-cli/`, `.trinity-screenshots/` already exist (untracked). Phase 6 Trinity will baseline before/after for the new ai_review row + skill_groups grouping.
+
+### Verification
+- `go test ./hyoka/...` — all green (including new `TestV2ReportReadByV3Code`, `TestMigrateToV3`, updated `TestMigrateToV2`, updated `TestReviewResultsAppendedNotOverwritten`).
+- `go build ./...` — clean.
+- Live eval against `key-vault-dp-python-crud` / `python-pairwise` produced a v3 report with all expected shapes (snippet above).
+
+### Notes / Quirks
+- `tool_availability` field uses `ToolAvailabilityEntry` (separate struct) and was deliberately NOT touched — parent linkage goes through `session_setup` (`SessionSetupEvent.Skills/MCPServers` typed as `[]ToolLoadResult`). If anyone sees null Kind/Parent in `tool_availability`, that's by design.
+- `report.ReviewGraderDetail` field names are `ReviewGraderPanelEntry` and `ReviewGraderCriterion` (not `ReviewerResultDetail`/`CriterionDetail`); top-level has no `Summary` field — Summary lives on the panel entries. Tripped me up once.
+- The `omitempty` on `EnvironmentInfo.SkillsLoaded` means an empty slice renders as missing (jq returns `null`). If the field shows `null` in JSON, the SDK didn't report any skills — that's an upstream signal, not a regression.
+- The buildToolLoadResults helper duplicates plugin parent rows into both skills and mcp_servers buckets if the plugin has both kinds — intentional, each bucket needs its container row.
+
+### Out of scope (Phase 6 — Trinity)
+- Site rendering of the new `ai_review` row with Points panel.
+- Adapting `eval-detail-page.tsx` and `run-detail-page.tsx` to consume `skill_groups` (Option A migration, optional).
+- Visual regression baselines.
