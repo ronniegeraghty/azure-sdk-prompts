@@ -350,3 +350,44 @@ The prior fix counted bytes in some paths and runes in others. The new fix consi
 
 - **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
 - **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+
+## Site UX review — 2026-04-23 (Ronnie)
+
+Audited `hyoka/internal/serve/` + React `site/src/` against anchor run `20260423-195948` (12/12 passed). Drove the served site with `playwright-cli` (skill: `playwright-cli`) on port 8088. Wrote `.squad/decisions/inbox/trinity-site-ux-review.md`.
+
+**Findings (UX layer):**
+- `run-detail-page.tsx:236` — strict `g.pass === true` filter excludes review graders (which ship `pass: null`). On a 12/12 anchor run every row in the table renders `1/4` or `0/0` in red. **Single most visible bug**, anchor of Ronnie's report.
+- `GraderResultRow.tsx:16` — same tri-state collapse: 3 of 4 graders show `N/A` grey on a fully passing eval. Internally inconsistent with the green `12/12` card immediately above (`eval-detail-page.tsx:441`).
+- `/dashboard` is currently a hard React error boundary crash (`Cannot read properties of undefined (reading 'toFixed')`). Bundle minified — didn't bisect line.
+- `/runs` rate column folds errored runs into denominator → `0.0%` red bar with no "errored" signal.
+- `tool_availability` JSON is a flat list — site has zero notion of plugin parents or skill-dir parents. Phase-2 plugin grouping will need `parent_kind`/`parent_name` on the wire.
+- `GraderResult` has no `Points []` on the wire yet; site types in `data/types.ts` will need it added when Phase 2 ships.
+
+**Quick wins shippable pre-Phase-2:** smarter `isPass()` helper that ANDs `scores.criteria` when `pass: null`; reuse same helper everywhere; relabel header score card "Review Score" so it stops contradicting the grader rows; guard dashboard crash; distinguish errored runs from failed runs on `/runs`.
+
+**Phase-2 UX proposals:** plugin parent renders as header-only group with children indented (no parent badge); skill-dir parent uses config `name` not path; grader row collapsed shows `X/Y passed` badge, expanded shows N indented points; one `evalPassFromPoints()` helper used by every surface so rollup stays consistent.
+
+**Conventions reaffirmed:**
+- The site is a Vite/React SPA (`site/src/`) embedded into the Go binary at `hyoka/internal/serve/site/`. Source-of-truth code is the React, not the embedded `index.html`.
+- `playwright-cli` is restricted to roots `/home/rgeraghty/projects/hyoka` and `.playwright-cli` — screenshot output must land inside the repo (or be copied to `/tmp/` after).
+- Read-only investigations on `ronniegeraghty/dev` while Tank is concurrently editing means I never `git add` or commit; screenshots into `.trinity-screenshots/` (gitignored) + copy to `/tmp/trinity-site-review/`.
+- Coordination boundary: data-model and roll-up structural critique is Morpheus; presentation/UX critique is mine. Deliverables link rather than overlap.
+
+## Phase 4 — Site quick wins shipped — 2026-04-23 (Ronnie)
+
+All six Phase 4 tasks landed on `ronniegeraghty/dev`. Verified live against `reports/20260423-195948` via `playwright-cli` (skill: `playwright-cli`) on vite dev (5173) → hyoka serve (8080). Before/after PNGs in `.trinity-screenshots/phase4/`.
+
+**Shipped:**
+- `99133d8d` — `run-detail-page.tsx`: `isPass()` helper (tri-state aware) + `r.success`-anchored `—`/`✗` fallback when grader_results empty. Anchor row flipped from red `1/4` to emerald `4/4`; gpt-5.3-codex no-files row now shows neutral `—` instead of red `0/0`.
+- `888a0552` — `GraderResultRow.tsx`: same fallback, derives pass from `scores.criteria` AND or `overall_score === max_score` when `result.pass == null`. The 3 review rows on the anchor eval flipped from grey `N/A` to emerald `PASS` (verified: 0 N/A, 4 PASS in DOM).
+- Dashboard crash fix (NaN aggregations + missing `?? 0` on `run.duration_seconds.toFixed`) **bundled into `6df67540`**. My staged files (`dashboard-page.tsx`, new `ErrorBoundary.tsx`, `routes.ts → routes.tsx`) were swept into Neo's parallel commit when our processes both ran `git add` on the shared worktree at the same instant. Result: dashboard now shows 284 / 44.7% / 87.5s instead of NaN; ErrorBoundary wraps the route with friendly amber fallback. Did NOT rewrite history (would have clobbered Neo mid-work).
+- `58475254` — `runs-page.tsx`: errored-rate fix. `effectiveTotal = total - errors`, amber bar + `⚠ run errored` tag on rows where `errors > 0`.
+- `ff63ab6d` — `runs-page.tsx`: in-progress card path. Detects `total_evaluations == null` (summary.json never finalized), renders separate amber card with spinner + "no summary yet" subtitle.
+- `58e12ab6` — `eval-detail-page.tsx`: `REVIEW SCORE` caption added above the `12 / 12` card so it stops looking like it's contradicting the grader rows. Stop-gap until Phase 6 reworks the metaphor.
+
+**Verification:** `npm run build` green (1082 KB / 312 KB gzip; existing chunk-size warning unchanged). Live walkthrough: `/runs` shows in-progress card + amber errored runs; `/runs/{id}` shows `4/4` first row + `—` for no-graders row; `/dashboard` no longer crashes; eval detail header shows `REVIEW SCORE 12/12` green with all 4 grader rows emerald.
+
+**Coordination lessons (parallel agent on shared worktree):**
+- Two agents `git add`-ing into the same working tree races. The agent who calls `git commit` second can find their staged files already committed by the first agent under that first agent's commit message. **Mitigation for next time:** stage + commit in a single shell line (`git add X && git commit -m ...`) and verify `git log -1 --stat` immediately after each commit before doing more work; if the file list looks wrong, abort + re-stage.
+- Did NOT touch `hyoka/internal/...` — Neo's territory this round. The accidentally-bundled commit is annoying but the work shipped correctly; rewriting branch history while Neo was still committing would have been worse.
+- Per the user's standing instruction, did NOT start Phase 6 (depends on Neo's Phase 2 model). Stopping here.
