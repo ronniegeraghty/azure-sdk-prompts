@@ -148,7 +148,7 @@ wantSubs: []string{
 "azure-mcp",
 "✅ Loaded",
 "Agent Attempt:",
-"✅ Complete",
+"✅ Completed",
 "Session Details:",
 "Files: a.py",
 "Graders:",
@@ -224,7 +224,7 @@ events: []ProgressEvent{
 wantSubs: []string{
 "Prompt: p5",
 "Agent Attempt:",
-"❌ Failed", // agentComplete(false) path
+"✅ Completed", // Three-state model: errors still show Completed for agent attempt
 "copilot session terminated",
 "1 errors",
 },

@@ -645,6 +645,14 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			if evalReport.Review != nil {
 				reviewScore = evalReport.Review.OverallScore
 			}
+			// Populate guardrail reason if present
+			guardrailReason := ""
+			if evalReport.GuardrailAbortReason != "" {
+				// Extract a short version of the guardrail reason for display
+				// Format is like: "guardrail: turn count 26 exceeded limit of 25"
+				// We want to show: "turn limit (25)"
+				guardrailReason = extractGuardrailShortReason(evalReport.GuardrailAbortReason)
+			}
 			if evalReport.Error != "" {
 				evtType = progress.EventError
 				msg = "ERROR"
@@ -655,13 +663,14 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				}
 			}
 			display.HandleEvent(progress.ProgressEvent{
-				EvalID:      taskName,
-				PromptID:    t.Prompt.ID,
-				ConfigName:  t.Config.Name,
-				Type:        evtType,
-				Message:     msg,
-				FileCount:   len(evalReport.GeneratedFiles),
-				ReviewScore: reviewScore,
+				EvalID:          taskName,
+				PromptID:        t.Prompt.ID,
+				ConfigName:      t.Config.Name,
+				Type:            evtType,
+				Message:         msg,
+				FileCount:       len(evalReport.GeneratedFiles),
+				ReviewScore:     reviewScore,
+				GuardrailReason: guardrailReason,
 			})
 
 			mu.Lock()
@@ -918,4 +927,40 @@ func pairwiseScore(r *report.EvalReport) (int, int) {
 		return score, 100
 	}
 	return 0, 0
+}
+
+// extractGuardrailShortReason converts a verbose guardrail reason like
+// "guardrail: turn count 26 exceeded limit of 25" to a short display form
+// like "turn limit (25)". Used by progress display rendering.
+func extractGuardrailShortReason(reason string) string {
+	// Format from engine_eval.go:387, 414:
+	// "guardrail: turn count %d exceeded limit of %d"
+	// "guardrail: agent file count %d exceeded limit of %d"
+	if strings.Contains(reason, "turn count") && strings.Contains(reason, "exceeded limit of") {
+		// Extract the limit number
+		parts := strings.Split(reason, "exceeded limit of ")
+		if len(parts) == 2 {
+			limit := strings.TrimSpace(parts[1])
+			return fmt.Sprintf("turn limit (%s)", limit)
+		}
+		return "turn limit"
+	}
+	if strings.Contains(reason, "file count") && strings.Contains(reason, "exceeded limit of") {
+		parts := strings.Split(reason, "exceeded limit of ")
+		if len(parts) == 2 {
+			limit := strings.TrimSpace(parts[1])
+			return fmt.Sprintf("file limit (%s)", limit)
+		}
+		return "file limit"
+	}
+	if strings.Contains(reason, "output size") && strings.Contains(reason, "exceeded limit of") {
+		parts := strings.Split(reason, "exceeded limit of ")
+		if len(parts) == 2 {
+			limit := strings.TrimSpace(parts[1])
+			return fmt.Sprintf("output size (%s)", limit)
+		}
+		return "output size limit"
+	}
+	// Fallback: return the reason as-is if we can't parse it
+	return reason
 }

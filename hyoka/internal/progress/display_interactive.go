@@ -154,17 +154,11 @@ type interactiveEval struct {
 	toolsVerified      bool             // guard so we only redraw once
 	toolIndexByName    map[string]int   // name -> index in toolLines
 
-	// Agent Attempt section.
+	// Agent Attempt section — simplified to a three-state machine (Running, Completed, Guardrail).
 	agentHeaderPrinted bool
-	agentActivity      string
+	agentState         agentAttemptState
 	agentStartTime     time.Time
-	agentTurn          int
-	agentMaxTurns      int
-	agentToolCalls     int
-	agentDone          bool
-	agentFileCount     int
-	agentTurns         int
-	agentDuration      time.Duration
+	agentGuardrailMsg  string // populated when state = agentStateGuardrail
 
 	// Agent attempt buffering — hold back rendering until tools are verified.
 	// If no tool events arrive before the first agent-attempt event, we treat
@@ -203,6 +197,15 @@ const (
 	tailGrader
 )
 
+// agentAttemptState represents the three possible states for the Agent Attempt section.
+type agentAttemptState int
+
+const (
+	agentStateRunning agentAttemptState = iota
+	agentStateCompleted
+	agentStateGuardrail
+)
+
 // ANSI cursor helpers. Kept private to this file so the rest of the package
 // doesn't rely on raw escapes.
 const (
@@ -234,8 +237,9 @@ func newInteractiveRenderer(w io.Writer, total, workers int, reportDir string) *
 	return r
 }
 
-// tickLoop refreshes the Agent Attempt tail line's duration counter once per
-// second. All other tail updates are driven by incoming events.
+// tickLoop refreshes tail lines once per second. With the three-state Agent
+// Attempt model, only the Grader tail needs ticker updates (if we add progress
+// indicators there later). For now, this is a no-op but kept for symmetry.
 func (r *interactiveRenderer) tickLoop() {
 	defer r.wg.Done()
 	for {
@@ -243,11 +247,8 @@ func (r *interactiveRenderer) tickLoop() {
 		case <-r.stopCh:
 			return
 		case <-r.ticker.C:
-			r.mu.Lock()
-			if r.cur != nil && r.tailIsAgent() && !r.cur.agentDone {
-				r.rewriteAgentTail()
-			}
-			r.mu.Unlock()
+			// Agent Attempt no longer needs ticker updates (three-state model)
+			// If we add grader progress indicators, update them here
 		}
 	}
 }
@@ -573,17 +574,17 @@ func (r *interactiveRenderer) onAgentActivity(evt ProgressEvent) {
 
 // renderAgentEvent performs the actual rendering for an agent-attempt event.
 // Factored out so both buffered-flush and direct rendering use the same logic.
+// With the three-state model, we just transition to Running on first event.
 func (r *interactiveRenderer) renderAgentEvent(evt ProgressEvent) {
 	r.ensureAgentHeader()
-	// Update rolling activity counters.
-	if evt.Type == EventToolStart {
-		r.cur.agentToolCalls++
+	// First agent event transitions to Running state if not already set.
+	if r.cur.agentState == 0 { // zero value means not initialized
+		r.cur.agentState = agentStateRunning
+		r.cur.agentStartTime = time.Now()
 	}
-	if evt.Message != "" {
-		r.cur.agentActivity = evt.Message
-	}
+	// Write or update the tail to show Running state
 	if r.cur.tailKind != tailAgent {
-		r.writeTail(tailAgent, r.renderAgentTail())
+		r.writeTail(tailAgent, r.renderAgentStateLine())
 	} else {
 		r.rewriteAgentTail()
 	}
@@ -591,53 +592,49 @@ func (r *interactiveRenderer) renderAgentEvent(evt ProgressEvent) {
 
 // rewriteAgentTail refreshes the live Agent Attempt line in place.
 func (r *interactiveRenderer) rewriteAgentTail() {
-	r.rewriteTail(r.renderAgentTail())
+	r.rewriteTail(r.renderAgentStateLine())
 }
 
-func (r *interactiveRenderer) renderAgentTail() string {
+// renderAgentStateLine renders the single-line status based on current state.
+func (r *interactiveRenderer) renderAgentStateLine() string {
 	e := r.cur
-	dur := time.Since(e.agentStartTime)
-	if e.agentStartTime.IsZero() {
-		dur = time.Since(e.startTime)
+	switch e.agentState {
+	case agentStateRunning:
+		// Show simple "Running" with a spinner character
+		return fmt.Sprintf("  🔄 %s", r.sty.Info("Running"))
+	case agentStateCompleted:
+		return fmt.Sprintf("  %s", r.sty.OK("✅ Completed"))
+	case agentStateGuardrail:
+		msg := "Guardrail hit"
+		if e.agentGuardrailMsg != "" {
+			msg = fmt.Sprintf("Guardrail hit — %s", e.agentGuardrailMsg)
+		}
+		return fmt.Sprintf("  %s", r.sty.Warn(msg))
+	default:
+		return "  🔄 Running"
 	}
-	act := e.agentActivity
-	if act == "" {
-		act = "Starting…"
-	}
-	if e.agentToolCalls > 0 {
-		act = fmt.Sprintf("%s · %d tool calls", act, e.agentToolCalls)
-	}
-	return fmt.Sprintf("  🔄 %s   %s",
-		r.sty.Info(act),
-		r.sty.Muted("("+fmtClock(dur)+")"))
 }
 
-// agentComplete freezes the Agent Attempt tail into a Complete line.
+// agentComplete transitions the Agent Attempt state to Completed or Guardrail.
 // Called from EventPassed/Failed (where the generation phase has ended).
-func (r *interactiveRenderer) agentComplete(fileCount int, success bool) {
+func (r *interactiveRenderer) agentComplete(fileCount int, success bool, guardrailReason string) {
 	e := r.cur
-	if !e.agentHeaderPrinted || e.agentDone {
+	if !e.agentHeaderPrinted {
 		return
 	}
-	e.agentDone = true
-	e.agentFileCount = fileCount
-	if e.agentStartTime.IsZero() {
-		e.agentDuration = time.Since(e.startTime)
+	// Determine the final state
+	if guardrailReason != "" {
+		e.agentState = agentStateGuardrail
+		e.agentGuardrailMsg = guardrailReason
+	} else if success {
+		e.agentState = agentStateCompleted
 	} else {
-		e.agentDuration = time.Since(e.agentStartTime)
+		// Non-guardrail failure (e.g., review failed) — treat as completed
+		// since the generation itself finished
+		e.agentState = agentStateCompleted
 	}
-	var line string
-	if success {
-		line = fmt.Sprintf("  %s — %d files, %d tool calls   %s",
-			r.sty.OK("✅ Complete"),
-			e.agentFileCount,
-			e.agentToolCalls,
-			r.sty.Muted("("+fmtClock(e.agentDuration)+")"))
-	} else {
-		line = fmt.Sprintf("  %s   %s",
-			r.sty.Fail("❌ Failed"),
-			r.sty.Muted("("+fmtClock(e.agentDuration)+")"))
-	}
+	// Update the tail to show final state
+	line := r.renderAgentStateLine()
 	if e.tailKind == tailAgent {
 		r.rewriteTail(line)
 	} else {
@@ -726,7 +723,7 @@ func (r *interactiveRenderer) onPassed(evt ProgressEvent) {
 	if !r.cur.agentGateOpen {
 		r.openAgentGate()
 	}
-	r.agentComplete(evt.FileCount, true)
+	r.agentComplete(evt.FileCount, true, evt.GuardrailReason)
 	r.completed++
 	r.passed++
 	r.cur.terminalStatus = evalPassed
@@ -738,7 +735,7 @@ func (r *interactiveRenderer) onFailed(evt ProgressEvent) {
 	if !r.cur.agentGateOpen {
 		r.openAgentGate()
 	}
-	r.agentComplete(evt.FileCount, false)
+	r.agentComplete(evt.FileCount, false, evt.GuardrailReason)
 	r.completed++
 	r.failed++
 	r.cur.terminalStatus = evalFailed
@@ -757,7 +754,7 @@ func (r *interactiveRenderer) onError(evt ProgressEvent) {
 	if !r.cur.agentGateOpen {
 		r.openAgentGate()
 	}
-	r.agentComplete(0, false)
+	r.agentComplete(0, false, evt.GuardrailReason)
 	r.completed++
 	r.errors++
 	r.cur.terminalStatus = evalError

@@ -100,6 +100,9 @@ type ProgressEvent struct {
 	Turns     int      // Total turns consumed
 	ToolCalls int      // Total tool calls made
 	Cost      float64  // Session cost in USD
+
+	// Guardrail fields (EventFailed, EventError).
+	GuardrailReason string // Populated when a guardrail terminated the run (e.g., "turn limit (25)")
 }
 
 // ProgressFunc receives progress events from evaluators.
