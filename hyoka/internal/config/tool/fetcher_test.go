@@ -3,6 +3,8 @@ package tool
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -39,10 +41,12 @@ func (m *mockFetcher) Fetch(_ context.Context, req FetchRequest) (FetchResult, e
 	return FetchResult{Dir: m.dir, Version: req.Version}, nil
 }
 
+// TestRegistry_RegisterAndLookup verifies that custom fetchers can shadow the
+// default fetcher when their CanFetch matches first.
 func TestRegistry_RegisterAndLookup(t *testing.T) {
 	r := NewRegistry()
-	if err := r.Register(&npxFetcher{}); err != nil {
-		t.Fatalf("register npx: %v", err)
+	if err := r.Register(&gitFetcher{}); err != nil {
+		t.Fatalf("register git: %v", err)
 	}
 	custom := &mockFetcher{name: "custom", matchRepo: "owner/repo"}
 	if err := r.Register(custom); err != nil {
@@ -62,7 +66,7 @@ func TestRegistry_RegisterAndLookup(t *testing.T) {
 		{
 			name:    "default falls through for other repos",
 			entry:   Entry{Type: TypeSkill, Source: SourceRemote, Repo: "other/repo"},
-			wantFet: "npx",
+			wantFet: "git",
 		},
 		{
 			name:    "local skill — no remote fetcher matches",
@@ -98,7 +102,7 @@ func TestRegistry_DefaultStaysLast(t *testing.T) {
 	r := NewRegistry()
 	// Register default first, then custom — custom must still come before
 	// default in lookup order so it can shadow it.
-	if err := r.Register(&npxFetcher{}); err != nil {
+	if err := r.Register(&gitFetcher{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Register(&mockFetcher{name: "custom"}); err != nil {
@@ -106,7 +110,7 @@ func TestRegistry_DefaultStaysLast(t *testing.T) {
 	}
 	names := r.Names()
 	if len(names) != 2 || names[0] != "custom" || names[1] != defaultFetcherName {
-		t.Errorf("expected [custom, npx], got %v", names)
+		t.Errorf("expected [custom, git], got %v", names)
 	}
 }
 
@@ -194,11 +198,11 @@ func TestValidateFetchers(t *testing.T) {
 	}); err != nil {
 		t.Errorf("remote with default fetcher: %v", err)
 	}
-	// No-fetcher branch: temporarily unregister the default npx fetcher so
+	// No-fetcher branch: temporarily unregister the default git fetcher so
 	// nothing in the registry matches a remote skill. ValidateFetchers must
 	// surface a clear error rather than silently passing.
 	DefaultRegistry.Unregister(defaultFetcherName)
-	t.Cleanup(func() { _ = DefaultRegistry.Register(&npxFetcher{}) })
+	t.Cleanup(func() { _ = DefaultRegistry.Register(&gitFetcher{}) })
 	err := ValidateFetchers([]Entry{
 		{Type: TypeSkill, Source: SourceRemote, Repo: "acme/orphan", Name: "x"},
 	})
@@ -211,19 +215,19 @@ func TestValidateFetchers(t *testing.T) {
 	}
 }
 
-// TestNpxFetcher_CanFetchAndName verifies the default fetcher's interface
+// TestGitFetcher_CanFetchAndName verifies the default fetcher's interface
 // contract: it accepts remote skills, rejects local/non-skill entries, and
 // reports the canonical name used by the registry.
-func TestNpxFetcher_CanFetchAndName(t *testing.T) {
-	f := npxFetcher{}
+func TestGitFetcher_CanFetchAndName(t *testing.T) {
+	f := gitFetcher{}
 	if !f.CanFetch(Entry{Type: TypeSkill, Source: SourceRemote, Repo: "x/y"}) {
-		t.Fatal("npx must accept remote skill")
+		t.Fatal("git must accept remote skill")
 	}
 	if f.CanFetch(Entry{Type: TypeSkill, Source: SourceLocal, Path: "/x"}) {
-		t.Fatal("npx must reject local skill")
+		t.Fatal("git must reject local skill")
 	}
 	if f.CanFetch(Entry{Type: TypeMCP}) {
-		t.Fatal("npx must reject non-skill")
+		t.Fatal("git must reject non-skill")
 	}
 	if f.Name() != defaultFetcherName {
 		t.Errorf("name mismatch: %q", f.Name())
@@ -278,4 +282,206 @@ func (c *ctxProbeFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchRes
 		c.onFetch(ctx)
 	}
 	return FetchResult{Dir: c.dir, Version: req.Version}, nil
+}
+
+// --- gitFetcher-specific tests --------------------------------------------
+
+func TestParseSkillSpec(t *testing.T) {
+cases := []struct {
+name           string
+repo           string
+skillName      string
+wantOwner      string
+wantRepo       string
+wantSkillName  string
+}{
+{
+name:          "name@skills shorthand",
+repo:          "",
+skillName:     "azure-sdk-python@skills",
+wantOwner:     "microsoft",
+wantRepo:      "skills",
+wantSkillName: "azure-sdk-python",
+},
+{
+name:          "name@owner/repo format",
+repo:          "",
+skillName:     "myskill@acme/widgets",
+wantOwner:     "acme",
+wantRepo:      "widgets",
+wantSkillName: "myskill",
+},
+{
+name:          "standard owner/repo with name",
+repo:          "github/copilot-skills",
+skillName:     "python-helper",
+wantOwner:     "github",
+wantRepo:      "copilot-skills",
+wantSkillName: "python-helper",
+},
+{
+name:          "bare repo no name",
+repo:          "acme/tools",
+skillName:     "",
+wantOwner:     "acme",
+wantRepo:      "tools",
+wantSkillName: "",
+},
+{
+name:          "microsoft shorthand",
+repo:          "",
+skillName:     "example@copilot",
+wantOwner:     "microsoft",
+wantRepo:      "copilot",
+wantSkillName: "example",
+},
+}
+for _, tc := range cases {
+t.Run(tc.name, func(t *testing.T) {
+owner, repo, skillName := parseSkillSpec(tc.repo, tc.skillName)
+if owner != tc.wantOwner || repo != tc.wantRepo || skillName != tc.wantSkillName {
+t.Errorf("got (%q, %q, %q), want (%q, %q, %q)",
+owner, repo, skillName,
+tc.wantOwner, tc.wantRepo, tc.wantSkillName)
+}
+})
+}
+}
+
+func TestFindSkillInRepo(t *testing.T) {
+// Create temp repo structure
+tmpDir := t.TempDir()
+
+// Create skill directories in different locations
+locations := []string{
+".github/skills/test-skill",
+".github/plugins/plugin-skill",
+"skills/top-level-skill",
+}
+for _, loc := range locations {
+dir := filepath.Join(tmpDir, loc)
+if err := os.MkdirAll(dir, 0o755); err != nil {
+t.Fatal(err)
+}
+// Write SKILL.md marker
+if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# Test"), 0o644); err != nil {
+t.Fatal(err)
+}
+}
+
+cases := []struct {
+name      string
+skillName string
+wantDir   string
+wantErr   bool
+}{
+{
+name:      "finds in .github/skills",
+skillName: "test-skill",
+wantDir:   ".github/skills/test-skill",
+},
+{
+name:      "finds in .github/plugins",
+skillName: "plugin-skill",
+wantDir:   ".github/plugins/plugin-skill",
+},
+{
+name:      "finds in skills/",
+skillName: "top-level-skill",
+wantDir:   "skills/top-level-skill",
+},
+{
+name:      "not found",
+skillName: "missing-skill",
+wantErr:   true,
+},
+}
+
+for _, tc := range cases {
+t.Run(tc.name, func(t *testing.T) {
+got, err := findSkillInRepo(tmpDir, tc.skillName)
+if tc.wantErr {
+if err == nil {
+t.Fatal("expected error, got nil")
+}
+return
+}
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+wantPath := filepath.Join(tmpDir, tc.wantDir)
+if got != wantPath {
+t.Errorf("got %q, want %q", got, wantPath)
+}
+})
+}
+}
+
+func TestFindSingleSkill(t *testing.T) {
+tmpDir := t.TempDir()
+
+// Create exactly one skill directory
+skillDir := filepath.Join(tmpDir, ".github", "skills", "only-skill")
+if err := os.MkdirAll(skillDir, 0o755); err != nil {
+t.Fatal(err)
+}
+if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Test"), 0o644); err != nil {
+t.Fatal(err)
+}
+
+got := findSingleSkill(tmpDir)
+if got != skillDir {
+t.Errorf("got %q, want %q", got, skillDir)
+}
+
+// Add a second skill — should return empty
+secondDir := filepath.Join(tmpDir, "skills", "another-skill")
+if err := os.MkdirAll(secondDir, 0o755); err != nil {
+t.Fatal(err)
+}
+if err := os.WriteFile(filepath.Join(secondDir, "SKILL.md"), []byte("# Test"), 0o644); err != nil {
+t.Fatal(err)
+}
+
+got = findSingleSkill(tmpDir)
+if got != "" {
+t.Errorf("expected empty when multiple skills exist, got %q", got)
+}
+}
+
+func TestIsValidSkillDir(t *testing.T) {
+tmpDir := t.TempDir()
+
+// Valid: has SKILL.md
+validDir := filepath.Join(tmpDir, "valid")
+if err := os.MkdirAll(validDir, 0o755); err != nil {
+t.Fatal(err)
+}
+if err := os.WriteFile(filepath.Join(validDir, "SKILL.md"), []byte("# Test"), 0o644); err != nil {
+t.Fatal(err)
+}
+if !isValidSkillDir(validDir) {
+t.Error("directory with SKILL.md should be valid")
+}
+
+// Valid: has plugin.yaml
+pluginDir := filepath.Join(tmpDir, "plugin")
+if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+t.Fatal(err)
+}
+if err := os.WriteFile(filepath.Join(pluginDir, "plugin.yaml"), []byte("name: test"), 0o644); err != nil {
+t.Fatal(err)
+}
+if !isValidSkillDir(pluginDir) {
+t.Error("directory with plugin.yaml should be valid")
+}
+
+// Invalid: empty directory
+emptyDir := filepath.Join(tmpDir, "empty")
+if err := os.MkdirAll(emptyDir, 0o755); err != nil {
+t.Fatal(err)
+}
+if isValidSkillDir(emptyDir) {
+t.Error("empty directory should not be valid")
+}
 }

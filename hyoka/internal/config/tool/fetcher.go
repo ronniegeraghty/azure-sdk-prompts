@@ -1,12 +1,14 @@
 package tool
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -141,10 +143,10 @@ func (r *Registry) Names() []string {
 }
 
 // DefaultRegistry is the process-wide registry consulted by ResolveSkills.
-// It is preloaded with the built-in npx fetcher.
+// It is preloaded with the built-in git fetcher.
 var DefaultRegistry = func() *Registry {
 	r := NewRegistry()
-	_ = r.Register(&npxFetcher{})
+	_ = r.Register(&gitFetcher{})
 	return r
 }()
 
@@ -174,63 +176,257 @@ func ValidateFetchers(entries []Entry) error {
 	return nil
 }
 
-// --- built-in npx fetcher --------------------------------------------------
+// --- built-in git fetcher --------------------------------------------------
 
-const defaultFetcherName = "npx"
+const defaultFetcherName = "git"
 
-// npxFetcher is the built-in Fetcher backed by `npx skills add`. It preserves
-// the historical behavior of FetchRemote: caches under <baseDir>/.skills-cache/
-// and shells out to npx. When a Version is supplied it is appended to the repo
-// arg as `repo@version`, which `npx skills add` (and the underlying git fetch)
-// interprets as a branch/tag/commit ref.
-type npxFetcher struct{}
+// gitFetcher is the built-in Fetcher that clones Git repositories directly
+// instead of shelling out to npx. It replaces the historical npxFetcher to
+// avoid stdout pollution from npm plugin auto-install. Skill specs are parsed:
+//   - "name@skills" → clone microsoft/skills, look for skill "name"
+//   - "name@owner/repo" → clone owner/repo, look for skill "name"
+//   - Bare "owner/repo" → clone repo, return root if no name specified
+// Caches under <baseDir>/.skills-cache/<version>/<owner>/<repo>/.
+type gitFetcher struct{}
 
-func (npxFetcher) Name() string { return defaultFetcherName }
+func (gitFetcher) Name() string { return defaultFetcherName }
 
 // CanFetch returns true for any remote skill entry. The default fetcher is the
 // last-resort handler; custom fetchers can pre-empt it via their own CanFetch.
-func (npxFetcher) CanFetch(entry Entry) bool {
+func (gitFetcher) CanFetch(entry Entry) bool {
 	return entry.ResolvedType() == TypeSkill && entry.SkillSource() == SourceRemote
 }
 
-func (npxFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, error) {
+func (gitFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, error) {
 	entry := req.Entry
-	// Version-aware install path: keeps different versions in distinct dirs
-	// so switching the override doesn't poison the cache.
 	versionSegment := req.Version
 	if versionSegment == "" {
 		versionSegment = "default"
 	}
-	installDir := filepath.Join(req.BaseDir, ".skills-cache", versionSegment, entry.Repo)
-	if entry.Name != "" {
-		installDir = filepath.Join(installDir, entry.Name)
-	}
-	if err := os.MkdirAll(installDir, 0o755); err != nil {
-		return FetchResult{}, fmt.Errorf("creating skill install dir: %w", err)
+
+	// Parse skill spec: handle "name@skills" shorthand for microsoft/skills
+	owner, repo, skillName := parseSkillSpec(entry.Repo, entry.Name)
+
+	// Cache path: <baseDir>/.skills-cache/<version>/<owner>/<repo>/
+	cacheDir := filepath.Join(req.BaseDir, ".skills-cache", versionSegment, owner, repo)
+
+	// Clone or update the repo
+	if err := ensureRepoCloned(ctx, owner, repo, versionSegment, cacheDir); err != nil {
+		return FetchResult{}, fmt.Errorf("cloning %s/%s: %w", owner, repo, err)
 	}
 
-	repoArg := entry.Repo
-	if req.Version != "" {
-		repoArg = entry.Repo + "@" + req.Version
-	}
-	args := []string{"skills", "add", repoArg, "--directory", installDir}
-	if entry.Name != "" {
-		args = append(args, "--name", entry.Name)
-	}
-
-	slog.Info("Fetching remote skill", "skill", entry.Name, "repo", entry.Repo, "version", versionSegment, "fetcher", defaultFetcherName)
-
-	cmd := exec.CommandContext(ctx, "npx", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return FetchResult{}, fmt.Errorf("npx skills add: %w", err)
+	// If no specific skill name, return the repo root
+	if skillName == "" {
+		abs, absErr := filepath.Abs(cacheDir)
+		if absErr != nil {
+			slog.Warn("Failed to resolve absolute path", "path", cacheDir, "error", absErr)
+			abs = cacheDir
+		}
+		slog.Info("Resolved skill repo", "repo", entry.Repo, "version", versionSegment, "path", abs)
+		return FetchResult{Dir: abs, Version: versionSegment}, nil
 	}
 
-	abs, absErr := filepath.Abs(installDir)
+	// Search for the named skill in common locations
+	skillDir, err := findSkillInRepo(cacheDir, skillName)
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("finding skill %q in %s/%s: %w", skillName, owner, repo, err)
+	}
+
+	abs, absErr := filepath.Abs(skillDir)
 	if absErr != nil {
-		slog.Warn("Failed to resolve absolute install path", "path", installDir, "error", absErr)
-		abs = installDir
+		slog.Warn("Failed to resolve absolute skill path", "path", skillDir, "error", absErr)
+		abs = skillDir
 	}
+	slog.Info("Resolved skill", "skill", skillName, "repo", entry.Repo, "version", versionSegment, "path", abs)
 	return FetchResult{Dir: abs, Version: versionSegment}, nil
+}
+
+// parseSkillSpec parses skill specifications:
+//   - If repo is empty and name contains "@skills", name is "skillname@skills" → (microsoft, skills, skillname)
+//   - If name contains "@", split at last @ to get skillname and owner/repo
+//   - Otherwise, repo is "owner/repo" format and name is the skill name
+func parseSkillSpec(repo, name string) (owner, repoName, skillName string) {
+	// Handle "azure-sdk-python@skills" syntax (repo is empty, name has @skills)
+	if repo == "" && strings.HasSuffix(name, "@skills") {
+		skillName = strings.TrimSuffix(name, "@skills")
+		return "microsoft", "skills", skillName
+	}
+
+	// Handle "name@owner/repo" format
+	if idx := strings.LastIndex(name, "@"); idx > 0 {
+		skillName = name[:idx]
+		ownerRepo := name[idx+1:]
+		parts := strings.SplitN(ownerRepo, "/", 2)
+		if len(parts) == 2 {
+			return parts[0], parts[1], skillName
+		}
+		// If no slash, treat it as microsoft/repo shorthand
+		return "microsoft", ownerRepo, skillName
+	}
+
+	// Standard "owner/repo" with separate name
+	parts := strings.SplitN(repo, "/", 2)
+	if len(parts) != 2 {
+		// Malformed repo — return as-is, will fail downstream
+		return repo, "", name
+	}
+	return parts[0], parts[1], name
+}
+
+// ensureRepoCloned ensures the repo is cloned at cacheDir. If it already
+// exists, runs git fetch and checks out the specified version. All git output
+// is suppressed unless the command fails.
+func ensureRepoCloned(ctx context.Context, owner, repo, version, cacheDir string) error {
+	repoURL := fmt.Sprintf("https://github.com/%s/%s.git", owner, repo)
+
+	_, statErr := os.Stat(filepath.Join(cacheDir, ".git"))
+	if statErr == nil {
+		// Repo already exists — fetch and checkout
+		slog.Debug("Repo cache hit, updating", "owner", owner, "repo", repo, "version", version)
+		if err := runGitQuiet(ctx, cacheDir, "fetch", "--all", "--tags"); err != nil {
+			return fmt.Errorf("git fetch: %w", err)
+		}
+		// Checkout the version (default branch if version == "default")
+		ref := version
+		if version == "default" {
+			ref = "HEAD"
+		}
+		if err := runGitQuiet(ctx, cacheDir, "checkout", ref); err != nil {
+			return fmt.Errorf("git checkout %s: %w", ref, err)
+		}
+		return nil
+	}
+
+	// Fresh clone
+	slog.Debug("Cloning repo", "owner", owner, "repo", repo, "version", version, "url", repoURL)
+	parentDir := filepath.Dir(cacheDir)
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		return fmt.Errorf("creating cache dir: %w", err)
+	}
+
+	cloneArgs := []string{"clone", "--quiet"}
+	if version != "default" {
+		cloneArgs = append(cloneArgs, "--branch", version)
+	}
+	cloneArgs = append(cloneArgs, repoURL, cacheDir)
+
+	if err := runGitQuiet(ctx, "", cloneArgs...); err != nil {
+		return fmt.Errorf("git clone: %w", err)
+	}
+	return nil
+}
+
+// runGitQuiet runs a git command with stdout/stderr captured. Only surfaces
+// stderr if the command exits non-zero, and even then only logs it at Debug.
+func runGitQuiet(ctx context.Context, dir string, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if stderr.Len() > 0 {
+			slog.Debug("git command failed", "args", args, "stderr", stderr.String())
+		}
+		return err
+	}
+	return nil
+}
+
+// findSkillInRepo searches for a named skill in common locations within the
+// repo. Search order:
+//  1. .github/skills/<name>/
+//  2. .github/plugins/<name>/
+//  3. .claude/skills/<name>/
+//  4. .agent/skills/<name>/
+//  5. skills/<name>/
+//  6. Top-level plugin.yaml or marketplace.yaml pointing at custom dir
+//  7. If only one skill dir exists, use it
+// Returns the absolute path to the skill directory (containing SKILL.md or
+// plugin.yaml).
+func findSkillInRepo(repoDir, skillName string) (string, error) {
+	candidates := []string{
+		filepath.Join(repoDir, ".github", "skills", skillName),
+		filepath.Join(repoDir, ".github", "plugins", skillName),
+		filepath.Join(repoDir, ".claude", "skills", skillName),
+		filepath.Join(repoDir, ".agent", "skills", skillName),
+		filepath.Join(repoDir, "skills", skillName),
+	}
+
+	for _, dir := range candidates {
+		if isValidSkillDir(dir) {
+			return dir, nil
+		}
+	}
+
+	// Check for top-level plugin.yaml or marketplace.yaml with custom skills_dir
+	if customDir := checkTopLevelPluginManifest(repoDir); customDir != "" {
+		skillDir := filepath.Join(repoDir, customDir, skillName)
+		if isValidSkillDir(skillDir) {
+			return skillDir, nil
+		}
+	}
+
+	// Last resort: if there's exactly one valid skill directory, use it
+	if singleSkill := findSingleSkill(repoDir); singleSkill != "" {
+		return singleSkill, nil
+	}
+
+	return "", fmt.Errorf("skill %q not found in any standard location", skillName)
+}
+
+// isValidSkillDir checks if a directory contains SKILL.md or plugin.yaml
+func isValidSkillDir(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err == nil {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(dir, "plugin.yaml")); err == nil {
+		return true
+	}
+	return false
+}
+
+// checkTopLevelPluginManifest looks for plugin.yaml or marketplace.yaml at
+// the repo root and extracts a custom skills_dir if present. Returns empty
+// string if none found or no custom directory specified.
+func checkTopLevelPluginManifest(repoDir string) string {
+	// TODO: if needed, parse YAML and extract skills_dir field
+	// For now, return empty — this is a fallback path rarely used
+	return ""
+}
+
+// findSingleSkill scans the repo for skill directories. If exactly one valid
+// skill directory exists, returns it. Otherwise returns empty string.
+func findSingleSkill(repoDir string) string {
+	var found []string
+	searchDirs := []string{
+		filepath.Join(repoDir, ".github", "skills"),
+		filepath.Join(repoDir, ".github", "plugins"),
+		filepath.Join(repoDir, ".claude", "skills"),
+		filepath.Join(repoDir, ".agent", "skills"),
+		filepath.Join(repoDir, "skills"),
+	}
+
+	for _, searchDir := range searchDirs {
+		entries, err := os.ReadDir(searchDir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			skillDir := filepath.Join(searchDir, e.Name())
+			if isValidSkillDir(skillDir) {
+				found = append(found, skillDir)
+			}
+		}
+	}
+
+	if len(found) == 1 {
+		slog.Debug("Single skill auto-selected", "path", found[0])
+		return found[0]
+	}
+	return ""
 }

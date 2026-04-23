@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 	"gopkg.in/yaml.v3"
 )
 
@@ -93,10 +91,10 @@ func (tc *ToolConfig) Normalize() {
 }
 
 // resolveInstalledPlugin resolves a plugin reference (e.g., "azure-sdk-java@skills")
-// to the local skills directory. Checks ~/.hyoka/cache/ first (isolated cache),
-// then falls back to ~/.copilot/installed-plugins/ for backwards compatibility.
+// to the local skills directory. Checks the git-clone cache first (.hyoka/cache/),
+// then falls back to ~/.copilot/installed-plugins/ for backward compatibility.
 // The format is "plugin-name@marketplace" where marketplace is the source
-// (e.g., "skills" from "/plugin marketplace add Microsoft/skills").
+// (e.g., "skills" from microsoft/skills repo).
 // Returns the path to the plugin's skills directory, or empty string if not found.
 func resolveInstalledPlugin(ref string) string {
 	home, err := os.UserHomeDir()
@@ -116,9 +114,28 @@ func resolveInstalledPlugin(ref string) string {
 		}
 	}
 
-	// Check ~/.hyoka/cache/ first (preferred isolated location).
-	hyokaCache := filepath.Join(home, ".hyoka", "cache")
+	// Special case: "name@skills" is shorthand for microsoft/skills repo
+	if marketplace == "skills" {
+		// Check .hyoka/cache/default/microsoft/skills/.github/plugins/{name}/
+		hyokaCache := filepath.Join(home, ".hyoka", "cache", "default", "microsoft", "skills")
+		skillLocations := []string{
+			filepath.Join(hyokaCache, ".github", "plugins", plugin),
+			filepath.Join(hyokaCache, ".github", "skills", plugin),
+			filepath.Join(hyokaCache, "skills", plugin),
+		}
+		for _, dir := range skillLocations {
+			if info, err := os.Stat(dir); err == nil && info.IsDir() {
+				if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err == nil {
+					return dir
+				}
+			}
+		}
+	}
+
+	// Check ~/.hyoka/cache/ for any version (prefer "default")
+	hyokaCache := filepath.Join(home, ".hyoka", "cache", "default")
 	if marketplace != "" {
+		// Try marketplace as owner/repo pattern
 		dir := filepath.Join(hyokaCache, marketplace, plugin, "skills")
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
 			return dir
@@ -405,64 +422,13 @@ func (cf *ConfigFile) GetConfigs(names []string) ([]ToolConfig, error) {
 	return result, nil
 }
 
-// InstallSkillsAndPlugins installs declared plugins across the given configs.
-// GitHub repo plugins (containing "/") are installed via "copilot plugin install".
-// Other plugins are installed via "npx skills add". Entries are deduplicated
-// so each package is only installed once.
+// InstallSkillsAndPlugins is a no-op as of the git-clone resolver implementation.
+// Plugin resolution now happens lazily on first use via the gitFetcher, which
+// clones repos to the per-eval .skills-cache/ directory. This function remains
+// for backward compatibility but does nothing — plugins are resolved at eval time
+// by ExpandPlugins and the git-clone fetcher handles the actual git operations
+// without any stdout pollution.
 func InstallSkillsAndPlugins(configs []ToolConfig) error {
-	seen := make(map[string]bool)
-	type entry struct {
-		kind  string
-		value string
-	}
-	var entries []entry
-
-	reg := plugin.NewRegistry()
-	pluginsDir := resolvePluginsDir()
-	if err := reg.LoadDir(pluginsDir); err != nil {
-		return err
-	}
-
-	for _, c := range configs {
-		for _, p := range c.Plugins {
-			if _, err := reg.Get(p); err == nil {
-				continue
-			}
-			// Skip npx install if the plugin is already installed locally
-			if dir := resolveInstalledPlugin(p); dir != "" {
-				slog.Info("Plugin already installed locally, skipping npx install", "plugin", p, "path", dir)
-				continue
-			}
-			if !seen["plugin:"+p] {
-				seen["plugin:"+p] = true
-				entries = append(entries, entry{"plugin", p})
-			}
-		}
-	}
-
-	if len(entries) == 0 {
-		return nil
-	}
-
-	for _, e := range entries {
-		fmt.Printf("Installing %s: %s\n", e.kind, e.value)
-		var cmd *exec.Cmd
-		if strings.Contains(e.value, "/") {
-			// GitHub repo plugin (e.g. "heaths/azsdk-samples-mcp")
-			cmd = exec.Command("copilot", "plugin", "install", e.value)
-		} else {
-			// npm-based skill package
-			cmd = exec.Command("npx", "skills", "add", e.value, "--yes")
-		}
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			slog.Warn("Failed to install plugin, skipping",
-				"plugin", e.value,
-				"error", err,
-				"hint", "Install manually with: copilot plugin install "+e.value)
-		}
-	}
-
+	// No-op: git-clone resolver handles everything lazily
 	return nil
 }

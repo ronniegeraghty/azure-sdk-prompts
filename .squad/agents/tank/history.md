@@ -333,3 +333,22 @@ Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total acros
 **Your commits this sprint:** `3b9cbab9` default `--workers` to 1 · `27c6a679` history · `d6fd0a59` `--progress auto` by worker count · `2d38533f` hot-fix `--progress auto` order for piped CI.
 
 See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.
+
+## 2026-04-23 — feat: human-friendly slog handler for stdout/stderr
+
+Implemented ConsoleHandler to replace structured slog output on stdout/stderr with human-friendly messages. When logs go to console (no --log-file):
+- WARN: `⚠️  <msg> (key=val ...)` with dim attrs
+- ERROR: `❌ <msg>` in red, attrs dim
+- INFO/DEBUG: suppressed entirely (diagnostic noise on console)
+
+When --log-file is set, structured TextHandler with timestamps is still used for diagnostics. The handler respects NO_COLOR and TTY detection via the existing progress/style package.
+
+Added console_handler.go and console_handler_test.go with 9 table-driven tests covering enabled levels, formatting, colors, NO_COLOR, handler attrs, and WithGroup. All tests pass with -race.
+
+**Commit:** `82fc9750` — feat(logging): human-friendly slog handler for stdout/stderr
+
+### Learnings
+- **slog.Handler interface is ergonomic**: Implementing Handle, Enabled, WithAttrs, WithGroup was straightforward. The Enabled check lets you suppress levels cleanly at the handler layer.
+- **Style package integration**: The existing progress/style package with its NO_COLOR + TTY detection made color support trivial — just wrap text in styler.Red() or styler.Dim().
+- **Handler selection at Setup time**: Choosing handler based on whether --log-file is set keeps the decision in one place (logging.Setup). No need for runtime handler swapping.
+- **Snapshot testing with ANSI codes**: Testing ANSI sequences in strings is readable with \x1b[31m etc. inline in want strings. NO_COLOR tests verify by checking for absence of \x1b[ prefix.
