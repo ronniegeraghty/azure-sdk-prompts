@@ -759,3 +759,40 @@ Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total acros
 **Ledger reconciliation:** `82cd8590` (your ToolsVerified emission) never merged into dev — the commit exists but is not an ancestor of HEAD. Behavior was re-landed by Switch inside `25ce00a7` in a more testable shape (`hyoka/internal/eval/tool_verification.go` with 9 tests). Contract preserved: at-most-once, configured-kinds-only, deterministic sort, plugins excluded, slog warn paths preserved. See `.squad/decisions.md` for full details.
 
 See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md`.
+
+### Session 2026-04-23: Git-Clone Skill Resolver (CLI Output UX Follow-up)
+
+**Status:** ✅ COMPLETE (committed on `ronniegeraghty/dev` at 727a67b0)
+**Context:** First real `--pairwise` run revealed the new interactive renderer gets stomped by stdout from the Copilot SDK's `npx skills add` plugin auto-install. Ronnie decided to stop using `npx skills add` and `copilot plugin install` entirely.
+
+**Task:** Replace the npx/copilot-plugin-install shell-outs with a git-clone resolver hyoka owns end-to-end.
+
+**Implementation:**
+- **New `gitFetcher`** (replaces `npxFetcher` in `hyoka/internal/config/tool/fetcher.go`):
+  - Parses skill specs: `name@skills` → microsoft/skills; `name@owner/repo` → owner/repo + name; bare `owner/repo` → repo root
+  - Cache path: `<baseDir>/.skills-cache/<version>/<owner>/<repo>/` (preserves existing cache layout)
+  - Reuses clones if already cached; runs `git fetch && git checkout <version>` to update
+  - Searches for named skills in: `.github/skills/`, `.github/plugins/`, `.claude/skills/`, `.agent/skills/`, `skills/`
+  - **All git output suppressed** via captured stdout/stderr; only surfaces stderr on non-zero exit (logged at Debug)
+  - No direct stdout/stderr writes — renderer owns the screen
+- **Updated `InstallSkillsAndPlugins`** (in `config.go`): now a no-op — resolution happens lazily on first use via the git fetcher
+- **Updated `resolveInstalledPlugin`** (in `config.go`): checks the git-clone cache first (`.hyoka/cache/default/microsoft/skills/.github/plugins/{name}/` for `name@skills` shorthand), then falls back to `~/.copilot/installed-plugins/` for backward compatibility
+- **Tests** (in `fetcher_test.go`): spec parsing, skill discovery in common locations, cache reuse logic, all existing fetcher tests updated to use `gitFetcher` instead of `npxFetcher`
+
+**Build & Test:**
+```
+go build ./...
+go test -race ./hyoka/internal/config/tool/... -timeout 3m
+go test -race ./hyoka/internal/config/... -timeout 3m
+```
+All green. No pre-existing test failures touched.
+
+**Commit:** `727a67b0` on `ronniegeraghty/dev` (authored by Tank's session but contains Neo's work)
+**Decision:** `.squad/decisions/inbox/neo-git-skill-resolver.md`
+
+## Learnings
+
+- **When another agent commits your work mid-session,** verify the commit matches your intent before proceeding. In this case, Tank's commit `727a67b0` landed the exact changes I authored — the git-clone resolver, updated tests, and InstallSkillsAndPlugins no-op. No conflicts, clean integration.
+- **Skill spec parsing is more flexible than the original npx path.** The `@skills` shorthand (e.g., `azure-sdk-python@skills` → microsoft/skills repo) simplifies config YAMLs. The `name@owner/repo` format enables arbitrary repo sources without expanding the YAML schema.
+- **Silent git operations are critical for renderer stability.** Capturing stdout/stderr to a buffer and only logging stderr on failure keeps the CLI output clean. The interactive renderer depends on this — any stray git progress output would stomp the live display.
+- **Cache reuse via `git fetch` is faster than re-cloning.** The new fetcher checks for a `.git` directory first; if present, runs `git fetch --all --tags` and `git checkout <version>` instead of cloning. Version-pinned caches in separate directories prevent poisoning across evals.
