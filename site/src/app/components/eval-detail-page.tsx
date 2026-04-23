@@ -549,49 +549,75 @@ export function EvalDetailPage() {
                 parent linkage; we join by name. Builtins and MCP servers
                 stay flat below the grouped section. v2 reports without
                 skill_groups fall through to the flat layout. */}
-            {(environment.available_tools?.length ?? 0) > 0 && (() => {
-              const tools = environment.available_tools ?? [];
-              const skillGroups = environment.skill_groups ?? [];
+            {((r.tool_availability?.length ?? 0) > 0 ||
+              ((environment.skills_loaded ?? environment.skillsLoaded)?.length ?? 0) > 0 ||
+              (environment.available_tools?.length ?? 0) > 0) && (() => {
+              // Normalize Env field names — Go emits a mix of camelCase (most
+              // fields) and snake_case (skill_groups). Read both casings.
+              const envSkillsLoaded = environment.skills_loaded ?? environment.skillsLoaded ?? [];
+              const envSkillsInvoked = environment.skills_invoked ?? environment.skillsInvoked ?? [];
+              const envMcpServers = environment.mcp_servers ?? environment.mcpServers ?? [];
+              const envSkillGroups = environment.skill_groups ?? [];
 
-              // name -> SkillGroupEntry (linkage source)
-              const linkage = new Map(skillGroups.map(g => [g.name, g]));
+              // Prefer top-level r.tool_availability (v3, has type/used). Fall
+              // back to environment.available_tools (legacy flat list) or
+              // synthesize from envSkillsLoaded/envMcpServers (v2).
+              type ToolRow = { name: string; type?: string; used?: boolean };
+              let toolRows: ToolRow[] = [];
+              if ((r.tool_availability?.length ?? 0) > 0) {
+                toolRows = (r.tool_availability ?? []).map(t => ({
+                  name: t.name, type: t.type, used: t.used,
+                }));
+              } else if ((environment.available_tools?.length ?? 0) > 0) {
+                toolRows = (environment.available_tools ?? []).map(n => ({ name: n }));
+              } else {
+                toolRows = [
+                  ...envSkillsLoaded.map(n => ({ name: n, type: "skill" })),
+                  ...envMcpServers.map(n => ({ name: n, type: "mcp" })),
+                ];
+              }
 
-              const isMCPName = (name: string) =>
-                environment.mcp_servers?.some(s =>
-                  name === s || name.startsWith(s + ".") || name.startsWith(s + "_") || name.startsWith(s + "/")
-                ) ?? false;
+              const linkage = new Map(envSkillGroups.map(g => [g.name, g]));
+              const invokedSet = new Set(envSkillsInvoked);
+              const skillNamesSet = new Set(envSkillsLoaded);
 
-              const skillNames = new Set(environment.skills_loaded ?? []);
-              const invokedSet = new Set(environment.skills_invoked ?? []);
+              const classify = (row: ToolRow): "skill" | "mcp" | "builtin" => {
+                if (row.type === "skill") return "skill";
+                if (row.type === "mcp") return "mcp";
+                if (row.type === "builtin") return "builtin";
+                if (skillNamesSet.has(row.name)) return "skill";
+                if (envMcpServers.some(s =>
+                  row.name === s || row.name.startsWith(s + ".") || row.name.startsWith(s + "_") || row.name.startsWith(s + "/")
+                )) return "mcp";
+                return "builtin";
+              };
 
-              // Build groups: parentKey -> {parent, parentKind, children}
-              // Skills with no parent linkage land in an "Ungrouped Skills"
-              // pseudo-group so they're still visible.
               type Group = { parent: string; parentKind: string; children: string[] };
               const groups = new Map<string, Group>();
               const builtins: string[] = [];
               const mcps: string[] = [];
 
-              for (const tool of tools) {
-                if (skillNames.has(tool)) {
-                  const link = linkage.get(tool);
+              for (const row of toolRows) {
+                const cat = classify(row);
+                if (cat === "skill") {
+                  const link = linkage.get(row.name);
                   if (link?.parent) {
                     const key = `${link.parent_kind ?? "skill_dir"}::${link.parent}`;
                     if (!groups.has(key)) {
                       groups.set(key, { parent: link.parent, parentKind: link.parent_kind ?? "skill_dir", children: [] });
                     }
-                    groups.get(key)!.children.push(tool);
+                    groups.get(key)!.children.push(row.name);
                   } else {
                     const key = "__ungrouped__";
                     if (!groups.has(key)) {
                       groups.set(key, { parent: "Ungrouped skills", parentKind: "", children: [] });
                     }
-                    groups.get(key)!.children.push(tool);
+                    groups.get(key)!.children.push(row.name);
                   }
-                } else if (isMCPName(tool)) {
-                  mcps.push(tool);
+                } else if (cat === "mcp") {
+                  mcps.push(row.name);
                 } else {
-                  builtins.push(tool);
+                  builtins.push(row.name);
                 }
               }
 

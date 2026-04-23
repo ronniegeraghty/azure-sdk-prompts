@@ -236,6 +236,8 @@ export interface Environment {
    * when rendering grouped views.
    */
   skills_loaded?: string[];
+  /** Schema v2 alias (Go emits camelCase). Same data as `skills_loaded`. */
+  skillsLoaded?: string[];
   /**
    * Schema v3: structured view of `skills_loaded` with parent linkage
    * (plugin / skill_dir). Empty for v2 reports and any v3 run where the
@@ -243,8 +245,12 @@ export interface Environment {
    */
   skill_groups?: SkillGroupEntry[];
   skills_invoked?: string[];
+  /** Schema v2 alias (Go emits camelCase). Same data as `skills_invoked`. */
+  skillsInvoked?: string[];
   available_tools?: string[];
   mcp_servers?: string[];
+  /** Schema v2 alias (Go emits camelCase). Same data as `mcp_servers`. */
+  mcpServers?: string[];
   totalInputTokens?: number;
   totalOutputTokens?: number;
   total_input_tokens?: number;
