@@ -408,3 +408,35 @@ Tail stayed on exactly one row throughout the entire evaluation. No leaked wrapp
 - **Test against the actual terminal behavior**: The fix for Bug A (section ordering) was verified by inspection of frozen output. Bug B (wrapping) needed a **live narrow-terminal run** to reproduce — unit tests alone wouldn't have caught the cell-width bug because test assertions used rune counts too.
 - **Progress package is now Tank's scope**: As of 2026-04-23 directive, `hyoka/internal/progress/` (including `display_interactive.go`, `display_ci.go`, and `style/` helpers) is owned by Tank, not Trinity. CLI-facing renderers = Tank; site/report HTML = Trinity.
 
+
+### Session 2026-04-23 (Tail Leak Fix v2 — Foreign Writes + Terminal Width Edge Cases)
+
+**Status:** COMPLETE (commit 670c5dbf)
+**Issue:** Multi-line tail leak still occurring after previous runewidth fix (fe6efebf)
+
+**Root causes identified:**
+1. **Foreign writes from slog**: When --log-file NOT specified, slog ConsoleHandler writes directly to stderr. Interactive renderer writes to stdout. Both render to same TTY → slog warnings inject lines between tail writes, breaking row-count tracking.
+2. **Terminal width edge case**: When tail text exactly == termWidth, cursor wrapping is terminal-dependent (immediate vs delayed), causing potential off-by-one in tailRowCount.
+
+**Fix applied:**
+1. Added `SuppressConsole` option to logging.Setup(). When interactive mode active without --log-file, run.go reconfigures logger to use io.Discard (prevents stderr corruption).
+2. Modified writeTail/rewriteTail to truncate to `(termWidth - 2)` instead of `termWidth` (avoids cursor wrapping ambiguity). For narrow terminals (<12 cols), skip margin.
+
+**Files changed:**
+- `hyoka/cmd/run.go`: Import logging pkg, reconfigure when interactive mode without --log-file
+- `hyoka/internal/logging/logging.go`: Add SuppressConsole + io.Discard handler branch  
+- `hyoka/internal/progress/display_interactive.go`: Safety margin on truncation (2 cols)
+
+**Verification:**
+- All tests pass with -race flag
+- Manual test: no warnings appear during interactive mode (when --log-file absent)
+- Defensive 2-column margin prevents "exactly terminal width" edge case
+
+**Learnings:**
+- **Stdout vs stderr matter**: Even when both write to same TTY, they're separate file descriptors. A renderer tracking writes to one can't know about writes to the other.
+- **The "auto" progress mode mystery**: Initially confused because user didn't pass `--progress interactive`. Found that resolveAutoProgress() in run.go auto-selects "interactive" when workers==1 && isTerminal.
+- **Pre-existing downgrade logic**: run.go already had logic to downgrade interactive→ci when logLevel is debug/info without --log-file. I extended this to suppress console logging entirely (vs downgrade mode).
+- **Terminal cursor wrapping is non-standard**: When you write exactly N chars to N-column terminal, cursor position is ambiguous (column N vs column 0 of next row). Only safe approach: never write exactly termWidth chars.
+
+Related commits: fe6efebf (wide char), 6b3d3d48 (multi-row clearing), 42ea88fb (truncation base)
+

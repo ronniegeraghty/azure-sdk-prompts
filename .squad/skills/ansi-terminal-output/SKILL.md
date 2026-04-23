@@ -333,3 +333,73 @@ Observe that tail lines stay on one row (no leaked wrapped content).
 ---
 
 **Key Takeaway:** Terminal cell width ≠ rune count. Always use `runewidth.StringWidth()` for layout math when Unicode is involved. Track row counts for multi-row clearing.
+
+## Isolating Terminal Output from Foreign Writes
+
+### The Problem
+
+When rendering interactive progress with in-place tail updates, ANY writes to the same TTY from other code paths (logging, error handlers, debug prints) will break the renderer's row-count tracking.
+
+Example: renderer tracks "tail is at row N", but slog emits a warning to stderr (which renders to the same TTY), moving the cursor to row N+2. Renderer's next rewriteTail thinks cursor is at row N, clears the wrong rows.
+
+### The Solution: Suppress or Redirect Foreign Writes
+
+**Option 1: Suppress console output during interactive rendering**
+```go
+// In logging setup:
+if interactiveModeActive && logFile == "" {
+    handler = slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: level})
+} else {
+    handler = NewConsoleHandler(os.Stderr, level, styler)
+}
+```
+
+**Option 2: Redirect logging through the renderer**
+```go
+// Pass the renderer's writer to the logger
+handler = NewConsoleHandler(renderer.Writer(), level, styler)
+
+// Renderer routes writes through its own tracking
+func (r *Renderer) Write(p []byte) (n int, err error) {
+    r.mu.Lock()
+    defer r.mu.Unlock()
+    r.freezeTail() // commit tail before foreign write
+    return r.w.Write(p)
+}
+```
+
+**Option 3: Downgrade to append-only mode when logging is verbose**
+```go
+// Existing pattern in hyoka:
+if mode == "interactive" && (logLevel == "debug" || logLevel == "info") && logFile == "" {
+    mode = "ci" // downgrade to append-only, tolerates interleaved output
+}
+```
+
+**Recommendation:** Use Option 1 (suppress) or Option 3 (downgrade) for simplicity. Option 2 (redirect) is complex and requires all foreign writes to go through the renderer.
+
+### Terminal Width "Exactly Fits" Edge Case
+
+**Problem:** When tail text visible width EXACTLY equals terminal width, cursor wrapping is terminal-dependent. Some terminals wrap immediately, others delay until the next write.
+
+**Solution:** Always truncate to `termWidth - 2` (not `termWidth`) to leave a safety margin:
+
+```go
+func writeTail(w io.Writer, text string, termWidth int, state *tailState) {
+    maxWidth := termWidth - 2
+    if maxWidth < 10 {
+        maxWidth = termWidth // skip margin for very narrow terminals
+    }
+    text = truncateToWidth(text, maxWidth)
+    // ... rest of write logic
+}
+```
+
+**Why 2 columns:**
+- Wide chars (emoji) are 2 cells
+- If truncation leaves a wide char at position `termWidth - 1`, it would occupy `termWidth - 1` and `termWidth`, hitting the edge
+- 2-column margin ensures any single rune + ellipsis fits without ambiguity
+
+---
+
+**Key Takeaway:** Terminal renderers must OWN the output stream. Any code writing to the same TTY outside the renderer will corrupt tracking state. Either suppress, redirect, or downgrade to append-only mode.
