@@ -947,3 +947,38 @@ All green. No pre-existing test failures touched.
 - Oracle (WU-4): Documentation updates
 
 **Status:** WU-1 and WU-3 complete. Ready for Switch to add tests (WU-2).
+
+## Tool Gate Deadlock Fix (2026-04-23)
+
+**Status:** ✅ Complete
+
+**What happened:** After merging commit 92a9746c (tool validation gate), **no evaluations could run**. Every eval timed out after 10 seconds waiting for `SessionSkillsLoaded` events that never came. This blocked not just configs WITH tools (expected) but also configs WITHOUT tools (unexpected).
+
+**Root cause:** The gate at `copilot.go:596` assumed `SessionSkillsLoaded` events fire **after** `CreateSession()` returns. The SDK actually emits them **during** the first `SendAndWait()` call. Gate was blocking before SendAndWait could run, so the events never fired. Classic deadlock: A waits for B, but B can't happen until A finishes.
+
+**Timeline (from live eval log):**
+- T+0.0s: CreateSession completes
+- T+2.2s: SendAndWait called
+- T+2.3s: SessionSkillsLoaded fires (during SendAndWait)
+- T+10.0s: Gate times out (before skills ever loaded)
+
+**Fix:** Disabled the blocking gate. Tool load failures are still logged (observational) but don't block eval execution. This is better than zero evals running at all.
+
+**Verification:**
+- Live eval (key-vault-dp-python-crud, baseline/claude-opus-4.6): 88s, passed ✅
+- go test -race ./... all pass ✅
+- go build ./... clean ✅
+
+**Commits:**
+- `4b593d3b` fix(eval): disable blocking tool verification gate
+- `f061823f` docs(neo): document tool gate fix and SDK event timing discovery
+
+**Open questions for future work:**
+1. Should gate run AFTER SendAndWait instead (verify tools post-generation)?
+2. Should timeout be much longer (30s+) to handle cold-start MCP servers?
+3. Should gate be optional (--strict-tools flag)?
+4. Are there different SDK events that fire earlier?
+
+See `.squad/decisions.md` for full decision document including lessons learned and next steps for Tank, Switch, Oracle, and future Neo work.
+
+**Impact:** Evals are now functional. Tool load observability maintained via event logging.

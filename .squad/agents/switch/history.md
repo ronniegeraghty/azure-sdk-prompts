@@ -596,3 +596,13 @@ Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total acros
 **Ledger reconciliation you triggered:** the round-1/2 decisions ledger claimed `82cd8590` shipped; you proved it never merged and re-landed equivalent behavior testable-ly. Entry in `decisions.md` now marks it Re-landed via `25ce00a7`.
 
 See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.
+
+## Tool Validation Gate Fixed (2026-04-23)
+
+**Neo's Work:** Fixed blocking tool verification gate that was preventing ALL evaluations from running. Root cause: SDK emits SessionSkillsLoaded events **during** first SendAndWait, not after CreateSession. Gate was blocking before SendAndWait, causing indefinite timeout before events could ever fire.
+
+**Relevant to Switch:** The gate implementation had WU-2 (tests written by Switch) validating the gate's blocking behavior. With the gate now disabled and observational-only, the tests for blocking gate behavior should be updated or removed. The gate itself is still active for logging tool load events, but the tests expecting "gate blocks eval on tool failure" will fail. Consider: (A) Remove gate tests entirely, (B) Rename to "observability tests" and verify tool load events are still logged, or (C) Rewrite as "gate is disabled, failures logged but not blocking" tests.
+
+**Status:** ✅ Gate disabled, evals running. Verified with live eval (88s, passed). Observability maintained via event logging.
+
+**Decision:** Gate remains observational pending SDK event lifecycle documentation and architectural review. Options for future re-enablement documented in decisions.md.

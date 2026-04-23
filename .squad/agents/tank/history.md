@@ -492,3 +492,13 @@ Related commits: fe6efebf (wide char), 6b3d3d48 (multi-row clearing), 42ea88fb (
 2. Trigger a guardrail scenario → confirm "Guardrail hit — {reason}" displays
 3. Check that no line wrapping occurs even on narrow terminals (`stty cols 60`)
 
+
+## Tool Validation Gate Fixed (2026-04-23)
+
+**Neo's Work:** Fixed blocking tool verification gate that was preventing ALL evaluations from running. Root cause: SDK emits SessionSkillsLoaded events **during** first SendAndWait, not after CreateSession. Gate was blocking before SendAndWait, causing indefinite timeout before events could ever fire.
+
+**Relevant to Tank:** The gate implementation (commit 92a9746c) created a deadlock in the eval flow. This fix disables the blocking gate. Tool failures are still logged (observational) but don't block eval execution. If Tank had any tests for the blocking gate behavior (WU-2 validation), those tests will need updating or removal since the gate is now observational-only.
+
+**Status:** ✅ Gate disabled, evals running. Verified with live eval (88s, passed). Observability maintained via event logging.
+
+**Decision:** Gate remains observational pending SDK event lifecycle documentation and architectural review. Options for future re-enablement documented in decisions.md.

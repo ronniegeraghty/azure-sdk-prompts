@@ -814,3 +814,13 @@ My documentation task (WU-4) was to explain this new behavior to users.
 - If Neo modifies the error message format, these docs can be easily updated in a follow-up
 
 **Status:** ✅ Complete. Tool load validation behavior is now documented for users.
+
+## Tool Validation Gate Fixed (2026-04-23)
+
+**Neo's Work:** Fixed blocking tool verification gate that was preventing ALL evaluations from running. Root cause: SDK emits SessionSkillsLoaded events **during** first SendAndWait, not after CreateSession. Gate was blocking before SendAndWait, causing indefinite timeout before events could ever fire.
+
+**Relevant to Oracle:** Documentation for the tool validation gate feature (commit 2c3835ca, architecture docs) becomes partially obsolete. The gate itself is no longer blocking, though observability (event logging) remains. Oracle should: (1) Update any architecture docs describing the gate as a blocking mechanism, (2) Document the SDK event timing discovery (events fire during SendAndWait, not after CreateSession), (3) Consider writing SDK event lifecycle docs for future reference.
+
+**Status:** ✅ Gate disabled, evals running. Verified with live eval (88s, passed). Observability maintained via event logging.
+
+**Decision:** Gate remains observational pending SDK event lifecycle documentation and architectural review. Options for future re-enablement documented in decisions.md.
