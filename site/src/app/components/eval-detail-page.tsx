@@ -439,6 +439,9 @@ export function EvalDetailPage() {
             </div>
           </div>
           <div className={`rounded-xl border px-6 py-3 text-center ${r.success ? "border-emerald-500/20 bg-emerald-500/10" : "border-red-500/20 bg-red-500/10"}`}>
+            <div className="mb-1 text-white/40" style={{ fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase" }}>
+              Review Score
+            </div>
             <div className={`${scoreColor}`} style={{ ...mono, fontSize: 32 }}>{overallScore}</div>
             <div className="text-white/30" style={{ fontSize: 11 }}>/ {maxScore}</div>
           </div>
