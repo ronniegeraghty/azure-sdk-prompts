@@ -96,6 +96,24 @@ PromptDetails   *PromptGraderDetails   `json:"prompt_details,omitempty"`
 BehaviorDetails *BehaviorGraderDetails `json:"behavior_details,omitempty"`
 ReviewDetails   *ReviewGraderDetails   `json:"review_details,omitempty"`
 OutputCheckDetails *OutputCheckGraderDetails `json:"output_check_details,omitempty"`
+
+// Points is the generalized per-sub-check projection introduced in
+// Phase 2 (#GraderPoints). Every grader emits one or more Points; the
+// grader's overall Pass is the AND of every Point.Pass. The legacy
+// per-kind detail structs above remain alongside Points for report-
+// template fidelity until Phase 5/6 retires them.
+Points []GraderPoint `json:"points,omitempty"`
+}
+
+// GraderPoint is one binary pass/fail check inside a grader. A grader's
+// overall Pass is the AND of every Point.Pass. Each grader implementation
+// is responsible for projecting its internal sub-results into Points so
+// the renderer and report layers can show nested pass/fail rows without
+// reaching into per-kind detail structs.
+type GraderPoint struct {
+	Name    string `json:"name"`
+	Pass    bool   `json:"pass"`
+	Message string `json:"message,omitempty"`
 }
 
 // FileGraderDetails holds file-check specifics.
