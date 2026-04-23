@@ -589,32 +589,19 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	}
 	sessionID = session.SessionID
 
-	// Tool validation gate: wait for SDK to report tool load results and
-	// abort if any required tool failed to load (#347).
-	if len(verifier.expectedSkills) > 0 || len(verifier.expectedMCP) > 0 {
-		lg.Debug("Waiting for tool verification", "timeout", "10s")
-		tools, err := waitForToolVerification(genCtx, verifier, 10*time.Second)
-		if err != nil {
-			return &EvalResult{
-				Error:        fmt.Sprintf("tool verification timeout: %v", err),
-				ErrorDetails: err.Error(),
-				ErrorCategory: "tool_load_failure",
-			}, fmt.Errorf("tool verification failed: %w", err)
-		}
-		// Check for any failed tools
-		for _, t := range tools {
-			if t.Status == progress.ToolStatusFailed {
-				errMsg := fmt.Sprintf("required %s %q failed to load: %s", t.ToolKind, t.ToolName, t.Reason)
-				lg.Error("Tool load failure — aborting eval", "kind", t.ToolKind, "name", t.ToolName, "reason", t.Reason)
-				return &EvalResult{
-					Error:         errMsg,
-					ErrorDetails:  t.Reason,
-					ErrorCategory: "tool_load_failure",
-				}, fmt.Errorf("%s %q not loaded", t.ToolKind, t.ToolName)
-			}
-		}
-		lg.Info("Tool verification passed", "skills", len(verifier.expectedSkills), "mcp", len(verifier.expectedMCP))
-	}
+	// NOTE: Tool validation gate is DISABLED pending SDK event timing investigation.
+	// The gate was blocking before SendAndWait, but the SDK only emits SessionSkillsLoaded
+	// and SessionMcpServersLoaded events AFTER the first message round-trip. This created
+	// a deadlock where every eval timed out waiting for events that would never fire.
+	//
+	// TODO(#347): Re-enable after confirming SDK event ordering. Options:
+	//   1. Move gate AFTER first SendAndWait (verify tools loaded post-generation)
+	//   2. Check SDK internals to see if there's a different event that fires earlier
+	//   3. Make timeout much longer (30s+) to handle cold-start MCP servers
+	//
+	// For now, tool load failures are logged (see SessionSkillsLoaded/SessionMcpServersLoaded
+	// event handlers above) but don't block eval execution. This is better than zero evals
+	// running at all.
 
 	// Send the prompt
 	if e.progressFn != nil {
