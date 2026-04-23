@@ -80,12 +80,22 @@ func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 			result.Score = 0
 			result.Pass = false
 			result.Message = fmt.Sprintf("required file %q not found", g.path)
+			result.Points = []GraderPoint{{
+				Name:    g.path,
+				Pass:    false,
+				Message: fmt.Sprintf("required file %q not found", g.path),
+			}}
 			return result, nil
 		}
 		// File not required and doesn't exist — that's fine.
 		result.Score = 1.0
 		result.Pass = true
 		result.Message = fmt.Sprintf("optional file %q not found (ok)", g.path)
+		result.Points = []GraderPoint{{
+			Name:    g.path,
+			Pass:    true,
+			Message: fmt.Sprintf("optional file %q not found (ok)", g.path),
+		}}
 		return result, nil
 	}
 
@@ -100,6 +110,11 @@ func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 			result.Score = 0.5 // File exists but content doesn't match
 			result.Pass = false
 			result.Message = fmt.Sprintf("file %q exists but pattern %q not matched", g.path, g.rawPat)
+			result.Points = []GraderPoint{{
+				Name:    g.path,
+				Pass:    false,
+				Message: fmt.Sprintf("pattern %q not matched", g.rawPat),
+			}}
 			return result, nil
 		}
 	}
@@ -108,5 +123,14 @@ func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 	result.Score = 1.0
 	result.Pass = true
 	result.Message = fmt.Sprintf("file %q check passed", g.path)
+	pointMsg := fmt.Sprintf("file %q present", g.path)
+	if g.pattern != nil {
+		pointMsg = fmt.Sprintf("file %q present and matches %q", g.path, g.rawPat)
+	}
+	result.Points = []GraderPoint{{
+		Name:    g.path,
+		Pass:    true,
+		Message: pointMsg,
+	}}
 	return result, nil
 }

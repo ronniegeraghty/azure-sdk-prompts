@@ -40,6 +40,11 @@ Reasoning: pr.Details.Reasoning,
 RawScore:  pr.Details.RawScore,
 MaxScore:  pr.Details.MaxScore,
 }
+result.Points = []GraderPoint{{
+Name:    "LLM judge",
+Pass:    pr.Passed,
+Message: fmt.Sprintf("score %d/%d", pr.Details.RawScore, pr.Details.MaxScore),
+}}
 
 return result, nil
 }

@@ -254,13 +254,22 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		result.Pass = true
 		result.Score = 1.0
 		result.Message = "output_check: no knobs configured — trivially passed"
+		result.Points = []GraderPoint{{
+			Name:    "no_knobs_configured",
+			Pass:    true,
+			Message: "no knobs configured — trivially passed",
+		}}
 		return result, nil
 	}
 
 	overallPass := true
 	var failedLines []string
 	var passedLines []string
+	result.Points = make([]GraderPoint, 0, len(details.SubChecks))
 	for _, sc := range details.SubChecks {
+		result.Points = append(result.Points, GraderPoint{
+			Name: sc.Check, Pass: sc.Pass, Message: sc.Message,
+		})
 		if sc.Pass {
 			passedLines = append(passedLines, sc.Message)
 			continue

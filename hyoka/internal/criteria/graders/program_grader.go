@@ -91,6 +91,7 @@ result.Message = fmt.Sprintf("command timed out after %s", g.timeout)
 result.Message = fmt.Sprintf("command cancelled: %v", ctx.Err())
 }
 result.ProgramDetails = details
+result.Points = []GraderPoint{{Name: "exit code 0", Pass: false, Message: result.Message}}
 return result, nil
 }
 
@@ -101,6 +102,11 @@ result.Score = 0.0
 result.Pass = false
 result.Message = fmt.Sprintf("command exited with code %d (took %s)", exitErr.ExitCode(), elapsed)
 result.ProgramDetails = details
+result.Points = []GraderPoint{{
+Name:    "exit code 0",
+Pass:    false,
+Message: fmt.Sprintf("exited with code %d", exitErr.ExitCode()),
+}}
 return result, nil
 }
 
@@ -111,5 +117,6 @@ result.Score = 1.0
 result.Pass = true
 result.Message = fmt.Sprintf("command succeeded (took %s)", elapsed)
 result.ProgramDetails = details
+result.Points = []GraderPoint{{Name: "exit code 0", Pass: true, Message: "exited 0"}}
 return result, nil
 }

@@ -121,6 +121,20 @@ for _, c := range consolidated.Scores.Criteria {
 	details.Criteria = append(details.Criteria, ReviewCriterion{
 		Name: c.Name, Passed: c.Passed, Reason: c.Reason,
 	})
+	result.Points = append(result.Points, GraderPoint{
+		Name: c.Name, Pass: c.Passed, Message: c.Reason,
+	})
+}
+if len(result.Points) == 0 {
+	// Fallback: review with no criteria — synthesize one point from the
+	// consolidated overall pass state so the renderer still has something
+	// to nest. This keeps the "every grader emits at least one point"
+	// invariant intact.
+	result.Points = []GraderPoint{{
+		Name:    "consensus",
+		Pass:    result.Pass,
+		Message: consolidated.Summary,
+	}}
 }
 for _, p := range panel {
 	entry := ReviewPanelEntry{
@@ -186,6 +200,16 @@ for _, c := range reviewResult.Scores.Criteria {
 	details.Criteria = append(details.Criteria, ReviewCriterion{
 		Name: c.Name, Passed: c.Passed, Reason: c.Reason,
 	})
+	result.Points = append(result.Points, GraderPoint{
+		Name: c.Name, Pass: c.Passed, Message: c.Reason,
+	})
+}
+if len(result.Points) == 0 {
+	result.Points = []GraderPoint{{
+		Name:    "review",
+		Pass:    result.Pass,
+		Message: reviewResult.Summary,
+	}}
 }
 result.ReviewDetails = details
 return result, nil
