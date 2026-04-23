@@ -509,11 +509,14 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				if panelReviewer != nil || reviewer != nil {
 					reviewGrader = graders.NewPromptReviewGrader("ai_review", reviewer, panelReviewer)
 
+					// NOTE: Do NOT bracket this with sendEvent(EventToolStart)/
+					// sendEvent(EventToolComplete). The grader Start/Complete
+					// events emitted just below already convey this state for
+					// the renderer; the dual emission disturbs the active tail
+					// right around the grader handoff and produces duplicate
+					// rendered rows for ai_review (see Tank Phase 1 issue (e)).
 					if panelReviewer != nil {
-						models := panelReviewer.Models()
-						sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
-					} else {
-						sendEvent(progress.EventToolStart, "Single model review")
+						glg.Debug("Review panel models", "models", panelReviewer.Models())
 					}
 
 					emitGraderStart(sendRawEvent, reviewGrader)
@@ -529,11 +532,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 							Score:   0,
 							Message: fmt.Sprintf("review grader error: %v", reviewErr),
 						}
-					} else {
-						if reviewGrader.LastConsolidated != nil {
-							sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed",
-								reviewGrader.LastConsolidated.OverallScore, reviewGrader.LastConsolidated.MaxScore))
-						}
+					} else if reviewGrader.LastConsolidated != nil {
+						glg.Debug("Review complete",
+							"passed", reviewGrader.LastConsolidated.OverallScore,
+							"max", reviewGrader.LastConsolidated.MaxScore)
 					}
 					// Apply default weight — review has weight 1.0, not a gate grader.
 					if reviewResult.Weight == 0 {
