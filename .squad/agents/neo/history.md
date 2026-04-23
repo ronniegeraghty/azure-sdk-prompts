@@ -982,3 +982,45 @@ All green. No pre-existing test failures touched.
 See `.squad/decisions.md` for full decision document including lessons learned and next steps for Tank, Switch, Oracle, and future Neo work.
 
 **Impact:** Evals are now functional. Tool load observability maintained via event logging.
+
+### 2026-04-23 — WU-1 + WU-2: Static tool validation & reviewer parity (Morpheus plan)
+
+Commits (branch `ronniegeraghty/dev`):
+- `acd36cde` feat(progress): add ParentName/ParentKind to ToolStatus for grouped tool display
+- `5c75b47c` feat(tool): introduce ToolLoadReport and ValidateAndExpand for strict pre-session validation
+- `8c947c8a` feat(eval): hard-fail evals on tool_load_failure in buildSessionConfig
+- `0131f35d` fix(cmd/run): move reviewer skill resolution into reviewerFactory; eliminate cross-config leakage
+
+## Learnings
+
+**Loader failure modes I fixed (Morpheus F1–F9):**
+- F1 missing plugin: `config.ExpandPlugins` still silent-warns at load time (intentional — config package stays tolerant for `hyoka list`), but `tool.ValidateAndExpand` now re-validates at Run() time and hard-fails. Clean split: config load is lenient, eval start is strict.
+- F2/F3/F4/F5 missing skill path / missing SKILL.md / unreadable skill_dir / empty skill_dir: validator emits one Failed ToolLoadItem per failure mode with a distinct `Reason` string. The legacy `ResolveSkills` / `ResolveSkillsWithReporter` helpers are left lenient on purpose so the `engine_eval.go` reporting path (line 268) keeps producing best-effort `env.SkillDirectories` even when primary validation failed.
+- F9 reviewer skills unresolved: WU-2 replaced raw-path passthrough with `ValidateAndExpand(ReviewerTools=…)` inside the factory closure. skill_dir=true now actually expands.
+
+**ValidateAndExpand contract (for future callers):**
+- `Emit` nil → silent. Otherwise emits ToolResolutionStart / ToolResolutionResult with ParentName/ParentKind set so Tank's WU-3 grouped renderer can nest children.
+- Returns `(*ToolLoadReport, error)`. The report is always non-nil. The error is non-nil iff any item.Status == failed, and is a `*ToolLoadError` wrapping the first failure — callers can both render the full report AND tag EvalReport.
+- `PluginsDir=""` → only installed-plugins lookup. `ConfigDir=""` → local paths resolved against cwd.
+- `ReviewerTools` and `GeneratorTools` validated independently; items tagged with `Role` so callers partition via `report.GeneratorSkillDirs()` / `ReviewerSkillDirs()` without cross-talk.
+- Plugin children (skills+MCPs) are attributed to the plugin via ParentName/ParentKind=plugin. Top-level tool entries matching a plugin child's (kind,name) are deduped — no double-reporting.
+
+**What the SDK still does vs what static validation now catches:**
+- Static (new): plugin registry lookup, installed-plugin cache lookup, `os.Stat` on skill path, `SKILL.md` presence check, `ReadDir` on skill_dir, MCP command/url field presence.
+- SDK (unchanged): actual MCP server spawn (npx download, process start), skill file parse/index, `SessionSkillsLoaded` / `SessionMcpServersLoaded` events.
+- Gap: the SDK-event post-session verification gate is still disabled (commit 4b593d3b) per deadlock decision. If a skill dir exists but its SKILL.md is malformed, the SDK may emit 0 skills — static validation won't catch that because we don't parse SKILL.md. Phase 2 would re-enable a post-SendAndWait gate for this.
+
+**Tank contract delivered (commit acd36cde, early & standalone):**
+- `progress.ProgressEvent` and `progress.ToolStatus` now carry `ParentName` + `ParentKind` (constants: `ToolParentKindPlugin`, `ToolParentKindSkillDir`). Fields are additive and default empty, so existing renderers are unaffected. Tank can rebase WU-3 onto `acd36cde` and consume ParentName to build the grouped display.
+
+**Acceptance runs (all passed, see commit log):**
+- Happy path `baseline/claude-opus-4.6` × `key-vault-dp-python-crud`: passed in 62s, 1 review panel.
+- Missing plugin `bogus-plugin@skills`: aborted in 1.3s, report.error_category = `tool_load_failure`, zero CreateSession calls in log.
+- Missing skill dir `./skills/does-not-exist`: aborted in 2.3s, same category.
+- Cross-config scoping: running `neo-test/xconfig-a` with config B also loaded → reviewer_skill_dirs=4 (children of xconfig-a's `./skills/reviewer` only; config B's generator-path marker never appeared).
+
+**Key design choices:**
+- `ValidateAndExpand` lives in `internal/config/tool/` (not `internal/config/`) per Morpheus plan; exported `plugin.ResolveInstalled` to avoid importing config from tool.
+- Old `resolveLocal` / `resolveSkillDir` / `ResolveSkills` left strictly unchanged — the existing lenient contract still has one consumer (`engine_eval.go:268`) whose behavior I don't want to change in this branch. Future work can deprecate them once all callers migrate.
+- `buildSessionConfigForEval` takes `*tool.ToolLoadReport` as a new final param (nil-safe for tests). When non-nil, it skips duplicate `EmitPluginResolutions`/`EmitMCPResolutions`/`ResolveSkillsWithReporter` calls — the validator is the single source of truth for the live path.
+- Reviewer validation uses `ConfigDir=""` (not the per-eval isolated configDir) because reviewer skills are resolved relative to repo cwd, not the ephemeral session dir. Plugins dir comes from `config.ResolvePluginsDir()`.
