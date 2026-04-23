@@ -832,3 +832,80 @@ All green. No pre-existing test failures touched.
 3. **Defer** (#622): Typed grader CLI surface (not urgent)
 
 **Outcome:** Issue is UX/observability, not a bug. Logging improvements will help users understand grader matching behavior. Full investigation report in `.squad/agents/neo/grader-coverage-investigation.md`.
+
+### Session 2026-04-23: Tool & Skill Loading Investigation
+
+**Status:** Investigation complete — fix plan ready for team assignment
+
+**Task:** Investigate two related bugs:
+1. Evals should error out if required tools don't load
+2. Skills/plugins not loading properly
+
+**Findings:**
+
+**Bug 1 (Tool Verification):** The tool verifier (`tool_verification.go`) correctly tracks expected vs. loaded tools and emits `EventToolsVerified` with success/failure statuses. However, this verification is purely observational — used only for rendering the Tools section in the progress display. The eval engine NEVER checks these statuses or fails the eval. When a required tool fails to load, the eval proceeds WITHOUT it, generates code blind, and produces misleading pass/fail results based on grader scores.
+
+**Bug 2 (Skill Loading):** Skills ARE being resolved and passed correctly to the Copilot SDK via `SessionConfig.SkillDirectories`. The code path from config YAML → `tool.ResolveSkills` → `SessionConfig` is functional. If skills fail to load at the SDK level (missing SKILL.md, permission errors, SDK bugs), the SDK fires `SessionEventTypeSessionSkillsLoaded` with empty or partial results, the verifier marks them `ToolStatusFailed`, but the eval continues (manifestation of Bug 1).
+
+**Root cause location:** `hyoka/internal/eval/copilot.go` lines 201–420. The verifier emits tool statuses but no code path checks them or fails the eval.
+
+**Recommended fix:** Add a validation gate in `copilot.go` after `CreateSession` but before `SendAndWait`. Block for up to 10 seconds waiting for the SDK to fire skill/MCP load events, check the verifier's results, and abort the eval if any required tool has `ToolStatusFailed`.
+
+**Work units:**
+- WU-1 (Neo): Implement validation gate in `copilot.go`
+- WU-2 (Switch): Add tests for tool load failure scenarios
+- WU-3 (Neo): Update error category in report types
+- WU-4 (Oracle): Document tool validation behavior
+
+**Deliverable:** `.squad/decisions/inbox/neo-tool-skill-investigation-2026-04-23.md` — comprehensive investigation report with root cause analysis, fix plan broken into assignable work units, and severity assessment.
+
+**Key insight:** The tool verification infrastructure EXISTS and WORKS — it just has no enforcement. The fix is to add a single validation gate that consumes the existing `ToolStatus` data and fails the eval early.
+
+
+### 2026-04-23 — WU-1 + WU-3: Tool Validation Gate Implementation
+
+**Objective:** Implement blocking tool verification gate (WU-1) and error category propagation (WU-3) from the fix plan in `neo-tool-skill-investigation-2026-04-23.md`.
+
+**Changes made:**
+
+1. **tool_verification.go** — Added `readyChan` to `toolVerifier` struct and implemented `waitForToolVerification` helper:
+   - Channel-based blocking wait for SDK tool load events
+   - 10-second timeout with clear error message
+   - Returns immediately if no tools are configured (zero overhead)
+   - Closes channel when `emitIfReady()` completes
+
+2. **copilot.go** — Inserted validation gate after `CreateSession`, before `SendAndWait`:
+   - Blocks on `waitForToolVerification` with 10s timeout
+   - If timeout: returns EvalResult with `ErrorCategory: "tool_load_failure"`
+   - If any tool has `Status == ToolStatusFailed`: aborts eval with clear error message naming the tool/kind/reason
+   - Logs success when all tools pass verification
+   - Gate only fires when `len(expectedSkills) > 0 || len(expectedMCP) > 0`
+
+3. **engine_eval.go** — Preserved `ErrorCategory` from `EvalResult`:
+   - Changed error handling to check `result.ErrorCategory` first
+   - If set, use it and the result's Error/ErrorDetails directly instead of overwriting with "sdk_error"
+   - Ensures tool_load_failure category flows through to EvalReport
+
+**Note:** `ErrorCategory` field was already added to `EvalResult` struct in commit aa8c4434 by Tank (fix for stuck progress state). My implementation leverages that existing field.
+
+**Testing:**
+- `go build ./...` — passed
+- `go test -race ./...` — all tests passed
+- Manual verification pending with `azure-mcp/claude-opus-4.6` config
+
+**Commit:** 92a9746c "Add tool validation gate (WU-1 + WU-3)"
+
+**Decision document:** `.squad/decisions/inbox/neo-tool-validation-gate-impl-2026-04-23.md`
+
+**Key design choices:**
+- Timeout set to 10 seconds (skills load instantly from disk; MCP servers may need a few seconds to spawn)
+- Used channel-based signaling (not polling) for zero CPU overhead
+- Made `waitForToolVerification` a standalone function for testability (Switch can inject mocks in WU-2)
+- Preserved existing `emitIfReady()` contract; added channel close as side effect
+- No schema version bump needed (ErrorCategory already existed in EvalReport)
+
+**Parallel work:**
+- Switch (WU-2): Tests for tool validation gate
+- Oracle (WU-4): Documentation updates
+
+**Status:** WU-1 and WU-3 complete. Ready for Switch to add tests (WU-2).
