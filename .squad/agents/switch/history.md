@@ -37,6 +37,41 @@ Oracle audited phase-6 docs and found 47 stale references — fixed in commits b
 
 ## Recent Sessions
 
+## 2026-04-23: WU-2 Tool Validation Gate Tests (COMPLETE ✅)
+
+### Context
+- Neo implementing tool validation gate (WU-1) to enforce skill/MCP load checks before sending prompts
+- Switch assigned WU-2: Write tests exercising the validation behavior
+- Tests must cover: happy path, skill failures, MCP failures, mixed failures, timeout, no tools, partial event arrival
+
+### Work Completed
+- Added 9 comprehensive test functions to `hyoka/internal/eval/tool_verification_test.go`:
+  1. `TestToolValidationGate_HappyPath` — all tools load successfully
+  2. `TestToolValidationGate_SkillLoadFailure` — missing skill marked as failed
+  3. `TestToolValidationGate_MCPLoadFailure` — missing MCP server marked as failed
+  4. `TestToolValidationGate_MixedFailure` — multiple tools, some fail
+  5. `TestToolValidationGate_NoExpectedTools` — verifier skipped when nothing configured
+  6. `TestToolValidationGate_TimeoutScenario` — verifier doesn't emit before events arrive
+  7. `TestToolValidationGate_PartialEventArrival` — must wait for all kinds to report
+  8. `TestToolValidationGate_AllFailures` — all expected tools fail to load
+  9. (Existing tests remain unchanged)
+
+- Fixed missing imports in `tool_verification.go`: added `context`, `fmt`, `time`
+- All tests pass with `-race` flag: `go test -race ./hyoka/internal/eval/... -run TestToolValidation`
+- Full eval package test suite passes (1.685s runtime)
+
+### Verification
+- ✅ Tests compile and pass
+- ✅ `-race` flag enabled (no data races detected)
+- ✅ Follows table-driven pattern where appropriate (hybrid: some tests use table, others standalone for clarity)
+- ✅ All 7 scenarios from Neo's fix plan covered
+- ✅ Tests ready for Neo's `waitForToolVerification` helper implementation
+
+### Notes
+- Neo's validation gate implementation already in place (lines 592-617 in copilot.go)
+- Tests validate the toolVerifier behavior that the gate depends on
+- Decision file created: `.squad/decisions/inbox/switch-tool-validation-tests-2026-04-23.md`
+
 ## 2026-04-20: Phase 5 Review — #364 Morpheus Mock Fix (APPROVED ✅)
 
 ### Context

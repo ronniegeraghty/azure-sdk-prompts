@@ -21,6 +21,8 @@ Agent Tank initialized as Platform Dev for hyoka. Owns CLI, config, build, repor
 
 - **Agent Attempt Tail-Streaming Deleted (2026-04-23):** After four failed attempts to fix line-wrapping leaks (commits 6b3d3d48, 42ea88fb, fe6efebf, 670c5dbf), replaced the streaming tail with a three-state machine: Running, Completed, or Guardrail hit — {reason}. The single-line bounded status eliminates all wrapping math and foreign-write contamination risks. Commit b17f1ef5.
 
+- **Stuck Running State Fixed (2026-04-23):** Context cancellation during eval or grading could exit goroutines without sending terminal progress events, leaving Agent Attempt and graders stuck in "Running" state. Added deferred handlers in engine.go (eval goroutine) and exec.go (grader loop) to force-send error events if interrupted abnormally. This ensures the display always transitions out of "Running" state even on Ctrl+C, timeout, or panic. Commit aa8c4434.
+
 - **Config migration pattern**: When removing backward compatibility code, the best approach is to update all configs first (all 8 YAML files), then delete legacy struct fields, then remove helper methods (Normalize, Effective*), then update all call sites. This ensures compiler errors guide you to every place that needs updating.
 - **Test-driven refactoring**: Large structural changes benefit from running tests after each phase (struct changes, method deletions, call site updates). The test failures become a checklist of what still needs updating.
 - **Unused function cleanup**: After removing legacy fields, helper functions like resolveSkillsDirs() that worked with those fields become unused. The compiler catches these with "declared and not used" errors.
