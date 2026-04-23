@@ -59,6 +59,21 @@ func RunGradersWithHooks(ctx context.Context, graderInstances []graders.Grader, 
 			hooks.OnStart(g)
 		}
 
+		// Track completion state to ensure OnComplete fires even on panic (#819).
+		completeFired := false
+		defer func(grader graders.Grader) {
+			if !completeFired && hooks.OnComplete != nil {
+				// Grader interrupted or panicked — send a failure result
+				hooks.OnComplete(grader, graders.GraderResult{
+					Name:    grader.Name(),
+					Kind:    grader.Kind(),
+					Pass:    false,
+					Score:   0,
+					Message: "grader interrupted or panicked",
+				})
+			}
+		}(g)
+
 		// Set the grader's own config in the input.
 		ginput := input
 		if gc, ok := configMap[g.Name()]; ok {
@@ -87,6 +102,7 @@ func RunGradersWithHooks(ctx context.Context, graderInstances []graders.Grader, 
 		if hooks.OnComplete != nil {
 			hooks.OnComplete(g, result)
 		}
+		completeFired = true
 	}
 
 	return results

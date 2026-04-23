@@ -37,6 +37,7 @@ type EvalResult struct {
 	Success        bool
 	Error          string
 	ErrorDetails   string
+	ErrorCategory  string // e.g., "tool_load_failure", "timeout", "sdk_error"
 	IsStub         bool
 	StarterFiles   []string
 	// CleanupFn deletes session state after the caller has consumed the
@@ -590,6 +591,24 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				resMonitor.RegisterEval(taskName)
 			}
 
+			// Tracks whether a terminal event (Passed/Failed/Error) was sent.
+			// If the goroutine exits abnormally (context cancel, panic), the
+			// deferred handler below ensures the progress display transitions
+			// out of "Running" state (#819).
+			terminalEventSent := false
+			defer func() {
+				if !terminalEventSent {
+					// Force-send an error event so Agent Attempt doesn't stay stuck
+					display.HandleEvent(progress.ProgressEvent{
+						EvalID:     taskName,
+						PromptID:   t.Prompt.ID,
+						ConfigName: t.Config.Name,
+						Type:       progress.EventError,
+						Message:    "eval cancelled or interrupted",
+					})
+				}
+			}()
+
 			display.HandleEvent(progress.ProgressEvent{
 				EvalID:     taskName,
 				PromptID:   t.Prompt.ID,
@@ -672,6 +691,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				ReviewScore:     reviewScore,
 				GuardrailReason: guardrailReason,
 			})
+			terminalEventSent = true
 
 			mu.Lock()
 			defer mu.Unlock()
