@@ -375,17 +375,12 @@ func runCmd() *cobra.Command {
 
 				clientOpts := eval.BuildBaseClientOpts()
 
-				// Extract reviewer skill directories from configs
-				var reviewerSkillsDirs []string
-				for _, c := range configs {
-					if c.Reviewer != nil {
-						for _, entry := range c.Reviewer.Tools {
-							if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-								reviewerSkillsDirs = append(reviewerSkillsDirs, entry.Path)
-							}
-						}
-					}
-				}
+				// Reviewer skill resolution is now per-config inside the
+				// factory closure (WU-2). Previously this pooled reviewer
+				// skill paths across every matched config — a single
+				// --config invocation would leak the other configs'
+				// reviewer skills into the resolved set. The closure below
+				// scopes ValidateAndExpand to cfg.Reviewer.Tools only.
 
 				// Create reviewer factory that builds a reviewer per config (#92)
 				reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
@@ -395,6 +390,23 @@ func runCmd() *cobra.Command {
 					}
 					if len(reviewerModels) == 0 {
 						return nil, nil, nil
+					}
+
+					// Per-config reviewer skill validation. A missing reviewer
+					// skill dir or empty skill_dir fails the reviewer build
+					// so the eval aborts with a clear error — no more silent
+					// raw-path passthrough to the SDK.
+					var reviewerSkillsDirs []string
+					if cfg.Reviewer != nil && len(cfg.Reviewer.Tools) > 0 {
+						report, err := tool.ValidateAndExpand(context.Background(), tool.ValidationInput{
+							ReviewerTools: cfg.Reviewer.Tools,
+							ConfigDir:     "",
+							PluginsDir:    config.ResolvePluginsDir(),
+						})
+						if err != nil {
+							return nil, nil, fmt.Errorf("reviewer tool load failure for config %q: %w", cfg.Name, err)
+						}
+						reviewerSkillsDirs = report.ReviewerSkillDirs()
 					}
 
 					if len(reviewerModels) > 1 {
@@ -407,7 +419,7 @@ func runCmd() *cobra.Command {
 						if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
 							panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
 						}
-						slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
+						slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels, "reviewer_skill_dirs", len(reviewerSkillsDirs))
 						return nil, panelReviewer, nil
 					}
 
@@ -424,7 +436,7 @@ func runCmd() *cobra.Command {
 					if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
 						copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
 					}
-					slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
+					slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0], "reviewer_skill_dirs", len(reviewerSkillsDirs))
 					return copilotReviewer, nil, nil
 				}
 			} // end if !f.dryRun
