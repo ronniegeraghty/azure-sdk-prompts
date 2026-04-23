@@ -24,23 +24,22 @@ author: JonathanCrd
 ## Prompt
 
 Some messages in my Service Bus queue are failing to process and I need to
-handle them properly. How do I work with the dead-letter queue in C#?
+handle them properly. How do I work with the dead-letter queue in .NET?
 1. Dead-letter a message explicitly with a reason and description
-2. Create a receiver for the dead-letter sub-queue
-3. Read dead-lettered messages and inspect the dead-letter reason
-4. Re-submit a dead-lettered message back to the main queue after fixing the issue
+2. Receive messages from the dead-letter sub-queue
+3. Inspect why a message was dead-lettered
+4. Re-submit a corrected message back to the main queue
 
-Show me the dead-letter queue path format and how to use
-DeadLetterMessageAsync with the Azure.Messaging.ServiceBus SDK.
+Explain how automatic dead-lettering works when delivery attempts are
+exhausted.
 
 ## Evaluation Criteria
 
-- `ServiceBusReceiver.DeadLetterMessageAsync()` with reason and description
-- Dead-letter sub-queue path: `$"{queueName}/$deadletterqueue"`
-- `ServiceBusClient.CreateReceiver()` with `SubQueue.DeadLetter` option
-- Accessing `DeadLetterReason` and `DeadLetterErrorDescription` properties
-- Re-submitting messages via `ServiceBusSender.SendMessageAsync()`
-- `MaxDeliveryCount` and automatic dead-lettering behavior
+- Explicitly dead-letters a message with a reason and error description
+- Receives messages from the dead-letter sub-queue
+- Inspects dead-letter reason and error description properties on messages
+- Re-submits messages to the main queue after correction
+- Explains automatic dead-lettering based on max delivery count
 
 ## Context
 

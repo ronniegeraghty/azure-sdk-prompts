@@ -23,24 +23,22 @@ author: JonathanCrd
 
 ## Prompt
 
-I need to set up pub/sub messaging with Azure Service Bus topics in C#.
-How do I send messages to a topic and receive them from a subscription?
-1. Create a ServiceBusSender for a topic and send a message
-2. Create a ServiceBusReceiver for a specific subscription on that topic
-3. Receive and complete messages from the subscription
-4. Set up a ServiceBusProcessor for continuous subscription processing
+I need to set up pub/sub messaging with Azure Service Bus topics in .NET.
+How do I:
+1. Publish a message to a topic
+2. Receive messages from a specific subscription on that topic
+3. Acknowledge messages after processing
+4. Set up continuous processing for a subscription
 
-Show the difference between queue-based and topic-based messaging with
-the Azure.Messaging.ServiceBus SDK.
+Explain how topic-based messaging differs from queue-based messaging.
 
 ## Evaluation Criteria
 
-- `ServiceBusClient.CreateSender(topicName)` for topic publishing
-- `ServiceBusClient.CreateReceiver(topicName, subscriptionName)` for subscription
-- `ServiceBusSender.SendMessageAsync()` to publish to topic
-- `ServiceBusReceiver.ReceiveMessagesAsync()` from subscription
-- `ServiceBusProcessor` with topic and subscription names
-- `CompleteMessageAsync()` for message acknowledgment
+- Publishes messages to a Service Bus topic
+- Receives messages from a named subscription
+- Acknowledges (completes) messages after successful processing
+- Supports continuous processing via a processor or handler pattern
+- Distinguishes between queue-based and topic/subscription-based messaging
 
 ## Context
 
