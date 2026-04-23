@@ -161,6 +161,24 @@ type interactiveEval struct {
 	agentStartTime     time.Time
 	agentGuardrailMsg  string // populated when state = agentStateGuardrail
 
+	// agentLineFrozen / agentLineRow track the row of a previously-active
+	// agent tail that got committed by some other section (typically a
+	// grader Start) taking over the tail before agentComplete fires. When
+	// agentComplete arrives later, it can rewrite that exact row in place
+	// rather than appending a stale "Completed" line at the bottom of the
+	// transcript.
+	agentLineFrozen bool
+	agentLineRow    int
+
+	// graderRowByID records the row index where each grader's "Running"
+	// tail was committed when something else took the tail before its own
+	// Complete event fired. onGraderComplete uses this to rewrite the
+	// original row in place, keeping each grader as exactly one line in
+	// stable order rather than producing a second stale entry at the
+	// bottom of the Graders section.
+	graderRowByID   map[string]int
+	pendingGraderID string
+
 	// Agent attempt buffering — hold back rendering until tools are verified.
 	// If no tool events arrive before the first agent-attempt event, we treat
 	// this as a no-tools config and flush immediately.
@@ -831,12 +849,22 @@ func (r *interactiveRenderer) agentComplete(fileCount int, success bool, guardra
 	line := r.renderAgentStateLine()
 	if e.tailKind == tailAgent {
 		r.rewriteTail(line)
-	} else {
 		r.freezeTail()
-		r.writeLine(line)
 		return
 	}
+	// Tail no longer ours. If the agent's "Running" line was frozen above
+	// (typically because a grader took over the tail), rewrite that exact
+	// row in place so the Completed status replaces the stale Running text
+	// rather than getting appended at the bottom of the transcript.
+	if e.agentLineFrozen {
+		r.freezeTail()
+		r.rewriteFrozenLine(e.agentLineRow, line)
+		e.agentLineFrozen = false
+		return
+	}
+	// No prior agent line at all — append a fresh row.
 	r.freezeTail()
+	r.writeLine(line)
 }
 
 // --- Session Details section ---
@@ -876,6 +904,10 @@ func (r *interactiveRenderer) onGraderStart(evt ProgressEvent) {
 		r.sty.Muted("("+evt.GraderKind+")"),
 		r.sty.Muted("Running…"))
 	r.writeTail(tailGrader, line)
+	// Track which grader owns the current tail so that, if some other
+	// section commits the tail before this grader's Complete event fires,
+	// freezeTail can record the row index for later in-place rewrite.
+	r.cur.pendingGraderID = evt.GraderID
 }
 
 func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
@@ -900,13 +932,30 @@ func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 	if evt.Message != "" && evt.Result == GraderResultFail {
 		line += " " + r.sty.Muted("— "+evt.Message)
 	}
-	if r.cur.tailKind == tailGrader {
+	// Happy path: this grader still owns the tail.
+	if r.cur.tailKind == tailGrader && r.cur.pendingGraderID == evt.GraderID {
 		r.rewriteTail(line)
 		r.freezeTail()
-	} else {
-		r.freezeTail()
-		r.writeLine(line)
+		// freezeTail will have cleared pendingGraderID and recorded the
+		// row in graderRowByID. Drop the row entry — the line is now in
+		// its final state and shouldn't be rewritten again.
+		if r.cur.graderRowByID != nil {
+			delete(r.cur.graderRowByID, evt.GraderID)
+		}
+		return
 	}
+	// Tail no longer ours. If a Running row for this grader was frozen
+	// above (because another section took over the tail), rewrite that
+	// exact row in place — never append a duplicate entry at the bottom.
+	if row, ok := r.cur.graderRowByID[evt.GraderID]; ok {
+		r.freezeTail()
+		r.rewriteFrozenLine(row, line)
+		delete(r.cur.graderRowByID, evt.GraderID)
+		return
+	}
+	// No prior row for this grader at all — append fresh.
+	r.freezeTail()
+	r.writeLine(line)
 }
 
 // --- Terminal events ---
@@ -1055,16 +1104,70 @@ func (r *interactiveRenderer) rewriteTail(text string) {
 }
 
 // freezeTail commits the current tail line with a trailing newline, so it
-// becomes immutable. No-op if there is no active tail.
+// becomes immutable. No-op if there is no active tail. Records the row of
+// agent / grader tails so a later Complete event can rewrite the original
+// row in place (see rewriteFrozenLine).
 func (r *interactiveRenderer) freezeTail() {
 	if r.cur == nil || r.cur.tailKind == tailNone {
 		return
+	}
+	switch r.cur.tailKind {
+	case tailAgent:
+		// The agent line currently sits on terminal row r.cur.linesWritten
+		// (the tail row, before the trailing newline is written below).
+		r.cur.agentLineFrozen = true
+		r.cur.agentLineRow = r.cur.linesWritten
+	case tailGrader:
+		if r.cur.pendingGraderID != "" {
+			if r.cur.graderRowByID == nil {
+				r.cur.graderRowByID = make(map[string]int)
+			}
+			r.cur.graderRowByID[r.cur.pendingGraderID] = r.cur.linesWritten
+			r.cur.pendingGraderID = ""
+		}
 	}
 	r.w.Write([]byte{'\n'})
 	r.cur.linesWritten++
 	r.cur.tailKind = tailNone
 	r.cur.tailText = ""
 	r.cur.tailRowCount = 0
+}
+
+// rewriteFrozenLine replaces the content of an already-committed line at
+// terminal row `row` (0-indexed; the same coordinate space as
+// linesWritten). Uses the same DECSC/DECRC bracketed save-and-restore
+// pattern as redrawToolsBlock, so the cursor returns to its original
+// position after the rewrite. Caller must freezeTail() first — the cursor
+// must be at column 0 of row r.cur.linesWritten when this is called.
+//
+// No-op when row >= r.cur.linesWritten (line not actually frozen above
+// the cursor) — callers should fall back to writeLine in that case.
+func (r *interactiveRenderer) rewriteFrozenLine(row int, text string) {
+	if r.cur == nil {
+		return
+	}
+	up := r.cur.linesWritten - row
+	if up <= 0 {
+		return
+	}
+	w := TermWidth()
+	if w <= 0 {
+		w = 80
+	}
+	maxWidth := w - 2
+	if maxWidth < 10 {
+		maxWidth = w
+	}
+	text = truncateToWidth(text, maxWidth)
+
+	var buf bytes.Buffer
+	buf.WriteString(ansiSaveCursor)
+	fmt.Fprintf(&buf, ansiCursorUpFmt, up)
+	buf.WriteString(ansiCR)
+	buf.WriteString(ansiClearLine)
+	buf.WriteString(text)
+	buf.WriteString(ansiRestoreCurs)
+	r.w.Write(buf.Bytes())
 }
 
 // --- Finish / counters ---

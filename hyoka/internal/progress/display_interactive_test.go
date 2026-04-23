@@ -457,3 +457,95 @@ if strings.Contains(out, "missing-plugin (plugin):\n") {
 t.Errorf("failed plugin must not emit a bare parent header:\n%s", out)
 }
 }
+
+// TestInteractive_AgentCompletedRowRewritesFrozenLine regresses Phase 1
+// issue (d): when a grader Start event freezes the active agent tail by
+// taking over the tail itself, the agent's later Complete event must
+// rewrite the original Running row in place rather than appending a
+// stale Completed line at the bottom of the transcript.
+//
+// The buffer is raw bytes (no terminal interpreting ANSI), so we
+// assert: (1) the in-place rewrite emitted a DECSC save sequence
+// (\x1b7) — proving the rewriteFrozenLine branch fired rather than
+// falling through to writeLine, and (2) the new "Completed" content
+// was NOT terminated by a writeLine newline (which would indicate a
+// stale duplicate at the bottom of the transcript).
+func TestInteractive_AgentCompletedRowRewritesFrozenLine(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+
+id := "agent-rewrite"
+d.HandleEvent(ProgressEvent{EvalID: id, PromptID: "p", ConfigName: "c", Type: EventStarting})
+// No tools — opens the agent gate immediately on the first activity event.
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventReasoning, Message: "thinking"})
+// Grader Start freezes the agent tail and takes over the tail itself.
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderStart, GraderID: "ai_review", GraderKind: "claude-opus-4.6"})
+score := 9.0
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderComplete, GraderID: "ai_review", GraderKind: "claude-opus-4.6", Result: GraderResultPass, Score: &score})
+// Agent Complete fires LAST. With the fix, this rewrites the frozen
+// Running row in place rather than appending a fresh Completed line.
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 0})
+d.Finish()
+
+out := buf.String()
+// (1) The rewrite path was taken: at least one DECSC save sequence
+// must appear (rewriteFrozenLine emits exactly one per call).
+if !strings.Contains(out, "\x1b7") {
+t.Errorf("expected DECSC save sequence (\\x1b7) from in-place rewrite; got:\n%q", out)
+}
+// (2) The "Completed" content must appear inside a DECSC...DECRC
+// rewrite bracket, never as a writeLine'd line ending in newline.
+if strings.Contains(out, "Completed\n") {
+t.Errorf("'Completed' must not be terminated by a writeLine newline (would be a stale duplicate):\n%q", out)
+}
+// (3) The grader's Pass content should appear exactly once — also
+// rewritten in place via the same mechanism (issue (e) regression).
+if got := strings.Count(out, "Pass (9/10)"); got != 1 {
+t.Errorf("want exactly 1 'Pass (9/10)' rewrite, got %d:\n%q", got, out)
+}
+}
+
+// TestInteractive_GraderCompleteIdempotentAfterFreeze regresses Phase 1
+// issue (e): if a grader's Running tail gets frozen by an unrelated
+// event (an EventToolStart fired between grader Start and Complete),
+// the grader's later Complete event must rewrite the original frozen
+// row in place — never append a duplicate ai_review entry below.
+func TestInteractive_GraderCompleteIdempotentAfterFreeze(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+
+id := "grader-idem"
+d.HandleEvent(ProgressEvent{EvalID: id, PromptID: "p", ConfigName: "c", Type: EventStarting})
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventReasoning, Message: "thinking"})
+// Grader Start owns the tail.
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderStart, GraderID: "ai_review", GraderKind: "panel"})
+// Some other event commits the grader tail and steals it (this is
+// exactly the historical noise pattern from the redundant
+// EventToolStart/EventToolComplete bracketing the AI review).
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventToolStart, Message: "Review panel: [m1 m2]"})
+// Grader Complete arrives after the tail moved.
+score := 7.0
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderComplete, GraderID: "ai_review", GraderKind: "panel", Result: GraderResultPass, Score: &score})
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 0})
+d.Finish()
+
+out := buf.String()
+// In-place rewrite escape was emitted.
+if !strings.Contains(out, "\x1b7") {
+t.Errorf("expected DECSC save sequence; got:\n%q", out)
+}
+// The grader's final Pass content appears exactly once — no stale
+// duplicate from a fallback writeLine.
+if got := strings.Count(out, "Pass (7/10)"); got != 1 {
+t.Errorf("want exactly 1 'Pass (7/10)' entry, got %d:\n%q", got, out)
+}
+// The Pass row was committed via rewriteFrozenLine (DECRC \x1b8
+// follows the Pass content), NOT via writeLine (which would write a
+// trailing newline immediately after).
+if i := strings.Index(out, "Pass (7/10)"); i != -1 {
+tail := out[i+len("Pass (7/10)"):]
+if strings.HasPrefix(tail, "\n") {
+t.Errorf("Pass row appears writeLine-terminated (newline immediately after) — should be DECRC-bracketed:\n%q", out)
+}
+}
+}
