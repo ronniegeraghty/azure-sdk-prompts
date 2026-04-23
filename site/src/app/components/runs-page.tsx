@@ -133,6 +133,50 @@ export function RunsPage() {
             ) : (
               <div className="space-y-4">
                 {filteredRuns.map((run, i) => {
+              // Runs without total_evaluations haven't finalized a summary.json
+              // yet (in-progress, crashed, or aborted). Render a separate
+              // in-progress card with a spinner so they don't render in the
+              // same shape as a finished run with `Unknown … 0.0% N/A`.
+              const inProgress = run.total_evaluations == null;
+              if (inProgress) {
+                return (
+                  <motion.div
+                    key={run.run_id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <Link
+                      to={`/runs/${run.run_id}`}
+                      className="group block rounded-xl border border-white/8 bg-white/[0.03] p-5 no-underline transition hover:border-amber-500/20 hover:bg-white/[0.05]"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1">
+                          <div className="mb-1 flex items-center gap-2 text-white/80" style={{ fontSize: 15 }}>
+                            {run.run_id}
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/[0.08] px-1.5 py-0.5 text-amber-300"
+                              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+                            >
+                              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                              In progress
+                            </span>
+                          </div>
+                          <p className="text-white/40" style={{ fontSize: 12 }}>
+                            no summary yet — run is still writing or never finalized
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 text-white/30" style={{ fontSize: 12 }}>
+                          <Clock className="h-3.5 w-3.5" />
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span>
+                          <ChevronRight className="h-4 w-4 transition group-hover:text-amber-400" />
+                        </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                );
+              }
+
               const passed = run.passed ?? 0;
               const total = run.total_evaluations ?? 0;
               const errors = run.errors ?? 0;
