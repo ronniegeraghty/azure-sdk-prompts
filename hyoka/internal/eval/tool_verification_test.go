@@ -227,3 +227,246 @@ func TestToolVerifier_EmitIsSeparatedFromStateMutation(t *testing.T) {
 		t.Error("emitIfReady unexpectedly mutated the loaded maps")
 	}
 }
+
+// --- Tool Validation Gate Tests (WU-2) ---
+// These tests validate the enforcement gate that checks tool load status
+// after session creation and before sending the prompt (per Neo's fix plan).
+
+// TestToolValidationGate_HappyPath validates that when all expected tools
+// report as loaded, the eval proceeds normally without errors.
+func TestToolValidationGate_HappyPath(t *testing.T) {
+	v := newToolVerifier(
+		[]string{"/skills/generator-skills"},
+		map[string]bool{"azure-mcp": true},
+	)
+	v.onSkillsLoaded([]string{"generator-skills"})
+	v.onMCPLoaded([]string{"azure-mcp"})
+
+	tools := v.emitIfReady()
+	if tools == nil {
+		t.Fatal("expected tools to be emitted")
+	}
+
+	// Validate that all tools show as loaded
+	for _, tool := range tools {
+		if tool.Status != progress.ToolStatusLoaded {
+			t.Errorf("tool %s (%s) should be loaded, got status=%s reason=%q",
+				tool.ToolName, tool.ToolKind, tool.Status, tool.Reason)
+		}
+	}
+}
+
+// TestToolValidationGate_SkillLoadFailure validates that when an expected
+// skill reports as Failed, the validation gate should detect it.
+func TestToolValidationGate_SkillLoadFailure(t *testing.T) {
+	v := newToolVerifier(
+		[]string{"/skills/generator-skills", "/skills/helper"},
+		nil,
+	)
+	// SDK only reports generator-skills; helper is missing
+	v.onSkillsLoaded([]string{"generator-skills"})
+
+	tools := v.emitIfReady()
+	if tools == nil {
+		t.Fatal("expected tools to be emitted")
+	}
+
+	// Verify that the missing skill is marked as failed
+	failures := 0
+	for _, tool := range tools {
+		if tool.ToolName == "helper" && tool.Status == progress.ToolStatusFailed {
+			failures++
+			if tool.Reason == "" {
+				t.Error("failed tool should have a Reason explaining why")
+			}
+		}
+	}
+
+	if failures == 0 {
+		t.Error("expected helper skill to be marked as failed")
+	}
+}
+
+// TestToolValidationGate_MCPLoadFailure validates that when an expected
+// MCP server reports as Failed, the validation gate should detect it.
+func TestToolValidationGate_MCPLoadFailure(t *testing.T) {
+	v := newToolVerifier(
+		nil,
+		map[string]bool{"azure-mcp": true, "playwright-mcp": true},
+	)
+	// SDK only reports azure-mcp; playwright-mcp is missing
+	v.onMCPLoaded([]string{"azure-mcp"})
+
+	tools := v.emitIfReady()
+	if tools == nil {
+		t.Fatal("expected tools to be emitted")
+	}
+
+	// Verify that the missing MCP server is marked as failed
+	failures := 0
+	for _, tool := range tools {
+		if tool.ToolName == "playwright-mcp" && tool.Status == progress.ToolStatusFailed {
+			failures++
+			if tool.Reason == "" {
+				t.Error("failed MCP server should have a Reason explaining why")
+			}
+		}
+	}
+
+	if failures == 0 {
+		t.Error("expected playwright-mcp to be marked as failed")
+	}
+}
+
+// TestToolValidationGate_MixedFailure validates that when multiple tools
+// are configured and some fail, all failures are reported in the tools slice.
+func TestToolValidationGate_MixedFailure(t *testing.T) {
+	v := newToolVerifier(
+		[]string{"/skills/alpha", "/skills/beta", "/skills/gamma"},
+		map[string]bool{"mcp1": true, "mcp2": true},
+	)
+	// SDK reports: alpha loaded, beta missing, gamma loaded, mcp1 missing, mcp2 loaded
+	v.onSkillsLoaded([]string{"alpha", "gamma"})
+	v.onMCPLoaded([]string{"mcp2"})
+
+	tools := v.emitIfReady()
+	if tools == nil {
+		t.Fatal("expected tools to be emitted")
+	}
+
+	// Map tools by name for easy checking
+	byName := make(map[string]progress.ToolStatus)
+	for _, tool := range tools {
+		byName[tool.ToolName] = tool
+	}
+
+	// Verify loaded tools
+	if byName["alpha"].Status != progress.ToolStatusLoaded {
+		t.Errorf("alpha should be loaded, got %+v", byName["alpha"])
+	}
+	if byName["gamma"].Status != progress.ToolStatusLoaded {
+		t.Errorf("gamma should be loaded, got %+v", byName["gamma"])
+	}
+	if byName["mcp2"].Status != progress.ToolStatusLoaded {
+		t.Errorf("mcp2 should be loaded, got %+v", byName["mcp2"])
+	}
+
+	// Verify failed tools
+	if byName["beta"].Status != progress.ToolStatusFailed {
+		t.Errorf("beta should be failed, got %+v", byName["beta"])
+	}
+	if byName["mcp1"].Status != progress.ToolStatusFailed {
+		t.Errorf("mcp1 should be failed, got %+v", byName["mcp1"])
+	}
+
+	// Count failures (should be 2: beta and mcp1)
+	failures := 0
+	for _, tool := range tools {
+		if tool.Status == progress.ToolStatusFailed {
+			failures++
+		}
+	}
+	if failures != 2 {
+		t.Errorf("expected 2 failures, got %d", failures)
+	}
+}
+
+// TestToolValidationGate_NoExpectedTools validates that when no tools are
+// configured, the verifier never emits and the validation gate is skipped.
+func TestToolValidationGate_NoExpectedTools(t *testing.T) {
+	v := newToolVerifier(nil, nil)
+
+	// Even if SDK fires events, verifier shouldn't emit
+	v.onSkillsLoaded([]string{"unexpected-skill"})
+	v.onMCPLoaded([]string{"unexpected-mcp"})
+
+	tools := v.emitIfReady()
+	if tools != nil {
+		t.Errorf("verifier should not emit when nothing configured, got %+v", tools)
+	}
+}
+
+// TestToolValidationGate_TimeoutScenario validates the verifier's behavior
+// when SDK events never arrive. This tests the "timeout" path where the
+// validation gate would need to abort after waiting.
+func TestToolValidationGate_TimeoutScenario(t *testing.T) {
+	v := newToolVerifier(
+		[]string{"/skills/alpha"},
+		map[string]bool{"mcp1": true},
+	)
+
+	// Simulate: SDK never fires the load events
+	// Call emitIfReady multiple times to simulate polling with timeout
+	for i := 0; i < 5; i++ {
+		tools := v.emitIfReady()
+		if tools != nil {
+			t.Fatalf("verifier emitted before receiving events: %+v", tools)
+		}
+	}
+
+	// After timeout expires, the validation gate should detect this as a failure.
+	// The actual timeout logic will be in the waitForToolVerification helper
+	// that Neo implements, but this tests that the verifier doesn't emit
+	// prematurely.
+}
+
+// TestToolValidationGate_PartialEventArrival validates that the verifier
+// doesn't emit until ALL expected kinds have reported their events.
+func TestToolValidationGate_PartialEventArrival(t *testing.T) {
+	v := newToolVerifier(
+		[]string{"/skills/alpha"},
+		map[string]bool{"mcp1": true},
+	)
+
+	// Skills event arrives first
+	v.onSkillsLoaded([]string{"alpha"})
+
+	// Should NOT emit yet (still waiting for MCP event)
+	if tools := v.emitIfReady(); tools != nil {
+		t.Errorf("verifier emitted after only skills loaded: %+v", tools)
+	}
+
+	// MCP event arrives
+	v.onMCPLoaded([]string{"mcp1"})
+
+	// NOW it should emit
+	tools := v.emitIfReady()
+	if tools == nil {
+		t.Fatal("verifier should emit after both kinds report")
+	}
+	if len(tools) != 2 {
+		t.Errorf("expected 2 tools (1 skill + 1 mcp), got %d", len(tools))
+	}
+}
+
+// TestToolValidationGate_AllFailures validates the case where ALL expected
+// tools fail to load. The validation gate should detect and report all failures.
+func TestToolValidationGate_AllFailures(t *testing.T) {
+	v := newToolVerifier(
+		[]string{"/skills/alpha", "/skills/beta"},
+		map[string]bool{"mcp1": true, "mcp2": true},
+	)
+	// SDK reports no tools loaded (empty arrays)
+	v.onSkillsLoaded([]string{})
+	v.onMCPLoaded([]string{})
+
+	tools := v.emitIfReady()
+	if tools == nil {
+		t.Fatal("expected tools to be emitted")
+	}
+
+	// All 4 tools should be marked as failed
+	if len(tools) != 4 {
+		t.Fatalf("expected 4 tools, got %d", len(tools))
+	}
+
+	for _, tool := range tools {
+		if tool.Status != progress.ToolStatusFailed {
+			t.Errorf("tool %s should be failed, got status=%s", tool.ToolName, tool.Status)
+		}
+		if tool.Reason == "" {
+			t.Errorf("failed tool %s should have a reason", tool.ToolName)
+		}
+	}
+}
+
