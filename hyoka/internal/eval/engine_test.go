@@ -1425,7 +1425,9 @@ func TestReviewResultsAppendedNotOverwritten(t *testing.T) {
 		if gr.GraderType == "file" {
 			hasFile = true
 		}
-		if gr.GraderType == "review" {
+		// v3 schema collapses panel-member expansion into a single
+		// "ai_review" row carrying GraderType "prompt_review".
+		if gr.GraderType == "prompt_review" || gr.GraderType == "review" {
 			hasReview = true
 		}
 	}

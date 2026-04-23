@@ -947,15 +947,22 @@ func countPassed(results []graders.GraderResult) int {
 }
 
 // convertGraderResults converts internal grader results to report format.
-// Review grader results are expanded into individual panel + consensus entries
-// for backward compatibility with the report schema.
+//
+// Schema v3 (this code path) emits exactly one row per grader, including
+// the prompt_review grader: per-criterion outcomes ride on the row's
+// Points slice (populated by the grader itself in Phase 2), while the
+// existing ReviewDetails struct still carries PanelResults / Criteria for
+// backward-compat with the static Markdown/HTML report templates.
+//
+// The legacy "expand to one entry per panel member + one consensus row"
+// behaviour was removed in Phase 5 — its expanded shape was the structural
+// cause of the "all panel members passed but rows render red" bug, since
+// site renderers had no way to distinguish a panel-member entry (no Points,
+// no Pass) from a real grader failure. Old v2 reports on disk keep the
+// expanded shape on read; only freshly written v3 reports use this path.
 func convertGraderResults(results []graders.GraderResult) []report.GraderResult {
 	var reportResults []report.GraderResult
 	for _, r := range results {
-		if r.Kind == graders.KindPromptReview && r.ReviewDetails != nil {
-			reportResults = append(reportResults, expandReviewGraderResult(r)...)
-			continue
-		}
 		pass := r.Pass
 		rr := report.GraderResult{
 			GraderName: r.Name,
@@ -1010,77 +1017,68 @@ func convertGraderResults(results []graders.GraderResult) []report.GraderResult 
 				ToolCounts:       r.BehaviorDetails.ToolCounts,
 			}
 		}
+		// prompt_review graders: re-shape the grader's name to a stable
+		// "ai_review" identifier (the panel-member-expansion code used to
+		// produce one row per model — site filters keyed off "ai_review"
+		// or "review" type for years) and copy the existing ReviewDetails
+		// struct verbatim so static Markdown/HTML templates keep working.
+		if r.Kind == graders.KindPromptReview && r.ReviewDetails != nil {
+			rd := r.ReviewDetails
+			rr.GraderName = "ai_review"
+			rr.GraderType = "prompt_review"
+			rr.Model = rd.Model
+			rr.OverallScore = rd.OverallScore
+			rr.MaxScore = rd.MaxScore
+			rr.Issues = rd.Issues
+			rr.Strengths = rd.Strengths
+			rr.IsConsensus = len(rd.PanelResults) > 0
+			scores := review.ReviewScores{}
+			for _, c := range rd.Criteria {
+				scores.Criteria = append(scores.Criteria, review.CriterionResult{
+					Name: c.Name, Passed: c.Passed, Reason: c.Reason,
+				})
+			}
+			rr.Scores = scores
+			// ReviewDetails struct is preserved for templates that walk
+			// PanelResults / Criteria directly.
+			panelDetails := make([]report.ReviewGraderPanelEntry, 0, len(rd.PanelResults))
+			for _, p := range rd.PanelResults {
+				crit := make([]report.ReviewGraderCriterion, 0, len(p.Criteria))
+				for _, c := range p.Criteria {
+					crit = append(crit, report.ReviewGraderCriterion{
+						Name: c.Name, Passed: c.Passed, Reason: c.Reason,
+					})
+				}
+				panelDetails = append(panelDetails, report.ReviewGraderPanelEntry{
+					Model:        p.Model,
+					OverallScore: p.OverallScore,
+					MaxScore:     p.MaxScore,
+					Summary:      p.Summary,
+					Issues:       p.Issues,
+					Strengths:    p.Strengths,
+					Criteria:     crit,
+				})
+			}
+			critDetails := make([]report.ReviewGraderCriterion, 0, len(rd.Criteria))
+			for _, c := range rd.Criteria {
+				critDetails = append(critDetails, report.ReviewGraderCriterion{
+					Name: c.Name, Passed: c.Passed, Reason: c.Reason,
+				})
+			}
+			rr.ReviewDetails = &report.ReviewGraderDetail{
+				Model:        rd.Model,
+				PanelResults: panelDetails,
+				Criteria:     critDetails,
+				OverallScore: rd.OverallScore,
+				MaxScore:     rd.MaxScore,
+				Issues:       rd.Issues,
+				Strengths:    rd.Strengths,
+				IsConsensus:  len(rd.PanelResults) > 0,
+			}
+		}
 		reportResults = append(reportResults, rr)
 	}
 	return reportResults
-}
-
-// expandReviewGraderResult converts a review grader result into multiple
-// report entries — one per panel member plus the consensus. This replaces
-// the removed GraderResultsFromReview function in the main code path.
-//
-// Phase 2 cohabitation note: the consensus entry now carries the grader's
-// Points so the site can begin reading per-criterion pass/fail directly off
-// the JSON shape. Phase 5 will retire this expansion entirely (single row
-// per grader, Points-driven) and the panel-member entries will be replaced
-// by parent linkage on the consensus row.
-func expandReviewGraderResult(r graders.GraderResult) []report.GraderResult {
-	rd := r.ReviewDetails
-	var results []report.GraderResult
-
-	// Panel member entries.
-	for _, p := range rd.PanelResults {
-		scores := review.ReviewScores{}
-		for _, c := range p.Criteria {
-			scores.Criteria = append(scores.Criteria, review.CriterionResult{
-				Name: c.Name, Passed: c.Passed, Reason: c.Reason,
-			})
-		}
-		results = append(results, report.GraderResult{
-			GraderName:   p.Model,
-			GraderType:   "review",
-			Model:        p.Model,
-			Scores:       scores,
-			OverallScore: p.OverallScore,
-			MaxScore:     p.MaxScore,
-			Summary:      p.Summary,
-			Issues:       p.Issues,
-			Strengths:    p.Strengths,
-		})
-	}
-
-	// Consolidated entry.
-	consensusName := rd.Model
-	if consensusName == "" {
-		consensusName = "consensus"
-	}
-	scores := review.ReviewScores{}
-	for _, c := range rd.Criteria {
-		scores.Criteria = append(scores.Criteria, review.CriterionResult{
-			Name: c.Name, Passed: c.Passed, Reason: c.Reason,
-		})
-	}
-	consensus := report.GraderResult{
-		GraderName:   consensusName,
-		GraderType:   "review",
-		Model:        rd.Model,
-		Scores:       scores,
-		OverallScore: rd.OverallScore,
-		MaxScore:     rd.MaxScore,
-		Summary:      rd.Summary,
-		Issues:       rd.Issues,
-		Strengths:    rd.Strengths,
-		IsConsensus:  len(rd.PanelResults) > 0,
-	}
-	if len(r.Points) > 0 {
-		consensus.Points = make([]report.GraderPoint, len(r.Points))
-		for i, p := range r.Points {
-			consensus.Points[i] = report.GraderPoint{Name: p.Name, Pass: p.Pass, Message: p.Message}
-		}
-	}
-	results = append(results, consensus)
-
-	return results
 }
 
 // buildGraderHooks wires criteria.GraderHooks to a raw progress emitter so
