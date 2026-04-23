@@ -23,24 +23,24 @@ tags:
 
 ## Prompt
 
-I keep getting AuthenticationFailedException when using DefaultAzureCredential
+I keep getting authentication errors when using DefaultAzureCredential
 and I don't understand where it's looking for credentials. Explain:
-1. What NuGet packages are needed for Azure.Identity
-2. The credential chain order (which credentials are tried and in what sequence)
+1. What packages are needed for Azure Identity
+2. The credential chain order — which credentials are tried and in what sequence
 3. How it behaves differently in local development vs deployed Azure environments
-4. How to troubleshoot when authentication fails — what logs or options help?
+4. How to troubleshoot when authentication fails
 
-Show a working example that creates a BlobServiceClient with DefaultAzureCredential,
-and explain what to check when it doesn't work.
+Show a working example that creates an Azure SDK client with
+DefaultAzureCredential, and explain what to check when it doesn't work.
 
 ## Evaluation Criteria
 
 The generated code should include:
-- `Azure.Identity` NuGet package installation
-- `DefaultAzureCredential` constructor and options
-- Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.
-- Passing credential to any Azure SDK client constructor
-- `AuthenticationFailedException` handling and diagnostics
+- Uses the Azure Identity package
+- Creates a `DefaultAzureCredential` with appropriate options
+- Explains the credential chain order
+- Passes the credential to an Azure SDK client
+- Handles authentication errors with diagnostics guidance
 
 ## Context
 

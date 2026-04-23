@@ -24,11 +24,11 @@ tags:
 ## Prompt
 
 My CI pipeline needs to authenticate to Azure using a service principal.
-How do I use ClientSecretCredential in C#? I need:
-1. Required NuGet packages
-2. How to create a ClientSecretCredential with tenant ID, client ID, and client secret
-3. How to use it with a BlobServiceClient
-4. Best practices for storing the secret (environment variables vs configuration)
+How do I set up client-secret-based authentication in .NET? I need:
+1. What packages are required
+2. How to create a credential with tenant ID, client ID, and client secret
+3. How to use the credential with Azure SDK clients
+4. Best practices for storing the secret securely
 5. Error handling when credentials are invalid
 
 Show a complete example with proper error handling.
@@ -36,11 +36,10 @@ Show a complete example with proper error handling.
 ## Evaluation Criteria
 
 The generated code should include:
-- `Azure.Identity` package with `ClientSecretCredential` class
-- Constructor parameters: tenantId, clientId, clientSecret
-- Passing credential to Azure SDK clients
-- Environment variable patterns for secret storage
-- `AuthenticationFailedException` for invalid credentials
+- Uses a client secret credential with tenant, client ID, and secret
+- Passes the credential to Azure SDK clients
+- Stores secrets via environment variables or secure configuration
+- Handles authentication errors for invalid credentials
 
 ## Context
 
