@@ -204,3 +204,33 @@ Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total acros
 **Your commits this sprint:** `21636fdd` ANSI style helper package (`internal/progress/style/`) · `63e2c11f` CI append-only renderer + summary table.
 
 See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.
+
+### Session 2026-04-23 (Agent Attempt Gating Fix)
+
+**Branch:** `ronniegeraghty/dev` (commit 0747aa58)
+
+Fixed interleaving issue in interactive renderer where "Agent Attempt:" section started rendering before Tools section completed. Ronnie reported this after a real `--pairwise` eval run.
+
+**Root cause:** The renderer was calling `ensureAgentHeader()` immediately when agent-activity events arrived (EventPhaseChange, EventToolStart, etc.), without waiting for EventToolsVerified to signal that all configured tool kinds (skills + MCP servers) had reported.
+
+**Solution:**
+- Added `agentEventsBuffered []ProgressEvent` and `agentGateOpen bool` to `interactiveEval` state
+- Agent-attempt events (PhaseChange, ToolStart, ToolComplete, WritingFile, etc.) are buffered until the gate opens
+- Gate opens on `EventToolsVerified` arrival OR when first agent event arrives with no prior tool events (no-tools config detection)
+- Safety: Terminal events (Passed/Failed/Error) force gate open if tools verification never fired (defensive against missing EventToolsVerified)
+- Redraw-before-flush: When `onToolsVerified` triggers a block redraw (status flip), `freezeTail()` is called BEFORE `redrawToolsBlock()` to ensure cursor position is correct for the DECSC/DECRC save/restore bracket
+
+**Tests added (4 new cases in `TestInteractive_AgentAttemptGating`):**
+1. In-order (tools → verified → agent) — baseline happy path
+2. Out-of-order (tools → agent → verified) — buffering + flush on verification
+3. No-tools eval — immediate gate open, no Tools: header at all
+4. Two back-to-back evals — state isolation, no cross-eval bleed
+
+**Pre-existing test compatibility:** Added safety gate-opening in terminal handlers so tests that skip EventToolsVerified (like `TestInteractive_HappyPath`) still work — the buffered events flush at Passed/Failed/Error if verification never arrived.
+
+**Learnings:**
+- The interactive renderer's tail-only update contract has ONE exception (tools block redraw on flip). Gating agent-attempt rendering requires careful cursor state management: freeze any active tail before calling `redrawToolsBlock()` so the cursor-up calculation is correct.
+- CI renderer doesn't have this issue — it's append-only with no Tools/Agent detail during the run, just start/finish timestamps and a final summary table.
+- `EventToolsVerified` is the bulk verification signal emitted at `hyoka/internal/eval/copilot.go:413-420` after all tool kinds (skills, plugins, MCP servers) have reported. It's always emitted in production, but tests may skip it — hence the safety fallback.
+
+**Decision filed:** `.squad/decisions/inbox/trinity-attempt-gating.md`
