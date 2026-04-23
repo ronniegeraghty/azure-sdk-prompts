@@ -937,3 +937,11 @@ Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
 
 - **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
 - **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+
+---
+
+### 2026-04-23T18:52Z: Cross-agent update — Plugin schema BREAKING CHANGE (Neo, commit `2c1de1c0`)
+
+Neo rewrote `docs/configuration.md` plugin section. The `@skills` magic alias is gone — remote plugin entries now require an explicit `repo:` field (e.g. `repo: github.com/microsoft/skills`). Names containing `@` are rejected at validation. This BREAKING CHANGE reverses commit `769dea69`. Per Ronnie: *"I want to be explicit when configs are written."*
+
+For your work: any docs, examples, or CHANGELOG entries that reference `name@skills` shorthand need to be migrated to the explicit `repo:` form. Worth a CHANGELOG callout for downstream users. See `decisions.md` 2026-04-23T18:50Z entry for the full schema, validator messages, and migration guidance.

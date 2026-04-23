@@ -733,3 +733,18 @@ The morpheus-issue-audit.md (2026-04-22) flagged #305 as "probably stale — lik
 
 - **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
 - **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+
+---
+
+### 2026-04-23T18:52Z: Cross-agent update — Plugin schema BREAKING CHANGE (Neo, commit `2c1de1c0`)
+
+Per Ronnie directive, Neo reversed his earlier `@marketplace` validator (commit `769dea69`) and removed the hardcoded `microsoft/skills` magic from `plugin.ResolveInstalled`. New rule: remote plugin entries MUST declare `repo:` explicitly. Names with `@` are now rejected at validation. Affects any config audits you do — the canonical form is now:
+
+```yaml
+- name: azure-sdk-python
+  type: plugin
+  source: remote
+  repo: github.com/microsoft/skills
+```
+
+This repo's configs (`configs/python-pairwise.yaml`, `configs/baseline-sonnet-skills.yaml`) are already migrated. Any wild config not in this repo using `name@skills` will fail validation with a migration message. See `decisions.md` entry at 2026-04-23T18:50Z for full schema and validator contracts.

@@ -14,6 +14,9 @@
 
 ### Decision: Remote Plugin Source Requires `@marketplace` Locator in Name (2026-04-23)
 
+> **⚠️ SUPERSEDED (2026-04-23T18:50Z) by "Explicit `repo:` required on remote plugin entries; `@skills` magic removed (BREAKING)" — see entry at end of this file. The `@marketplace` locator convention has been removed; `repo:` is now the required form.**
+
+
 **Agent:** Neo 💊
 **Branch:** ronniegeraghty/dev
 **Commit:** `769dea69`
@@ -482,3 +485,35 @@ Full per-agent shipping notes were merged from `.squad/decisions/inbox/` and the
 ## Archive
 
 Decisions prior to 2026-04-22 have been moved to `.squad/decisions/archive/`. See `pre-2026-04-22-decisions-archived-2026-04-23T18-29-46Z.md` for the most recent archival.
+### 2026-04-23T18:50Z: Explicit `repo:` required on remote plugin entries; `@skills` magic removed (BREAKING)
+
+**By:** Neo (per Ronnie directive)
+
+**What:** Remote plugin entries in tool configs (`generator.tools` / `reviewer.tools`) MUST now declare a `repo:` field. The `name` field is a plain identifier. The `@marketplace` shorthand (e.g. `azure-sdk-python@skills`) and the hardcoded `microsoft/skills` alias inside `plugin.ResolveInstalled` have both been removed.
+
+**New shape:**
+```yaml
+- name: azure-sdk-python
+  type: plugin
+  source: remote
+  repo: github.com/microsoft/skills   # REQUIRED for source: remote
+  version: main                        # OPTIONAL git ref
+```
+
+**Validator contract:**
+- `source: remote` + missing `repo:` → hard-fail with: *"plugin … declares source: remote but has no repo: field. Add repo: github.com/microsoft/skills (or your fork) so hyoka knows where to fetch it from."*
+- Any plugin name containing `@` → hard-fail with: *"plugin name … contains '@' — the @marketplace shorthand has been removed. … declare the source repo explicitly via repo: …"*
+
+**Resolver contract:** `plugin.ResolveInstalled(repo, name)` looks under `~/.hyoka/cache/default/<owner>/<repo>/{.github/plugins,.github/skills,skills}/<name>` and the legacy `~/.copilot/installed-plugins/<owner>-<repo>/<name>/skills`. There is no implicit `microsoft/skills` fallback. `repo` accepts `owner/repo`, `github.com/owner/repo`, or `https://github.com/owner/repo[.git]` (normalized via the new exported `plugin.SplitOwnerRepo`).
+
+**Why (Ronnie's framing, paraphrased):** A `source` field tells hyoka the *kind* of source; a `repo` field tells it the *location*. Both are required for any remote entry. Implicit aliases — even ones that "everybody knows" — are landmines for future readers of the config.
+
+**Reverses:** The `@marketplace`-locator validator from commit `769dea69`. That commit closed a real schema gap but with the wrong primitive — it entrenched the magic alias instead of removing it. This decision is the corrective.
+
+**Breaking change semantics:** Pre-1.0, no deprecation path. The cure for an implicit-magic schema isn't a softer warning; it's removal. Configs in this repo (`python-pairwise.yaml`, `baseline-sonnet-skills.yaml`) are migrated in the same commit. Downstream / wild configs WILL fail validation with a clear migration message — that's the point.
+
+**Follow-ups:**
+1. **Wild-config audit.** Any config not in this repo that previously used `name@skills` will fail validation. The error message tells users exactly what to change. Worth a CHANGELOG callout (Oracle).
+2. **Plugin auto-fetch.** Today plugins must be pre-installed (via Copilot CLI `/plugin install` or manual placement) — `ResolveInstalled` is read-only. Now that `repo:` is explicit, a future `gitFetcher`-style auto-clone for plugins is a clean addition; the schema is ready for it.
+3. **Skill `@owner/repo` form.** The `name@owner/repo` shorthand for `type: skill` is preserved (it's at least explicit), but it's less idiomatic than `name + repo:` separately. Consider deprecating in a follow-up if it causes confusion.
+4. **`Version` is the git ref.** Reaffirmed: there is no separate `ref:` field. The `Version` field on `Entry` covers branches/tags/commits for both skills and plugins. Documented in `entry.go`.
