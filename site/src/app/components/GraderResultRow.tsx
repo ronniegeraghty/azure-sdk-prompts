@@ -12,8 +12,23 @@ export interface GraderResultRowProps {
 export function GraderResultRow({ result, defaultExpanded = false }: GraderResultRowProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
-  // Determine pass/fail status
-  const passed = result.pass !== null && result.pass !== undefined ? result.pass : null;
+  // Determine pass/fail status. Tri-state aware: review graders ship
+  // pass: null but populate scores.criteria or overall_score; mirror the
+  // engine's roll-up so they don't render as N/A on a fully passing eval.
+  let passed: boolean | null;
+  if (result.pass != null) {
+    passed = result.pass;
+  } else if ((result.scores?.criteria?.length ?? 0) > 0) {
+    passed = result.scores!.criteria!.every(c => c.passed);
+  } else if (
+    result.overall_score != null &&
+    result.max_score != null &&
+    result.max_score > 0
+  ) {
+    passed = result.overall_score === result.max_score;
+  } else {
+    passed = null;
+  }
   const hasScore = result.score !== undefined && result.score !== null;
   const hasOverallScore = result.overall_score !== undefined && result.max_score !== undefined;
 
