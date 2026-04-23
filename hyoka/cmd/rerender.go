@@ -3,7 +3,7 @@ package cmd
 import (
 "fmt"
 
-"github.com/ronniegeraghty/hyoka/internal/rerender"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/rerender"
 "github.com/spf13/cobra"
 )
 

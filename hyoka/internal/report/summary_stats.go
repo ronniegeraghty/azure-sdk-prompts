@@ -4,7 +4,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/ronniegeraghty/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 )
 
 // DurationStats holds min/avg/max duration statistics with source labels for tooltips.

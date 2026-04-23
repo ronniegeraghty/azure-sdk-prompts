@@ -12,12 +12,13 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
-	"github.com/ronniegeraghty/hyoka/internal/config"
-	"github.com/ronniegeraghty/hyoka/internal/logging"
-	"github.com/ronniegeraghty/hyoka/internal/pidfile"
-	"github.com/ronniegeraghty/hyoka/internal/progress"
-	"github.com/ronniegeraghty/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.
@@ -486,7 +487,8 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 
 	slog.Info("Creating Copilot session",
 		"model", cfg.Generator.Model,
-		"skills", len(sessionCfg.SkillDirectories),
+		"skill_dirs", len(sessionCfg.SkillDirectories),
+		"skills", skills.CountSkills(sessionCfg.SkillDirectories),
 		"mcp_servers", len(sessionCfg.MCPServers),
 		"work_dir", workDir,
 	)
@@ -661,18 +663,46 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 }
 
 func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
-	// Build skill directories from generator tool entries.
+	// Resolve skill directories from Generator.Tools using the skills package.
+	// This handles glob patterns, validates directories exist and contain skills,
+	// and warns about empty/missing directories (#291).
+	//
+	// Local skill paths (e.g. "./skills/generator") are relative to the .hyoka
+	// project root, not the isolated configDir. The configDir is an ephemeral
+	// temp directory used only to prevent user-level skills from leaking
+	// into the session (#21); it contains no skill files.
+	proj := config.DiscoverFromCWD()
+	skillBaseDir := ""
+	if proj.Found() {
+		skillBaseDir = proj.Root
+	}
 	var skillDirs []string
 	if cfg.Generator != nil {
-		for _, entry := range cfg.Generator.Tools {
-			if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-				skillDirs = append(skillDirs, entry.Path)
-			}
+		resolved, err := skills.ResolveSkillDirs(cfg.Generator.Tools, skillBaseDir)
+		if err != nil {
+			slog.Warn("Failed to resolve generator skill directories", "error", err)
+		} else {
+			skillDirs = resolved
 		}
 	}
-
 	// Use the config-driven system prompt (#115, #116). The default is zero
 	// system prompt — all behavioral instructions belong in the config YAML.
+	systemMsg := ""
+	if cfg.Generator != nil && cfg.Generator.SystemPrompt != "" {
+		systemMsg = cfg.Generator.SystemPrompt
+	}
+
+	// Instruct the agent to use available skills before generating code.
+	// Without this hint, models tend to go straight to code generation
+	// and never invoke the skill tool, even when skills are loaded.
+	// Only add if there are actual skills, not just empty directories (#291).
+	if skills.CountSkills(skillDirs) > 0 {
+		systemMsg += "\n\nSKILLS:\n" +
+			"You have Azure SDK skills available. BEFORE writing any code, invoke the relevant skill " +
+			"using the skill tool to get SDK-specific patterns, API examples, and acceptance criteria. " +
+			"Also read the skill's reference files (acceptance-criteria.md, examples.md) for detailed guidance. " +
+			"Then use that information to generate correct, modern Azure SDK code."
+	}
 
 	sc := &copilot.SessionConfig{
 		Model:               cfg.Generator.Model,
@@ -781,13 +811,14 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		slog.Debug("No MCP servers configured")
 	}
 
-	// Wire generator system prompt to Copilot SDK session.
-	if cfg.Generator.SystemPrompt != "" {
+	// Set the system message: start with config-driven system prompt,
+	// then append any accumulated hints (skills, MCP, etc.)
+	if systemMsg != "" {
 		sc.SystemMessage = &copilot.SystemMessageConfig{
 			Mode:    "append",
-			Content: cfg.Generator.SystemPrompt,
+			Content: systemMsg,
 		}
-		slog.Info("Generator system prompt configured", "length", len(cfg.Generator.SystemPrompt))
+		slog.Info("Generator system prompt configured", "length", len(systemMsg))
 	}
 
 	return sc

@@ -104,7 +104,7 @@
       <th>Score</th>
       <th>Duration</th>
       <th>Files</th>
-      <th>Tool Calls</th>
+      <th>Tools / Skills</th>
       <th>Report</th>
     </tr>
   </thead>
@@ -117,7 +117,7 @@
       <td>{{if .Review}}<span style="color:{{scoreColor .Review.OverallScore .Review.MaxScore}};font-weight:700">{{.Review.OverallScore}}/{{.Review.MaxScore}}</span>{{else}}{{if .FailureReason}}<span style="color:#6b7280;font-size:0.85rem" title="{{.FailureReason}}">{{truncate .FailureReason 40}}</span>{{else}}—{{end}}{{end}}</td>
       <td>{{fmtDuration .Duration}}</td>
       <td>{{len .GeneratedFiles}}</td>
-      <td>{{range .ToolCalls}}<span class="tool-tag">{{.}}</span>{{end}}</td>
+      <td>{{range .ToolCalls}}<span class="tool-tag">{{.}}</span>{{end}}{{if .Environment}}{{range .Environment.SkillsInvoked}}<span class="tool-tag" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">📚 {{.}}</span>{{end}}{{end}}</td>
       <td>{{with reportLink .}}<a href="{{.}}">View →</a>{{end}}</td>
     </tr>
     {{end}}

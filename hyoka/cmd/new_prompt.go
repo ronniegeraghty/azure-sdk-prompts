@@ -7,7 +7,7 @@ import (
 "strings"
 "time"
 
-"github.com/ronniegeraghty/hyoka/internal/validate"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/validate"
 "github.com/spf13/cobra"
 )
 

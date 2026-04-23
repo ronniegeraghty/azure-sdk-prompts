@@ -8,7 +8,7 @@ import (
 "path/filepath"
 "testing"
 
-"github.com/ronniegeraghty/hyoka/internal/report"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 // setupTestReportsWithEvals creates a reports directory with eval report.json files.

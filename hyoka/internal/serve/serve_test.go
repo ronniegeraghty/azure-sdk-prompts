@@ -359,8 +359,9 @@ func TestSPANoSiteDir(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("expected 404 with no site dir, got %d", rec.Code)
+	// With embedded site, root should serve index.html
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 with embedded site, got %d", rec.Code)
 	}
 }
 

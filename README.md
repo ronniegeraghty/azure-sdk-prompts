@@ -29,8 +29,8 @@ go run ./hyoka list
 # Note: requires --all-configs if multiple configs exist
 go run ./hyoka run --all-configs
 
-# Filter by service and language
-go run ./hyoka run --service storage --language dotnet
+# Filter by service and language (requires --config or --all-configs)
+go run ./hyoka run --service storage --language dotnet --config baseline/claude-opus-4.6
 ```
 
 ### Install as a CLI
@@ -40,10 +40,10 @@ go install github.com/ronniegeraghty/hyoka@latest
 
 # When run from the repo root, prompts are auto-detected
 cd hyoka
-hyoka run --service storage
+hyoka run --service storage --config baseline/claude-opus-4.6
 
 # Or specify the prompts path explicitly
-hyoka run --prompts ~/projects/hyoka/prompts
+hyoka run --prompts ~/projects/hyoka/prompts --config baseline/claude-opus-4.6
 ```
 
 > **Smart path detection:** `hyoka` checks `./prompts` then `../prompts` automatically. Running from the repo root or the `hyoka/` directory both work without extra flags.
@@ -61,7 +61,7 @@ cd .hyoka
 # Add prompts/ configs/ criteria/ skills/
 
 # Run evaluations against your local project
-hyoka run --service my-service --config my-config
+hyoka run --service my-service --config your-config-name
 ```
 
 The `init` command creates:
@@ -149,23 +149,23 @@ Did you mean one of these?
 All filter flags work with `run`, `list`, and other prompt-aware commands:
 
 ```bash
-# By service
-hyoka run --service storage
+# By service (requires --config or --all-configs)
+hyoka run --service storage --config baseline/claude-opus-4.6
 
-# By language
-hyoka run --language dotnet
+# By language (requires --config or --all-configs)
+hyoka run --language dotnet --config baseline/claude-opus-4.6
 
 # Combine filters (AND logic)
-hyoka run --service storage --language dotnet --plane data-plane
+hyoka run --service storage --language dotnet --plane data-plane --config baseline/claude-opus-4.6
 
 # By category
-hyoka run --category authentication
+hyoka run --category authentication --config baseline/claude-opus-4.6
 
 # By tags
-hyoka run --tags identity
+hyoka run --tags identity --config baseline/claude-opus-4.6
 
 # Single prompt by ID
-hyoka run --prompt-id storage-dp-dotnet-auth
+hyoka run --prompt-id storage-dp-dotnet-auth --config baseline/claude-opus-4.6
 
 # Dry run — list matches without executing
 hyoka run --service storage --dry-run
@@ -261,16 +261,13 @@ The compare command analyzes pass/fail deltas, score changes, and highlights reg
 - Top improvements and regressions
 - Details on failed/broken evaluations
 
-### Tools Command
+### Plugins Command
 
-Manage and list tools available to the generator agent:
+List plugins available in the project:
 
 ```bash
-# List all available tools
-hyoka tools list
-
-# Add a new tool configuration
-hyoka tools add --name my-tool --description "Tool description"
+# List all available plugins
+hyoka plugins
 ```
 
 ### Validating Prompts
@@ -280,26 +277,26 @@ hyoka tools add --name my-tool --description "Tool description"
 hyoka validate
 ```
 
-### Tool Configurations
+### Configurations
 
 Each config file defines **one generator model** and a **multi-model review panel**. The `configs/` directory contains configs auto-discovered via `LoadDir()`:
 
 ```bash
-# List configs
+# List all available configs
 hyoka configs
 
 # Run with a specific config file
 hyoka run --config-file configs/baseline-sonnet.yaml --prompt-id storage-dp-dotnet-auth
 
-# Run all configs (default — auto-discovers configs/ directory)
-hyoka run --prompt-id storage-dp-dotnet-auth
+# Run all configs (requires explicit --all-configs flag)
+hyoka run --prompt-id storage-dp-dotnet-auth --all-configs
 
 # Run with a specific config name
-hyoka run --config baseline/claude-sonnet-4.5
+hyoka run --prompt-id storage-dp-dotnet-auth --config baseline/claude-sonnet-4.5
 
 # Run multiple configs (produces comparison data)
 # Note: multiple config names must be quoted and comma-separated
-hyoka run --config "baseline/claude-sonnet-4.5,azure-mcp/claude-sonnet-4.5"
+hyoka run --prompt-id storage-dp-dotnet-auth --config "baseline/claude-sonnet-4.5,azure-mcp/claude-sonnet-4.5"
 ```
 
 > ⚠️ **Config names use the `name:` field from your YAML files**, not the filename. Multiple configs must be quoted: `--config "config1,config2"`. See [Configuration Guide](docs/configuration.md) for the full name-to-filename mapping.
@@ -339,7 +336,7 @@ configs:
           path: "./skills/reviewer"
 ```
 
-Then run with: `hyoka run --config-file configs/my-custom-config.yaml`
+Then run with: `hyoka run --prompt-id your-prompt-id --config-file configs/my-custom-config.yaml`
 
 #### Skills in `tools`
 
@@ -383,6 +380,34 @@ reviewer:
 ```
 
 > **Tip:** The [microsoft/skills](https://github.com/microsoft/skills) repo contains 132+ skills across Azure SDK scenarios. Browse the repo or run `npx skills add microsoft/skills` to see what's available.
+
+#### Using Copilot CLI Installed Plugins
+
+If you've installed skill plugins via the Copilot CLI `/plugin` commands, you can reference them directly in your config using the `plugins` field. This avoids hardcoding absolute paths.
+
+**Step 1 — Install skills in Copilot CLI:**
+
+```
+/plugin marketplace add Microsoft/skills
+/plugin install azure-sdk-java@skills
+/plugin list
+```
+
+**Step 2 — Reference in config:**
+
+```yaml
+configs:
+  - name: baseline-skills/claude-sonnet-4.5
+    description: "Baseline + Skills"
+    generator:
+      model: "claude-sonnet-4.5"
+    plugins:
+      - "azure-sdk-java@skills"
+```
+
+The `plugins` field resolves `plugin-name@marketplace` to `~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/` automatically. This is equivalent to setting `generator_skill_directories` to the full absolute path.
+
+See `configs/baseline-sonnet-skills.yaml` for a working example.
 
 See `configs/example-full.yaml` for a complete example with all options.
 
@@ -437,7 +462,8 @@ hyoka/
 │       ├── reviewer-build/
 │       └── sdk-version-check/
 ├── hyoka/                              # Go eval tool (hyoka)
-│   ├── cmd/hyoka/main.go
+│   ├── main.go                        # CLI entry point
+│   ├── cmd/                           # Cobra command implementations
 │   ├── go.mod / go.sum
 │   └── internal/                      # All internal packages
 │       ├── build/                     # Language-specific build verification

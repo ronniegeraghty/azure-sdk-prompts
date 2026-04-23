@@ -955,3 +955,60 @@ Tests in `hyoka/internal/eval/resourcemonitor_test.go` were flaky because they u
 
 All future tests with background goroutines should follow the event-driven pattern. If a test needs to verify periodic behavior, expose the underlying method (make it public or use a test hook) so tests can call it directly.
 
+---
+
+## Decision: Site Embedding Architecture
+
+**Date:** 2026-04-07  
+**Author:** Morpheus 🕶️  
+**Status:** Proposed  
+**Category:** Build System, Distribution, Developer Experience
+
+### Summary
+
+Embed the built React SPA into the Go binary using `go:embed`. Pre-build the site in CI, commit the built `site/dist/` directory to the repo, and serve from the embedded filesystem at runtime. Follow the microsoft/waza pattern. Do not attempt auto-building at runtime.
+
+### Impact
+
+- Binary size: +1.3 MB (3 files: index.html + 1 CSS + 1 JS)
+- User experience: Zero-config `hyoka serve` works for all users (repo cloners, `go install` users, binary releases)
+- Repo churn: +1.3 MB in git history, minimal ongoing churn (dist rebuilds only when site changes)
+- Build complexity: Add pre-build step to CI, update `.gitignore` to allow `site/dist/`
+
+### Reference
+
+Full proposal: `.squad/decisions/inbox/morpheus-site-embed-architecture.md`
+
+
+---
+
+## Decision: Site Embed Implementation
+
+**Author:** Trinity 🖤  
+**Date:** 2026-04-07  
+**Status:** Implemented  
+**PR:** #289  
+**Issue:** #288  
+
+### What
+
+Embedded the built React SPA into the Go binary using `go:embed` so `hyoka serve` works zero-config.
+
+### Key Implementation Details
+
+- `hyoka/internal/serve/embed.go` holds the `//go:embed all:site` directive
+- Built site is copied to `hyoka/internal/serve/site/` (required because `go:embed` can't reference `../../site/dist/`)
+- `spaHandler()` uses `fs.FS` interface — `fs.Sub(embeddedSite, "site")` for embedded, `os.DirFS(siteDir)` for dev override
+- `--site-dir` flag still works as a development override
+- Startup message distinguishes embedded vs override mode
+- `site/dist/` un-gitignored so repo cloners also get the built assets
+
+### Impact
+
+- Binary size increases ~1.3 MB (gzipped JS + CSS + HTML)
+- `go install` and binary releases now include the dashboard automatically
+- No runtime Node.js dependency for serving
+
+### Orchestration Log
+
+See `.squad/orchestration-log/2026-04-07T21-25-trinity.md`

@@ -40,6 +40,9 @@ skills-lock.json
 # Node modules
 site/node_modules/
 
+# Site build output (embedded copy lives in hyoka/internal/serve/site/)
+site/dist/
+
 # Built binary
 /hyoka/azsdk-prompt-eval
 # Squad: ignore runtime state (logs, inbox, sessions)
@@ -52,3 +55,6 @@ site/node_modules/
 
 # Playwright MCP snapshots
 .playwright-mcp/
+
+# Remote skill cache (populated on first run / dry-run by internal/skills/fetcher.go)
+.skills-cache/

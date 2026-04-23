@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/plugin"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 	"gopkg.in/yaml.v3"
 )
 
@@ -62,6 +62,83 @@ type ToolConfig struct {
 	Reviewer    *ReviewerConfig  `yaml:"reviewer,omitempty" json:"reviewer,omitempty"`
 	Plugins     []string         `yaml:"plugins,omitempty" json:"plugins,omitempty"`
 	Limits      *SessionLimits   `yaml:"limits,omitempty" json:"limits,omitempty"`
+}
+
+// Normalize resolves plugin references into generator skill directories.
+// It is idempotent — safe to call multiple times.
+func (tc *ToolConfig) Normalize() {
+	if tc.Generator == nil {
+		tc.Generator = &GeneratorConfig{}
+	}
+	if tc.Reviewer == nil {
+		tc.Reviewer = &ReviewerConfig{}
+	}
+
+	// Resolve installed Copilot CLI plugins to generator skills.
+	// Format: "plugin-name@marketplace" (e.g., "azure-sdk-java@skills")
+	// Resolves to: ~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/
+	for _, p := range tc.Plugins {
+		if dir := resolveInstalledPlugin(p); dir != "" {
+			tc.Generator.Tools = append(tc.Generator.Tools, ToolEntry{
+				Name:   p,
+				Type:   "skill",
+				Source: "local",
+				Path:   dir,
+			})
+			slog.Info("Resolved plugin to skill directory", "plugin", p, "path", dir)
+		} else {
+			slog.Warn("Could not resolve installed plugin", "plugin", p)
+		}
+	}
+}
+
+// resolveInstalledPlugin resolves a plugin reference (e.g., "azure-sdk-java@skills")
+// to the local skills directory under ~/.copilot/installed-plugins/.
+// The format is "plugin-name@marketplace" where marketplace is the source
+// (e.g., "skills" from "/plugin marketplace add Microsoft/skills").
+// Returns the path to the plugin's skills directory, or empty string if not found.
+func resolveInstalledPlugin(ref string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	basePath := filepath.Join(home, ".copilot", "installed-plugins")
+
+	// Parse "plugin@marketplace" format
+	plugin, marketplace := ref, ""
+	if idx := len(ref) - 1; idx > 0 {
+		for i := idx; i >= 0; i-- {
+			if ref[i] == '@' {
+				plugin = ref[:i]
+				marketplace = ref[i+1:]
+				break
+			}
+		}
+	}
+
+	// Try with marketplace subdirectory: ~/.copilot/installed-plugins/{marketplace}/{plugin}/skills/
+	if marketplace != "" {
+		dir := filepath.Join(basePath, marketplace, plugin, "skills")
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return dir
+		}
+	}
+
+	// Fallback: try without marketplace: ~/.copilot/installed-plugins/{plugin}/skills/
+	dir := filepath.Join(basePath, plugin, "skills")
+	if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		return dir
+	}
+
+	return ""
+}
+
+// EffectiveGeneratorSkills returns the generator's skill list from the normalized config.
+func (tc *ToolConfig) EffectiveGeneratorSkills() []ToolEntry {
+	if tc.Generator != nil {
+		return tc.Generator.Tools
+	}
+	return nil
 }
 
 // ConfigFile represents the top-level config file structure.
@@ -250,9 +327,10 @@ func (cf *ConfigFile) GetConfigs(names []string) ([]ToolConfig, error) {
 	return result, nil
 }
 
-// InstallSkillsAndPlugins runs "npx skills add <entry>" for each declared
-// plugin across the given configs. It deduplicates entries so each
-// package is only installed once.
+// InstallSkillsAndPlugins installs declared plugins across the given configs.
+// GitHub repo plugins (containing "/") are installed via "copilot plugin install".
+// Other plugins are installed via "npx skills add". Entries are deduplicated
+// so each package is only installed once.
 func InstallSkillsAndPlugins(configs []ToolConfig) error {
 	seen := make(map[string]bool)
 	type entry struct {
@@ -272,6 +350,11 @@ func InstallSkillsAndPlugins(configs []ToolConfig) error {
 			if _, err := reg.Get(p); err == nil {
 				continue
 			}
+			// Skip npx install if the plugin is already installed locally
+			if dir := resolveInstalledPlugin(p); dir != "" {
+				slog.Info("Plugin already installed locally, skipping npx install", "plugin", p, "path", dir)
+				continue
+			}
 			if !seen["plugin:"+p] {
 				seen["plugin:"+p] = true
 				entries = append(entries, entry{"plugin", p})
@@ -285,11 +368,21 @@ func InstallSkillsAndPlugins(configs []ToolConfig) error {
 
 	for _, e := range entries {
 		fmt.Printf("Installing %s: %s\n", e.kind, e.value)
-		cmd := exec.Command("npx", "skills", "add", e.value)
+		var cmd *exec.Cmd
+		if strings.Contains(e.value, "/") {
+			// GitHub repo plugin (e.g. "heaths/azsdk-samples-mcp")
+			cmd = exec.Command("copilot", "plugin", "install", e.value)
+		} else {
+			// npm-based skill package
+			cmd = exec.Command("npx", "skills", "add", e.value, "--yes")
+		}
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("installing %s %q: %w", e.kind, e.value, err)
+			slog.Warn("Failed to install plugin, skipping",
+				"plugin", e.value,
+				"error", err,
+				"hint", "Install manually with: copilot plugin install "+e.value)
 		}
 	}
 

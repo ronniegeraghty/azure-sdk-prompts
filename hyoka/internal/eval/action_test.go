@@ -3,7 +3,7 @@ package eval
 import (
 	"testing"
 
-	"github.com/ronniegeraghty/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 func boolPtr(b bool) *bool { return &b }
@@ -66,6 +66,21 @@ func TestBuildActionTimeline_ToolCalls(t *testing.T) {
 	if tl.Summary.Errors != 0 {
 		t.Errorf("expected 0 errors, got %d", tl.Summary.Errors)
 	}
+	// TotalToolCalls = file_read(1) + file_write(1) + bash(1)
+	if tl.Summary.TotalToolCalls != 3 {
+		t.Errorf("expected 3 total tool calls, got %d", tl.Summary.TotalToolCalls)
+	}
+	// TotalActions = 3 tool calls + turn_start(1) + turn_end(1) = 5
+	if tl.Summary.TotalActions != 5 {
+		t.Errorf("expected 5 total actions, got %d", tl.Summary.TotalActions)
+	}
+	// All 3 tools succeeded
+	if tl.Summary.ToolSuccesses != 3 {
+		t.Errorf("expected 3 tool successes, got %d", tl.Summary.ToolSuccesses)
+	}
+	if tl.Summary.ToolFailures != 0 {
+		t.Errorf("expected 0 tool failures, got %d", tl.Summary.ToolFailures)
+	}
 
 	// Check file_read event classification
 	ev := tl.Events[1]
@@ -127,6 +142,14 @@ func TestBuildActionTimeline_MCPAndErrors(t *testing.T) {
 	if tl.Summary.Errors != 1 {
 		t.Errorf("expected 1 error, got %d", tl.Summary.Errors)
 	}
+	// TotalToolCalls: 1 MCP + 1 tool_call (edit) = 2
+	if tl.Summary.TotalToolCalls != 2 {
+		t.Errorf("expected 2 total tool calls, got %d", tl.Summary.TotalToolCalls)
+	}
+	// TotalActions: 2 tool calls + turn_start(1) + turn_end(1) = 4
+	if tl.Summary.TotalActions != 4 {
+		t.Errorf("expected 4 total actions, got %d", tl.Summary.TotalActions)
+	}
 
 	// MCP event should have server name
 	ev := tl.Events[1]
@@ -157,6 +180,14 @@ func TestBuildActionTimeline_MultipleTurns(t *testing.T) {
 
 	if tl.Summary.TotalTurns != 3 {
 		t.Errorf("expected 3 turns, got %d", tl.Summary.TotalTurns)
+	}
+	// TotalToolCalls: view(1) + create(1) = 2
+	if tl.Summary.TotalToolCalls != 2 {
+		t.Errorf("expected 2 total tool calls, got %d", tl.Summary.TotalToolCalls)
+	}
+	// TotalActions: 2 tool calls + 3 turn_start + 3 turn_end + 1 message = 9
+	if tl.Summary.TotalActions != 9 {
+		t.Errorf("expected 9 total actions, got %d", tl.Summary.TotalActions)
 	}
 	// Events in turn 2 should have TurnNumber 2
 	ev := tl.Events[5] // tool.execution_start in turn 2
@@ -338,12 +369,56 @@ func TestActionTimeline_ToReport(t *testing.T) {
 	if rpt.Summary.FileReads != 1 {
 		t.Errorf("expected 1 file read in summary, got %d", rpt.Summary.FileReads)
 	}
+	// Verify TotalActions and TotalToolCalls are mapped
+	// 1 file_read tool + turn_start(1) = TotalActions 2, TotalToolCalls 1
+	if rpt.Summary.TotalToolCalls != 1 {
+		t.Errorf("expected 1 total tool call in report, got %d", rpt.Summary.TotalToolCalls)
+	}
+	if rpt.Summary.TotalActions != 2 {
+		t.Errorf("expected 2 total actions in report, got %d", rpt.Summary.TotalActions)
+	}
+	if rpt.Summary.ToolSuccesses != 1 {
+		t.Errorf("expected 1 tool success in report, got %d", rpt.Summary.ToolSuccesses)
+	}
+	if rpt.Summary.ToolFailures != 0 {
+		t.Errorf("expected 0 tool failures in report, got %d", rpt.Summary.ToolFailures)
+	}
 	// Verify field mapping
 	if rpt.Events[2].DurationMs != 50 {
 		t.Errorf("expected duration 50, got %f", rpt.Events[2].DurationMs)
 	}
 	if rpt.Events[2].Success == nil || !*rpt.Events[2].Success {
 		t.Error("expected success=true in report event")
+	}
+}
+
+func TestBuildActionTimeline_ToolSuccessFailure(t *testing.T) {
+	records := []report.SessionEventRecord{
+		{Type: "assistant.turn_start", TurnNumber: 1},
+		{Type: "assistant.reasoning", Content: "Let me think..."},
+		{Type: "tool.execution_start", ToolName: "view"},
+		{Type: "tool.execution_complete", ToolName: "view", Duration: 50, ToolSuccess: boolPtr(true)},
+		{Type: "tool.execution_start", ToolName: "edit", Error: "permission denied"},
+		{Type: "tool.execution_complete", ToolName: "edit", Duration: 10, ToolSuccess: boolPtr(false)},
+		{Type: "assistant.message", Content: "I hit an error"},
+		{Type: "assistant.turn_end", TurnNumber: 1},
+	}
+
+	tl := BuildActionTimeline(records)
+
+	if tl.Summary.ToolSuccesses != 1 {
+		t.Errorf("expected 1 tool success, got %d", tl.Summary.ToolSuccesses)
+	}
+	if tl.Summary.ToolFailures != 1 {
+		t.Errorf("expected 1 tool failure, got %d", tl.Summary.ToolFailures)
+	}
+	// TotalToolCalls: file_read(1) + tool_call/edit(1) = 2
+	if tl.Summary.TotalToolCalls != 2 {
+		t.Errorf("expected 2 total tool calls, got %d", tl.Summary.TotalToolCalls)
+	}
+	// TotalActions: 2 tool calls + turn_start(1) + turn_end(1) + reasoning(1) + message(1) = 6
+	if tl.Summary.TotalActions != 6 {
+		t.Errorf("expected 6 total actions, got %d", tl.Summary.TotalActions)
 	}
 }
 

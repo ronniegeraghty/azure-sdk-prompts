@@ -2,6 +2,7 @@ package report
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ronniegeraghty/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
 
 //go:embed templates/*.gohtml
@@ -182,6 +183,14 @@ type ReportTemplateData struct {
 	FileCount      int
 	FileContents   map[string]string // filename → content for expandable display
 	BackPath       string            // relative path from report.html back to summary.html
+	ToolCallCounts []ToolCallCount   // per-tool call counts, sorted by count desc
+}
+
+// ToolCallCount pairs a tool (or skill) name with its invocation count.
+type ToolCallCount struct {
+	Name      string
+	Count     int
+	MCPServer string // non-empty if all calls went through the same MCP server
 }
 
 // ToolAction represents one tool invocation extracted from session events.
@@ -279,15 +288,37 @@ func buildReportData(r *EvalReport) *ReportTemplateData {
 			})
 			stepIndex++
 			toolTitle := toolName
+			icon := "🔧"
+			stepType := "tool_call"
 			if ev.FilePath != "" {
 				toolTitle += " → " + ev.FilePath
+			}
+			// Distinguish skill-related tool calls with dedicated icons
+			if toolName == "skill" {
+				icon = "📚"
+				stepType = "skill"
+				// Extract skill name from args JSON
+				if skillArg := extractJSONField(ev.ToolArgs, "skill"); skillArg != "" {
+					toolTitle = "Skill invoked: " + skillArg
+				} else {
+					toolTitle = "Skill invoked"
+				}
+			} else if toolName == "view" && strings.Contains(ev.ToolArgs, "skills") && strings.Contains(ev.ToolArgs, "references") {
+				icon = "📖"
+				stepType = "skill_ref"
+				toolTitle = "Skill reference fetch"
+				if ev.FilePath != "" {
+					toolTitle += " → " + filepath.Base(ev.FilePath)
+				} else if refFile := extractJSONField(ev.ToolArgs, "path"); refFile != "" {
+					toolTitle += " → " + filepath.Base(refFile)
+				}
 			}
 			step := TimelineStep{
 				Index:     stepIndex,
 				Phase:     "generation",
-				StepType:  "tool_call",
-				Icon:      "🔧",
-				Title:     "Tool call: " + toolTitle,
+				StepType:  stepType,
+				Icon:      icon,
+				Title:     toolTitle,
 				Detail:    ev.ToolArgs,
 				ToolName:  toolName,
 				MCPServer: ev.MCPServerName,
@@ -333,6 +364,44 @@ func buildReportData(r *EvalReport) *ReportTemplateData {
 				Title:    title,
 				Content:  ev.Content,
 			})
+		case "skill.invoked":
+			skillName := ev.SkillName
+			if skillName == "" && ev.Content != "" {
+				for _, line := range strings.Split(ev.Content, "\n") {
+					line = strings.TrimSpace(line)
+					if strings.HasPrefix(line, "name:") {
+						skillName = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
+						break
+					}
+				}
+			}
+			// Merge into the existing skill tool call timeline step if present,
+			// rather than creating a duplicate entry.
+			merged := false
+			for i := len(d.TimelineSteps) - 1; i >= 0; i-- {
+				if d.TimelineSteps[i].StepType == "skill" {
+					d.TimelineSteps[i].Content = truncateStr(ev.Content, 2000)
+					if skillName != "" {
+						d.TimelineSteps[i].Title = "Skill loaded: " + skillName
+					}
+					merged = true
+					break
+				}
+			}
+			if !merged && (skillName != "" || ev.Content != "") {
+				if skillName == "" {
+					skillName = "(unknown)"
+				}
+				stepIndex++
+				d.TimelineSteps = append(d.TimelineSteps, TimelineStep{
+					Index:    stepIndex,
+					Phase:    "generation",
+					StepType: "skill",
+					Icon:     "📚",
+					Title:    "Skill loaded: " + skillName,
+					Content:  truncateStr(ev.Content, 2000),
+				})
+			}
 		}
 	}
 
@@ -349,6 +418,40 @@ func buildReportData(r *EvalReport) *ReportTemplateData {
 			Content:  summary,
 		})
 	}
+
+	// Build per-tool call counts from ToolActions.
+	toolCounts := map[string]int{}
+	toolMCP := map[string]string{}
+	for _, ta := range d.ToolActions {
+		name := ta.ToolName
+		// Resolve generic "skill" tool calls to the actual skill name.
+		if name == "skill" {
+			if skillArg := extractJSONField(ta.Args, "skill"); skillArg != "" {
+				name = "skill: " + skillArg
+			}
+		}
+		toolCounts[name]++
+		if ta.MCPServer != "" {
+			if prev, ok := toolMCP[name]; !ok {
+				toolMCP[name] = ta.MCPServer
+			} else if prev != ta.MCPServer {
+				toolMCP[name] = "" // mixed servers
+			}
+		}
+	}
+	for name, count := range toolCounts {
+		d.ToolCallCounts = append(d.ToolCallCounts, ToolCallCount{
+			Name:      name,
+			Count:     count,
+			MCPServer: toolMCP[name],
+		})
+	}
+	sort.Slice(d.ToolCallCounts, func(i, j int) bool {
+		if d.ToolCallCounts[i].Count != d.ToolCallCounts[j].Count {
+			return d.ToolCallCounts[i].Count > d.ToolCallCounts[j].Count
+		}
+		return d.ToolCallCounts[i].Name < d.ToolCallCounts[j].Name
+	})
 
 	d.Reasoning = strings.Join(reasoningParts, "\n\n")
 	d.FinalReply = strings.Join(messageParts, "\n\n")
@@ -463,6 +566,18 @@ func buildReviewTimeline(events []review.ReviewEvent) []TimelineStep {
 
 // readFileContents reads file contents from the code directory for display in the HTML report.
 // If starterFiles is non-empty, only files NOT in the starter set are included.
+// extractJSONField extracts a string field from a JSON args string.
+func extractJSONField(jsonStr, field string) string {
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &m); err != nil {
+		return ""
+	}
+	if v, ok := m[field].(string); ok {
+		return v
+	}
+	return ""
+}
+
 func readFileContents(codeDir string, files []string, starterFiles []string) map[string]string {
 	contents := make(map[string]string)
 	starterSet := make(map[string]bool, len(starterFiles))
@@ -667,4 +782,3 @@ func htmlFuncMap() template.FuncMap {
 		},
 	}
 }
-

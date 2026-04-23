@@ -1,9 +1,7 @@
 name: azure-python
-description: "Azure SDK for Python — MCP server + best practices skill"
-skills:
-  - type: local
-    name: azure-python-best-practices
-    path: ./skills/generator
+description: "Azure SDK for Python — MCP server"
+# Generator skills removed: ./skills/generator/ contains no skills (#291).
+# Re-add when generator skill content is created.
 mcp_servers:
   azure:
     type: stdio

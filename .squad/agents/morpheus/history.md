@@ -69,6 +69,33 @@ Initial setup complete.
 
 **Decision:** CI is the single biggest hardening priority. Without it, every other fix can regress silently.
 
+### React SPA Embedding Architecture (2026-04-07)
+
+**Context:** User reported blank page when running `hyoka serve` without pre-built React site. Site build output (`site/dist/`, ~1.3 MB) is gitignored. Current serve command probes filesystem for `site/dist/` and fails with plaintext error if missing. Breaks `go install` users who get binary only.
+
+**Investigation:** Analyzed microsoft/waza's approach (commits `web/dist/`, uses `//go:embed all:dist`, serves from `http.FS`). Reviewed existing `go:embed` usage in codebase (templates, rubric). Evaluated 3 architectural questions:
+1. Should serve command auto-build site at runtime? **No** — fatal for `go install` users (no npm/node), slow startup, fragile dependencies.
+2. Should built site be embedded in binary? **Yes** — required for `go install` to work, +1.3 MB is acceptable, standard Go pattern.
+3. Should built site be committed to repo? **Yes** — required for `go:embed` to work at build time, enables instant `go run` for repo cloners.
+
+**Recommendation:** Embed site using `go:embed` in new `hyoka/internal/serve/embed.go`, commit `site/dist/` to repo, add CI build step with staleness check, preserve `--site-dir` flag for dev overrides. Follow waza's proven pattern.
+
+**Key architectural principles:**
+- CLI tools must not depend on npm/node in production
+- `go:embed` requires source files at build time (can't defer to CI)
+- Binary size (+1.3 MB) is trivial for modern Go tools
+- Dual approach (embedded + filesystem override) serves both prod and dev needs
+
+**Implementation plan:** 3 phases: (1) Enable embedding with backward compat, (2) Add build automation + CI, (3) Optional deprecation of filesystem fallback. Detailed code changes, migration path, edge cases, and risk assessment in proposal.
+
+**Decision document:** `.squad/decisions/inbox/morpheus-site-embed-architecture.md` (28 KB)
+
+**Key file paths:**
+- Serve command: `hyoka/cmd/serve.go` (53 lines)
+- SPA handler: `hyoka/internal/serve/serve.go:335-360` (25 lines)
+- Site build: `site/package.json` (Vite 6.3.5, React 18.3.1)
+- Current dist size: 1.3 MB (3 files: index.html + 1 CSS + 1 JS)
+
 ### Evolution Plan (2026-10-14)
 
 **Scope:** Integrated hardening + product vision plan mapping Ronnie's 15 requirements against current architecture. Deep-dived into all 6 major subsystems: config, prompt, eval engine, review/criteria, serve/report, skills.
@@ -174,3 +201,21 @@ Initial setup complete.
 - Phase 5 (Ecosystem): #152–#162 (11 issues — .hyoka init, tool registry, tests, skills)
 
 **Total: 72 issues across 5 phases**
+
+### Session Limits Analysis (2026-10-16)
+
+**Task:** Analyze where session limits (`max_turns`, `max_session_actions`) should live and create a GitHub issue with the proposal.
+
+**Investigation findings:**
+- `max_session_actions` exists at 3 layers: CLI flag (default 50), config YAML `limits:` block, engine default (50). Resolution: config > CLI > default.
+- `max_turns` exists at 2 layers: config YAML `limits:` block, engine default (25). No CLI flag.
+- **No config currently uses custom limits** — the `limits:` block is unused across all 8 config files.
+- All 89 prompts get identical limits regardless of difficulty. The `difficulty` property exists on all prompts (35 basic, 48 intermediate, 6 advanced).
+- The `Prompt` struct already has a `Timeout` field — establishes precedent for per-prompt typed fields.
+- The behavior grader uses `max_turns` independently (from its own grader config), so moving limits to prompts doesn't affect graders.
+- `max_turns` and `max_session_actions` serve different purposes: turns = conversation efficiency, actions = compute budget. Do NOT consolidate.
+
+**Proposal:** Add `max_session_actions` to prompt frontmatter with 4-layer resolution: prompt > config > CLI > engine default. Optional difficulty-based auto-scaling (basic=30, intermediate=50, advanced=100). Zero prompts need updates initially — all backward compatible.
+
+**Issue created:** #284 — "feat: Move session limits to prompt frontmatter with config/CLI fallback"
+**Assigned to:** Neo 💊 via `squad:neo 💊` label
