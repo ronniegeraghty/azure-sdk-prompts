@@ -1201,3 +1201,17 @@ Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
 > **No magic aliases. Remote tools must declare `repo:` explicitly.** A `source` field tells hyoka the *kind* of source; a `repo` field tells it the *location*. Both are required for any remote entry. Implicit defaults to `microsoft/skills` (or any other repo) are forbidden — the writer of the config must spell out the source so the next reader has zero inference to do.
 
 **Why a BREAKING CHANGE instead of a deprecation path:** Pre-1.0. The whole point of the reversal is that the implicit form is wrong; keeping it warmly deprecated would entrench the magic Ronnie objected to.
+
+### 2026-04-23: Canonical owner/repo form in configs/docs (follow-up to 2c1de1c0)
+
+Ronnie wanted the short `owner/repo` form to be the recommended/canonical shape in configs and docs (long `github.com/owner/repo` form still works for backward compat — `SplitOwnerRepo` accepts both).
+
+**Changes:**
+- `configs/python-pairwise.yaml`, `configs/baseline-sonnet-skills.yaml`: all `repo:` values rewritten to `microsoft/skills`.
+- `docs/configuration.md`: example blocks updated; the field-table row now states canonical = `owner/repo` and notes the `github.com/` prefix is accepted but redundant.
+- `validate.go`: both error-message hints now say `repo: microsoft/skills`.
+- `validate_test.go`: assertion updated to match the new short-form hint.
+- `plugin_migration_test.go`, `tool_load_hardfail_schema_test.go`: test fixtures use short form.
+- `fetcher_test.go` left untouched — its `"github.com prefix is stripped"` case is the deliberate backward-compat coverage. `installed.go` doc comment also left untouched (it intentionally documents both forms).
+
+`go build ./...`, the targeted test packages, and `hyoka validate` all green.

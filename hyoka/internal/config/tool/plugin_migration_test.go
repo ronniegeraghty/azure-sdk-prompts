@@ -105,7 +105,7 @@ func TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo(t *te
 
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
 		GeneratorTools: []Entry{
-			{Type: TypePlugin, Name: "ghost-plugin", Source: "remote", Repo: "github.com/microsoft/skills"},
+			{Type: TypePlugin, Name: "ghost-plugin", Source: "remote", Repo: "microsoft/skills"},
 		},
 		ConfigDir: dir,
 	})
@@ -519,7 +519,7 @@ func TestValidateAndExpand_RemotePlugin_MissingCache_HardFails(t *testing.T) {
 
 	report, err := ValidateAndExpand(context.Background(), ValidationInput{
 		GeneratorTools: []Entry{
-			{Type: TypePlugin, Name: "never-cached", Source: "remote", Repo: "github.com/microsoft/skills"},
+			{Type: TypePlugin, Name: "never-cached", Source: "remote", Repo: "microsoft/skills"},
 		},
 		ConfigDir: dir,
 	})

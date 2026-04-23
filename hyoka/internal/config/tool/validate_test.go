@@ -651,7 +651,7 @@ if toolErr.Name != "azure-sdk-python" {
 t.Errorf("expected Name=azure-sdk-python, got %q", toolErr.Name)
 }
 // Reason should mention the fix: add a repo: field.
-for _, want := range []string{"repo:", "github.com/microsoft/skills"} {
+for _, want := range []string{"repo:", "microsoft/skills"} {
 if !strings.Contains(toolErr.Reason, want) {
 t.Errorf("expected reason to contain %q, got: %s", want, toolErr.Reason)
 }

@@ -16,23 +16,23 @@ configs:
         - name: azure-sdk-java
           type: plugin
           source: remote
-          repo: github.com/microsoft/skills
+          repo: microsoft/skills
         - name: azure-sdk-python
           type: plugin
           source: remote
-          repo: github.com/microsoft/skills
+          repo: microsoft/skills
         - name: azure-sdk-dotnet
           type: plugin
           source: remote
-          repo: github.com/microsoft/skills
+          repo: microsoft/skills
         - name: azure-sdk-typescript
           type: plugin
           source: remote
-          repo: github.com/microsoft/skills
+          repo: microsoft/skills
         - name: azure-sdk-rust
           type: plugin
           source: remote
-          repo: github.com/microsoft/skills
+          repo: microsoft/skills
     reviewer:
       models:
         - "claude-opus-4.6"

@@ -28,7 +28,7 @@ configs:
         - name: azure-sdk-python
           type: plugin
           source: remote
-          repo: github.com/microsoft/skills
+          repo: microsoft/skills
     reviewer:
       models:
         - "claude-opus-4.6"

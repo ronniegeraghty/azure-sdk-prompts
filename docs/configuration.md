@@ -267,7 +267,7 @@ generator:
     - name: azure-sdk-python
       type: plugin
       source: remote
-      repo: github.com/microsoft/skills
+      repo: microsoft/skills
     - name: my-plugin
       type: plugin
       source: local
@@ -278,7 +278,7 @@ generator:
 | `name` | yes | — | Plugin identifier (filename without `.yaml` for local; the plugin folder name within the repo for remote) |
 | `type` | yes | — | Must be `"plugin"` |
 | `source` | yes | — | `local` or `remote` |
-| `repo` | for `source: remote` | — | Source repository in `owner/repo` or `github.com/owner/repo` form (e.g. `github.com/microsoft/skills`). hyoka has no implicit marketplace — declare it explicitly. |
+| `repo` | for `source: remote` | — | Source repository. Canonical form is `owner/repo` (e.g. `microsoft/skills`); GitHub is assumed, so the `github.com/` prefix is redundant but accepted for backward compatibility. hyoka has no implicit marketplace — declare it explicitly. |
 | `version` | no | repo default | Git ref (branch, tag, or commit) to pin |
 
 #### Local Plugins
@@ -305,7 +305,7 @@ generator:
     - name: azure-sdk-python
       type: plugin
       source: remote
-      repo: github.com/microsoft/skills
+      repo: microsoft/skills
 ```
 
 hyoka resolves remote plugins from `~/.hyoka/cache/default/<owner>/<repo>/...` (populated by your prior `/plugin install` or by hyoka's fetch flow). To pin to a specific git ref, add `version: <branch-tag-or-sha>`.

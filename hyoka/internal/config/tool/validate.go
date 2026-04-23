@@ -308,7 +308,7 @@ if strings.Contains(name, "@") {
 reason := fmt.Sprintf(
 "plugin name %q contains '@' — the @marketplace shorthand has been removed. "+
 "Set the plugin name to the bare identifier (e.g. %q) and declare the source repo "+
-"explicitly via repo: (e.g. repo: github.com/microsoft/skills).",
+"explicitly via repo: (e.g. repo: microsoft/skills).",
 name, strings.SplitN(name, "@", 2)[0],
 )
 report.Items = append(report.Items, ToolLoadItem{
@@ -337,7 +337,7 @@ src = SourceLocal
 if src == SourceRemote && entry.Repo == "" {
 reason := fmt.Sprintf(
 "plugin %q declares source: remote but has no repo: field. "+
-"Add repo: github.com/microsoft/skills (or your fork) so hyoka knows where to fetch it from.",
+"Add repo: microsoft/skills (or your fork) so hyoka knows where to fetch it from.",
 name,
 )
 report.Items = append(report.Items, ToolLoadItem{

@@ -30,7 +30,7 @@ func TestCopilotRunner_ToolLoadFailure_RemotePluginUncached(t *testing.T) {
 		Generator: &config.GeneratorConfig{
 			Model: "gpt-4",
 			Tools: []config.ToolEntry{
-				{Type: "plugin", Name: "uncached-remote", Source: "remote", Repo: "github.com/microsoft/skills"},
+				{Type: "plugin", Name: "uncached-remote", Source: "remote", Repo: "microsoft/skills"},
 			},
 		},
 	}
