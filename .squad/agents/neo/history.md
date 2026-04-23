@@ -6,6 +6,44 @@
 - **Created:** 2026-04-03
 - **Repo:** /home/rgeraghty/projects/hyoka
 
+## Recent Sessions
+
+### 2026-04-23: Tool Validation Gate Fix — SDK Event Timing
+
+**Status:** ✅ FIXED. Commit 4b593d3b.
+
+**Problem:** After merging commit 92a9746c (tool validation gate), NO evals could run. Every eval aborted after 10s with "tool verification timeout". Agent attempts never started.
+
+**Root Cause:** The gate blocked BEFORE `SendAndWait` waiting for `SessionSkillsLoaded`/`SessionMcpServersLoaded` events that the SDK only emits DURING the first message round-trip. Classic deadlock: gate waits for events that can't fire until gate releases.
+
+**Evidence from live log:**
+```
+14:22:42  CreateSession() completes
+14:22:45  SendAndWait() called (2s later)
+14:22:45  SessionSkillsLoaded fires (DURING SendAndWait, not after CreateSession)
+14:22:46  Turn 1 starts
+```
+
+Gate would block at 14:22:42 and timeout at 14:22:52, aborting before the event at 14:22:45.
+
+**Fix:** Disabled blocking gate. Tool load failures still logged (event handlers unchanged) but don't abort evals. Better to have evals run with degraded tools than zero evals at all.
+
+**Verification:**
+- Live run: `key-vault-dp-python-crud × baseline/claude-opus-4.6`
+- ✅ Agent executed (3 turns, files created)
+- ✅ Eval passed (88s duration)
+- ✅ Skills loaded during SendAndWait (not at CreateSession)
+
+**Lesson:** SDK event timing assumptions MUST be verified with live traces. "SessionSkillsLoaded fires right after CreateSession" was wrong. The SDK emits tool load events during/after the first message exchange, possibly because:
+1. Lazy initialization (SDK loads tools when agent needs them)
+2. Cold-start MCP servers (npx can take 15-30s)
+
+**TODO:** Re-enable gate after deciding placement (post-SendAndWait?) and timeout (30s+?). Or make it optional via `--strict-tools` flag. See decision doc for options.
+
+**Decision:** `.squad/decisions/inbox/neo-fix-tool-gate-blocking-evals.md`
+
+---
+
 ## Core Context
 
 Agent Neo initialized as Core Engine architect. Charter: evaluation pipeline, review orchestration, criteria system, feature flags. Expertise: eval/engine, review/graders, wiring-layer design, #587 regression prevention.
