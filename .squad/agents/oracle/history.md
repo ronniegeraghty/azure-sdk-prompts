@@ -748,3 +748,13 @@ Once shipped, `output_check.md` sections marked "(coming in v1)" will be expande
 - **Aliases matter for scripted callers.** `live` → `interactive` and `log` → `ci` are kept per Trinity's decision doc. Documented them as aliases rather than hiding them, so existing CI scripts don't look broken when users grep the reference.
 - **NO_COLOR trigger is OR, not AND.** Per Trinity's renderer doc and `style.New`, either `NO_COLOR=1` OR non-TTY stdout disables styling. Wrote it as a bulleted OR list to avoid the common "both required" misreading.
 - **Sample blocks are verbatim from the sprint plan.** Neo's and Trinity's decision docs match the plan's layout exactly — no drift to reconcile. Kept the code fences unmodified so future renderer tweaks can be detected by a simple diff against the golden text.
+
+## Team Updates
+
+### CLI Output UX Sprint — Complete (2026-04-23T00:05:04Z)
+
+Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total across three rounds. 48 new test cases. 2 regressions caught by Switch: 1 fixed in-sprint by Tank (`2d38533f`), 1 filed as preexisting Known Issue (out-of-scope).
+
+**Your commits this sprint:** `32f4e6c9` docs refresh (README + `docs/getting-started.md` + `docs/cli-reference.md`) covering workers=1 default, `--progress` values + aliases, auto-selection matrix, NO_COLOR behavior as an OR condition.
+
+See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.

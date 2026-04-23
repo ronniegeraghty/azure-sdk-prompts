@@ -525,3 +525,39 @@ confirmed by inspection.
 **Commit:** `3130c84c` — `test(events): unit tests for tool + grader event emission`.
 
 **Decision memo:** `.squad/decisions/inbox/switch-tool-verification-rerelease.md`
+
+---
+
+## 2026-04-22 — Sprint capstone: manual verification of new CLI output UX
+
+Ran the 8-row matrix from `session-state/.../plan.md` end-to-end on `ronniegeraghty/dev @ 25ce00a7`. Used `script -E always -c "..." < /dev/null` to simulate TTY rows and direct `>` redirection for piped rows. Single prompt `key-vault-dp-python-crud` on `baseline/claude-opus-4.6` (+3 more for workers=4 rows). Report: `session-state/56d0e8c7-b8f9-456f-91bb-9e9fd759908e/files/manual-verification.md`.
+
+**Result:** 6/8 PASS. Recommendation: ship with known issue.
+
+### Learnings
+
+- **Interactive renderer uses `\r` + `\x1b[2K` (erase-in-line), not DECSC/DECRC** (`\x1b7/\x1b8`). Functionally equivalent for single-line tail updates and more portable across terminals that don't implement DEC save/restore. The plan language should probably be updated so future testers don't hunt for `\x1b7`. In rows 1 & 3 I observed 322/302 ANSI sequences with 58/54 × `[2K` and **zero** DECSC/RC — that's the expected pattern.
+- **CI renderer is cleanly append-only**: rows 5 & 7 each produced exactly 68 ANSI sequences, all color codes, zero erase/cursor-movement codes. Safe to pipe into any log. That made the row 6/8 regression more surprising and more annoying: the renderer that was *designed* to be pipe-safe is exactly the one the `auto` resolver turns off when you pipe.
+- **`--progress auto` precedence bug (rows 6/8):** in `hyoka/cmd/run.go` the non-TTY branch fires before the workers>1 branch. Result: any CI invocation that pipes stdout loses the CI renderer and gets a bare banner + run-summary. Filed as `switch-bug-ci-mode-suppressed-when-piped.md`. Needs a table-driven regression test in `cmd/cmd_test.go` that covers all four `(TTY, workers)` combinations.
+- **`slog` → stderr routing is tight.** Rows 3/4/7/8 all produced exactly 0 bytes on stderr when `--log-file` was passed, and 267–576 `level=DEBUG` entries in the file. No leaks. When `--log-file` was absent (rows 2/6) `slog` still went to stderr as expected; rows 5/7 showed the ad-hoc SDK warnings interleaving with stdout rendering — ugly but not new.
+- **`hyoka clean` hangs on non-interactive stdin** waiting for `Kill these N process(es)? [y/N]`. Cost me ~2 minutes during matrix setup when a chained command blocked silently. Filed as `switch-bug-clean-blocks-non-interactive.md`. Low severity but high friction because the AGENTS.md now *recommends* `hyoka clean` after every test run — agents will hit this.
+- **Concurrency caveat when multiple hyoka instances run on the same host:** running 4 parallel hyoka invocations in parallel shells generally works, but I saw `hyoka clean` reporting 18 orphan Copilot processes from one of the parallel runs; the orphan-termination logic on graceful exit appears not to handle the parallel-harness case perfectly. Didn't dig in — noting as an observation for future.
+- **Row-6/8 failure was content-complete even so:** all 4 evals passed, reports written to disk, log files correct. The user-visible impact is purely "bare stdout instead of append-only CI output". Not a data bug. This is why I'd land the fix before the next release rather than block this sprint on it.
+
+### Operational notes for future testers
+
+- `script -E always -c "<cmd>" <outfile> < /dev/null` is the only reliable way to capture a raw PTY stream from an agent shell. Without `< /dev/null`, backgrounded `script` runs get SIGTTIN'd into `T` state and silently hang (cost me a row 1 redo). Without `-E always`, ANSI gets stripped in some terminfo configs.
+- Use the pre-built `./hyoka-bin` (≈14 MB) not `go run ./hyoka`; saved ~5s per invocation × 8 rows.
+- Python `re.findall(rb'\x1b(?:\[[0-9;]*[a-zA-Z]|[78])', data)` is a clean way to catalog ANSI sequences and was how I confirmed the CI-mode has-zero-cursor-codes claim empirically rather than by inspection.
+
+## Team Updates
+
+### CLI Output UX Sprint — Complete (2026-04-23T00:05:04Z)
+
+Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total across three rounds. 48 new test cases (all yours). 2 regressions you caught: 1 fixed in-sprint by Tank (`2d38533f`, piped-CI auto-mode ordering), 1 filed as preexisting Known Issue (`hyoka clean` blocks on non-interactive stdin — OPEN, out-of-scope).
+
+**Your commits this sprint:** `142da225` renderer snapshot tests (13 cases — 6 interactive scenarios + NO_COLOR + ANSI markers + 5 CI scenarios + full-output golden with `normalizeCI` timestamp stripper) · `25ce00a7` event-wiring tests (35 cases) + re-landed `EventToolsVerified` emission in `hyoka/internal/eval/tool_verification.go` with 9 tests.
+
+**Ledger reconciliation you triggered:** the round-1/2 decisions ledger claimed `82cd8590` shipped; you proved it never merged and re-landed equivalent behavior testable-ly. Entry in `decisions.md` now marks it Re-landed via `25ce00a7`.
+
+See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.

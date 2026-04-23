@@ -747,3 +747,15 @@ Switch can author snapshot tests without re-reading the code.
   failed/errors` so `CompletedEvalCount()` keeps working; the dispatch
   shim increments them on terminal events. Same pattern Trinity used for
   the CI renderer — kept consistent.
+
+## Team Updates
+
+### CLI Output UX Sprint — Complete (2026-04-23T00:05:04Z)
+
+Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total across three rounds. 48 new test cases. 2 regressions caught by Switch: 1 fixed in-sprint by Tank (`2d38533f`), 1 filed as preexisting Known Issue (out-of-scope).
+
+**Your commits this sprint:** `61d830c6` progress event types (tools/graders/session) · `bffd0c40` grader start/complete events · `e06ead61` tool-resolution events during config load · `a0105a9d` interactive renderer (tail-only layout).
+
+**Ledger reconciliation:** `82cd8590` (your ToolsVerified emission) never merged into dev — the commit exists but is not an ancestor of HEAD. Behavior was re-landed by Switch inside `25ce00a7` in a more testable shape (`hyoka/internal/eval/tool_verification.go` with 9 tests). Contract preserved: at-most-once, configured-kinds-only, deterministic sort, plugins excluded, slog warn paths preserved. See `.squad/decisions.md` for full details.
+
+See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md`.

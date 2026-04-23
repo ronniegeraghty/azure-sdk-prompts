@@ -13,7 +13,7 @@
 | ProgressEvent schema extension (6 new event types + fields + string consts) | Neo 💊 | `61d830c6` | ✅ Locked |
 | Style helper package `internal/progress/style/` | Trinity 🖤 | `21636fdd` | ✅ Locked |
 | Tool-resolution emission wiring (plugin → MCP → skill) | Neo 💊 | `e06ead61` | ✅ Shipped |
-| Tool-verification emission wiring (SDK post-session) | Neo 💊 | `82cd8590` | ✅ Shipped |
+| Tool-verification emission wiring (SDK post-session) | Neo 💊 → Switch 🤍 | `82cd8590` (never merged) → re-landed via `25ce00a7` | ⚠️ Re-landed — see round-3/4 reconciliation below |
 | Grader serialization + per-grader lifecycle events | Neo 💊 | `bffd0c40` | ✅ Shipped |
 | Workers default flipped to 1 | Tank 📡 | `3b9cbab9` | ✅ Shipped |
 | Progress mode auto-selection (TTY + worker count) | Tank 📡 | `d6fd0a59` | ✅ Shipped |
@@ -88,6 +88,116 @@ Exactly one `EventToolsVerified` per eval is emitted after SDK `SessionSkillsLoa
 - `criteria.RunGraders` signature unchanged; existing callers and tests untouched.
 - Report JSON format unchanged.
 - All verifications: `go build ./...`, `go vet ./hyoka/...`, `go test -race ./hyoka/internal/{progress,eval,criteria,config/tool}/...` green on each commit.
+
+---
+
+### Decision: CLI Output UX Overhaul — Round 3 & 4 (Renderers, Tests, Docs, Verification) (2026-04-23)
+
+**Status:** ✅ Sprint complete. Shipped on `ronniegeraghty/dev` at HEAD `2d38533f`.
+**Consolidated from 4 inbox entries + 2 bug reports** merged 2026-04-23T00:05:04Z:
+`neo-interactive-renderer.md`, `trinity-ci-renderer.md`, `switch-renderer-tests.md`, `switch-tool-verification-rerelease.md`, `switch-bug-ci-mode-suppressed-when-piped.md`, `switch-bug-clean-blocks-non-interactive.md`.
+
+| Item | Agent | Commit | Status |
+|------|-------|--------|--------|
+| CI append-only renderer + summary table | Trinity 🖤 | `63e2c11f` | ✅ Shipped |
+| Interactive renderer (tail-only tool+grader layout) | Neo 💊 | `a0105a9d` | ✅ Shipped |
+| Docs refresh (README, getting-started, cli-reference) | Oracle 📖 | `32f4e6c9` | ✅ Shipped |
+| Renderer snapshot tests (13 cases) | Switch 🤍 | `142da225` | ✅ Shipped |
+| Event-wiring tests (35 cases) + ToolsVerified re-release | Switch 🤍 | `25ce00a7` | ✅ Shipped |
+| Hot-fix: `--progress auto` order for piped CI | Tank 📡 | `2d38533f` | ✅ Shipped |
+
+Total sprint: 15 commits, 48 new test cases, 2 regressions caught, 1 ledger discrepancy reconciled.
+
+#### Interactive renderer (`display_interactive.go`)
+
+- Mode string `"interactive"`; dispatched via `NewDisplay` mirroring Trinity's CI delegation pattern.
+- Auto-mode: `workers==1` → `"interactive"`, `workers>1` → `"ci"`. Explicit `--progress live|log|ci|off` still overrides. Debug/info log level without `--log-file` downgrades `interactive`→`ci` to keep stderr slog out of cursor moves.
+- **Tail-update protocol:** `writeLine` (immutable append), `writeTail` (freeze previous tail, write without newline), `rewriteTail` (`\r\x1b[2K` + text, same physical row), `freezeTail` (`\n`, clear `tailKind`).
+- **One sanctioned exception:** `redrawToolsBlock` triggered only from `onToolsVerified` when ≥1 tool status flips. Sequence: DECSC `\x1b7` → `\x1b[<N>A\r` → rewrite N lines → DECRC `\x1b8`. `toolsVerified` flag guards against double redraws.
+- Per-eval layout: `Prompt` / `Config` / `Tools:` / `Agent Attempt:` / `Session Details:` / `Graders:`. Sections omitted when their events never arrive.
+- Ticker: 1 Hz, refreshes only the Agent Attempt duration counter.
+- Multi-eval: interactive mode only selected at `workers==1`; queued evals print sequentially with a blank separator.
+- Counters (`completed/passed/failed/errors`) updated in dispatch shim; final `Summary` written by `interactiveRenderer.finish()`.
+- All styled output via `style.Styler` (`sty.OK/Fail/Muted/Info`); `bytes.Buffer` writers get plain text.
+
+#### CI renderer (`display_ci.go`)
+
+- Mode string `"ci"` (preferred); `"log"` kept as a non-breaking alias — existing CI scripts get the new output with no flag change. Legacy per-phase/inline log behavior is gone.
+- **Event → line mapping:** only `EventStarting` / `EventPassed` / `EventFailed` / `EventError` produce output. `EventGraderStart`/`Complete` update per-eval tallies (`graderPass` / `graderTotal`) keyed on `evt.EvalID` — interleaved graders across parallel evals are attributed correctly. All other events are deliberately silent in CI mode.
+- **Line format:** `[HH:MM:SS] ▶ start <promptID> | <configName>` (cyan/dim on TTY), `[HH:MM:SS] ✅ pass … (<dur>, G/T graders)`, `[HH:MM:SS] ❌ fail … (<dur>, G/T graders) — <reason>`. `EventError` renders as FAIL with default reason `"eval errored"`; `EventFailed` with empty `Message` defaults to `"graders failed"`. Reasons collapsed to one line via `oneLine()`.
+- **Timestamps:** `[HH:MM:SS]` relative to renderer construction (`time.Since(startTime).Round(time.Second)`). Styled `Muted` when enabled.
+- **Summary table:** rendered at `Finish()` after blank line + bold `Summary` header. Row order = first-seen eval order (`order []string` keyed on evalID). Column widths auto-sized to `max(header, cells)` via `len()`. Unicode box-drawing (`┌─┐│├┼┤└┴┘`) rendered unconditionally — valid UTF-8, works in GitHub Actions / Datadog / Splunk / `less`. Result column is literal `PASS` / `FAIL` (no emoji, no ANSI) so snapshot goldens stay clean.
+- Footer: `N/M passed · report: <reportDir>` (plain text; `report:` omitted when empty).
+- Glyph/color tied to `Styler.Enabled` — NO_COLOR or non-TTY drops both emoji and SGR codes; box borders survive.
+
+#### Auto-mode resolution (after hot-fix `2d38533f`)
+
+Pure function `resolveAutoProgress(workers, isTerminal, logLevel, logFile) string` in `cmd/run.go`. Case order (after the fix):
+
+1. `workers > 1` → `"ci"` (the CI renderer is exactly what should engage in piped/CI contexts).
+2. `!isTerminal(os.Stdout)` → `"off"` (single-eval non-TTY is silent unless forced).
+3. Single-eval TTY → `"interactive"`.
+4. `--log-file` exception preserved verbatim from `3b9cbab9` as a post-pass.
+
+Explicit `--progress` flag always overrides. Regression guarded by table-driven tests in `cmd/cmd_test.go`.
+
+#### Tool-verification reconciliation (82cd8590 never merged)
+
+The round-1/2 ledger marked `82cd8590` as ✅ Shipped, but `git merge-base --is-ancestor 82cd8590 HEAD` returns non-zero on `ronniegeraghty/dev`. The commit sits on a parallel branch that diverged from `bffd0c40`; dev went on to include `e06ead61` while `82cd8590` never merged.
+
+Switch re-landed the emission inside `25ce00a7` in a more testable shape:
+
+- New `hyoka/internal/eval/tool_verification.go` exporting `toolVerifier` with `newToolVerifier`, `onSkillsLoaded`, `onMCPLoaded`, `emitIfReady`.
+- `copilot.go` OnEvent handler constructs one per eval, calls `onXLoaded` under `mu.Lock()`, invokes `progressFn(EventToolsVerified)` **after** `mu.Unlock()` — preserves the "build under lock, dispatch outside lock" guarantee from round 1–2.
+- Contract preserved: at-most-once per eval; fires after both SDK load events when both kinds configured / after the single relevant event when one is configured / never when neither; never when reporter nil; before any generation event; deterministic `(ToolKind, ToolName)` sort; configured-only payload; plugins excluded; skill match by basename.
+- Preserved slog paths: `lg.Warn("Expected MCP server not loaded", ...)` and `"No MCP servers loaded despite configuration"`.
+- 9 table-driven tests in `hyoka/internal/eval/tool_verification_test.go`.
+
+#### Test coverage (Switch, 48 new cases total)
+
+**Renderer snapshots — `142da225` (13 cases):**
+
+- `display_interactive_test.go` extended: 6 scenario cases (`happy_path_one_tool_two_graders`, `tool_load_failure_at_resolution`, `tools_verified_flip_loaded_to_failed`, `grader_fail_one_pass_one_fail`, `error_path_generation_error`, + `NoColorEnvDropsColor` via `t.Setenv`) and dedicated `ANSIMarkers` test asserting tail-update `\r\x1b[2K` and DECSC/DECRC bracket sequencing. Retains Neo's 3 pre-existing happy-path tests.
+- `display_ci_test.go` new: 5 scenario cases (`happy_path_three_evals_all_pass`, `mixed_two_pass_one_fail_with_reason`, `multi_eval_interleaved_graders`, `no_color_drops_emoji_keeps_box_borders`, `zero_evals_empty_summary_does_not_crash`) + `TestCIRenderer_HappyPathSnapshot` full-output golden.
+- Infra: `normalizeCI` regex stripper (`[HH:MM:SS]`, `(Ns, G/T graders)`, Duration-column cells) with placeholders `[HH:MM:SS]` / `DUR`; `feedInteractive` / `feedCI` helpers; `floatPtr` for grader scores. No `testdata/` needed — inline string literals + regex normalization sufficed.
+
+**Event wiring — `25ce00a7` (35 cases):** unit tests for tool-resolution pairing/ordering (plugins → MCPs → skills, each group in declaration order, one Start/Result pair per tool before any next), grader event attribution across interleaved evals, `tool_verification.go` behavior (9 cases), session-details propagation, terminal events (`EventPassed` / `EventFailed` / `EventError`) all routed through counter dispatch.
+
+#### Docs refresh (`32f4e6c9`)
+
+- README, `docs/getting-started.md`, `docs/cli-reference.md` updated.
+- Documented: `workers=1` default, `--progress interactive|ci|live|log|auto|off` values, `live`→`interactive` and `log`→`ci` aliases (kept as aliases rather than hidden so existing CI scripts remain greppable), auto-selection matrix (TTY × worker count).
+- NO_COLOR behavior documented as **OR** condition: disabled if `NO_COLOR=1` **or** stdout is non-TTY. Common "both required" misreading explicitly prevented.
+- Sample layout blocks are verbatim from the sprint plan — future renderer tweaks detectable via diff against the golden text.
+- Suggested future: `docs/progress.md` with "Renderer snapshot coverage" subsection pointing at `display_interactive_test.go` + `display_ci_test.go` as canonical renderer contract (deferred — not blocking).
+
+#### Resolved sprint regressions
+
+| Row | Repro | Root cause | Fix |
+|-----|-------|------------|-----|
+| Matrix rows 6 & 8 | `--workers 4 > out.log` — no timestamped start lines, no summary table | `--progress auto` resolution in `cmd/run.go` checked `!IsTerminal` **before** worker count, so any piped invocation fell through to `off` regardless of worker count | Tank `2d38533f` — refactored to pure `resolveAutoProgress(...)`, reordered so `workers>1` wins first. Regression test in `cmd/cmd_test.go`. |
+
+#### Verification
+
+- Final `go build ./...`, `go vet ./hyoka/...`, `go test -race ./hyoka/...` green at HEAD `2d38533f`.
+- 8-row manual verification matrix (workers × TTY × log-file) run by Switch on the built binary. 6/8 passed initially → 7/8 after Tank's hot-fix. The remaining fail row is unrelated (see Known Issues).
+
+---
+
+### Known Issues (non-blocking, out-of-sprint)
+
+#### `hyoka clean` blocks in non-interactive contexts
+
+**Filed by:** Switch 🤍 during matrix verification setup. **Status:** OPEN. **Not a sprint deliverable.**
+
+Running `./hyoka-bin clean` with stdin not attached to a terminal hangs indefinitely at the `Kill these N process(es)? [y/N]` prompt. No input is possible; the call blocks the next scripted step.
+
+Impact:
+
+- `AGENTS.md` instructs agents to run `hyoka clean` after each test run, but agent shells have no interactive stdin.
+- Any CI workflow that chains `hyoka clean` as a cleanup step hangs until timeout.
+
+Suggested fix: add `-y / --yes` flag and/or auto-confirm when stdin is not a TTY; emit a deterministic exit code when there's nothing to clean so scripted callers can branch. Preexisting bug — not introduced by this sprint.
 
 ---
 

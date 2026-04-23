@@ -608,3 +608,21 @@ All non-template examples are schema-valid. The single "failure" (`prompt-templa
 **#622 status:** closed with comment linking the new four-phase plan.
 
 **Owner for implementation:** Neo (`squad:neo` label on all four).
+
+## Learnings (Option A Pivot — 2026-04-22)
+
+**Pivot:** Flat `hyoka/internal/graders/` rejected after Phases 1–3 had already shipped there. New directive (`copilot-directive-grader-package-layout.md`) locks Option A: nested `hyoka/internal/criteria/` (file-level) + `hyoka/internal/criteria/graders/` (grader-level). The package hierarchy must mirror the YAML reality — criteria files *contain* graders.
+
+**In-flight commit resolved:** Neo's background Phase 3 spawn landed 46b624fb before replan finished — it deleted the legacy `internal/criteria/` and migrated `cmd/list` + `cmd/validate` to the flat `internal/graders/` target. The deletion is still correct; the import targets get rewritten as part of #628.
+
+**Issues filed:**
+- **#628** — Phase 3 (Option A): Restructure unified grader package to nested layout. `squad:neo`. Includes full file-by-file move map and a rename pass that drops the `Unified*` prefix Phase 1 used as a coexistence aid (`UnifiedGraderConfig` → `criteria.Config`, etc.).
+- **#629** — Phase 4 (Option A follow-up): Doc + example path sweep after #628 lands. `squad:oracle`.
+
+**Issues updated:**
+- #626 (closed): comment pointing at #628.
+- #627 (open): comment noting path moves; functional scope unchanged.
+
+**Process takeaway:** When a locked directive arrives mid-rollout and some phases have already shipped, the replan commit for Phase N+1 should explicitly map each shipped commit to "still correct" vs "needs rewrite" — saves the next implementer from guessing which earlier work is safe to build on.
+
+**Plan:** `.squad/decisions/inbox/morpheus-option-a-replan.md`. Awaiting Ronnie approval before restart.

@@ -323,3 +323,13 @@ Reordered the `--progress auto` switch in `hyoka/cmd/run.go` so `workers>1` shor
 - **Case order matters in progress-mode switches**: TTY check must come *after* the worker count, not before. The CI renderer is append-only and is specifically the one that should engage in piped/CI contexts — so "non-TTY" is a single-eval-only signal, not a global suppression. My d6fd0a59 ordering accidentally inverted this.
 - **Extract-to-pure-function for case-matrix testability**: factoring the resolution out of the cobra `RunE` closure into `resolveAutoProgress(workers, isTerminal, logLevel, logFile) string` made the regression guard a trivial table-driven test with no cobra/os.Stdout stubbing. Worth doing eagerly whenever a decision depends on >2 inputs.
 - **The `--log-file` exception from 3b9cbab9 is fragile**: it lives as a post-pass after the main switch. Preserved it verbatim in the new pure function and added test rows for it so the next refactor can't silently drop it.
+
+## Team Updates
+
+### CLI Output UX Sprint — Complete (2026-04-23T00:05:04Z)
+
+Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total across three rounds. 48 new test cases. 2 regressions caught by Switch: 1 fixed in-sprint (yours, `2d38533f`), 1 filed as preexisting Known Issue (`hyoka clean` blocks on non-interactive stdin — OPEN, out-of-scope). Ledger discrepancy reconciled: `82cd8590` never merged → re-landed inside `25ce00a7`.
+
+**Your commits this sprint:** `3b9cbab9` default `--workers` to 1 · `27c6a679` history · `d6fd0a59` `--progress auto` by worker count · `2d38533f` hot-fix `--progress auto` order for piped CI.
+
+See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.

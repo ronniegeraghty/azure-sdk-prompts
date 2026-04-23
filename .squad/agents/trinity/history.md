@@ -194,3 +194,13 @@ mid-run where Neo's block wasn't fully written yet. The fix was just
 retrying `go build` once both agents had settled. Worth flagging for future
 parallel runs: if one agent is about to commit and the other is mid-edit,
 you get a brief window of non-compiling state.
+
+## Team Updates
+
+### CLI Output UX Sprint — Complete (2026-04-23T00:05:04Z)
+
+Sprint landed on `ronniegeraghty/dev` at HEAD `2d38533f`. 15 commits total across three rounds. 48 new test cases. 2 regressions caught by Switch: 1 fixed in-sprint by Tank (`2d38533f`), 1 filed as preexisting Known Issue (out-of-scope).
+
+**Your commits this sprint:** `21636fdd` ANSI style helper package (`internal/progress/style/`) · `63e2c11f` CI append-only renderer + summary table.
+
+See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md` and the round-3/4 section in `.squad/decisions.md`.

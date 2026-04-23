@@ -91,3 +91,15 @@ Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026
 **Phase 5 Status:** COMPLETE. Rollup PR #592 open for Ronnie's review.
 
 **Key Learning:** Per-phase workflow with shared integration branch + live verification gate significantly accelerates delivery compared to per-issue PRs. Reviewer-protocol escalation chain worked as designed: locked agents step back, escalation brings fresh eyes, root causes fixed instead of worked around.
+
+## Team Updates
+
+### CLI Output UX Sprint — Complete (2026-04-23T00:05:04Z)
+
+Sprint closed at HEAD `2d38533f` on `ronniegeraghty/dev`. 15 commits total across three rounds, 48 new test cases.
+
+**Your merges this sprint:** `60cc90bf` round-2 merge (schema + emitters consolidation, 5 inbox entries) · final wrap merge 2026-04-23T00:05:04Z (6 inbox entries including 2 bug reports: one resolved, one moved to Known Issues).
+
+**Key reconciliation:** Updated the round-1/2 table in `.squad/decisions.md` to reflect that `82cd8590` (Neo's original ToolsVerified emission) never merged; behavior re-landed via Switch's `25ce00a7`. Added a Known Issues section containing the preexisting `hyoka clean` non-interactive-stdin bug.
+
+See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md`.
