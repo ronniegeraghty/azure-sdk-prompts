@@ -1,33 +1,17 @@
 import { useParams, Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
-import type { RunSummary, EvalResult, EvalReport, GraderResult } from "../data/types";
+import type { RunSummary, EvalResult, EvalReport } from "../data/types";
 import { CheckCircle2, XCircle, Clock, FileCode2, ArrowLeft, Loader2, Tag, Zap } from "lucide-react";
 import { GraderResultRow } from "./GraderResultRow";
+import { evalPassFromPoints, evalGraderTotals, graderPasses } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
-// Tri-state aware pass detection. Mirrors the engine's roll-up: review graders
-// often ship `pass: null` but populate `scores.criteria` or `overall_score`.
-// Stop-gap until Phase 5 lands the schema bump that drops the review expansion.
-function isPass(g: GraderResult): boolean {
-  if (g.pass === true) return true;
-  if (g.pass === false) return false;
-  // pass is null/undefined — fall back to derived truth
-  const criteria = g.scores?.criteria;
-  if (criteria && criteria.length > 0) {
-    return criteria.every(c => c.passed);
-  }
-  if (
-    g.overall_score != null &&
-    g.max_score != null &&
-    g.max_score > 0 &&
-    g.overall_score === g.max_score
-  ) {
-    return true;
-  }
-  return false;
-}
+// Tri-state aware pass detection lives in lib/evalPass.ts. This file
+// previously shipped a local `isPass` stop-gap (Phase 4.1); Phase 6.4
+// replaced it with the canonical helper so every page agrees on the
+// rollup. Do NOT reintroduce a local copy.
 
 function ScoreBadge({
   passed,
@@ -121,8 +105,8 @@ export function RunDetailPage() {
   const langs = [...new Set(results.map(r => r.prompt_metadata?.language).filter(Boolean))];
 
   const filtered = results.filter((r: EvalResult) => {
-    if (filterStatus === "pass" && !r.success) return false;
-    if (filterStatus === "fail" && r.success) return false;
+    if (filterStatus === "pass" && !evalPassFromPoints(r as EvalReport)) return false;
+    if (filterStatus === "fail" && evalPassFromPoints(r as EvalReport)) return false;
     if (filterService !== "all" && r.prompt_metadata?.service !== filterService) return false;
     if (filterLang !== "all" && r.prompt_metadata?.language !== filterLang) return false;
     return true;
@@ -273,24 +257,27 @@ export function RunDetailPage() {
               <tbody>
                 {filtered.map((r, i) => {
                   const evalReport = r as EvalReport;
-                  const graderResults = evalReport.grader_results ?? [];
-                  const gradersTotal = graderResults.length;
-                  const gradersPassed = graderResults.filter(isPass).length;
+                  const totals = evalGraderTotals(evalReport);
+                  const gradersTotal = totals.total;
+                  const gradersPassed = totals.passed;
+                  const evalPassed = evalPassFromPoints(evalReport);
 
                   // When no graders ran (e.g. gpt-5.3-codex no-files case),
                   // fall back to the engine's success bit so the row doesn't
                   // render a misleading red `0/0`.
                   const noGraders = gradersTotal === 0;
                   const badgeDisplay = noGraders
-                    ? r.success
+                    ? evalPassed
                       ? "—"
                       : "✗"
                     : undefined;
                   const badgeTone: "pass" | "fail" | "neutral" | undefined = noGraders
-                    ? r.success
+                    ? evalPassed
                       ? "neutral"
                       : "fail"
-                    : undefined;
+                    : evalPassed
+                    ? "pass"
+                    : "fail";
 
                   const model = evalReport.config_used?.model || evalReport.environment?.model || r.config_name;
                   const tools = evalReport.environment?.mcp_servers || [];
@@ -409,6 +396,7 @@ export function RunDetailPage() {
                       const evalReport = result as EvalReport;
                       const graders = evalReport.grader_results || [];
                       const model = evalReport.config_used?.model || configName;
+                      const evalPassed = evalPassFromPoints(evalReport);
 
                       return (
                         <div key={configName} className="rounded-lg border border-white/5 bg-white/[0.01]">
@@ -417,7 +405,7 @@ export function RunDetailPage() {
                               <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-blue-400/80" style={{ fontSize: 11 }}>
                                 {model}
                               </span>
-                              {result.success ? (
+                              {evalPassed ? (
                                 <CheckCircle2 className="h-3 w-3 text-emerald-400" />
                               ) : (
                                 <XCircle className="h-3 w-3 text-red-400" />

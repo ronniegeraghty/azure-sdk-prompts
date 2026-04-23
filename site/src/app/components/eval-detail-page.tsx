@@ -8,6 +8,7 @@ import {
   AlertTriangle, Zap, Copy, Check, Loader2
 } from "lucide-react";
 import { GraderResultRow } from "./GraderResultRow";
+import { evalPassFromPoints, evalGraderTotals, evalPointTotals, graderPasses } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 

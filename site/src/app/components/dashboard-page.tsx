@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 import { CheckCircle2, XCircle, Clock, FileCode2, Cpu, TrendingUp, Loader2, Calendar } from "lucide-react";
 import { fetchRuns } from "../data/api";
 import type { RunSummary } from "../data/types";
+import { evalPassFromPoints } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -86,13 +87,13 @@ export function DashboardPage() {
         const service = meta?.service || "unknown";
         if (!serviceStats[service]) serviceStats[service] = { total: 0, passed: 0 };
         serviceStats[service].total++;
-        if (result.success) serviceStats[service].passed++;
+        if (evalPassFromPoints(result)) serviceStats[service].passed++;
 
         // Language stats
         const lang = meta?.language || "unknown";
         if (!langStats[lang]) langStats[lang] = { total: 0, passed: 0 };
         langStats[lang].total++;
-        if (result.success) langStats[lang].passed++;
+        if (evalPassFromPoints(result)) langStats[lang].passed++;
       }
     }
 
@@ -107,7 +108,7 @@ export function DashboardPage() {
           lang: result.prompt_metadata?.language || "unknown",
           config: result.config_name,
           score: result.review?.overall_score || 0,
-          pass: result.success,
+          pass: evalPassFromPoints(result),
           duration: `${(result.duration_seconds ?? 0).toFixed(1)}s`,
           files: result.generated_files?.length || 0,
         });

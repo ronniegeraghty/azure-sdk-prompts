@@ -4,6 +4,7 @@ import { fetchPrompt, fetchRuns, type PromptInfo } from "../data/api";
 import type { RunSummary, EvalResult, Environment } from "../data/types";
 import { ArrowLeft, CheckCircle2, XCircle, Clock, BarChart3, TrendingUp, Cpu, Wrench, ArrowUpRight, ArrowDownRight, Minus, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { evalPassFromPoints } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -151,7 +152,7 @@ function computeGrouped(
       if (!key) continue;
       if (!map[key]) map[key] = { total: 0, passed: 0, scoreSum: 0, durationSum: 0 };
       map[key].total++;
-      if (result.success) map[key].passed++;
+      if (evalPassFromPoints(result)) map[key].passed++;
       map[key].scoreSum += result.review?.overall_score || 0;
       map[key].durationSum += result.duration_seconds || 0;
     }
@@ -210,7 +211,7 @@ export function PromptDetailPage() {
           entries.push({
             run_id: run.run_id,
             config_name: result.config_name,
-            success: result.success,
+            success: evalPassFromPoints(result),
             duration: result.duration_seconds || 0,
             file_count: result.generated_files?.length || 0,
             score: result.review?.overall_score || 0,
