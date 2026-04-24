@@ -26,9 +26,9 @@ func TestInteractive_GraderPointsRendersNestedBlock(t *testing.T) {
 		GraderKind: "prompt_review",
 		Result:     GraderResultFail,
 		Points: []GraderPoint{
-			{Name: "returns DefaultAzureCredential", Pass: true},
-			{Name: "exposes get_secret/set_secret/delete_secret", Pass: true},
-			{Name: "paginates list_secrets", Pass: false, Message: "missing pagination loop"},
+			{Label: "returns DefaultAzureCredential", Pass: true},
+			{Label: "exposes get_secret/set_secret/delete_secret", Pass: true},
+			{Label: "paginates list_secrets", Pass: false, Message: "missing pagination loop"},
 		},
 	})
 	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 1})
@@ -77,8 +77,8 @@ func TestInteractive_GraderPointsAllPassedBadge(t *testing.T) {
 		GraderKind: "output_check",
 		Result:     GraderResultPass,
 		Points: []GraderPoint{
-			{Name: "min_files", Pass: true},
-			{Name: "require_files", Pass: true},
+			{Label: "min_files", Pass: true},
+			{Label: "require_files", Pass: true},
 		},
 	})
 	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 1})
@@ -110,7 +110,7 @@ func TestInteractive_GraderSinglePointFlatRow(t *testing.T) {
 		GraderKind: "program",
 		Result:     GraderResultPass,
 		Points: []GraderPoint{
-			{Name: "exit code 0", Pass: true},
+			{Label: "exit code 0", Pass: true},
 		},
 	})
 	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 1})

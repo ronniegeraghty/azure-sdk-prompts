@@ -61,34 +61,33 @@ func RunGradersWithHooks(ctx context.Context, graderInstances []graders.Grader, 
 
 		// Track completion state to ensure OnComplete fires even on panic (#819).
 		completeFired := false
-		defer func(grader graders.Grader) {
+		gc, _ := configMap[g.Name()]
+		defer func(grader graders.Grader, gcfg graders.GraderConfig) {
 			if !completeFired && hooks.OnComplete != nil {
-				// Grader interrupted or panicked — send a failure result
-				hooks.OnComplete(grader, graders.GraderResult{
-					Name:    grader.Name(),
-					Kind:    grader.Kind(),
-					Pass:    false,
-					Score:   0,
-					Message: "grader interrupted or panicked",
-				})
+				// Grader interrupted or panicked — synthesize a failing
+				// result that still satisfies the "every grader must emit
+				// ≥ 1 Point" invariant so the renderer doesn't fall back
+				// to "PASS"/"100%".
+				hooks.OnComplete(grader, graders.NewErrorResult(
+					grader.Kind(), grader.Name(), gcfg, "grader interrupted or panicked",
+				))
 			}
-		}(g)
+		}(g, gc)
 
 		// Set the grader's own config in the input.
 		ginput := input
-		if gc, ok := configMap[g.Name()]; ok {
+		if ok := gc.Name != ""; ok {
 			ginput.Config = gc
 		}
 
 		result, err := g.Grade(ctx, ginput)
 		if err != nil {
-			result = graders.GraderResult{
-				Name:    g.Name(),
-				Kind:    g.Kind(),
-				Pass:    false,
-				Score:   0,
-				Message: fmt.Sprintf("grader execution error: %v", err),
-			}
+			// Synthesize a failing result with a single failure Point so the
+			// site never sees a Points-less GraderResult (Phase 3 invariant).
+			result = graders.NewErrorResult(
+				g.Kind(), g.Name(), gc,
+				fmt.Sprintf("grader execution error: %v", err),
+			)
 		}
 
 		// Apply weight and gate from config.

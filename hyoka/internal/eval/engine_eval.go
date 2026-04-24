@@ -640,14 +640,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 					if reviewErr != nil {
 						glg.Error("Review grader failed", "bucket", bucket.Name, "error", reviewErr)
 						sendEvent(progress.EventReasoning, fmt.Sprintf("Review bucket %q failed: %v", bucket.Name, reviewErr))
-						// Add a failing result so aggregation accounts for the review attempt.
-						reviewResult = graders.GraderResult{
-							Kind:    graders.KindPromptReview,
-							Name:    bucket.Name,
-							Pass:    false,
-							Score:   0,
-							Message: fmt.Sprintf("review grader error: %v", reviewErr),
-						}
+						// Synthesize a failing result with a single failure Point so the
+						// renderer never sees a Points-less prompt_review result
+						// (Phase 3 invariant — see graders.NewErrorResult).
+						reviewResult = graders.NewErrorResult(
+							graders.KindPromptReview, bucket.Name, graders.GraderConfig{},
+							fmt.Sprintf("review grader error: %v", reviewErr),
+						)
 					} else if reviewGrader.LastConsolidated != nil {
 						glg.Debug("Review bucket complete",
 							"bucket", bucket.Name,
@@ -1183,6 +1182,12 @@ func readGeneratedFileContents(workspaceDir string, generatedFiles []string, lg 
 // shape (Points, Extras, Kind/Name/Weight/Gate/Message/Pass/Score). The
 // legacy per-kind detail fields and the prompt_review snowflake are gone.
 //
+// Phase 3 invariant (2026-04-25): every grader.GraderResult must have ≥ 1
+// Point. If a Points-less result somehow reaches this layer it indicates a
+// new code path bypassing graders.NewResult / graders.NewErrorResult — the
+// converter logs loudly and synthesizes a fallback Point so the report
+// remains well-formed and the site never falls back to "PASS"/"100%".
+//
 // The legacy "expand to one entry per panel member + one consensus row"
 // behaviour was removed in Phase 5 — its expanded shape was the structural
 // cause of the "all panel members passed but rows render red" bug, since
@@ -1192,6 +1197,20 @@ func readGeneratedFileContents(workspaceDir string, generatedFiles []string, lg 
 func convertGraderResults(results []graders.GraderResult) []report.GraderResult {
 	var reportResults []report.GraderResult
 	for _, r := range results {
+		// Defensive: every grader must emit at least one Point. If somehow a
+		// graderless result reached here, synthesize a fallback Point so the
+		// report stays well-formed. This branch should be unreachable — emit
+		// a loud warning so the bug is visible in logs.
+		if len(r.Points) == 0 {
+			slog.Warn("grader returned zero Points — synthesizing fallback (this is a bug; see graders.NewErrorResult)",
+				"grader", r.Name, "kind", r.Kind, "pass", r.Pass)
+			fallback := graders.GraderPoint{
+				Label:   "grader executed",
+				Pass:    r.Pass,
+				Message: r.Message,
+			}
+			r.Points = []graders.GraderPoint{fallback}
+		}
 		rr := report.GraderResult{
 			GraderName: r.Name,
 			GraderType: r.Kind,

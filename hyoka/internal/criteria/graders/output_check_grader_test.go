@@ -61,11 +61,13 @@ func TestOutputCheckGrader_NoKnobs_TriviallyPasses(t *testing.T) {
 	if !res.Pass || res.Score != 1.0 {
 		t.Errorf("want trivial pass, got Pass=%v Score=%v", res.Pass, res.Score)
 	}
-	if len(res.Points) != 0 {
-		t.Errorf("expected zero sub-checks, got %d", len(res.Points))
+	// Phase 3 invariant: every grader emits ≥ 1 Point. The "no knobs" case
+	// emits a single trivially-passing "no_knobs" Point.
+	if len(res.Points) != 1 {
+		t.Errorf("expected exactly one (trivial-pass) sub-check, got %d", len(res.Points))
 	}
-	if !strings.Contains(res.Message, "no knobs configured") {
-		t.Errorf("unexpected message: %q", res.Message)
+	if len(res.Points) >= 1 && res.Points[0].Label != "no_knobs" {
+		t.Errorf("expected single Point with label 'no_knobs', got %q", res.Points[0].Label)
 	}
 }
 
@@ -75,7 +77,7 @@ func TestOutputCheckGrader_NilDelta_TreatedAsEmpty(t *testing.T) {
 	if res.Pass {
 		t.Errorf("nil delta with min_files=1 should fail; msg=%q", res.Message)
 	}
-	point := findPoint(t, res, "min files")
+	point := findPoint(t, res, "min_files")
 	if point.Pass {
 		t.Errorf("min_files point should fail, got pass: %q", point.Message)
 	}

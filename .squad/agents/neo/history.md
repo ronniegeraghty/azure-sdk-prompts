@@ -678,3 +678,57 @@ Implemented v4 Go types (Point, discriminated Extras union, Score derivation), 8
 Trinity's site integration complete and Playwright-verified. Dev branch ready for live testing.
 
 **Reference:** Orchestration logs (neo-impl, trinity-verify).
+
+
+## 2026-04-25 — Phase 3: Grader Points Invariant Hardening
+
+**Mission:** Ensure every grader emits ≥ 1 GraderPoint per Result so the site never falls back to its legacy "PASS"/"100%" rendering.
+
+**Branch:** `ronniegeraghty/dev`
+
+### Audit findings
+
+Every concrete grader in `hyoka/internal/criteria/graders/` (file, program, prompt, behavior, action_sequence, tool_constraint, output_check, prompt_review) was already routing through `NewResult` with at least one Point. **The graders themselves were clean.** The bugs were in the engine layer:
+
+1. **`hyoka/internal/criteria/exec.go`** — when a grader returned an error or panicked, the recovery path constructed `graders.GraderResult{Pass: false, Score: 0}` directly with **no Points**. This silently produced graderless results that the site rendered as PASS/100%.
+2. **`hyoka/internal/eval/engine_eval.go`** — the prompt_review error fallback at line 644 had the same shape: `graders.GraderResult{...}` with no Points.
+3. **`OutputCheckGrader` labels** were free-form ("min files: ≥ 1", "require file: foo.go") and per-file rather than per-knob, which hurt aggregability and didn't match the test contract.
+
+### What changed
+
+- **`graders/grader.go`** — added `NewErrorResult(kind, name, cfg, msg)` which routes through `NewResult` to synthesize a single failing "grader executed" Point. This is the canonical fallback for any code path that needs to construct a result outside a real Grade() execution.
+- **`graders/output_check_grader.go`** — refactored to use stable snake_case Point Labels (`min_files`, `max_files`, `require_files`, `forbid_files`, `require_updated`, `min_bytes_per_file`, `max_bytes_per_file`), one Point per knob, with informative Messages on **both** pass and fail. The "no knobs" case now emits a single trivially-passing `no_knobs` Point instead of zero points.
+- **`criteria/exec.go`** — error fallback and panic-recovery hook both now use `NewErrorResult`. Bonus: hoisted `gc, _ := configMap[g.Name()]` so the panic-recovery path can pass the right config.
+- **`eval/engine_eval.go`** — review-grader error fallback uses `NewErrorResult`. Added a defensive synth in `convertGraderResults`: if a grader somehow reaches the converter with empty Points, log a `slog.Warn` and synthesize a fallback Point so the report is still well-formed.
+
+### Tests
+
+- Updated `behavior_grader_test.go`: `TestBehaviorGrader_RequiredToolMissing` now expects Score=0.5 (1 of 2 required tools — v4 weighted derivation) instead of 0.0; fixed `TestToolConstraintGrader_ForbiddenUsed` to read `Extras.ToolConstraint` instead of `Extras.Behavior`.
+- Updated `output_check_grader_test.go`: `TestOutputCheckGrader_NoKnobs_TriviallyPasses` now expects 1 Point (the `no_knobs` trivial-pass) instead of 0; fixed `TestOutputCheckGrader_NilDelta_TreatedAsEmpty` label match.
+- Updated `progress/display_interactive_points_test.go`: renamed `Name:` → `Label:` in struct literals (legacy of the v4 rename).
+- Added `TestEveryGraderEmitsPointsOnPassAndFail` in `points_test.go`: exercises every concrete grader kind (file, program, behavior, action_sequence, tool_constraint, output_check) with both passing and failing inputs and asserts `len(Points) >= 1` plus non-empty Labels.
+- Added `TestNewErrorResult_AlwaysEmitsPoint` and `TestNewResult_PanicsOnEmptyPoints` to lock the invariant at the constructor level.
+
+### Verification
+
+- `go build ./...` clean.
+- `go test -race ./hyoka/internal/criteria/... ./hyoka/internal/eval/... ./hyoka/internal/progress/... -timeout 3m` — all green.
+- Real eval: `hyoka run --prompt-id key-vault-dp-python-crud --config baseline/claude-opus-4.6` — completed; report written to `reports/20260424-195854/.../report.json`.
+- `jq '.grader_results | map(select(.points == null or (.points | length) == 0))' report.json` returns `[]` — **zero graderless graders in the produced report.**
+
+### Pre-existing failures (not in scope)
+
+`hyoka/internal/report/`, `hyoka/internal/serve/`, and `hyoka/internal/rerender/` test files reference removed v3 fields (`Model`, `OverallScore`, `MaxScore`, `Summary`, `IsConsensus`, `*bool` Pass) and fail to build. These were broken on `dev` before this work and are Switch's domain (test files for non-grader packages owned by Trinity / Tank).
+
+### Note for Trinity
+
+The graders that historically emitted only an aggregate verdict with no breakdown — and were therefore the source of the "PASS"/"100%" headers — were never the graders themselves. They were the **engine error fallbacks** when a grader threw or the reviewer factory failed. Your defensive site code still earns its keep because old reports on disk (pre-v4) lack Points, but freshly-generated v4 reports will never reach the renderer without Points anymore.
+
+**Outcome:** ✅ INVARIANT LOCKED. Every grader emits ≥ 1 Point in every code path; the engine's error/panic paths route through `NewErrorResult`; the converter has a defensive synth as belt-and-braces; tests cover the invariant per-kind.
+
+## Learnings
+
+- **The bugs are usually in the seams, not the units.** Every grader implementation was correct in isolation. The Points-less results came from the engine's error-recovery code that constructed `GraderResult{}` literally, bypassing the `NewResult` constructor's `len(points)==0` panic. Lesson: invariants enforced by constructors only hold if every result-construction site uses the constructor. Add a `NewErrorResult` helper so the right fallback is one obvious call away.
+- **Stable identifier labels enable cross-run aggregation.** Free-form Labels like "min files: ≥ 5" make tests brittle and trend-analysis impossible. Snake_case identifiers (`min_files`) plus a separate human-readable Message give both worlds.
+- **Defensive code at multiple layers is fine when the layers are independent.** The converter's synth-Point fallback duplicates the constructor invariant, but it covers the legacy on-disk reports and the not-yet-discovered next bypass. Cheap insurance.
+- **The "no constraints" case is a real Point.** A behavior grader with no required/forbidden tools, or an output_check with no knobs, must still emit a "no constraints — trivially passed" Point. Otherwise it's invisible to the renderer's Points-driven UI.

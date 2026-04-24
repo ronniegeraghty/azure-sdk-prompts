@@ -234,6 +234,12 @@ type ReviewCriterionResult struct {
 // NewResult constructs a GraderResult with Pass and Score derived from Points.
 // Points must be non-empty; panics if empty. Each point's Weight defaults to 1.0
 // when zero or omitted.
+//
+// Invariant (Phase 3, 2026-04-25): every grader MUST emit at least one Point.
+// A Points-less GraderResult is a bug — the site's defensive "PASS"/"100%"
+// fallback exists only as a safety net for legacy data on disk, never for
+// freshly-generated results. Use NewErrorResult below when an internal error
+// prevents a real check.
 func NewResult(kind, name string, cfg GraderConfig, points []GraderPoint, msg string, extras *GraderExtras) GraderResult {
 	if len(points) == 0 {
 		panic(fmt.Sprintf("grader %s (%s) must emit at least one Point", name, kind))
@@ -276,6 +282,27 @@ func NewResult(kind, name string, cfg GraderConfig, points []GraderPoint, msg st
 		Points:  points,
 		Extras:  extras,
 	}
+}
+
+// NewErrorResult constructs a GraderResult representing a grader that failed
+// to execute (returned an error, panicked, or was skipped). It synthesizes a
+// single failing "grader execution" Point so the result still satisfies the
+// "every grader must emit ≥ 1 Point" invariant. Without this, the site's
+// renderer can't distinguish a graderless failure from a passing grader and
+// falls back to "PASS"/"100%".
+//
+// Use this everywhere a GraderResult is constructed outside a real Grade()
+// path — currently the engine's error and panic recovery branches.
+func NewErrorResult(kind, name string, cfg GraderConfig, msg string) GraderResult {
+	if msg == "" {
+		msg = "grader execution failed"
+	}
+	points := []GraderPoint{{
+		Label:   "grader executed",
+		Pass:    false,
+		Message: msg,
+	}}
+	return NewResult(kind, name, cfg, points, msg, nil)
 }
 
 // AggregateResult holds the final aggregated score from all graders.

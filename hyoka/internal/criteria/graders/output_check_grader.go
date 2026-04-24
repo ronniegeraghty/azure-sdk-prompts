@@ -79,6 +79,12 @@ type producedFile struct {
 // Grade evaluates every configured knob against input.WorkspaceDelta and
 // returns a GraderResult whose Pass is the AND of every sub-check.
 // Per v4 spec: one Point per configured knob, OutputCheckExtras carries ProducedFiles.
+//
+// Phase 3 (2026-04-25) invariant: every grader emits ≥ 1 Point. When no knobs
+// are configured, a single trivially-passing "no_knobs" Point is emitted so
+// the site never falls back to its "PASS"/"100%" header. Labels are stable
+// snake_case identifiers so reports are aggregable across runs; Messages
+// describe what was checked in both pass and fail cases.
 func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderResult, error) {
 	// Flatten delta into produced files. A nil delta is treated as "empty":
 	// the agent produced nothing. This is a deliberate choice so output_check
@@ -102,76 +108,100 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 
 	if g.cfg.MinFiles > 0 {
 		pass := len(produced) >= g.cfg.MinFiles
-		label := fmt.Sprintf("min files: ≥ %d", g.cfg.MinFiles)
-		var pointMsg string
-		if !pass {
-			pointMsg = fmt.Sprintf("produced %d file(s), need >= %d", len(produced), g.cfg.MinFiles)
+		var msg string
+		if pass {
+			msg = fmt.Sprintf("produced %d file(s), need >= %d", len(produced), g.cfg.MinFiles)
+		} else {
+			msg = fmt.Sprintf("produced %d file(s), need >= %d", len(produced), g.cfg.MinFiles)
 		}
 		points = append(points, GraderPoint{
-			Label:    label,
+			Label:    "min_files",
 			Pass:     pass,
-			Message:  pointMsg,
+			Message:  msg,
 			Evidence: map[string]string{"actual": fmt.Sprintf("%d", len(produced)), "expected": fmt.Sprintf(">=%d", g.cfg.MinFiles)},
 		})
 	}
 
 	if g.cfg.MaxFiles > 0 {
 		pass := len(produced) <= g.cfg.MaxFiles
-		label := fmt.Sprintf("max files: ≤ %d", g.cfg.MaxFiles)
-		var pointMsg string
-		if !pass {
-			pointMsg = fmt.Sprintf("produced %d file(s), exceeds max of %d", len(produced), g.cfg.MaxFiles)
+		var msg string
+		if pass {
+			msg = fmt.Sprintf("produced %d file(s), <= %d max", len(produced), g.cfg.MaxFiles)
+		} else {
+			msg = fmt.Sprintf("produced %d file(s), exceeds max of %d", len(produced), g.cfg.MaxFiles)
 		}
 		points = append(points, GraderPoint{
-			Label:    label,
+			Label:    "max_files",
 			Pass:     pass,
-			Message:  pointMsg,
+			Message:  msg,
 			Evidence: map[string]string{"actual": fmt.Sprintf("%d", len(produced)), "expected": fmt.Sprintf("<=%d", g.cfg.MaxFiles)},
 		})
 	}
 
-	// require_files: one Point per file
-	for _, p := range g.cfg.RequireFiles {
-		present := producedSet[p]
-		label := fmt.Sprintf("require file: %s", p)
-		var pointMsg string
-		if !present {
-			pointMsg = fmt.Sprintf("file %s not found in output", p)
+	// require_files: aggregate into a single Point per knob.
+	if len(g.cfg.RequireFiles) > 0 {
+		var missing []string
+		for _, p := range g.cfg.RequireFiles {
+			if !producedSet[p] {
+				missing = append(missing, p)
+			}
+		}
+		pass := len(missing) == 0
+		var msg string
+		if pass {
+			msg = fmt.Sprintf("all %d required file(s) present", len(g.cfg.RequireFiles))
+		} else {
+			msg = fmt.Sprintf("missing %d/%d required file(s): %s",
+				len(missing), len(g.cfg.RequireFiles), strings.Join(missing, ", "))
 		}
 		points = append(points, GraderPoint{
-			Label:   label,
-			Pass:    present,
-			Message: pointMsg,
+			Label:   "require_files",
+			Pass:    pass,
+			Message: msg,
 		})
 	}
 
-	// forbid_files: one Point per file
-	for _, p := range g.cfg.ForbidFiles {
-		absent := !producedSet[p]
-		label := fmt.Sprintf("forbid file: %s", p)
-		var pointMsg string
-		if !absent {
-			pointMsg = fmt.Sprintf("forbidden file %s found in output", p)
+	// forbid_files: aggregate into a single Point per knob.
+	if len(g.cfg.ForbidFiles) > 0 {
+		var found []string
+		for _, p := range g.cfg.ForbidFiles {
+			if producedSet[p] {
+				found = append(found, p)
+			}
+		}
+		pass := len(found) == 0
+		var msg string
+		if pass {
+			msg = fmt.Sprintf("none of %d forbidden file(s) present", len(g.cfg.ForbidFiles))
+		} else {
+			msg = fmt.Sprintf("found forbidden file(s): %s", strings.Join(found, ", "))
 		}
 		points = append(points, GraderPoint{
-			Label:   label,
-			Pass:    absent,
-			Message: pointMsg,
+			Label:   "forbid_files",
+			Pass:    pass,
+			Message: msg,
 		})
 	}
 
-	// require_updated: one Point per file
-	for _, p := range g.cfg.RequireUpdated {
-		updated := modifiedSet[p]
-		label := fmt.Sprintf("require updated: %s", p)
-		var pointMsg string
-		if !updated {
-			pointMsg = fmt.Sprintf("file %s not modified by agent", p)
+	// require_updated: aggregate into a single Point per knob.
+	if len(g.cfg.RequireUpdated) > 0 {
+		var notUpdated []string
+		for _, p := range g.cfg.RequireUpdated {
+			if !modifiedSet[p] {
+				notUpdated = append(notUpdated, p)
+			}
+		}
+		pass := len(notUpdated) == 0
+		var msg string
+		if pass {
+			msg = fmt.Sprintf("all %d path(s) appear in modified files", len(g.cfg.RequireUpdated))
+		} else {
+			msg = fmt.Sprintf("not modified by agent: %s", strings.Join(notUpdated, ", "))
 		}
 		points = append(points, GraderPoint{
-			Label:   label,
-			Pass:    updated,
-			Message: pointMsg,
+			Label:   "require_updated",
+			Pass:    pass,
+			Message: msg,
 		})
 	}
 
@@ -187,17 +217,19 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		if len(produced) == 0 {
 			pass = false
 		}
-		label := fmt.Sprintf("min bytes/file: ≥ %d", g.cfg.MinBytesPerFile)
-		var pointMsg string
+		var msg string
 		if len(produced) == 0 {
-			pointMsg = fmt.Sprintf("no produced files to check (>= %d B required)", g.cfg.MinBytesPerFile)
-		} else if !pass {
-			pointMsg = fmt.Sprintf("%d file(s) below %d bytes: %s", len(offenders), g.cfg.MinBytesPerFile, strings.Join(offenders, ", "))
+			msg = fmt.Sprintf("no produced files to check (>= %d B required)", g.cfg.MinBytesPerFile)
+		} else if pass {
+			msg = fmt.Sprintf("all %d file(s) >= %d byte(s)", len(produced), g.cfg.MinBytesPerFile)
+		} else {
+			msg = fmt.Sprintf("%d file(s) below %d bytes: %s",
+				len(offenders), g.cfg.MinBytesPerFile, strings.Join(offenders, ", "))
 		}
 		points = append(points, GraderPoint{
-			Label:   label,
+			Label:   "min_bytes_per_file",
 			Pass:    pass,
-			Message: pointMsg,
+			Message: msg,
 		})
 	}
 
@@ -209,35 +241,39 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 			}
 		}
 		pass := len(offenders) == 0
-		label := fmt.Sprintf("max bytes/file: ≤ %d", g.cfg.MaxBytesPerFile)
-		var pointMsg string
-		if !pass {
-			pointMsg = fmt.Sprintf("%d file(s) above %d bytes: %s", len(offenders), g.cfg.MaxBytesPerFile, strings.Join(offenders, ", "))
+		var msg string
+		if pass {
+			msg = fmt.Sprintf("all %d file(s) <= %d byte(s)", len(produced), g.cfg.MaxBytesPerFile)
+		} else {
+			msg = fmt.Sprintf("%d file(s) above %d bytes: %s",
+				len(offenders), g.cfg.MaxBytesPerFile, strings.Join(offenders, ", "))
 		}
 		points = append(points, GraderPoint{
-			Label:   label,
+			Label:   "max_bytes_per_file",
 			Pass:    pass,
-			Message: pointMsg,
+			Message: msg,
 		})
 	}
 
 	// --- Aggregate. ---
+	// Phase 3 invariant: every grader emits ≥ 1 Point. When no knobs are
+	// configured the grader still emits a single trivially-passing Point so
+	// the site never falls back to its legacy "PASS"/"100%" header.
 	if len(points) == 0 {
 		points = []GraderPoint{{
-			Label:   "no knobs configured",
+			Label:   "no_knobs",
 			Pass:    true,
-			Message: "no knobs configured — trivially passed",
+			Message: "no output_check knobs configured — trivially passed",
 		}}
 	}
 
-	msg := fmt.Sprintf("output_check passed all %d configured knob(s)", len(points))
-	// Check if any failed
 	failCount := 0
 	for _, p := range points {
 		if !p.Pass {
 			failCount++
 		}
 	}
+	msg := fmt.Sprintf("output_check passed all %d configured knob(s)", len(points))
 	if failCount > 0 {
 		msg = fmt.Sprintf("output_check failed %d/%d knob(s)", failCount, len(points))
 	}

@@ -51,8 +51,8 @@ t.Fatal(err)
 if result.Pass {
 t.Error("expected Pass=false when required tool is missing")
 }
-if result.Score != 0.0 {
-t.Errorf("expected Score=0.0, got %f", result.Score)
+if result.Score != 0.5 {
+t.Errorf("expected Score=0.5 (1 of 2 required tools present), got %f", result.Score)
 }
 extras := result.Extras.Behavior
 if extras == nil {
@@ -360,7 +360,7 @@ ActionLog: []ActionEvent{{Tool: "read_file"}, {Tool: "dangerous"}},
 if result.Pass {
 t.Error("expected Pass=false when forbidden tool used")
 }
-extras := result.Extras.Behavior
+extras := result.Extras.ToolConstraint
 if extras == nil || len(extras.Violations) == 0 {
 t.Error("expected violations")
 }
