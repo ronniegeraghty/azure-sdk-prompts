@@ -356,3 +356,58 @@ Trinity's site audit found 744/838 historical Points used the legacy `name` fiel
 So: no engine fix was needed. The 88% legacy-name reports came from local `reports/` (git-ignored ephemera) generated before the rename. Trinity's fallback chain in the renderer is the right disposition, since those old artifacts will never be regenerated.
 
 (Bundle.go:84 silent coercion note still stands — that's a separate observation about loader leniency.)
+
+## Session: Feature Cleanup — Unimplemented Examples to Issues
+
+**Date:** 2026-04-24  
+**Requested by:** Ronnie Geraghty  
+**Status:** ✅ COMPLETE  
+**Branch:** ronniegeraghty/dev  
+**Commit:** 09cf17f0
+
+### Task
+
+Per Ronnie's directive, remove two example files/doc sections that documented features not yet implemented in the parser:
+
+1. **`examples/prompts/graders-frontmatter-example.prompt.md`** — sketched `graders:` frontmatter field (Issue #636)
+2. **`docs/starter-files.md` "Option B"** — sketched `starter_files:` list syntax (Issue #637)
+
+Convert both into GitHub issues for future implementation.
+
+### Work Log
+
+1. **Deleted** `examples/prompts/graders-frontmatter-example.prompt.md` via `git rm -f`
+2. **Updated** `examples/README.md`:
+   - Removed reference to deleted example
+   - Removed "Prompt-Level Graders" section (documented unimplemented feature)
+3. **Updated** `docs/starter-files.md`:
+   - Removed "Option B: Explicit File List" section (2.2 → 2.2 precedence rules)
+   - Removed validation checks for `starter_files`
+   - Removed struct field documentation for `StarterFiles`
+   - Removed implementation roadmap
+   - Kept Option A (directory reference) as the sole recommended approach
+4. **Created two GitHub issues:**
+   - Issue #636: "Feature: support `graders:` list in prompt frontmatter" — documents the design concept, parser gap, and implementation steps
+   - Issue #637: "Feature: support `starter_files:` list (Option B) in prompt frontmatter" — documents the design concept, lightweight use case, and validation rules
+5. **Committed** with co-author trailer: `09cf17f0`
+6. **Pushed** to `ronniegeraghty/dev`
+
+### Outcomes
+
+- ✅ All unimplemented features removed from shipped examples/docs
+- ✅ Features properly tracked in GitHub (Issues #636, #637) with full context
+- ✅ Documentation now reflects only implemented functionality
+- ✅ Examples directory cleaned; `hyoka validate` will find no false positives
+- ✅ Cross-references removed from examples/README.md
+
+### Design Pattern Applied
+
+**Documentation Hygiene Principle:** If a feature is sketched but unimplemented, move it to an issue rather than leaving stale examples/docs that drift from the parser. This ensures:
+- Single source of truth: issue tracker, not docs
+- Examples always match current parser behavior
+- Feature requests clearly scoped with implementation steps
+
+### Learnings
+
+Unimplemented examples are worse than no examples — they confuse users and pollute validation reports. Always defer unshippped features to the issue tracker.
+
