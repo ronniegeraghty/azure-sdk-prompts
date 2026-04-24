@@ -143,3 +143,24 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
 - **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
 - This affects what every future spawn looks like — expect opus-4.7 as your model.
+
+---
+
+## 2026-04-24: Oracle Cleanup — Unimplemented Examples → Issues
+
+**Decision:** Ronnie → Oracle: delete unimplemented doc sketches, file as GitHub issues  
+**Outcome:** ✅ COMPLETED
+
+**Execution:**
+- Deleted `examples/prompts/graders-frontmatter-example.prompt.md`
+- Removed "Option B" section from `docs/starter-files.md`
+- Removed graders-frontmatter refs from `examples/README.md`
+- Filed **#636**: graders frontmatter feature
+- Filed **#637**: starter_files list feature
+
+**Commits:** `09cf17f0` (cleanup) · `a41616fe` (Oracle history)  
+**Branch:** ronniegeraghty/dev
+
+**Rationale:** Documentation debt — unimplemented features belong in issues, not in shipped examples. Examples now match parser reality.
+
+**Decision archive:** `.squad/decisions/archive/oracle-unimplemented-examples-to-issues.md`
