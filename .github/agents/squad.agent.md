@@ -858,8 +858,8 @@ prompt: |
   SPAWN MANIFEST: {spawn_manifest}
 
   Tasks (in order):
-  1. ORCHESTRATION LOG: Write .squad/orchestration-log/{timestamp}-{agent}.md per agent. Use ISO 8601 UTC timestamp.
-  2. SESSION LOG: Write .squad/log/{timestamp}-{topic}.md. Brief. Use ISO 8601 UTC timestamp.
+  1. ORCHESTRATION LOG: Write .squad/orchestration-log/{timestamp}-{agent}.md per agent. Use ISO 8601 UTC timestamp with hyphens instead of colons (e.g., `2026-04-04T03-55-26Z`) for Windows compatibility.
+  2. SESSION LOG: Write .squad/log/{timestamp}-{topic}.md. Brief. Use ISO 8601 UTC timestamp with hyphens instead of colons for Windows compatibility.
   3. DECISION INBOX: Merge .squad/decisions/inbox/ → decisions.md, delete inbox files. Deduplicate.
   4. CROSS-AGENT: Append team updates to affected agents' history.md.
   5. DECISIONS ARCHIVE: If decisions.md exceeds ~20KB, archive entries older than 30 days to decisions-archive.md.
