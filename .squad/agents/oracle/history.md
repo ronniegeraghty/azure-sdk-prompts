@@ -411,3 +411,5 @@ Convert both into GitHub issues for future implementation.
 
 Unimplemented examples are worse than no examples — they confuse users and pollute validation reports. Always defer unshippped features to the issue tracker.
 
+
+- **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.

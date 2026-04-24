@@ -531,3 +531,5 @@ After this session, Neo audited `internal/criteria/graders/*.go` and ran a fresh
 
 Neo's verification recipe (worth remembering):
 `jq '[.grader_results[].points[] | select(.label=="" or .label==null)]' <report.json>` returning `[]` + zero `synthesizing fallback` log hits = engine invariant verified end-to-end.
+
+- **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.

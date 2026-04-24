@@ -786,3 +786,5 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 Correct workflow: `make site-embed` (does Vite build + atomic wipe + copy dist → embed dir) → `go build ./...` → commit BOTH source and embed bundle. There is also a `make verify-embed` target — likely going into CI per Trinity's ask.
 
 This ate three "shipped" site fixes in two consecutive sessions before Trinity caught it. If you're modifying `site/src/**` or auditing why the served UI doesn't match source, check embed freshness first.
+
+- **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.

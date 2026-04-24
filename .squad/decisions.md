@@ -1832,3 +1832,19 @@ Three "shipped" site fixes have failed this way in two consecutive sessions. **A
 - Defensive `[graderless]` `console.warn` synth when no label field is present.
 - Section reorder + collapsed-by-default (now actually deployed; verified via embed bytes).
 - 132 site tests pass. Serve killed cleanly.
+
+---
+
+## 2026-04-24T23-55-30Z: User directive — never use `:` in filenames
+
+**Status:** ENFORCED. Cross-platform compliance.
+**By:** Ronnie Geraghty (via Copilot)
+**Scope:** ALL files written by the team. Applies especially to `.squad/log/`, `.squad/orchestration-log/`, `.squad/decisions/`, and any other timestamped/generated files.
+
+Never create files with `:` in the filename. Windows filesystems reject colons outright. For ISO 8601 timestamped logs, replace colons with hyphens:
+- ✅ CORRECT: `2026-04-24T23-58-37Z` (hyphens)
+- ❌ WRONG: `2026-04-24T23:58:37Z` (colons)
+
+**Why:** Cross-platform compatibility — the repo must clone and work cleanly on Windows.
+
+**Baseline:** Commit `8148ba13` renamed 83 pre-existing files with colons. All agents and Scribe must follow this invariant going forward. Reference: `.squad/skills/windows-compatibility/SKILL.md`.
