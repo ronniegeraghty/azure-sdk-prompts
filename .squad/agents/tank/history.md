@@ -426,3 +426,79 @@ Live eval (post-fix) not performed — working tree is on ronniegeraghty/dev wit
 **Status:** ✅ Bug 1 is now properly fixed at the source. Tank's display work and Neo's engine work are complementary — Tank clarifies *when* graders run; Neo ensures graders *always* run when they should. Both patches are needed for full correctness.
 
 **See:** `.squad/decisions.md` — "Graders Run on Every Eval; Generator Response Threaded Through (2026-04-24T00:56:09Z)"
+
+---
+
+## 2026-04-24 — Bug 3: Duplicate "Agent Attempt: ✅ Completed" After Graders (commit 6f2e1f03)
+
+**Branch:** ronniegeraghty/dev  
+**Commit:** 6f2e1f03 `fix(progress): suppress reviewer session events after Agent Attempt completes`
+
+### Symptom
+
+After the graders section finished, two (or more) duplicate `"Agent Attempt: ✅ Completed"` rows appeared at the bottom of the eval block. The Bug 2 fix (commit dcff4f68) had correctly flipped Agent Attempt → Completed in-place via `onSessionDetails` BEFORE graders rendered, but downstream reviewer activity events were still landing in `renderAgentEvent` and creating extra tail lines.
+
+### Root Cause
+
+The PromptReviewGrader runs a real Copilot SDK session for AI review. That session emits the same generation events the generator emits — `EventReasoning`, `EventToolStart`, `EventToolComplete` — through `sendRawEvent` (see hyoka/internal/eval/copilot.go). `engine_eval.go:596` also emits `EventReasoning` directly when a review fails.
+
+These events flow into `interactiveRenderer.HandleEvent` → switch lands on `onAgentActivity` (display_interactive.go:318-320) → `renderAgentEvent` (line 794).
+
+In `renderAgentEvent` (lines 794-807, pre-fix):
+- After `onSessionDetails` flips agentState → `agentStateCompleted` and freezes the tail, the tail is no longer `tailAgent`.
+- When the FIRST reviewer activity event arrives:
+  - `agentState == 0` check is false (it's Completed = 1) — fine, doesn't reset to Running ✓
+  - BUT line 802 `if r.cur.tailKind != tailAgent` is true → calls `writeTail(tailAgent, renderAgentStateLine())`
+  - `renderAgentStateLine()` reads agentState=Completed and renders **`"Agent Attempt: ✅ Completed"`**
+  - That string gets written as a NEW tail line at the bottom
+- The next reviewer activity event sees tailKind=tailAgent and just `rewriteAgentTail()`s in place — but the next reviewer (or the next "tail handover" — e.g., grader complete freezes the tail and another reviewer event arrives) creates ANOTHER fresh "Agent Attempt: ✅ Completed" row.
+
+With 2 reviewers in pairwise mode, you get 2 stray rows. There's also the `EventReasoning` emit from engine_eval.go:596 path on review failures.
+
+### Fix
+
+Added a phase-state guard at the top of `renderAgentEvent` (display_interactive.go:794):
+
+```go
+// Agent Attempt is already finalized — generation phase is over. Ignore
+// activity events from downstream sessions (reviewer Copilot sessions
+// emit the same EventReasoning/EventToolStart/etc. through the shared
+// event channel, but they belong to grader rows, not the agent tail).
+if r.cur != nil && (r.cur.agentState == agentStateCompleted || r.cur.agentState == agentStateGuardrail) {
+    return
+}
+```
+
+The agent tail belongs to the GENERATION phase only — once `agentState` is Completed or Guardrail, no event should re-open it.
+
+### Test
+
+`TestInteractive_ReviewerEventsAfterCompletionIgnored` (display_interactive_test.go:520-568) drives the full sequence:
+1. Standard prelude (Starting, EventReasoning to open agent gate)
+2. EventSessionDetails (flips Agent Attempt → Completed)
+3. EventGraderStart + EventGraderComplete (a typed grader run)
+4. EventGraderStart (start the AI review grader)
+5. **EventReasoning + EventToolStart + EventToolComplete** (simulate the reviewer session emitting events)
+6. EventGraderComplete (review done)
+7. EventPassed
+
+Asserts: `strings.Count(out, "\nAgent Attempt:")` equals 1 — exactly ONE Agent Attempt row exists in the transcript.
+
+### Verification
+
+- `go build ./hyoka/...` — clean
+- `go test -race ./hyoka/internal/progress/...` — all green (28 tests pass, including the new regression test)
+- Live eval: `hyoka run --prompt-id key-vault-dp-python-crud --config python-pairwise --log-level debug --log-file hyoka-tank-bug3-verify.log` — 3 evals (2 passed, 1 failed), zero duplicate "Agent Attempt" rows in the output or log.
+- `hyoka clean` — 6 orphaned sessions cleaned (normal for pairwise runs)
+
+### Files Changed
+
+- `hyoka/internal/progress/display_interactive.go` (+5 lines): phase-state guard in `renderAgentEvent`
+- `hyoka/internal/progress/display_interactive_test.go` (+56 lines): new regression test `TestInteractive_ReviewerEventsAfterCompletionIgnored`
+
+## Learnings
+
+- **Reviewer Copilot sessions share the event channel with the generator.** Once a phase ends (agent attempt completed), incoming activity events from downstream sessions must NOT re-open the previous phase's tail. The renderer must guard each phase's rendering on phase-ownership, not just on event type.
+- **Phase-state guards are critical in event-driven terminal renderers.** When multiple concurrent processes (generator, reviewer sessions) emit events through a shared channel, the renderer must filter events by phase. Just checking event type (`EventReasoning`, `EventToolStart`) is insufficient — you must also check whether the event is relevant to the *current rendering phase*.
+- **The agent tail lifecycle is: unopened → Running (first activity event) → Completed/Guardrail (terminal state) → CLOSED.** The CLOSED state (post-completion) was implicit before this fix. Making it explicit via the guard prevents leakage from downstream sessions.
+

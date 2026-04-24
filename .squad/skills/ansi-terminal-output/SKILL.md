@@ -276,6 +276,79 @@ if !isColorEnabled() {
 4. **Only clearing one row with `\r\x1b[2K`:** Wrapped content requires multi-row clearing.
 5. **Not tracking previous row count:** Can't clear the right number of rows without it.
 6. **Not appending `\x1b[0m` after truncation:** Styles bleed past the ellipsis.
+7. **No phase-state guards in event-driven renderers:** Events from downstream processes bleed into previous phases' rendering.
+
+## Phase-State Guards in Event-Driven Renderers
+
+**Use case:** When multiple concurrent processes (e.g., generator and reviewer Copilot sessions) emit events through a shared event channel, the renderer must filter events by phase-ownership, not just event type.
+
+### The Problem
+
+In hyoka's progress renderer, both the generator and reviewer Copilot sessions emit `EventReasoning`, `EventToolStart`, `EventToolComplete` through the same event channel. After the generator completes (Agent Attempt → Completed), reviewer events were still landing in `renderAgentEvent` and creating duplicate "Agent Attempt: ✅ Completed" rows at the bottom of the transcript.
+
+**Root cause:** Filtering by event type alone (`case EventReasoning:`) is insufficient. The renderer must also check whether the event is relevant to the *current rendering phase*.
+
+### The Solution: Phase Guards
+
+Add an early return at the top of phase-specific event handlers that checks the phase state:
+
+```go
+func (r *interactiveRenderer) renderAgentEvent(evt ProgressEvent) {
+    // Agent Attempt is already finalized — generation phase is over. Ignore
+    // activity events from downstream sessions (reviewer Copilot sessions
+    // emit the same EventReasoning/EventToolStart/etc. through the shared
+    // event channel, but they belong to grader rows, not the agent tail).
+    if r.cur != nil && (r.cur.agentState == agentStateCompleted || r.cur.agentState == agentStateGuardrail) {
+        return
+    }
+    // ... rest of rendering logic
+}
+```
+
+### The Lifecycle Pattern
+
+For multi-phase rendering (e.g., generation → grading → completion):
+1. **unopened** — no events processed yet for this phase
+2. **active** (e.g., Running) — events update the phase's tail in place
+3. **terminal** (e.g., Completed, Guardrail) — phase is closed, future events ignored
+4. **CLOSED** — explicit guard prevents reopening from downstream events
+
+The CLOSED state is enforced by the guard, not by the event emitter.
+
+### Key Insights
+
+- **Event types are not phase-specific.** `EventReasoning` could come from generation, review, or any other process that uses the SDK.
+- **Phase ownership is a renderer concern.** The eval engine doesn't (and shouldn't) tag events with phase metadata.
+- **Test for phase isolation.** When adding event-driven features, always test that events from one phase don't bleed into another phase's rendering.
+
+### Regression Test Pattern
+
+```go
+func TestPhaseIsolation(t *testing.T) {
+    // 1. Drive to terminal state for phase A
+    d.HandleEvent(ProgressEvent{...PhaseAComplete...})
+    
+    // 2. Start phase B (e.g., grader)
+    d.HandleEvent(ProgressEvent{...PhaseBStart...})
+    
+    // 3. Emit events that would normally trigger phase A's renderer
+    d.HandleEvent(ProgressEvent{Type: EventReasoning, ...}) // from phase B's process
+    
+    // 4. Assert: phase A's row count did NOT increase (no duplicate rows)
+    if got := strings.Count(out, "\nPhaseA:"); got != 1 {
+        t.Errorf("want exactly 1 PhaseA row, got %d (phase B leaked into phase A)", got)
+    }
+}
+```
+
+### Real-World Example: hyoka Bug 3
+
+**Symptom:** Two `"Agent Attempt: ✅ Completed"` rows after the graders section.
+
+**Fix:** Added phase-state guard in `renderAgentEvent` (commit 6f2e1f03):
+- Generation phase closes when `agentState` transitions to `Completed` or `Guardrail`.
+- Subsequent `EventReasoning`/`EventToolStart` from reviewer sessions are suppressed.
+- Test: `TestInteractive_ReviewerEventsAfterCompletionIgnored` drives the full sequence and asserts exactly ONE "Agent Attempt:" row.
 
 ## Testing
 
