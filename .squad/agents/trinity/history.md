@@ -176,3 +176,47 @@ Aligned the React/TypeScript site with schema-v3 reports in 7 commits on `ronnie
 - Tank (Phase 5): Schema v3 extensions for grader Points.
 
 **Status:** All 6 phases shipped. Architecture decisions filed (Morpheus report review, Neo plugin investigation). Awaiting user input on open questions.
+
+## Session: Generator Artifact Site Integration (2026-04-24)
+
+**User directive:** "This generator.json file should also be part of the data we use on the site."
+
+**Task:** Wire Neo's GeneratorArtifact (commit d1ed5f61) into the report layer and render it on the eval-detail page.
+
+**Outcome:** ✅ Complete
+
+1. **Phase 1 (Go wiring):**
+   - Added `GeneratorArtifact *artifact.GeneratorArtifact` field to `report.EvalReport` (type alias pattern, consistent with `WorkspaceDelta`)
+   - Implemented `buildGeneratorArtifact()` helper to construct artifact from eval state (prompt, config, result, timing, termination)
+   - Write `generator.json` to `{reportDir}/generator.json` AFTER workspace delta computed, BEFORE graders run (line 530 in `engine_eval.go`)
+   - Read artifact back when building report (after FileContents, before WriteReport) and attach to `evalReport.GeneratorArtifact`
+   - Schema v3 already bumped by Neo; artifact field is `omitempty` so v2 reports remain valid
+
+2. **Phase 2 (TypeScript types):**
+   - Mirrored `GeneratorArtifact`, `ArtifactWorkspaceDelta`, `ActionsSummary`, `ArtifactFileInfo` in `site/src/app/data/types.ts` (snake_case JSON tags)
+   - Added `generator_artifact?: GeneratorArtifact` to `EvalReport` interface with doc comment explaining v3 addition
+
+3. **Phase 3 (Rendering):**
+   - Added "Generator Session" panel to `eval-detail-page.tsx` ABOVE "Generated Files" panel
+   - Collapsed by default (new state: `showGenSession`)
+   - Displays:
+     - **Termination badge:** color-coded (green=completed, yellow=max_actions, orange=timeout/guardrail, red=error)
+     - **Timing:** duration formatted as "Xm Ys", started timestamp
+     - **Actions summary:** total actions, tool calls, reasoning steps (3-column grid)
+     - **Workspace delta:** created/modified/deleted file counts (emerald/amber/red badges)
+     - **Final response:** truncated to 500 chars if >500 AND files were generated; full text otherwise (with copy button)
+   - Conditional render: only shows if `generatorArtifact` exists (handles v2 reports gracefully)
+
+4. **Verification:**
+   - Go build passes: `go build ./hyoka/...`
+   - Go tests pass: eval + report packages
+   - Site build passes: `npm run build` in `site/`
+   - Commit: `feat(site): surface generator.json artifact on eval-detail page`
+
+## Learnings
+
+- **Schema v3 bump:** Neo already incremented `CurrentSchemaVersion` to 3 in commit d1ed5f61. The artifact field is additive metadata (`omitempty`) so v2 reports unmarshal safely with `generator_artifact == nil`.
+- **Unconditional render rule:** If the artifact field is missing (v2 report or older eval), the panel simply doesn't render — no error state, no placeholder. This follows the same pattern as `workspace_delta` elsewhere in the UI.
+- **Artifact write timing:** Must write generator.json AFTER workspace delta is computed (need full session state) but BEFORE graders run (graders may consume it via `GraderInput.GeneratorArtifactPath`).
+- **Termination semantics:** `terminated_by` enum values: `"completed"`, `"max_actions"`, `"max_turns"`, `"guardrail"`, `"timeout"`, `"error"`. Badge colors map to user expectation (green=good, yellow=soft limit, orange=hard fail, red=error).
+
