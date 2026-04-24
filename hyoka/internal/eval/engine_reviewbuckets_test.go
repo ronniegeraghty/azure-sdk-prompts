@@ -34,8 +34,8 @@ func bundleWith(entries ...criteria.UnifiedGraderEntry) *criteria.Bundle {
 }
 
 // TestEngineReviewBuckets_Combined verifies that combined mode produces
-// two review buckets: one for prompt-frontmatter criteria and one for
-// matched criteria-file entries.
+// one bucket per matched entry: one for prompt-frontmatter criteria and one
+// for each matched criteria-file entry.
 func TestEngineReviewBuckets_Combined(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		ReviewMode: criteria.ReviewModeCombined,
@@ -48,8 +48,8 @@ func TestEngineReviewBuckets_Combined(t *testing.T) {
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "prompt-level criteria"}
 	buckets := e.reviewBuckets(p, nil)
 
-	if len(buckets) != 2 {
-		t.Fatalf("combined mode: expected 2 buckets (prompt + criteria files), got %d", len(buckets))
+	if len(buckets) != 3 {
+		t.Fatalf("combined mode: expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
 	}
 	// First bucket: prompt frontmatter criteria
 	if buckets[0].Name != "Criteria from prompt file" {
@@ -58,19 +58,25 @@ func TestEngineReviewBuckets_Combined(t *testing.T) {
 	if !strings.Contains(buckets[0].Criteria, "prompt-level criteria") {
 		t.Errorf("prompt bucket missing 'prompt-level criteria': %q", buckets[0].Criteria)
 	}
-	// Second bucket: combined criteria-file entries
-	if buckets[1].Name != "combined" {
-		t.Errorf("expected second bucket 'combined', got %q", buckets[1].Name)
+	// Second bucket: per-entry "a"
+	if buckets[1].Name != "a" {
+		t.Errorf("expected second bucket 'a', got %q", buckets[1].Name)
 	}
-	if !strings.Contains(buckets[1].Criteria, "criterion A") ||
-		!strings.Contains(buckets[1].Criteria, "criterion B") {
-		t.Errorf("combined bucket missing criteria-file entries: %q", buckets[1].Criteria)
+	if !strings.Contains(buckets[1].Criteria, "criterion A") {
+		t.Errorf("bucket 'a' missing 'criterion A': %q", buckets[1].Criteria)
+	}
+	// Third bucket: per-entry "b"
+	if buckets[2].Name != "b" {
+		t.Errorf("expected third bucket 'b', got %q", buckets[2].Name)
+	}
+	if !strings.Contains(buckets[2].Criteria, "criterion B") {
+		t.Errorf("bucket 'b' missing 'criterion B': %q", buckets[2].Criteria)
 	}
 }
 
 // TestEngineReviewBuckets_DefaultModeMatchesCombined verifies that an empty
 // ReviewMode is treated as combined — prompt criteria get their own bucket,
-// matched entries get a combined bucket.
+// each matched entry gets its own bucket.
 func TestEngineReviewBuckets_DefaultModeMatchesCombined(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	e.graderBundle = bundleWith(
@@ -80,8 +86,8 @@ func TestEngineReviewBuckets_DefaultModeMatchesCombined(t *testing.T) {
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "pc"}
 	buckets := e.reviewBuckets(p, nil)
-	if len(buckets) != 2 {
-		t.Fatalf("default (empty) mode should behave like combined: expected 2 buckets, got %d", len(buckets))
+	if len(buckets) != 3 {
+		t.Fatalf("default (empty) mode should behave like combined: expected 3 buckets, got %d", len(buckets))
 	}
 }
 
@@ -139,8 +145,8 @@ func TestEngineReviewBuckets_IsolatedWithIsolation(t *testing.T) {
 
 // TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation verifies that
 // when --review-mode isolated is requested but nothing is marked isolate,
-// the engine logs a slog.Warn and produces two buckets: prompt criteria and
-// combined criteria-file entries.
+// the engine logs a slog.Warn and produces per-entry buckets: prompt criteria
+// and one bucket per criteria-file entry.
 func TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation(t *testing.T) {
 	buf, restore := captureSlog(t)
 	defer restore()
@@ -156,8 +162,8 @@ func TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation(t *testing.T) {
 	p := &prompt.Prompt{ID: "prompt-X", EvaluationCriteria: "pc"}
 	buckets := e.reviewBuckets(p, nil)
 
-	if len(buckets) != 2 {
-		t.Fatalf("degraded path expected 2 buckets (prompt + combined), got %d", len(buckets))
+	if len(buckets) != 3 {
+		t.Fatalf("degraded path expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
 	}
 	logs := buf.String()
 	if !strings.Contains(logs, "review-mode=isolated requested but no graders or groups are marked isolate") {

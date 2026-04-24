@@ -1025,13 +1025,13 @@ func TestLargeRunConfirmNoTTY(t *testing.T) {
 	}
 }
 
-// capturingReviewer records the evaluation criteria passed to Review.
+// capturingReviewer records all evaluation criteria passed to Review calls.
 type capturingReviewer struct {
-	capturedCriteria string
+	capturedCriteria []string
 }
 
 func (c *capturingReviewer) Review(_ context.Context, _ string, _ string, _ string, evaluationCriteria string, _ *review.GeneratorArtifact) (*review.ReviewResult, error) {
-	c.capturedCriteria = evaluationCriteria
+	c.capturedCriteria = append(c.capturedCriteria, evaluationCriteria)
 	return &review.ReviewResult{
 		OverallScore: 5,
 		MaxScore:     5,
@@ -1075,11 +1075,12 @@ graders:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.Contains(reviewer.capturedCriteria, "DefaultAzureCredential") {
-		t.Errorf("expected grader criteria in review, got: %s", reviewer.capturedCriteria)
+	allCriteria := strings.Join(reviewer.capturedCriteria, "\n")
+	if !strings.Contains(allCriteria, "DefaultAzureCredential") {
+		t.Errorf("expected grader criteria in review, got: %s", allCriteria)
 	}
-	if !strings.Contains(reviewer.capturedCriteria, "handle errors properly") {
-		t.Errorf("expected prompt criteria in review, got: %s", reviewer.capturedCriteria)
+	if !strings.Contains(allCriteria, "handle errors properly") {
+		t.Errorf("expected prompt criteria in review, got: %s", allCriteria)
 	}
 }
 
@@ -1130,8 +1131,12 @@ func TestCriteriaDirEmpty(t *testing.T) {
 	}
 
 	// Should fall back to prompt-only criteria
-	if !strings.Contains(reviewer.capturedCriteria, "Prompt specific criterion") {
-		t.Errorf("expected prompt criteria as fallback, got: %s", reviewer.capturedCriteria)
+	if len(reviewer.capturedCriteria) == 0 {
+		t.Errorf("expected at least one Review() call with criteria")
+	}
+	allCriteria := strings.Join(reviewer.capturedCriteria, "\n")
+	if !strings.Contains(allCriteria, "Prompt specific criterion") {
+		t.Errorf("expected prompt criteria as fallback, got: %s", allCriteria)
 	}
 }
 

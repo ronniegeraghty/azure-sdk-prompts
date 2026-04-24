@@ -113,9 +113,10 @@ func TestIntegrationReviewModeIsolatedFiresBuckets(t *testing.T) {
 }
 
 // TestIntegrationReviewModeCombinedSkipsBuckets verifies that combined mode
-// produces 2 buckets (prompt + criteria files) and calls ReviewBuckets(),
+// produces 3 buckets (prompt + 2 per-entry) and calls ReviewBuckets(),
 // not the single Review() path. This reflects the change to always separate
-// prompt-frontmatter criteria from criteria-file entries.
+// prompt-frontmatter criteria from criteria-file entries, and to create
+// one bucket per criteria-file entry.
 func TestIntegrationReviewModeCombinedSkipsBuckets(t *testing.T) {
 	outputDir := t.TempDir()
 	rec := &recordingReviewer{}
@@ -149,11 +150,11 @@ func TestIntegrationReviewModeCombinedSkipsBuckets(t *testing.T) {
 	}
 
 	// Phase 2 per-bucket grading: the engine creates one PromptReviewGrader
-	// per bucket (prompt + criteria files = 2 buckets in this test), so we
-	// expect 2 Review() calls instead of one ReviewBuckets() call.
+	// per bucket (prompt + 2 per-entry = 3 buckets in this test), so we
+	// expect 3 Review() calls instead of one ReviewBuckets() call.
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	if rec.reviewCalls != 2 {
-		t.Errorf("combined mode should call Review() twice (once per bucket: prompt + criteria files), got %d calls", rec.reviewCalls)
+	if rec.reviewCalls != 3 {
+		t.Errorf("combined mode should call Review() 3 times (once per bucket: prompt + 2 entries), got %d calls", rec.reviewCalls)
 	}
 }

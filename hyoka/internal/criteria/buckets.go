@@ -153,10 +153,11 @@ func MergeUnifiedCriteria(entries []UnifiedGraderEntry, promptCriteria string) s
 // into distinct buckets, regardless of mode:
 //   - promptCriteria (if non-empty) becomes its own bucket named
 //     "Criteria from prompt file"
-//   - Matched criteria-file entries form separate bucket(s) based on mode
+//   - Matched criteria-file entries each get their own bucket, named after
+//     the entry's name field
 //
-// In combined mode (default), matched criteria-file entries go into a
-// single "combined" bucket.
+// In combined mode (default), each matched criteria-file entry becomes its
+// own top-level bucket (one bucket per entry).
 //
 // In isolated mode:
 //   - Each prompt entry marked Isolate goes into its own bucket (named
@@ -167,7 +168,7 @@ func MergeUnifiedCriteria(entries []UnifiedGraderEntry, promptCriteria string) s
 //     the combined bucket is omitted.
 //
 // When isolated mode is requested but nothing is marked isolate, matched
-// criteria-file entries fall back to a single combined bucket.
+// criteria-file entries fall back to per-entry buckets (same as combined mode).
 func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mode string) []graders.ReviewBucket {
 	var buckets []graders.ReviewBucket
 
@@ -182,9 +183,12 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 
 	// Build buckets for matched criteria-file entries.
 	if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
-		// Combined mode: all matched entries go into one "combined" bucket.
-		if len(matched) > 0 {
-			buckets = append(buckets, combinedCriteriaFileBucket(matched))
+		// Combined mode (default): each matched entry gets its own bucket.
+		for _, m := range matched {
+			buckets = append(buckets, graders.ReviewBucket{
+				Name:     bucketName(m.Entry.Name, len(buckets)),
+				Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, ""),
+			})
 		}
 		return buckets
 	}

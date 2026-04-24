@@ -104,8 +104,8 @@ func TestBuildUnifiedReviewBuckets_CombinedMode(t *testing.T) {
 		{Entry: promptEntry("b", "criterion B", false)},
 	}
 	buckets := BuildUnifiedReviewBuckets(prompts, "prompt criteria", ReviewModeCombined)
-	if len(buckets) != 2 {
-		t.Fatalf("combined: expected 2 buckets (prompt + criteria files), got %d", len(buckets))
+	if len(buckets) != 3 {
+		t.Fatalf("combined: expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
 	}
 	// First bucket should be prompt frontmatter criteria
 	if buckets[0].Name != "Criteria from prompt file" {
@@ -114,18 +114,19 @@ func TestBuildUnifiedReviewBuckets_CombinedMode(t *testing.T) {
 	if !strings.Contains(buckets[0].Criteria, "prompt criteria") {
 		t.Errorf("prompt bucket missing 'prompt criteria': %q", buckets[0].Criteria)
 	}
-	// Second bucket should be combined criteria-file entries
-	if buckets[1].Name != "combined" {
-		t.Errorf("expected second bucket name 'combined', got %q", buckets[1].Name)
+	// Second bucket should be per-entry "a"
+	if buckets[1].Name != "a" {
+		t.Errorf("expected second bucket name 'a', got %q", buckets[1].Name)
 	}
-	for _, needle := range []string{"criterion A", "criterion B"} {
-		if !strings.Contains(buckets[1].Criteria, needle) {
-			t.Errorf("combined bucket missing %q: %q", needle, buckets[1].Criteria)
-		}
+	if !strings.Contains(buckets[1].Criteria, "criterion A") {
+		t.Errorf("bucket 'a' missing 'criterion A': %q", buckets[1].Criteria)
 	}
-	// Prompt criteria should NOT be in the combined bucket
-	if strings.Contains(buckets[1].Criteria, "prompt criteria") {
-		t.Errorf("combined bucket should not contain prompt criteria: %q", buckets[1].Criteria)
+	// Third bucket should be per-entry "b"
+	if buckets[2].Name != "b" {
+		t.Errorf("expected third bucket name 'b', got %q", buckets[2].Name)
+	}
+	if !strings.Contains(buckets[2].Criteria, "criterion B") {
+		t.Errorf("bucket 'b' missing 'criterion B': %q", buckets[2].Criteria)
 	}
 }
 
@@ -179,14 +180,17 @@ func TestBuildUnifiedReviewBuckets_IsolatedDegradesToCombined(t *testing.T) {
 		{Entry: promptEntry("b", "B", false)},
 	}
 	buckets := BuildUnifiedReviewBuckets(prompts, "pc", ReviewModeIsolated)
-	if len(buckets) != 2 {
-		t.Fatalf("degraded: expected 2 buckets (prompt + combined criteria files), got %d", len(buckets))
+	if len(buckets) != 3 {
+		t.Fatalf("degraded: expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
 	}
 	if buckets[0].Name != "Criteria from prompt file" {
 		t.Errorf("expected first bucket 'Criteria from prompt file', got %q", buckets[0].Name)
 	}
-	if buckets[1].Name != "combined" {
-		t.Errorf("expected second bucket 'combined', got %q", buckets[1].Name)
+	if buckets[1].Name != "a" {
+		t.Errorf("expected second bucket 'a', got %q", buckets[1].Name)
+	}
+	if buckets[2].Name != "b" {
+		t.Errorf("expected third bucket 'b', got %q", buckets[2].Name)
 	}
 }
 
@@ -211,16 +215,20 @@ func TestBuildUnifiedReviewBuckets_OnlyCriteriaFiles(t *testing.T) {
 		{Entry: promptEntry("b", "criterion B", false)},
 	}
 	buckets := BuildUnifiedReviewBuckets(prompts, "", ReviewModeCombined)
-	if len(buckets) != 1 {
-		t.Fatalf("expected 1 bucket (criteria files only), got %d", len(buckets))
+	if len(buckets) != 2 {
+		t.Fatalf("expected 2 buckets (per-entry), got %d", len(buckets))
 	}
-	if buckets[0].Name != "combined" {
-		t.Errorf("expected 'combined', got %q", buckets[0].Name)
+	if buckets[0].Name != "a" {
+		t.Errorf("expected 'a', got %q", buckets[0].Name)
 	}
-	for _, needle := range []string{"criterion A", "criterion B"} {
-		if !strings.Contains(buckets[0].Criteria, needle) {
-			t.Errorf("combined bucket missing %q: %q", needle, buckets[0].Criteria)
-		}
+	if !strings.Contains(buckets[0].Criteria, "criterion A") {
+		t.Errorf("bucket 'a' missing 'criterion A': %q", buckets[0].Criteria)
+	}
+	if buckets[1].Name != "b" {
+		t.Errorf("expected 'b', got %q", buckets[1].Name)
+	}
+	if !strings.Contains(buckets[1].Criteria, "criterion B") {
+		t.Errorf("bucket 'b' missing 'criterion B': %q", buckets[1].Criteria)
 	}
 }
 

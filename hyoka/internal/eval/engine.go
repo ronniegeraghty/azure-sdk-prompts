@@ -255,11 +255,10 @@ func (e *Engine) matchedForEval(props map[string]string) []criteria.MatchedUnifi
 
 // reviewBuckets builds the set of review buckets for a prompt under the
 // configured ReviewMode. In combined mode (default) it returns one bucket
-// containing all matched prompt-type graders + prompt criteria. In isolated
-// mode it returns one bucket per isolated grader/group plus a shared
-// "combined" bucket for the rest. When isolated mode is requested but
-// nothing is marked isolate, it logs a warning so the flag is observably
-// no-op rather than silently dead.
+// per matched prompt-type grader entry plus a bucket for prompt criteria.
+// In isolated mode it returns one bucket per isolated grader/group plus a
+// shared "combined" bucket for the rest. When isolated mode is requested but
+// nothing is marked isolate, it falls back to combined mode (per-entry buckets).
 func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string) []graders.ReviewBucket {
 	mode := e.opts.ReviewMode
 	if mode == "" {
