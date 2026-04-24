@@ -371,7 +371,7 @@ func TestReviewScoresAllPassed(t *testing.T) {
 
 func TestStubReviewer(t *testing.T) {
 	s := &StubReviewer{}
-	result, err := s.Review(nil, "test prompt", "some-dir", "", "")
+	result, err := s.Review(nil, "test prompt", "some-dir", "", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -382,7 +382,7 @@ func TestStubReviewer(t *testing.T) {
 
 func TestStubReviewerScores(t *testing.T) {
 	s := &StubReviewer{}
-	result, err := s.Review(nil, "prompt", "dir", "", "")
+	result, err := s.Review(nil, "prompt", "dir", "", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

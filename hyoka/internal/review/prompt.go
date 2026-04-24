@@ -9,7 +9,7 @@ import (
 // It includes the original prompt, agent output files, optional reference answer,
 // and evaluation criteria. The reviewer evaluates ONLY against the provided criteria
 // — no general rubric is injected.
-func BuildReviewPrompt(originalPrompt string, generatedFiles map[string]string, referenceFiles map[string]string, evaluationCriteria string) string {
+func BuildReviewPrompt(originalPrompt string, generatedFiles map[string]string, referenceFiles map[string]string, evaluationCriteria string, artifact *GeneratorArtifact) string {
 	var b strings.Builder
 
 	b.WriteString("You are evaluating another AI agent's work. The agent was given the prompt below ")
@@ -27,9 +27,25 @@ func BuildReviewPrompt(originalPrompt string, generatedFiles map[string]string, 
 		b.WriteString("\n\n")
 	}
 
-	b.WriteString("## Generated Code\n\n")
-	for name, content := range generatedFiles {
-		fmt.Fprintf(&b, "### %s\n```\n%s\n```\n\n", name, content)
+	// If files were generated, show them; otherwise indicate no files
+	if len(generatedFiles) > 0 {
+		b.WriteString("## Generated Code\n\n")
+		for name, content := range generatedFiles {
+			fmt.Fprintf(&b, "### %s\n```\n%s\n```\n\n", name, content)
+		}
+	} else {
+		b.WriteString("## Generated Code\n\n")
+		b.WriteString("(No files were created by the agent.)\n\n")
+	}
+
+	// Agent's final response — shown when available
+	if artifact != nil && artifact.FinalResponse != "" {
+		b.WriteString("## Agent's Final Response\n\n")
+		if len(generatedFiles) == 0 {
+			b.WriteString("The agent did not create files, but provided this response:\n\n")
+		}
+		b.WriteString(artifact.FinalResponse)
+		b.WriteString("\n\n")
 	}
 
 	if len(referenceFiles) > 0 {
@@ -45,6 +61,9 @@ func BuildReviewPrompt(originalPrompt string, generatedFiles map[string]string, 
 	b.WriteString("For EACH criterion listed above, determine:\n")
 	b.WriteString("- **passed**: true if the criterion is fully met, false otherwise\n")
 	b.WriteString("- **reasoning**: brief explanation of why it passed or failed\n\n")
+	if len(generatedFiles) == 0 && artifact != nil && artifact.FinalResponse != "" {
+		b.WriteString("Note: Since no files were created, evaluate the agent's response text against the criteria.\n\n")
+	}
 	b.WriteString("The overall score = number of passed criteria out of total criteria.\n\n")
 	b.WriteString("Respond with ONLY a JSON object, no markdown fencing, no explanation.\n")
 	b.WriteString("Use this EXACT schema:\n\n")

@@ -25,25 +25,25 @@ type Bucket struct {
 // across multiple sessions, one per bucket. Implementations may merge
 // per-bucket results into a single consolidated ReviewResult.
 type MultiBucketReviewer interface {
-	ReviewBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket) (*ReviewResult, error)
+	ReviewBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket, artifact *GeneratorArtifact) (*ReviewResult, error)
 }
 
 // MultiBucketPanelReviewer is implemented by panel reviewers that can split
 // each panel-model's review across multiple buckets and return both the
 // per-model panel and the consensus ReviewResult.
 type MultiBucketPanelReviewer interface {
-	ReviewPanelBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket) (panel []ReviewResult, consolidated *ReviewResult, err error)
+	ReviewPanelBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket, artifact *GeneratorArtifact) (panel []ReviewResult, consolidated *ReviewResult, err error)
 }
 
 // ReviewBuckets runs one Copilot session per bucket for this CopilotReviewer's
 // single model and merges the per-bucket criterion results into one
 // ReviewResult. With a single bucket, behavior is identical to Review.
-func (r *CopilotReviewer) ReviewBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket) (*ReviewResult, error) {
+func (r *CopilotReviewer) ReviewBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket, artifact *GeneratorArtifact) (*ReviewResult, error) {
 	if len(buckets) == 0 {
 		return nil, fmt.Errorf("ReviewBuckets called with no buckets")
 	}
 	if len(buckets) == 1 {
-		return r.Review(ctx, originalPrompt, workDir, referenceDir, buckets[0].Criteria)
+		return r.Review(ctx, originalPrompt, workDir, referenceDir, buckets[0].Criteria, artifact)
 	}
 	results := make([]bucketResult, 0, len(buckets))
 	for _, b := range buckets {
@@ -51,7 +51,7 @@ func (r *CopilotReviewer) ReviewBuckets(ctx context.Context, originalPrompt, wor
 			break
 		}
 		slog.Info("CopilotReviewer bucket starting", "model", r.model, "bucket", b.Name)
-		res, err := r.Review(ctx, originalPrompt, workDir, referenceDir, b.Criteria)
+		res, err := r.Review(ctx, originalPrompt, workDir, referenceDir, b.Criteria, artifact)
 		if err != nil {
 			slog.Warn("CopilotReviewer bucket failed", "model", r.model, "bucket", b.Name, "error", err)
 			continue
@@ -69,7 +69,7 @@ func (r *CopilotReviewer) ReviewBuckets(ctx context.Context, originalPrompt, wor
 // ReviewPanelBuckets runs each panel model against every bucket and merges
 // per-model bucket results into a single ReviewResult per model. The panel is
 // then consolidated via deterministic any-fail voting (matching ReviewPanel).
-func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket) ([]ReviewResult, *ReviewResult, error) {
+func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, workDir, referenceDir string, buckets []Bucket, artifact *GeneratorArtifact) ([]ReviewResult, *ReviewResult, error) {
 	if len(p.models) == 0 {
 		return nil, nil, fmt.Errorf("no reviewer models configured")
 	}
@@ -77,12 +77,16 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 		return nil, nil, fmt.Errorf("ReviewPanelBuckets called with no buckets")
 	}
 	if len(buckets) == 1 {
-		return p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, buckets[0].Criteria)
+		return p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, buckets[0].Criteria, artifact)
 	}
 
 	generatedFiles, err := utils.ReadDirFiles(workDir)
 	if err != nil || len(generatedFiles) == 0 {
-		return nil, nil, fmt.Errorf("no generated files to review in %s", workDir)
+		// Empty workspace is acceptable if we have an artifact with a response
+		if artifact == nil || artifact.FinalResponse == "" {
+			return nil, nil, fmt.Errorf("no generated files to review in %s and no agent response to review", workDir)
+		}
+		slog.Debug("No generated files, reviewing agent's final response only")
 	}
 	var referenceFiles map[string]string
 	if referenceDir != "" {
@@ -115,7 +119,7 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 				break
 			}
 			slog.Debug("Bucket review starting", "model", model, "bucket", b.Name)
-			reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, b.Criteria)
+			reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, b.Criteria, artifact)
 			res, rerr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir)
 			if rerr != nil {
 				slog.Warn("Bucket review failed", "model", model, "bucket", b.Name, "error", rerr)

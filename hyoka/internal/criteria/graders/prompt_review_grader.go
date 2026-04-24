@@ -60,10 +60,10 @@ if err != nil {
 }
 
 if g.panelReviewer != nil {
-	return g.gradePanel(ctx, input, reviewWorkDir, result)
+	return g.gradePanel(ctx, input, reviewWorkDir, result, input.GeneratorArtifact)
 }
 if g.reviewer != nil {
-	return g.gradeSingle(ctx, input, reviewWorkDir, result)
+	return g.gradeSingle(ctx, input, reviewWorkDir, result, input.GeneratorArtifact)
 }
 return result, fmt.Errorf("no reviewer configured")
 }
@@ -76,7 +76,7 @@ if g.LastReviewWorkDir != "" {
 }
 }
 
-func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, workDir string, result GraderResult) (GraderResult, error) {
+func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, workDir string, result GraderResult, artifact *review.GeneratorArtifact) (GraderResult, error) {
 	models := g.panelReviewer.Models()
 	slog.Debug("Review grader starting panel", "models", models)
 
@@ -88,14 +88,14 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 	if len(input.EvalCriteriaBuckets) > 1 {
 		slog.Info("Review grader using bucketed panel review", "bucket_count", len(input.EvalCriteriaBuckets))
 		panel, consolidated, err = g.panelReviewer.ReviewPanelBuckets(
-			ctx, input.OriginalPrompt, workDir, input.ReferenceDir, toReviewBuckets(input.EvalCriteriaBuckets),
+			ctx, input.OriginalPrompt, workDir, input.ReferenceDir, toReviewBuckets(input.EvalCriteriaBuckets), artifact,
 		)
 	} else {
 		criteria := input.EvalCriteria
 		if criteria == "" && len(input.EvalCriteriaBuckets) == 1 {
 			criteria = input.EvalCriteriaBuckets[0].Criteria
 		}
-		panel, consolidated, err = g.panelReviewer.ReviewPanel(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, criteria)
+		panel, consolidated, err = g.panelReviewer.ReviewPanel(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, criteria, artifact)
 	}
 	if err != nil {
 		return result, fmt.Errorf("review panel failed: %w", err)
@@ -156,7 +156,7 @@ result.ReviewDetails = details
 return result, nil
 }
 
-func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput, workDir string, result GraderResult) (GraderResult, error) {
+func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput, workDir string, result GraderResult, artifact *review.GeneratorArtifact) (GraderResult, error) {
 	slog.Debug("Review grader starting single review")
 
 	var (
@@ -166,17 +166,17 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 	if len(input.EvalCriteriaBuckets) > 1 {
 		if mb, ok := g.reviewer.(review.MultiBucketReviewer); ok {
 			slog.Info("Review grader using bucketed single review", "bucket_count", len(input.EvalCriteriaBuckets))
-			reviewResult, err = mb.ReviewBuckets(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, toReviewBuckets(input.EvalCriteriaBuckets))
+			reviewResult, err = mb.ReviewBuckets(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, toReviewBuckets(input.EvalCriteriaBuckets), artifact)
 		} else {
 			slog.Warn("Reviewer does not support buckets; collapsing to combined criteria")
-			reviewResult, err = g.reviewer.Review(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, joinCriteria(input.EvalCriteriaBuckets))
+			reviewResult, err = g.reviewer.Review(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, joinCriteria(input.EvalCriteriaBuckets), artifact)
 		}
 	} else {
 		criteria := input.EvalCriteria
 		if criteria == "" && len(input.EvalCriteriaBuckets) == 1 {
 			criteria = input.EvalCriteriaBuckets[0].Criteria
 		}
-		reviewResult, err = g.reviewer.Review(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, criteria)
+		reviewResult, err = g.reviewer.Review(ctx, input.OriginalPrompt, workDir, input.ReferenceDir, criteria, artifact)
 	}
 	if err != nil {
 		return result, fmt.Errorf("review failed: %w", err)

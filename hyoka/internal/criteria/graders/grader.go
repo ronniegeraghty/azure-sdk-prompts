@@ -1,6 +1,7 @@
 package graders
 
 import (
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
 "context"
 "fmt"
 
@@ -50,6 +51,12 @@ type GraderInput struct {
 	// instead of using the single EvalCriteria string. Length 0 or 1
 	// means use the legacy single-session path (combined mode).
 	EvalCriteriaBuckets []ReviewBucket
+
+	// GeneratorArtifactPath is the absolute path to the generator.json file.
+	GeneratorArtifactPath string
+
+	// GeneratorArtifact is a pre-parsed pointer to the generator session artifact.
+	GeneratorArtifact *GeneratorArtifact
 }
 
 // ReviewBucket is a graders-package mirror of criteria.ReviewBucket / review.Bucket.
@@ -274,3 +281,6 @@ func AggregateResults(results []GraderResult) (*AggregateResult, error) {
 
 	return agg, nil
 }
+
+// GeneratorArtifact is a type alias for the generator artifact type.
+type GeneratorArtifact = artifact.GeneratorArtifact

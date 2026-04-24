@@ -14,12 +14,17 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
+// GeneratorArtifact is a type alias for the generator artifact type.
+// This allows review to access artifact.GeneratorArtifact without creating an import cycle.
+type GeneratorArtifact = artifact.GeneratorArtifact
+
 // Reviewer runs LLM-as-judge code reviews via a separate Copilot session.
 type Reviewer interface {
-	Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error)
+	Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (*ReviewResult, error)
 }
 
 // CopilotReviewer uses a Copilot session to perform code reviews.
@@ -58,16 +63,22 @@ func (r *CopilotReviewer) SetSystemPrompt(prompt string) {
 }
 
 // Review creates a separate Copilot session, sends the review prompt, and parses results.
-func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error) {
+func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (*ReviewResult, error) {
 	slog.Debug("Reading generated files for review", "workDir", workDir)
 	generatedFiles, err := utils.ReadDirFiles(workDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading generated files: %w", err)
 	}
+	
+	// Empty workspace is acceptable if we have an artifact with a response
 	if len(generatedFiles) == 0 {
-		return nil, fmt.Errorf("no generated files found in %s", workDir)
+		if artifact == nil || artifact.FinalResponse == "" {
+			return nil, fmt.Errorf("no generated files found in %s and no agent response to review", workDir)
+		}
+		slog.Debug("No generated files, reviewing agent's final response only")
+	} else {
+		slog.Debug("Generated files loaded", "file_count", len(generatedFiles))
 	}
-	slog.Debug("Generated files loaded", "file_count", len(generatedFiles))
 
 	var referenceFiles map[string]string
 	if referenceDir != "" {
@@ -79,7 +90,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		}
 	}
 
-	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria)
+	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria, artifact)
 
 	// Create isolated config directory to prevent user-level skills from
 	// leaking into the review session (#21).
@@ -173,7 +184,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 type StubReviewer struct{}
 
 // Review returns a stub review result.
-func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _ string) (*ReviewResult, error) {
+func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _ string, _ *GeneratorArtifact) (*ReviewResult, error) {
 	return &ReviewResult{
 		Scores: ReviewScores{
 			Criteria: []CriterionResult{
@@ -190,7 +201,7 @@ func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _
 
 // ReviewBuckets returns a stub review result with one criterion per bucket so
 // StubReviewer satisfies MultiBucketReviewer for tests.
-func (s *StubReviewer) ReviewBuckets(_ context.Context, _ string, _ string, _ string, buckets []Bucket) (*ReviewResult, error) {
+func (s *StubReviewer) ReviewBuckets(_ context.Context, _ string, _ string, _ string, buckets []Bucket, _ *GeneratorArtifact) (*ReviewResult, error) {
 	criteria := make([]CriterionResult, 0, len(buckets))
 	for _, b := range buckets {
 		criteria = append(criteria, CriterionResult{
@@ -327,7 +338,7 @@ func (p *PanelReviewer) Models() []string {
 // in the list, which receives all other reviewers' outputs.
 // Reviews run one at a time so each Copilot session starts, completes, and stops
 // before the next begins, reducing peak memory usage.
-func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (panel []ReviewResult, consolidated *ReviewResult, err error) {
+func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (panel []ReviewResult, consolidated *ReviewResult, err error) {
 	slog.Info("Starting sequential panel review", "model_count", len(p.models), "models", p.models)
 	if len(p.models) == 0 {
 		return nil, nil, fmt.Errorf("no reviewer models configured")
@@ -335,7 +346,11 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 
 	generatedFiles, err := utils.ReadDirFiles(workDir)
 	if err != nil || len(generatedFiles) == 0 {
-		return nil, nil, fmt.Errorf("no generated files to review in %s", workDir)
+		// Empty workspace is acceptable if we have an artifact with a response
+		if artifact == nil || artifact.FinalResponse == "" {
+			return nil, nil, fmt.Errorf("no generated files to review in %s and no agent response to review", workDir)
+		}
+		slog.Debug("No generated files, reviewing agent's final response only")
 	}
 
 	var referenceFiles map[string]string
@@ -347,7 +362,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		}
 	}
 
-	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria)
+	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria, artifact)
 
 	// Run reviewers sequentially — one Copilot session at a time
 	for i, model := range p.models {
@@ -390,8 +405,8 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 }
 
 // Review implements the Reviewer interface using the panel (for backward compat).
-func (p *PanelReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error) {
-	_, consolidated, err := p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, evaluationCriteria)
+func (p *PanelReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (*ReviewResult, error) {
+	_, consolidated, err := p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, evaluationCriteria, artifact)
 	return consolidated, err
 }
 
