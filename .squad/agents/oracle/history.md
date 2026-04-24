@@ -269,3 +269,90 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
 - **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
 - This affects what every future spawn looks like — expect opus-4.7 as your model.
+
+---
+
+## Work Unit 5: Example-File Schema Audit (2026-04-24)
+
+**User Request:** Audit every example prompt/config/criteria file against the
+current schemas. Report drift; fix safe drift; flag ambiguous cases.
+
+### Scope audited
+- 90 production prompts under `prompts/` ✅ all valid (covered by `hyoka validate`)
+- 14 production configs under `configs/` ✅ all valid
+- 4 production criteria files under `criteria/` ✅ all valid
+- 4 example prompts under `examples/prompts/` — 1 ambiguous, 3 ok
+- 3 example configs under `examples/configs/` — all ok
+- 9 example criteria under `examples/criteria/` — 8 needed explicit `type: prompt`
+- 1 init-seed `exampleConfig` const in `hyoka/cmd/init.go` — was BROKEN
+- ~10 docs/*.md with embedded schema snippets — 5 had drift
+
+### Fixes applied (10 files)
+1. `hyoka/cmd/init.go` — wrapped `exampleConfig` in `configs:` list (was unparseable)
+2. `criteria/language/{java,rust}.yaml` — added explicit `type: prompt`
+3. `examples/criteria/{language/*,service/*,hierarchical-when-example}.yaml`
+   (8 files) — added explicit `type: prompt`
+4. `docs/configuration.md` — fixed flat-frontmatter snippet to nested `properties:`
+5. `docs/starter-files.md` — fixed 3 frontmatter snippets to nested `properties:`;
+   added implementation-status banner for unsupported `starter_files:` field
+6. `docs/graders/index.md` — corrected schema (top-level `prompt:`/`checks:`,
+   not `details: { prompt: ... }`); added v4 invariant call-out;
+   relabeled `prompt_review` as engine-internal
+7. `docs/graders/prompt.md` — full rewrite of Configuration + Example sections
+   with correct top-level `prompt:`/`checks:` shape and v4 invariant note
+8. `docs/graders/prompt_review.md` — rewrote to clarify it is **not** a
+   user-configurable YAML `type:` value (validation rejects it)
+9. `docs/grader-config-schema.md` — replaced 353-line legacy doc with a
+   stub redirect + migration cheat sheet (kind→type, config→details,
+   `gate:` removed, `kind: prompt` + `config.rubric` → top-level prompt/checks)
+10. `examples/prompts/graders-frontmatter-example.prompt.md` — added warning
+    banner that the `graders:` frontmatter field is NOT consumed by the
+    parser (proposed-only)
+
+### Flagged for human review (decision memo written)
+- **`graders:` frontmatter field** — example documents a feature the parser
+  doesn't consume. Decision needed: implement or delete the example.
+- **`starter_files:` (list)** — design-draft only; `docs/starter-files.md`
+  Option B does not match the parser. Banner added.
+
+### Validation evidence
+Before fixes: `✓ All 90 prompt(s) are valid / ✓ All 14 config(s) are valid /
+✓ All 4 criteria file(s) valid (32 grader(s))`.
+After fixes: identical output. Examples (which `hyoka validate` skips) all
+pass the loaders directly via a temporary in-module audit binary
+(documented in the new `example-file-validation` skill).
+
+### Note for Neo
+The unified loader silently translates "no `type:` + has `prompt:` + no
+`details:`" → `type: prompt` at `criteria/bundle.go:84`. This kept eight
+example files validating without explicit `type:` and hid the drift. With
+all in-tree examples now migrated, consider either logging a deprecation
+warning when this translation fires or removing it.
+
+### Skill extracted
+`.squad/skills/example-file-validation/SKILL.md` — schema sources of truth,
+where drift hides outside `hyoka validate`, the in-module audit-binary
+trick for testing example/ files, and the v4 invariants to defend.
+
+### Key Learnings
+- **`hyoka validate` covers runtime paths, not example/seed paths.** Three
+  major drift sites (the init seed, examples/, docs/* snippets) are
+  invisible to the validate command. A docs owner needs to walk these
+  manually on every schema change.
+- **Hidden translations mask drift.** The legacy-prompt → type-prompt
+  coercion in `bundle.go` made 8 stale example files look correct. When
+  the team adds compatibility shims, surface them as deprecation warnings
+  so doc audits catch the staleness.
+- **A brand-new doc set can still ship wrong.** `docs/graders/*.md` was
+  written DURING the v4 unification but encoded the prompt-grader shape
+  incorrectly (`details: { prompt: ... }` instead of top-level
+  `prompt:`/`checks:`). Always validate doc snippets by pasting them
+  through the actual loader, not by inspection.
+
+## 2026-04-24: Follow-up note — legacy `name` Point issue was historical only
+
+Trinity's site audit found 744/838 historical Points used the legacy `name` field. We were worried this might mean current engine code still emitted `Name:` instead of `Label:`. **Neo verified on a fresh run that the engine is clean** — every grader on current tip emits ≥1 Point with non-empty `Label`. The b7611606 invariant fix holds.
+
+So: no engine fix was needed. The 88% legacy-name reports came from local `reports/` (git-ignored ephemera) generated before the rename. Trinity's fallback chain in the renderer is the right disposition, since those old artifacts will never be regenerated.
+
+(Bundle.go:84 silent coercion note still stands — that's a separate observation about loader leniency.)

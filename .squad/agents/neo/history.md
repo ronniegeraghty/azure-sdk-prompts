@@ -744,3 +744,45 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
 - **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
 - This affects what every future spawn looks like — expect opus-4.7 as your model.
+
+---
+
+## 2026-04-24: Phase-3 Invariant Live Verification
+
+**Status:** ✅ VERIFIED. No engine fix required.
+
+**Trigger:** Ronnie reported live site still showing graders with no Points / blank labels. Goal: verify whether the engine is actually emitting Points + Labels for every grader on a fresh run, or whether b7611606 missed a code path.
+
+**Method:**
+1. Built `hyoka` from current tip and ran a live eval: `key-vault-dp-python-crud × baseline/claude-opus-4.6` (108s).
+2. Audited the produced `report.json` with jq.
+3. Grep'd debug log for `synthesizing fallback` warnings (the `convertGraderResults` defensive synth in `engine_eval.go:1205`).
+4. Walked every `GraderPoint{` construction site in `internal/criteria/graders/*.go` and verified Label is always set as the first field, sourced from a non-empty literal or `fmt.Sprintf` with a static prefix.
+
+**Findings:**
+- ✅ All 3 grader_results had `points_len ≥ 1` (output_check=2, prompt_review=5, prompt_review=3).
+- ✅ Empty/null label query `[.grader_results[].points[] | select(.label=="" or .label==null)]` returned `[]`.
+- ✅ Zero `synthesizing fallback` warnings in debug log — the defensive synth never fired.
+- ✅ All `internal/criteria/graders/*.go` Point constructions use Label-as-first-field with `fmt.Sprintf("static-prefix: %s", var)` patterns — even an empty `var` produces a non-empty label like `"criterion: "`.
+- ✅ All grader+eval tests pass with `-race`.
+
+**Caveat — verbose, not blank, labels:** One prompt_review point emitted `Label = "criterion: DefaultAzureCredential Authentication\n   Check the following criteria:\n   1. Uses..."` — i.e. the entire bucket header text leaked into the criterion Name. This is non-empty (so engine invariant holds) but renders ugly on the site and may be what Ronnie perceived as "blank/broken" labels. Root cause is the LLM judge response parsing in `internal/review/`, NOT a grader bug. **Action item for next session:** trim/normalize criterion Name to single-line in `consolidate` or in `prompt_review_grader.go` before constructing the label (e.g. `strings.Split(c.Name, "\n")[0]`).
+
+**Path layout note:** Top-level `report.json` has graders at `.grader_results` (NOT `.review.grader_results` — `.review` carries only the consolidated summary). Trinity's site code should consume `.grader_results`.
+
+**Conclusion:** Engine-side `≥1 GraderPoint w/ non-empty Label` invariant is holding on the current tip. The site reports Trinity is fixing are coming from either (a) legacy v3-or-older eval.json on disk, or (b) verbose multi-line Labels that LOOK empty due to CSS truncation but aren't actually empty.
+
+## Learnings
+
+- **Empty vs. verbose labels are different bugs.** Engine invariant says "Label is non-empty string". Site UX says "Label is human-readable single line". A `fmt.Sprintf("criterion: %s", c.Name)` where `c.Name` carries embedded newlines satisfies the invariant but breaks the UX.
+- **Audit recipe (reusable):** `jq '[.grader_results[].points[] | select(.label=="" or .label==null)]' <report.json>` returning `[]` + grep `synthesizing fallback` showing zero hits = engine-side invariant verified.
+- **Path of grader results:** `.grader_results` at top level. `.review` is only the consolidated review summary, not graders.
+
+
+## 2026-04-24: Cross-agent insight from Trinity — site embed-target gotcha
+
+**Critical for any future site-touching work:** the Go binary embeds `hyoka/internal/serve/site/`, **NOT** `site/dist/`. A `cd site && npm run build` will silently leave the binary serving stale bytes.
+
+Correct workflow: `make site-embed` (does Vite build + atomic wipe + copy dist → embed dir) → `go build ./...` → commit BOTH source and embed bundle. There is also a `make verify-embed` target — likely going into CI per Trinity's ask.
+
+This ate three "shipped" site fixes in two consecutive sessions before Trinity caught it. If you're modifying `site/src/**` or auditing why the served UI doesn't match source, check embed freshness first.

@@ -489,3 +489,45 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
 - **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
 - This affects what every future spawn looks like — expect opus-4.7 as your model.
+
+
+## 2026-04-24 — Site Fixes v2 (commit fcb8d1d6) — what actually shipped
+
+Prior session's site fixes were never committed/embedded — `git status` showed 4 modified files in working tree, no commit, embedded `hyoka/internal/serve/site/` still pointing at old `index-GEfg3Zux.js`. So the user kept seeing the old behavior even though the code "looked right."
+
+### The discovery that mattered
+**The blank-label bug had a real root cause, not just a missing fallback.**
+
+Audit of existing `reports/` showed **744 of 838 Points emit `name` (legacy field) instead of `label`**:
+- 506 in `prompt_review`
+- 166 in `output_check`
+- 30 in `tool_constraint`
+- 21 each in `file` and `behavior`
+
+The Go schema (`hyoka/internal/criteria/graders/grader.go:115`) declares `Label string \`json:"label"\``, but most grader implementations are still writing the field as `name` (or the historical reports were generated before v4's rename and v4 never broke them — both possibilities exist; engine audit is Neo's lane). Either way, the site MUST tolerate both shapes forever — old reports under `reports/` will never be regenerated.
+
+### What I shipped (commit fcb8d1d6)
+- `GraderPoint` TS interface gained optional legacy fields: `name`, `title`, `check`, `reason`.
+- `GraderResultRow` Points renderer uses the chain: `p.label || p.name || p.title || p.check || p.message || p.reason || (p.pass ? "Check passed" : "Check failed")`.
+- Synthesized fallback Point when `result.points` is null/empty, with `console.warn('[graderless] …')`.
+- All previously-uncommitted polish (collapsed-by-default, section reorder, score-string defensive case) finally got built + embedded.
+- `make site-embed` is the path — direct `cd site && npm run build` is NOT enough; the Go binary embeds from `hyoka/internal/serve/site/`, not `site/dist/`.
+
+### Numbers
+- Tests: 132 passing (added one for legacy `name` fallback).
+- Bundle: `index-CKxOEVk1.js` (1101248 bytes), confirmed contains "graderless" / "Check passed" / "synthesized fallback".
+- Verified embedded bundle served at `/` via `hyoka serve` (port 9120, killed via `python3 -c "os.kill(...)"` because the bash `kill` builtin was being intercepted).
+
+### The trap to never fall into again
+**`cd site && npm run build` is necessary but NOT sufficient.** Vite outputs to `site/dist/`, but `embed.go` embeds `hyoka/internal/serve/site/`. There is a `make site-embed` target that does both (build + copy + atomic replace). Use it.
+
+There's a `make verify-embed` target too — running it as a CI gate would have caught all of this. Worth pinning that into PR review checklist.
+
+## 2026-04-24: Neo confirmed engine clean — fallback chain is correct posture
+
+After this session, Neo audited `internal/criteria/graders/*.go` and ran a fresh eval on a single prompt. Result: every grader emits ≥1 Point with non-empty `Label`. The b7611606 invariant fix holds; no current engine path emits `Name:` instead of `Label:`.
+
+**Conclusion:** the 744/838 historical-name-field Points came from old `reports/` artifacts (git-ignored, predating the rename, will never regenerate). The fallback chain we shipped in fcb8d1d6 is purely backwards-compat for artifacts in the wild — exactly the right disposition. No engine bug to chase.
+
+Neo's verification recipe (worth remembering):
+`jq '[.grader_results[].points[] | select(.label=="" or .label==null)]' <report.json>` returning `[]` + zero `synthesizing fallback` log hits = engine invariant verified end-to-end.

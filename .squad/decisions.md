@@ -1773,3 +1773,62 @@ Tracking what ships out the door so future readers can confirm cleanup happened:
 - The 5-way `passed` derivation cascade in `GraderResultRow.tsx` — replaced by `r.pass`.
 - The score-format cascade (`pointsPassed/total` vs `score%` vs `overall_score/max_score`) — replaced by `formatGraderScore`.
 - `convertGraderResults` six-detail copy block + `prompt_review` special-case block — replaced by mechanical Points + Extras copy.
+
+---
+
+## 2026-04-24: Example-file & docs schema audit (Oracle)
+
+**By:** Oracle 🔮
+**Memo:** `.squad/decisions/inbox/oracle-example-files-audit.md` (merged, deleted)
+
+Audited every prompt/config/criteria/docs example file vs current schemas (prompt frontmatter, config YAML, unified grader v4). 121 files reviewed.
+
+**Fixed (16 files):**
+- `hyoka/cmd/init.go` `exampleConfig` const — wrapped a single ToolConfig in the missing `configs:` list. The seed for `hyoka init --with-examples` previously could not load.
+- `docs/graders/index.md` and `docs/graders/prompt.md` — rewrote prompt-grader examples from the (REJECTED) `details: { prompt: ... }` shape to the v4 top-level `prompt:`/`checks:` shape with v4 invariant call-out.
+- `docs/grader-config-schema.md` (353 lines, legacy `kind:`/`config:`/`gate:` schema) — rewrote as stub redirect + migration cheat sheet pointing at `docs/graders/index.md`.
+- Added explicit `type: prompt` to: `criteria/language/{java,rust}.yaml`, `examples/criteria/language/{dotnet,go,java,python,rust}.yaml`, `examples/criteria/service/{key-vault,storage}.yaml`, `examples/criteria/hierarchical-when-example.yaml`.
+
+**Flagged for human review (NOT auto-fixed):**
+
+A. `examples/prompts/graders-frontmatter-example.prompt.md` documents a `graders:` frontmatter field the parser does not consume (no `Graders` field on `prompt.frontmatter`) AND uses pre-v4 `kind:`/`config:`/`gate:`. Banner added. Need decision: implement `graders:` overrides in the parser (matches v4 unification model) OR delete the example. **Ask Neo.**
+
+B. `docs/starter-files.md` Option B (`starter_files:` list of paths) — only `starter_project:` (directory) is implemented. Doc was already DRAFT; explicit "implementation status" call-out added. Long-term: ship the feature or drop Option B.
+
+**Note for Neo (engine):**
+`hyoka/internal/criteria/bundle.go:84-97` silently coerces `no type: + has prompt: + no details:` → `type: prompt`. This kept 8 example files working without explicit `type:` and hid the schema drift. Consider either logging a deprecation warning when the translation fires, or removing it now that all in-tree examples are migrated.
+
+**Skill produced:** `.squad/skills/example-file-validation/SKILL.md`.
+
+---
+
+## 2026-04-24: Site fixes v2 + embed-target convention (Trinity)
+
+**By:** Trinity ⚛️
+**Commit:** `fcb8d1d6` on `dev`
+**Memo:** `.squad/decisions/inbox/trinity-site-fixes-v2.md` (merged, deleted)
+
+### Convention adopted (per Trinity's ask)
+**Site renderers MUST tolerate legacy Point fields.** Use the canonical fallback chain when rendering a Point's display string:
+```
+p.label || p.name || p.title || p.check || p.message || p.reason || "<unnamed check>"
+```
+Rationale: 744 of 838 historical Points across local `reports/` use the pre-v4 `name` field. `reports/` is git-ignored ephemera and these will never be regenerated. The engine on current tip is clean (Neo verified — see "Engine invariant — every grader emits ≥ 1 GraderPoint" above), so the fallback is purely backwards-compat for old artifacts in the wild.
+
+**When the chain is needed in a second call site, extract it to `site/src/lib/pointLabel.ts` and centralize.** Today only one call site exists; do not pre-extract.
+
+### Embed-target convention (CRITICAL)
+**The Go binary embeds `hyoka/internal/serve/site/`, NOT `site/dist/`.** A `cd site && npm run build` is necessary but **not sufficient**.
+
+Required workflow (per Makefile + `embedded-asset-freshness` skill):
+1. `make site-embed` — Vite build + atomic wipe + copy `dist/` → `hyoka/internal/serve/site/`
+2. `go build ./...` — picks up new embedded bytes
+3. Commit BOTH the source AND the embedded bundle
+
+Three "shipped" site fixes have failed this way in two consecutive sessions. **Ask:** Morpheus/Oracle, please wire `make verify-embed` into CI on every PR that touches `site/src/**`, or add it to the PR template's checklist. The foot-gun will recur otherwise.
+
+### What landed in fcb8d1d6
+- Fallback chain in `GraderResultRow.tsx`.
+- Defensive `[graderless]` `console.warn` synth when no label field is present.
+- Section reorder + collapsed-by-default (now actually deployed; verified via embed bytes).
+- 132 site tests pass. Serve killed cleanly.
