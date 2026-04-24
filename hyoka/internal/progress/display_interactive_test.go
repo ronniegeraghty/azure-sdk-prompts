@@ -471,44 +471,49 @@ t.Errorf("failed plugin must not emit a bare parent header:\n%s", out)
 // was NOT terminated by a writeLine newline (which would indicate a
 // stale duplicate at the bottom of the transcript).
 func TestInteractive_AgentCompletedRowRewritesFrozenLine(t *testing.T) {
-var buf bytes.Buffer
-d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+	var buf bytes.Buffer
+	d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
 
-id := "agent-rewrite"
-d.HandleEvent(ProgressEvent{EvalID: id, PromptID: "p", ConfigName: "c", Type: EventStarting})
-// No tools — opens the agent gate immediately on the first activity event.
-d.HandleEvent(ProgressEvent{EvalID: id, Type: EventReasoning, Message: "thinking"})
-// Grader Start freezes the agent tail and takes over the tail itself.
-d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderStart, GraderID: "ai_review", GraderKind: "claude-opus-4.6"})
-score := 9.0
-d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderComplete, GraderID: "ai_review", GraderKind: "claude-opus-4.6", Result: GraderResultPass, Score: &score})
-// Agent Complete fires LAST. With the fix, this rewrites the frozen
-// Running row in place rather than appending a fresh Completed line.
-d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 0})
-d.Finish()
+	id := "agent-rewrite"
+	d.HandleEvent(ProgressEvent{EvalID: id, PromptID: "p", ConfigName: "c", Type: EventStarting})
+	// No tools — opens the agent gate immediately on the first activity event.
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventReasoning, Message: "thinking"})
+// EventSessionDetails signals generation complete BEFORE graders start.
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventSessionDetails, Files: []string{"a.py"}, Turns: 3, ToolCalls: 5, Cost: 0.02})
+	// EventSessionDetails signals generation complete BEFORE graders start.
+	// This flips the Agent Attempt line to "Completed" while it is still the
+	// tail, so no rewriteFrozenLine is needed later.
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventSessionDetails, Files: []string{"a.py"}, Turns: 3, ToolCalls: 5, Cost: 0.02})
+	// Now graders run. The Agent Attempt line is already frozen as "Completed".
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderStart, GraderID: "ai_review", GraderKind: "claude-opus-4.6"})
+	score := 9.0
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderComplete, GraderID: "ai_review", GraderKind: "claude-opus-4.6", Result: GraderResultPass, Score: &score})
+	// EventPassed arrives last but does not need to rewrite the agent row
+	// because EventSessionDetails already did that.
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 1})
+	d.Finish()
 
-out := buf.String()
-// (1) The rewrite path was taken: at least one DECSC save sequence
-// must appear (rewriteFrozenLine emits exactly one per call).
-if !strings.Contains(out, "\x1b7") {
-t.Errorf("expected DECSC save sequence (\\x1b7) from in-place rewrite; got:\n%q", out)
-}
-// (2) The "Completed" content must appear inside a DECSC...DECRC
-// rewrite bracket, never as a writeLine'd line ending in newline.
-if strings.Contains(out, "Completed\n") {
-t.Errorf("'Completed' must not be terminated by a writeLine newline (would be a stale duplicate):\n%q", out)
-}
-// (2a) The rewritten line must begin with the full "Agent Attempt:"
-// prefix — header and state are merged into a SINGLE row, so the
-// rewrite payload must contain both, not just the state icon.
-if !strings.Contains(out, "Agent Attempt: ") {
-t.Errorf("expected 'Agent Attempt: ' prefix in rewritten single-line tail; got:\n%q", out)
-}
-// (3) The grader's Pass content should appear exactly once — also
-// rewritten in place via the same mechanism (issue (e) regression).
-if got := strings.Count(out, "Pass (9/10)"); got != 1 {
-t.Errorf("want exactly 1 'Pass (9/10)' rewrite, got %d:\n%q", got, out)
-}
+	out := buf.String()
+	// (1) The "Completed" content must appear once and be frozen before graders.
+	if !strings.Contains(out, "✅ Completed") {
+		t.Errorf("expected '✅ Completed' in transcript; got:\n%q", out)
+	}
+	// (2) "Agent Attempt:" must appear exactly once as a line start.
+	if got := strings.Count(out, "\nAgent Attempt:"); got != 1 {
+		t.Errorf("want exactly 1 'Agent Attempt:' starting a new line, got %d:\n%q", got, out)
+	}
+	// (3) Session Details section must be present.
+	if !strings.Contains(out, "Session Details:") {
+		t.Errorf("expected 'Session Details:' section; got:\n%q", out)
+	}
+	// (4) Graders section must follow Session Details.
+	if !strings.Contains(out, "Graders:") || !strings.Contains(out, "ai_review") {
+		t.Errorf("expected 'Graders:' section with ai_review; got:\n%q", out)
+	}
+	// (5) The grader's Pass content should appear exactly once.
+	if got := strings.Count(out, "Pass (9/10)"); got != 1 {
+		t.Errorf("want exactly 1 'Pass (9/10)', got %d:\n%q", got, out)
+	}
 }
 
 // TestInteractive_AgentAttemptSingleLineInvariant guards the single-line

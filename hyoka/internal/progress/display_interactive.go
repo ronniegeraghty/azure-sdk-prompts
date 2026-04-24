@@ -874,6 +874,17 @@ func (r *interactiveRenderer) agentComplete(fileCount int, success bool, guardra
 // --- Session Details section ---
 
 func (r *interactiveRenderer) onSessionDetails(evt ProgressEvent) {
+	// EventSessionDetails signals that the generation phase has completed.
+	// First, flip the Agent Attempt line to "Completed" (if it's still
+	// active) so the completion state is frozen BEFORE graders take over
+	// the tail. This fixes Bug 2: without this early call to agentComplete,
+	// the Agent Attempt line would stay as "Running" until the terminal
+	// event (EventPassed/Failed) arrived after ALL graders completed, at
+	// which point the frozen row index would be stale.
+	if r.cur.agentHeaderPrinted && r.cur.agentState == agentStateRunning {
+		r.agentComplete(evt.FileCount, true, "")
+	}
+	// Now render the Session Details section.
 	if r.cur.sessionPrinted {
 		return
 	}
@@ -1040,7 +1051,14 @@ func (r *interactiveRenderer) onPassed(evt ProgressEvent) {
 	if !r.cur.agentGateOpen {
 		r.openAgentGate()
 	}
-	r.agentComplete(evt.FileCount, true, evt.GuardrailReason)
+	// Only call agentComplete if the Agent Attempt hasn't already transitioned
+	// to Completed. EventSessionDetails now triggers agentComplete early (before
+	// graders run), so by the time EventPassed arrives, the agent line is
+	// already frozen in its final state. Calling agentComplete again would
+	// attempt a stale rewriteFrozenLine or append a duplicate row.
+	if r.cur.agentHeaderPrinted && r.cur.agentState != agentStateCompleted && r.cur.agentState != agentStateGuardrail {
+		r.agentComplete(evt.FileCount, true, evt.GuardrailReason)
+	}
 	r.completed++
 	r.passed++
 	r.cur.terminalStatus = evalPassed
@@ -1052,7 +1070,12 @@ func (r *interactiveRenderer) onFailed(evt ProgressEvent) {
 	if !r.cur.agentGateOpen {
 		r.openAgentGate()
 	}
-	r.agentComplete(evt.FileCount, false, evt.GuardrailReason)
+	// Only call agentComplete if the Agent Attempt hasn't already transitioned.
+	// EventSessionDetails triggers agentComplete early, so this is a no-op in
+	// the happy path where generation succeeded but graders failed.
+	if r.cur.agentHeaderPrinted && r.cur.agentState != agentStateCompleted && r.cur.agentState != agentStateGuardrail {
+		r.agentComplete(evt.FileCount, false, evt.GuardrailReason)
+	}
 	r.completed++
 	r.failed++
 	r.cur.terminalStatus = evalFailed
@@ -1071,7 +1094,13 @@ func (r *interactiveRenderer) onError(evt ProgressEvent) {
 	if !r.cur.agentGateOpen {
 		r.openAgentGate()
 	}
-	r.agentComplete(0, false, evt.GuardrailReason)
+	// Only call agentComplete if the Agent Attempt hasn't already transitioned.
+	// For errors that occur during generation (before EventSessionDetails),
+	// this will correctly mark the attempt as completed. For errors after
+	// graders (rare), this is a no-op since the state is already final.
+	if r.cur.agentHeaderPrinted && r.cur.agentState != agentStateCompleted && r.cur.agentState != agentStateGuardrail {
+		r.agentComplete(0, false, evt.GuardrailReason)
+	}
 	r.completed++
 	r.errors++
 	r.cur.terminalStatus = evalError

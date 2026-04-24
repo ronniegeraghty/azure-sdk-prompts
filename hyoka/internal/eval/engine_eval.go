@@ -464,6 +464,34 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
+	// Emit EventSessionDetails to signal that the generation phase is complete.
+	// This lets the interactive renderer flip the Agent Attempt line to
+	// "Completed" BEFORE graders take over the tail (#Bug-2-fix). Without this
+	// event, agentComplete would only be triggered by the terminal event
+	// (EventPassed/Failed) which arrives AFTER all graders have run, causing
+	// the frozen agent row index to be stale when rewriteFrozenLine tries to
+	// update it in place.
+	turnCount := 0
+	for _, ev := range evalReport.SessionEvents {
+		if ev.Type == "assistant.message" {
+			turnCount++
+		}
+	}
+	// Compute cost from token usage
+	cost := 0.0
+	for _, ev := range evalReport.SessionEvents {
+		if ev.Type == "assistant.usage" {
+			cost += float64(ev.InputTokens+ev.OutputTokens) * 0.00001 // rough estimate
+		}
+	}
+	sendRawEvent(progress.ProgressEvent{
+		Type:      progress.EventSessionDetails,
+		Files:     generatedFiles,
+		Turns:     turnCount,
+		ToolCalls: len(evalReport.ToolCalls),
+		Cost:      cost,
+	})
+
 	// Unified grading pipeline (#625) — the single Bundle drives both
 	// prompt-type entries (LLM review panel) and typed entries (file,
 	// program, output_check, ...). A malformed grader file only fails THIS
