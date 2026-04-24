@@ -10,6 +10,20 @@
 
 **Archived 34 entries from earlier sessions.**
 
+---
+
+## CROSS-AGENT UPDATE (2026-04-24T00:37:44Z — Tank)
+
+**Display Bug Fixes in engine_eval.go:**
+
+Tank fixed two interactive display bugs in pairwise eval. Files changed: `engine_eval.go`, `display_interactive.go`.
+
+**⚠️ SURFACES REAL BUG:** Tank's fix adds Session Details section for no-graders flow (when generation produces zero files). However, comment at `engine_eval.go:250` says output_check grader should handle this case. The guard at `engine_eval.go:500` (`if len(generatedFiles) > 0`) skips *entire* grading pipeline—contradicts spec. **Recommend:** Verify whether output_check should actually run on zero-file generation, then unify behavior.
+
+Commits: dcff4f68 (fix), b2398e3c (history). Branch: ronniegeraghty/dev. Tests: ✅ all pass.
+
+---
+
 Historical patterns and learnings:
 
 - ## Recent Sessions: ### 2026-04-23: Tool Validation Gate Fix — SDK Event Timing
