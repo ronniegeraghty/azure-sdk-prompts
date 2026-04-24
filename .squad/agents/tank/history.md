@@ -525,3 +525,33 @@ Asserts: `strings.Count(out, "\nAgent Attempt:")` equals 1 — exactly ONE Agent
 
 **Orchestration logs:** 2026-04-24T09:15:00Z-neo.md, 2026-04-24T10:30:00Z-trinity.md, 2026-04-24T11:45:00Z-neo-followup.md  
 **Session log:** 2026-04-24T12:00:00Z-generator-json-artifact-arc.md
+
+## 2026-04-24: Per-Grader Display with Bucket Breakdown
+
+**Task**: Split the single "ai_review" grader row into per-bucket graders with individual names and point breakdowns.
+
+**Problem**: User complaint that all AI review grader points were lumped under one `- ai_review` line. They wanted:
+- `- DefaultAzureCredential Authentication (prompt): 3/4`
+- `- Criteria from prompt file (prompt): 5/5`
+- Each with sub-bullets for individual points
+
+**Root cause**: Engine created one `PromptReviewGrader("ai_review")` that processed all ReviewBuckets together, returning one GraderResult with all points from all buckets.
+
+**Solution**:
+1. **Display layer** (`display_interactive.go`): Added `displayKind()` helper to map `"prompt_review"` → `"prompt"` for user-facing labels.
+2. **Engine** (`engine_eval.go`): Changed from one "ai_review" grader to N graders (one per ReviewBucket), each named after its bucket (e.g., "Criteria from prompt file").
+3. **Report builder**: Preserved bucket names in JSON (`r.Name` instead of hard-coded "ai_review").
+4. **Tests**: Updated to expect N `Review()` calls (one per bucket) instead of one `ReviewBuckets()` call.
+
+**Key learnings**:
+- The display already supported multi-point rendering (`renderGraderWithPoints`) — just needed per-bucket graders.
+- Empty-buckets fallback needed: when no criteria exist, create one grader with name "ai_review" to preserve test compatibility.
+- Optimization trade-off: Per-bucket grading makes N reviewer calls instead of one batched `ReviewBuckets()` call, prioritizing display clarity over API efficiency.
+
+**Files changed**:
+- `hyoka/internal/progress/display_interactive.go` — displayKind() mapper
+- `hyoka/internal/eval/engine_eval.go` — per-bucket grader iteration
+- `hyoka/internal/progress/display_interactive_points_test.go` — updated test assertions
+- `hyoka/internal/eval/engine_reviewmode_runtime_test.go` — updated bucket-mode tests
+
+**Verification**: All tests pass. Live run log shows bucket-level error messages ("Bucket review failed... bucket=Criteria from prompt file"), confirming per-bucket processing.
