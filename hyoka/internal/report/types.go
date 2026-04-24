@@ -334,6 +334,10 @@ type EvalReport struct {
 	GeneratedFiles     []string              `json:"generated_files"`
 	StarterFiles       []string              `json:"starter_files,omitempty"`
 	ReviewedFiles      []ReviewedFile           `json:"reviewed_files,omitempty"`
+	// FileContents maps file paths to their contents for site display.
+	// Populated at report-build time from the workspace directory. Files
+	// exceeding 1MB are capped with a truncation marker.
+	FileContents       map[string]string     `json:"file_contents,omitempty"`
 	Review             *review.ReviewResult     `json:"review,omitempty"`
 	ReviewPanel        []review.ReviewResult    `json:"review_panel,omitempty"`
 	SkippedReviewers   []review.SkippedReviewer `json:"skipped_reviewers,omitempty"`

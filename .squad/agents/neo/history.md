@@ -98,6 +98,29 @@ When a reviewer says "scope this down" and you respond by keeping the controvers
 - ## Learnings — ToolResolution emit plumbing (CLI UX overhaul, sprint todo #3, commit e06ead61): - Config-tool package had zero progress awareness. Minimal hook is a
   callback type `tool.ProgressEmitter = func(progress.ProgressEvent)`
   defined...
+
+## 2026-04-24 — Split Prompt-Frontmatter Criteria Into Separate AI Review Grader
+
+**Branch:** `ronniegeraghty/dev`  
+**Commit:** `27c04c71`
+
+**User report:** "I'm only seeing one group of ai review graders running but I thought we decided that if we wanted grader points to be graded in the same review agent session they would have to be grader points on the same grader. So the one I'm running should have one ai review grader group from the prompt criteria and one from the criteria files for python."
+
+**Root cause:** `BuildUnifiedReviewBuckets` merged `promptCriteria` (from prompt frontmatter) with matched criteria-file entries into a single `combined` bucket. This violated the source-separation principle: different sources (prompt frontmatter vs criteria files) must produce separate graders.
+
+**Changes:**
+- `hyoka/internal/criteria/buckets.go`: Refactored `BuildUnifiedReviewBuckets` so prompt-frontmatter criteria ALWAYS become their own bucket named "Criteria from prompt file", regardless of mode. Criteria-file entries form separate bucket(s) based on mode (combined or isolated).
+- `buckets_test.go`: Updated all tests to expect 2 buckets in combined mode (prompt + criteria files). Added edge-case tests: prompt-only, criteria-files-only, empty inputs.
+- `hyoka/internal/eval/engine_reviewbuckets_test.go`: Updated engine integration tests to reflect new bucket counts.
+- `hyoka/internal/eval/engine_reviewmode_runtime_test.go`: Fixed runtime test — combined mode now calls `ReviewBuckets()` because 2 buckets exist.
+
+**Result:** Prompt-frontmatter criteria and criteria-file entries now run in separate Copilot review sessions, each with a distinct grader name in the display. Users will see TWO AI review graders: "Criteria from prompt file" and "combined" (or other bucket names in isolated mode).
+
+**Tests:** ✅ All pass (`go test -race ./hyoka/...`)
+
+## Learnings
+
+**Different criteria sources (prompt frontmatter vs criteria files) ALWAYS produce separate review-grader buckets, regardless of combined/isolated mode.** Source-separation > mode-separation. This is a hard rule: each source gets its own bucket → its own Copilot review session → its own grader display entry. The mode (combined/isolated) only affects how criteria-FILE entries are bucketed among themselves; prompt-frontmatter criteria are always isolated from criteria-file entries.
 - ## Interactive renderer (display-interactive-renderer) — 2025 sprint: Built `hyoka/internal/progress/display_interactive.go` — new renderer for
 the single-eval, human-watched case (`workers==1`, default). Trinity was
 p...

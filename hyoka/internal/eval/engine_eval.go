@@ -633,8 +633,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			// directly. Counts are taken off agg.Results, which
 			// is the authoritative pre-conversion grader set —
 			// one entry per grader, including prompt_review.
-			evalReport.GradersTotal = len(agg.Results)
-			evalReport.GradersPassed = countPassed(agg.Results)
+			// Total is the sum of all grader points across all graders;
+			// graders with zero points count as 1 point for backward compat.
+			evalReport.GradersTotal = countTotalPoints(agg.Results)
+			evalReport.GradersPassed = countPassedPoints(agg.Results)
 
 			if !agg.Pass && !evalFailed {
 				evalReport.Success = false
@@ -689,6 +691,10 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Capture overall duration after all phases (generation, build, review) complete.
 	evalReport.Duration = time.Since(start).Seconds()
+
+	// Populate file contents for generated files (Bug #2: site display).
+	// Read each generated file from the workspace directory up to 1MB per file.
+	evalReport.FileContents = readGeneratedFileContents(ws.Dir, evalReport.GeneratedFiles, lg)
 
 	// Write JSON report
 	reportPath, err := report.WriteReport(evalReport, e.opts.OutputDir, runID, task.Prompt)
@@ -1010,6 +1016,93 @@ func countPassed(results []graders.GraderResult) int {
 		}
 	}
 	return n
+}
+
+// countTotalPoints returns the total number of grader points across all graders.
+// Graders with zero points are counted as having 1 point for backward compatibility
+// with legacy graders that don't populate the Points slice.
+func countTotalPoints(results []graders.GraderResult) int {
+	total := 0
+	for _, r := range results {
+		if len(r.Points) > 0 {
+			total += len(r.Points)
+		} else {
+			// Legacy grader with no Points: treat as 1 point
+			total++
+		}
+	}
+	return total
+}
+
+// countPassedPoints returns the number of passed grader points across all graders.
+// For graders without Points, the grader's overall Pass field is used (1 if true, 0 if false).
+func countPassedPoints(results []graders.GraderResult) int {
+	passed := 0
+	for _, r := range results {
+		if len(r.Points) > 0 {
+			for _, pt := range r.Points {
+				if pt.Pass {
+					passed++
+				}
+			}
+		} else {
+			// Legacy grader with no Points: use overall Pass
+			if r.Pass {
+				passed++
+			}
+		}
+	}
+	return passed
+}
+
+// readGeneratedFileContents reads the contents of generated files from the workspace.
+// Files exceeding maxFileContentSize (1MB) are capped with a truncation marker.
+// Binary files (detected via extension) are skipped with a marker message.
+func readGeneratedFileContents(workspaceDir string, generatedFiles []string, lg *slog.Logger) map[string]string {
+	const maxFileContentSize = 1024 * 1024 // 1MB cap per file
+	binaryExtensions := map[string]bool{
+		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".bmp": true,
+		".pdf": true, ".zip": true, ".tar": true, ".gz": true, ".7z": true,
+		".exe": true, ".dll": true, ".so": true, ".dylib": true,
+		".bin": true, ".dat": true, ".db": true, ".sqlite": true,
+	}
+
+	contents := make(map[string]string, len(generatedFiles))
+	for _, relPath := range generatedFiles {
+		fullPath := filepath.Join(workspaceDir, relPath)
+
+		// Check if file is binary by extension
+		ext := strings.ToLower(filepath.Ext(relPath))
+		if binaryExtensions[ext] {
+			contents[relPath] = "[Binary file — not displayed]"
+			continue
+		}
+
+		// Read file with size check
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			lg.Debug("Failed to stat generated file for content read", "file", relPath, "error", err)
+			contents[relPath] = fmt.Sprintf("[Error reading file: %v]", err)
+			continue
+		}
+
+		if info.Size() > maxFileContentSize {
+			contents[relPath] = fmt.Sprintf("[File too large to display (%d bytes) — view on disk at %s]",
+				info.Size(), fullPath)
+			continue
+		}
+
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			lg.Debug("Failed to read generated file contents", "file", relPath, "error", err)
+			contents[relPath] = fmt.Sprintf("[Error reading file: %v]", err)
+			continue
+		}
+
+		contents[relPath] = string(data)
+	}
+
+	return contents
 }
 
 // convertGraderResults converts internal grader results to report format.
