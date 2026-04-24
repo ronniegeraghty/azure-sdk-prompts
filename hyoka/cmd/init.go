@@ -94,15 +94,16 @@ func writeExampleFiles(root string) error {
 	return nil
 }
 
-const exampleConfig = `name: example/baseline
-description: Example baseline config — replace with your own
-
-generator:
-  model: claude-sonnet-4.5
-
-reviewer:
-  models:
-    - claude-sonnet-4.5
+const exampleConfig = `# Example baseline config — replace with your own.
+# A config file is a top-level configs: list; each entry is one named eval.
+configs:
+  - name: example/baseline
+    description: Example baseline config — replace with your own
+    generator:
+      model: claude-sonnet-4.5
+    reviewer:
+      models:
+        - claude-sonnet-4.5
 `
 
 const examplePrompt = `---

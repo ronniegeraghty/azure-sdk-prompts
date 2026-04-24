@@ -21,6 +21,7 @@ when:
 # FILE-LEVEL graders: inherit the `language: python` condition
 graders:
   - name: "General Python Quality"
+    type: prompt
     weight: 1.0
     prompt: >
       This grader applies to all Python prompts because it inherits
@@ -34,6 +35,7 @@ groups:
       category: auth
     graders:
       - name: "DefaultAzureCredential Usage"
+        type: prompt
         weight: 1.0
         prompt: >
           Grader applies to Python prompts with `category: auth`.
@@ -41,6 +43,7 @@ groups:
           Inherits file-level `language: python` + group-level `category: auth`.
 
       - name: "Error Handling for Auth Failures"
+        type: prompt
         weight: 1.0
         prompt: >
           Grader applies to Python prompts with `category: auth`.
@@ -52,6 +55,7 @@ groups:
       category: crud
     graders:
       - name: "Connection Pooling"
+        type: prompt
         weight: 1.0
         prompt: >
           Grader applies to Python prompts with `category: crud`.
@@ -59,6 +63,7 @@ groups:
           Inherits file-level `language: python` + group-level `category: crud`.
 
       - name: "Query Efficiency"
+        type: prompt
         weight: 1.0
         when:
           plane: data-plane

@@ -14,30 +14,40 @@ For objective, deterministic checks (file existence, build success, tool constra
 
 ## Configuration
 
+The `prompt` grader uses TWO top-level fields (NOT inside `details:` — validation
+rejects `details:` for `type: prompt`):
+
+- `prompt:` — optional preamble shown to the LLM judge before the numbered checks.
+- `checks:` — list of individual pass/fail items. Each non-empty string becomes one
+  line in the rendered review criteria AND one Point in the resulting GraderResult.
+
+At least one of `prompt:` or `checks:` must be non-empty.
+
 ```yaml
 graders:
   - name: Code Quality Review
     type: prompt
     weight: 0.7
-    details:
-      prompt: |
-        Review the generated Python code for these aspects:
-        
-        1. **Readability**: Is variable naming clear? Are functions small and focused?
-        2. **Error handling**: Are exceptions caught and handled appropriately?
-        3. **PEP 8 compliance**: Does the code follow PEP 8 style guide?
-        4. **Type hints**: Are type annotations present and correct?
-        
-        Provide a score from 0 (poor) to 10 (excellent) and brief reasoning.
+    prompt: |
+      Review the generated Python code against each of the following checks.
+      For each check, return PASS or FAIL with one-sentence reasoning.
+    checks:
+      - Variable naming is clear and functions are small and focused
+      - Errors are caught and handled appropriately (no bare except)
+      - Code adheres to PEP 8 style conventions
+      - Type annotations are present and correct on public APIs
 ```
 
-### `details` Schema
+### Field Reference
 
-| Field    | Type   | Required | Description                                    |
-|----------|--------|----------|------------------------------------------------|
-| `prompt` | string | yes      | Evaluation rubric/instructions for the LLM.    |
+| Field    | Type            | Required             | Description                                                              |
+|----------|-----------------|----------------------|--------------------------------------------------------------------------|
+| `prompt` | string          | one of prompt/checks | Preamble text shown to the judge before the numbered checks.             |
+| `checks` | list&lt;string&gt; | one of prompt/checks | Individual pass/fail items. Each becomes one Point in `GraderResult`.    |
 
-The `prompt` field contains the full evaluation criteria. It is sent to an LLM reviewer along with the generated code to produce a scored review.
+> **v4 invariant:** Each item in `checks:` becomes one Point. The pre-v4 magic that
+> split a single `prompt:` blob into multiple checks by parsing bullets is **gone**
+> for YAML graders — list each sub-check explicitly under `checks:`.
 
 ## Example
 
@@ -48,29 +58,26 @@ graders:
     weight: 0.6
     when:
       language: js-ts
-    details:
-      prompt: |
-        Review this TypeScript code for adherence to best practices:
-        
-        - Proper use of strict mode and type checking
-        - Null safety (proper use of optional types)
-        - Async/await patterns
-        - Import organization
-        - Function documentation
+    prompt: "Review the TypeScript code against each of the following:"
+    checks:
+      - Strict mode and type checking are enabled
+      - Optional types are used for nullable values (no any-typed null handling)
+      - Async/await is used (not raw Promises with .then chains)
+      - Imports are organized (external, internal, relative)
+      - Public functions have JSDoc-style documentation
 
   - name: Go Idioms Check
     type: prompt
     weight: 0.5
     when:
       language: go
-    details:
-      prompt: |
-        Evaluate this Go code for idiomatic usage:
-        
-        - Error handling (defer, explicit error checks)
-        - Interface design
-        - Concurrency patterns (goroutines, channels)
-        - Package organization
+    prompt: "Evaluate this Go code for idiomatic usage:"
+    checks:
+      - Errors are returned and explicitly checked (no panic in library code)
+      - defer is used for cleanup paths
+      - Interfaces are defined at the consumer, not the producer
+      - Concurrency uses goroutines + channels (not shared mutable state)
+      - Package layout follows standard Go conventions
 ```
 
 ## Result Structure

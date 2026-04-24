@@ -2,26 +2,31 @@ when:
   language: dotnet
 graders:
   - name: NuGet Package References
+    type: prompt
     weight: 1.0
     prompt: >
       Generated code includes correct NuGet package references for all
       Azure SDK packages used.
   - name: DefaultAzureCredential Usage
+    type: prompt
     weight: 1.0
     prompt: >
       Authentication uses DefaultAzureCredential from Azure.Identity,
       not connection strings or hardcoded keys.
   - name: IDisposable/IAsyncDisposable Pattern
+    type: prompt
     weight: 1.0
     prompt: >
       Azure SDK clients that implement IDisposable or IAsyncDisposable
       are used within using statements or explicitly disposed.
   - name: Correct Azure.* Namespace
+    type: prompt
     weight: 1.0
     prompt: >
       Imports use the latest Azure SDK namespace (Azure.*),
       not legacy Microsoft.Azure.* packages.
   - name: Async/Await Pattern
+    type: prompt
     weight: 1.0
     prompt: >
       If async operations are used, code follows proper async/await

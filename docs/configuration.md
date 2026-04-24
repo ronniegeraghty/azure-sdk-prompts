@@ -443,11 +443,12 @@ Override limits for a specific prompt via frontmatter (highest priority). This i
 ```yaml
 ---
 id: storage-dp-python-batch
-service: storage
-language: python
-plane: data-plane
-category: crud
-difficulty: advanced
+properties:
+  service: storage
+  language: python
+  plane: data-plane
+  category: crud
+  difficulty: advanced
 max_session_actions: 100  # This prompt needs more reasoning steps
 max_turns: 40             # Allow more back-and-forth turns
 ---

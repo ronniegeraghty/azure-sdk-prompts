@@ -2,6 +2,7 @@ when:
   language: rust
 graders:
   - name: Official Azure SDK Crate Selection
+    type: prompt
     weight: 1.0
     prompt: >
       Cargo.toml uses official azure_* crates (azure_core, azure_identity,
@@ -11,6 +12,7 @@ graders:
       the crates beginning with the azure_ prefix at version 0.21.0 should never 
       be used because they are obsolete.
   - name: TokenCredential Authentication
+    type: prompt
     weight: 1.0
     prompt: >
       Authentication uses a TokenCredential from azure_identity
@@ -21,6 +23,7 @@ graders:
       does not have DefaultAzureCredential. Must NOT use connection
       strings, shared access signatures, or hardcoded keys.
   - name: Async-First with Tokio Runtime
+    type: prompt
     weight: 1.0
     prompt: >
       Code follows the Azure SDK async-first model. The main function
@@ -28,6 +31,7 @@ graders:
       client methods are awaited properly. No synchronous wrappers
       are provided for service methods.
   - name: Idiomatic Error Handling
+    type: prompt
     weight: 1.0
     prompt: >
       Error handling uses Result<T, E> and the ? operator. Calls to
@@ -38,6 +42,7 @@ graders:
       StatusCode comparison). The main function returns
       Result<(), Box<dyn std::error::Error>> or azure_core::Result<()>.
   - name: Correct Client Construction
+    type: prompt
     weight: 1.0
     prompt: >
       Service clients are constructed using the ::new() constructor
@@ -47,6 +52,7 @@ graders:
       #[allow(clippy::needless_update)] annotation is used when all
       fields are assigned explicitly.
   - name: Cargo.toml Dependency Versions
+    type: prompt
     weight: 1.0
     prompt: >
       Cargo.toml specifies concrete version requirements for azure_*
@@ -55,6 +61,7 @@ graders:
       crates are included when async operations are used. Crates are
       installed via cargo add.
   - name: Pager and Stream Usage
+    type: prompt
     weight: 1.0
     prompt: >
       List operations return and consume azure_core::Pager<T> using
@@ -66,6 +73,7 @@ graders:
       is only necessary when there is an explicit requirement for page-level
       access.
   - name: Response Handling
+    type: prompt
     weight: 1.0
     prompt: >
       Service method responses use Response<T> correctly. Code calls
@@ -74,6 +82,7 @@ graders:
       are needed, deconstruct() is used to access status, headers,
       and body separately.
   - name: Long-Running Operations
+    type: prompt
     weight: 1.0
     prompt: >
       Long-running operations use azure_core::Poller<T> correctly.
@@ -82,6 +91,7 @@ graders:
       futures::TryStreamExt. LRO methods are called with the
       begin_ prefix convention where applicable.
   - name: Struct Initialization with Default
+    type: prompt
     weight: 1.0
     prompt: >
       All struct initialization for SDK types (client options, method
@@ -90,6 +100,7 @@ graders:
       Option<T>. Request-only models are constructible by the caller
       (not marked #[non_exhaustive]).
   - name: Rust Naming and Style Conventions
+    type: prompt
     weight: 1.0
     prompt: >
       Code follows Rust naming conventions: snake_case for functions
@@ -99,6 +110,7 @@ graders:
       Code is formatted with rustfmt and all clippy lint errors and warnings
       are addressed.
   - name: Ownership and Borrowing
+    type: prompt
     weight: 1.0
     prompt: >
       Code uses references (&str, &T) for borrowed data and avoids
@@ -107,6 +119,7 @@ graders:
       Parameters that are only used for URL construction borrow
       rather than own the data.
   - name: No Hardcoded Secrets
+    type: prompt
     weight: 1.0
     prompt: >
       Code does not contain hardcoded secrets, API keys, connection

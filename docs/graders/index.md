@@ -14,16 +14,31 @@ hyoka's grading system evaluates generated code and outputs using composable, si
 
 ## Unified Schema
 
-All graders are configured using a flat YAML structure:
+All graders are configured using a flat YAML structure with a `type:` discriminator:
 
 ```yaml
 graders:
   - name: <string>              # Required: human-readable name, unique in this file
     type: <string>              # Required: grader type (prompt, output_check, file, etc.)
     weight: <float>             # Optional: scoring weight 0.0–1.0 (default: 1.0)
-    details: <object>           # Required: type-specific configuration (shape varies)
     when: <map[string]string>   # Optional: property-based applicability conditions
+
+    # ── For type=prompt ONLY ─────────────────────────────────────────
+    prompt: <string>            # Optional preamble shown to the LLM judge
+    checks:                     # List of individual pass/fail items the judge must
+      - <string>                # evaluate. Each non-empty string becomes one line in
+      - <string>                # the rendered review criteria AND one Point in the
+      # ...                     # resulting GraderResult. At least one of prompt/
+                                # checks must be non-empty.
+
+    # ── For every OTHER type ─────────────────────────────────────────
+    details: <object>           # Required: type-specific configuration (shape varies)
 ```
+
+> **v4 invariant — "every grader emits Points":** Each `prompt` grader produces one
+> `Point` per entry in `checks:` (or a single Point when only `prompt:` is set). The
+> pre-v4 magic that split a single prompt blob into multiple checks by parsing
+> bullets is gone for YAML graders — list each sub-check explicitly under `checks:`.
 
 The `type:` field is the discriminator:
 - `prompt` — LLM-based review grader
@@ -33,22 +48,22 @@ The `type:` field is the discriminator:
 - `behavior` — Check tool and action constraints
 - `action_sequence` — Verify expected action sequence
 - `tool_constraint` — Constraint on tool usage and call counts
-- `prompt_review` — AI review panel orchestration (internal)
+- `prompt_review` — AI review panel orchestration (engine-internal; **not** a valid `type:` value in user criteria YAML)
 
 ### Example: Mixed Prompt and Typed Graders
 
 ```yaml
 graders:
-  # LLM prompt grader
+  # LLM prompt grader — `prompt:` and `checks:` are TOP-LEVEL fields,
+  # not inside `details:` (validation rejects details for type=prompt).
   - name: Code Quality Review
     type: prompt
     weight: 0.7
-    details:
-      prompt: |
-        Review the generated Python code for:
-        - Readability and clarity
-        - Proper error handling
-        - Adherence to PEP 8
+    prompt: "Review the generated Python code against each of the following:"
+    checks:
+      - Readable variable names and small focused functions
+      - Errors are caught and handled appropriately
+      - Adheres to PEP 8 style guide
 
   # File existence check
   - name: Main File Exists
@@ -73,8 +88,7 @@ graders:
     when:
       language: python
       plane: data-plane
-    details:
-      prompt: Check that async functions use await correctly.
+    prompt: Check that async functions use await correctly.
 ```
 
 ### Field Reference
@@ -84,7 +98,9 @@ graders:
 | `name`    | string              | yes      | —       | Human-readable name. Must be unique within the grader list.                     |
 | `type`    | string              | yes      | —       | Grader type identifier. See Grader Types below.                                 |
 | `weight`  | float64             | no       | 1.0     | Scoring weight (0.0–1.0). Normalized across all graders in aggregation.         |
-| `details` | object              | yes      | —       | Type-specific configuration. Schema varies by `type`.                           |
+| `prompt`  | string              | type=prompt only | — | Preamble / instructions for the LLM judge. Must be empty for typed graders. |
+| `checks`  | list&lt;string&gt;  | type=prompt only | — | One pass/fail item per entry. Each becomes one Point. Must be empty for typed graders. |
+| `details` | object              | typed graders only | — | Type-specific configuration. Must be empty for `type: prompt`.       |
 | `when`    | map\[string\]string | no       | —       | Property conditions for applicability. All entries must match (AND logic).       |
 
 ### Applicability (`when`)
@@ -112,7 +128,7 @@ Detailed documentation for each grader type:
 | `behavior`         | Tool and action constraint checking               | [behavior.md](./behavior.md)              |
 | `action_sequence`  | Expected action sequence verification             | [action_sequence.md](./action_sequence.md)|
 | `tool_constraint`  | Tool usage and call count constraints             | [tool_constraint.md](./tool_constraint.md)|
-| `prompt_review`    | AI review panel orchestration (internal/advanced) | [prompt_review.md](./prompt_review.md)    |
+| `prompt_review`    | AI review panel orchestration (engine-internal; not user-configurable) | [prompt_review.md](./prompt_review.md)    |
 
 ## Score Aggregation
 
