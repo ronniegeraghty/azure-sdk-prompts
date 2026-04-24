@@ -281,3 +281,32 @@ Read trinity-site-ux-review.md and my own morpheus-report-architecture-review.md
 Team Feature: Skill Usage grader + intentionally-failing check shipped and merged to `ronniegeraghty/dev` (commit ff38a7ec). Coordinator (Tank) consolidated 4 commits. Grader display validates ✅/❌ per-check rendering. All downstream artifacts (orchestration logs, session logs, decisions) recorded.
 
 **Directive:** Team now works directly on `ronniegeraghty/dev` with frequent commits (no transient feature branches for squad work).
+- ## 2026-04-24 — Issue Triage: Open Issues vs. `ronniegeraghty/dev`: **Task:** Triage open GitHub issues against work completed on `ronniegeraghty/dev` branch to identify candidates for closure.
+
+**Method:**
+1. Listed 100 open issues via `gh issue list`
+2. Analyzed commits on `ronniegeraghty/dev` vs `main` (100+ commits ahead)
+3. Cross-referenced merged PRs (#607 Phase 6, #592 Phase 5)
+4. Examined specific commit evidence for individual issues
+
+**Findings:**
+
+**HIGH CONFIDENCE — Completed on dev:**
+- **#586** (Builtin skill leakage) — Fixed in commit `445fea76` "Fix user-level skills leaking into eval Copilot sessions"
+- **#619** (Tool load guardrail) — Implemented via `ValidateAndExpand` + hard-fail logic in `tool_load_failure` path (commits `8c947c8a`, `5c75b47c`, `557bb83b`)
+
+**MEDIUM CONFIDENCE — Evidence suggests completion:**
+- Phase 5/6 epics and sub-issues (#311, #312, #364-#369, #597-#600, #580) — All **already closed** in GitHub (checked via `gh issue view`)
+
+**DEFERRED / STILL VALID:**
+- #635 (taxonomy discovery) — No implementation evidence found
+- #634 (file diffs on site) — Site work in Phase 4-6 doesn't cover this
+- #73 (embed Copilot CLI) — SDK is used but not embedded
+- #77 (skill vs dir property) — No commits found
+- #86 (summary tab) — Dashboard work exists but specific "summary tab" unclear
+- #88 (build failure false pass) — No fix evidence
+- #78 (Azure MCP tool investigation) — Investigative issue, likely ongoing
+- #72, #71, #14 — SDK/cleanup issues, no clear resolution
+
+**Recommendation:** Close #586 and #619 with clear commit references. Others require deeper investigation or remain open as valid future work.
+
