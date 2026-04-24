@@ -10,6 +10,7 @@ import (
 "time"
 
 copilot "github.com/github/copilot-sdk/go"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/compat"
 )
 
 // AnalyzeTrends uses a Copilot SDK session to perform AI-powered trend analysis.
@@ -53,7 +54,7 @@ Mode:    "append",
 Content: "You are an expert at analyzing AI agent tool usage and its impact on code generation quality. Focus on how tool availability affects output. Be concise and actionable.",
 },
 ConfigDir:           configDir,
-OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+OnPermissionRequest: compat.ApproveAll,
 })
 if err != nil {
 return "", fmt.Errorf("creating analysis session: %w", err)

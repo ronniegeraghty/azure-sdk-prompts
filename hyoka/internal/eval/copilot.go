@@ -12,6 +12,7 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/compat"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
@@ -708,7 +709,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		Model:               cfg.Generator.Model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: compat.ApproveAll,
 		Hooks: &copilot.SessionHooks{
 			OnPreToolUse: func(input copilot.PreToolUseHookInput, invocation copilot.HookInvocation) (*copilot.PreToolUseHookOutput, error) {
 				toolName := input.ToolName

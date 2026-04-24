@@ -14,6 +14,7 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/compat"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
@@ -101,7 +102,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		Model:               r.model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: compat.ApproveAll,
 		SkillDirectories:    r.skillDirectories,
 		OnEvent:             collector.handleEvent,
 	}
@@ -378,7 +379,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		Model:               model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: compat.ApproveAll,
 		SkillDirectories:    p.skillDirectories,
 		OnEvent:             collector.handleEvent,
 	}
