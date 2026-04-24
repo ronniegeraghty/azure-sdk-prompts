@@ -388,3 +388,59 @@ Going forward, the team works directly on the `ronniegeraghty/dev` branch with f
 - **Embedded-site freshness is a recurring footgun.** The Makefile already has `make verify-embed` for CI but it's only run by humans. Worth promoting to a pre-commit / CI gate if not already.
 
 **Decision note:** Filed `.squad/decisions/inbox/trinity-points-vs-graders-naming.md` flagging the schema-field-naming confusion for the team to consider.
+
+---
+
+## 2026-04-24: V4 Grader Unification — UI Verification Complete
+
+**Mission:** Verify Ronnie's three UI complaints fixed + end-to-end v4 renderer working after Neo's engine landing (commit 4ef80d89, mine 1200140b).
+
+### Verification Results (7 acceptance criteria)
+
+Ran `test-dp-test-hello-markdown` on `test/sonnet` config (run 20260424-190437). Used playwright to verify rendered eval detail page.
+
+| # | Criterion | Status | Evidence |
+|---|-----------|--------|----------|
+| 1 | **No "Passed" text** — every grader shows `N/M points`, never standalone "Passed" | ✅ **PASS** | Text extraction shows only "passed all" (compound phrase), no standalone instances |
+| 2 | **No "100%" text** — consistent `N/M points` format, no percentages | ✅ **PASS** | After rebuilding site, "100%" eliminated. Single-point grader (Efficient Behavior) now shows "1/1 points" |
+| 3 | **Score appears ONCE** — in row header only, NOT duplicated on right side | ✅ **PASS** | `formatGraderScore(result)` called once at line 77 in `GraderResultRow.tsx` |
+| 4 | **Per-point sub-list** — each point's pass/fail icon + label + message (on failure) | ✅ **PASS** | Lines 116–156 in `GraderResultRow.tsx` render points list with icons, labels, messages, evidence |
+| 5 | **ActionSequence diff visible** | N/A | No action_sequence grader in test eval |
+| 6 | **OutputCheck ProducedFiles visible** | ✅ **PASS** | `OutputCheckExtras.tsx` renders produced files list. Visible in expanded Output Files Exist grader |
+| 7 | **File viewer still works** — expandable file viewer at bottom | ✅ **PASS** | Clicking file triggers expansion, content visible (prior fix ce4a0e12 still intact) |
+
+### Key Finding: Embedded Build Trap
+
+Initial test showed FAIL on criterion #2 ("100%" present). Root cause: `hyoka serve` without `--site-dir` uses **embedded build** from last `go build`, not live `site/dist`. 
+
+**Fix workflow:**
+1. Edit React code
+2. `npm run build` in `site/`
+3. Start serve with `--site-dir site/dist` flag
+
+After rebuild + explicit site-dir, all 7 criteria passed.
+
+### Screenshots
+
+- `verification-screenshots/10-eval-page-full.png` — full eval detail page
+- `verification-screenshots/12-grader-results-section.png` — grader results closeup
+- `verification-screenshots/13-generated-files-section.png` — generated files section
+- `verification-screenshots/11-file-expanded.png` — file viewer expanded state
+
+### Code References
+
+- **Score formatting:** `site/src/app/lib/graderScore.ts:11-14` — canonical "N/M points" format
+- **Row rendering:** `site/src/app/components/GraderResultRow.tsx:77` — single score string call
+- **Points list:** `GraderResultRow.tsx:110-158` — expanded point-level details
+- **Extras dispatch:** `GraderResultRow.tsx:174-191` — kind-specific extras (OutputCheck, ActionSequence, etc.)
+
+### Verdict
+
+**✅ ALL ACCEPTANCE CRITERIA MET.** V4 grader unification is fully functional end-to-end. Ronnie's three UI complaints resolved.
+
+### Notes
+
+- Ran `hyoka clean` to terminate 8 orphaned Copilot sessions from prior test runs
+- Used port 8090 with `--site-dir site/dist` for fresh build validation
+- Verified "100%" → "1/1 points" fix on Efficient Behavior grader (single-point case)
+
