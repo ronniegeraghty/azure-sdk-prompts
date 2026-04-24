@@ -1324,3 +1324,280 @@ If any of these change shape, ping Trinity — site types live in `site/src/app/
 
 Read-only review — no templates, CSS, types, or data files were modified. No commits, no pushes.
 
+
+---
+
+## Latest Decisions (2026-04-24: Generator.json Artifact Arc)
+
+### 2026-04-24T02:50:00Z: Grader Inputs Always Provided, Never Conditional
+
+**Agent:** Ronnie Geraghty (via Copilot)
+
+**What:** Graders (typed AND AI review) always receive BOTH:
+1. A copy of the generator's working directory files
+2. `generator.json` containing all collected session info (prompt, final response, workspace delta, action summary, termination, etc.)
+
+Neither is conditional on the other being empty. The reviewer prompt unconditionally includes both the Generated Code section AND the Agent Session section. If files are missing, the Generated Code section says "(no files were created)" but the section is still present.
+
+**Why:** User clarification: "we should always pass anything that is available. We should copy over all the files from the generator's working dir and the generator.json that contains all the info we collect from the generator agent's work that is provided to the graders."
+
+**Implications:**
+1. GraderInput carries both `WorkspacePath` and `GeneratorArtifactPath`
+2. AI review graders always get a temp-dir copy of workspace files (existing PromptReviewGrader behavior continues)
+3. Typed graders read workspace directly from `WorkspacePath`
+4. Reviewer prompt rendering always includes both sections (never conditional)
+
+**Related:** `coordinator-grader-input-model.md`
+
+---
+
+### 2026-04-24T02:56:00Z: Grader Input Model — generator.json + AI Reviewer Workspace Copy
+
+**Agent:** Ronnie Geraghty (via Copilot)
+
+**What:**
+1. ALL graders (typed AND AI review) receive the same input data via the `generator.json` data model — single canonical schema describing the generator session (prompt, final response, workspace delta, action summary, termination, etc.). The artifact is persisted to disk per eval and also passed in-memory via GraderInput. Loose convenience fields on GraderInput remain for back-compat but generator.json is the authoritative source.
+
+2. AI review graders ADDITIONALLY receive a copy of all workspace files in their reviewer working dir (existing PromptReviewGrader.copyDirToTemp behavior). This is the only grader-class-specific input difference. Typed graders read the workspace from `WorkspacePath` directly (no copy).
+
+3. The reviewer prompt always includes both the Generated Code section (rendered from the workspace copy) and the Agent Session section (rendered from generator.json) — never conditional on either being empty. When files are absent, the Generated Code section says so explicitly but is still present.
+
+**Why:** User clarification: "we should be giving all the graders the same information via the data model of the generator.json and we should additionally give AI reviewer graders a copy of all workspace files in their working dir."
+
+**Implementation:** Captured in orchestration logs 2026-04-24T09:15:00Z-neo.md and 2026-04-24T10:30:00Z-trinity.md.
+
+---
+
+### 2026-04-24T02:56Z: Generator.json Artifact Must Be Surfaced on the Site
+
+**Agent:** Ronnie (via Coordinator)
+
+**What:** The `generator.json` artifact (prompt_id, original_prompt, final_response, workspace_delta, actions_summary, timing, terminated_by, error) that the engine emits for graders MUST also be ingested into the report layer and rendered on the site (eval-detail page at minimum). Same data model — graders and site consume one canonical artifact.
+
+**Why:** User directive — single source of truth for everything the generator session produced. Site users want to see the agent's final response, what files changed, and how the session terminated, alongside file contents and grader results.
+
+**Implications:**
+1. `report.EvalReport` gets a `GeneratorArtifact *GeneratorArtifact` field (or inline equivalent). Populated alongside `FileContents`.
+2. JSON schema bumps to v3 (Neo Phase 1).
+3. Site `data/types.ts` mirrors the new shape; eval-detail template renders a "Generator Session" panel showing final_response (collapsible), workspace_delta summary, actions/turns/duration, terminated_by/error.
+4. No conditional rendering — if artifact is present (v3+), show it. v2 reports just don't have it.
+
+**Status:** ✅ Implemented (Trinity Phase 2, commit 9f34f072)
+
+---
+
+### 2026-04-24 (Date TBD): Eval Detail Pages Include Generated File Contents
+
+**Agent:** Trinity 🌐
+
+**Status:** ✅ Implemented (Commit c06ca9e2)
+
+**What:** Generated file contents are now captured in `report.EvalReport.FileContents` at report-build time.
+
+**Root Cause of Bug:** The eval detail page served by `hyoka serve` at `/api/runs/{runId}/eval?path=...` returns the `report.json` for that eval, which contained the `GeneratedFiles` array (a list of file paths). However, the file **contents** were never populated in the report JSON.
+
+**Decision:**
+1. Added `FileContents map[string]string` field to `EvalReport` (marked `json:"file_contents,omitempty"`).
+2. Added `readGeneratedFileContents()` helper in `engine_eval.go`.
+   - Called right before `WriteReport()`, reads each file from `ws.Dir` (the workspace directory).
+   - **Size cap:** Files exceeding 1MB are capped with a message: `[File too large to display (N bytes) — view on disk at {path}]`.
+   - **Binary detection:** Files with binary extensions are skipped.
+   - **Error handling:** Files that can't be read show: `[Error reading file: {error}]`.
+3. Populated `evalReport.FileContents` before calling `report.WriteReport()`.
+
+**Binary Extensions Detected:**  
+`.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.pdf`, `.zip`, `.tar`, `.gz`, `.7z`, `.exe`, `.dll`, `.so`, `.dylib`, `.bin`, `.dat`, `.db`, `.sqlite`
+
+**Verification:**
+- All tests pass: `go test ./hyoka/...`
+- Live test: `hyoka serve` on existing report directory shows file contents in eval JSON
+
+**Impact:**
+- Site can now display generated file contents on eval detail pages
+- Size-safe: 1MB cap per file prevents JSON bloat
+- Backward compatible: Existing reports without `file_contents` continue to work
+
+**Reusable Pattern:** Capture report artifacts at report-build time, not serve time. Reading when the report is written (workspace still exists) is more reliable than serve-time reads.
+
+---
+
+### 2026-04-24: Surface generator.json Artifact on Eval-Detail Page
+
+**Agent:** Trinity 🌐
+
+**Status:** ✅ Implemented (Commit 9f34f072)
+
+**What:** Wire `GeneratorArtifact` into the report layer and render it on the eval-detail page as a collapsible "Generator Session" panel.
+
+**Implementation:**
+
+**Go Layer (Phase 1):**
+1. Add `GeneratorArtifact *artifact.GeneratorArtifact \`json:"generator_artifact,omitempty"\`` to `report.EvalReport`
+2. Type alias pattern (consistent with `WorkspaceDelta`) to avoid import cycles
+3. **Write:** After workspace delta computed, before graders run
+4. **Read:** After FileContents populated, before WriteReport
+5. Helper: `buildGeneratorArtifact()` constructs artifact from eval state
+
+**TypeScript Layer (Phase 2):**
+1. Type definitions (`site/src/app/data/types.ts`) mirror Go structs with snake_case
+2. Add `generator_artifact?: GeneratorArtifact` to EvalReport
+
+**UI Layer (Phase 3):**
+1. Panel placement: ABOVE "Generated Files" panel
+2. Collapsed by default with state `showGenSession` (false by default)
+3. Panel sections:
+   - **Termination badge:** Color-coded status (green=completed, yellow=max_actions, orange=timeout/guardrail, red=error)
+   - **Timing:** Duration as "Xm Ys", started timestamp
+   - **Actions summary:** 3-column grid (total/tool-calls/reasoning), truncation flag
+   - **Workspace delta:** Created/modified/deleted file counts with colored badges
+   - **Final response:** Truncated to 500 chars if >500 AND files generated; full text otherwise; copy button
+4. Conditional render: Only show panel if `generator_artifact` exists (handles v2 reports gracefully)
+
+**Rationale:**
+- Write timing: Artifact must capture complete generation state before graders run
+- Read timing: Populate artifact after file contents to keep related functionality grouped
+- Collapsed default: Avoids clutter for users who primarily care about grader scores
+- Truncation logic: Show full response if <500 chars OR no files generated; truncate if long + files exist
+- Backward compat: `omitempty` + conditional render means v2 reports display identically
+
+---
+
+### 2026-04-24: Grader Score Denominator Counts All Grader Points
+
+**Agent:** Trinity 🌐
+
+**Status:** ✅ Implemented (Commit c06ca9e2)
+
+**What:** The total score denominator is the sum of all grader points across all graders, not the count of graders.
+
+**Root Cause of Bug:** In `engine_eval.go:636-637`, `GradersTotal` and `GradersPassed` fields were computed using `len(agg.Results)` and `countPassed(agg.Results)`, which counted the number of graders, not the number of grader points.
+
+**Example:**
+- `file_check` grader with 3 points (file1, file2, file3)
+- `output_check` grader with 2 points (min_files, require_files)
+- Old denominator: 2 (number of graders)
+- Correct denominator: 5 (number of grader points)
+- Site incorrectly displayed `3/2` instead of `3/5`
+
+**Decision:**
+1. Added `countTotalPoints()` helper that sums `len(g.Points)` for each grader in `agg.Results`
+   - Graders with `len(Points) == 0` treated as 1 point (backward compatibility)
+2. Added `countPassedPoints()` helper that counts passed points across all graders
+   - For graders with Points, count points where `Point.Pass == true`
+   - For graders with no Points (legacy), use grader's overall `Pass` field (1 if true, 0 if false)
+3. Updated `engine_eval.go:636-637` to use point-based helpers
+
+**Verification:**
+- All tests pass: `go test ./hyoka/...`
+- Table-driven tests cover: multiple points per grader, zero-point graders (legacy), mixed scenarios, empty results
+
+**Impact:**
+- Site now displays accurate `X/Y` scores where Y is total grader points
+- Backward compatible: Legacy graders treated as 1 point
+- Consistent with grader-points architecture
+
+**Reusable Rule:** When aggregating grader scores, always count grader points, not graders. Denominator is `Σ len(g.Points) for g in graders`, with fallback of 1 for legacy graders.
+
+---
+
+### 2026-04-24: Prompt-Frontmatter Criteria Always Get Their Own Review-Grader Bucket
+
+**Agent:** Neo 💊
+
+**Status:** ✅ Implemented (Commit 27c04c71)
+
+**Branch:** ronniegeraghty/dev
+
+**What:** Prompt-frontmatter criteria and criteria-file entries are ALWAYS bucketed separately, regardless of review mode (combined or isolated).
+
+**Root Cause of Bug:** User report: "I'm only seeing one group of ai review graders running but I thought we decided that if we wanted grader points to be graded in the same review session they would have to be grader points on the same grader."
+
+`BuildUnifiedReviewBuckets` previously merged `promptCriteria` (from prompt frontmatter) with matched criteria-file entries into a single `combined` bucket, resulting in one AI review grader. This violated the source-separation principle.
+
+**Decision:**
+Each source produces its own `PromptReviewGrader` instance → its own Copilot review session → its own grader display entry.
+
+**Bucket Naming:**
+- Prompt-frontmatter criteria → bucket named `"Criteria from prompt file"`
+- Criteria-file entries → bucket(s) named based on mode:
+  - Combined mode: one `"combined"` bucket for all criteria-file entries
+  - Isolated mode: separate buckets per isolated entry/group, plus a `"combined"` bucket for leftovers
+
+**Edge Cases:**
+- If `promptCriteria` is empty AND matched criteria-file entries exist → only criteria-file bucket(s)
+- If `promptCriteria` is non-empty AND no criteria-file entries → only prompt-frontmatter bucket
+- If both are empty → zero buckets (no review graders)
+
+**Rationale:**
+**Source of truth determines grader identity.** Prompt-frontmatter criteria come from the `.prompt.md` file's YAML frontmatter. Criteria-file entries come from `criteria/*.yaml` files. These are fundamentally different sources and must be evaluated in separate Copilot sessions:
+
+1. Grader results are distinguishable — users see which bucket contributed which failing criteria
+2. Isolation is truly isolated — failure in one doesn't block the other
+3. Bucket names are meaningful — "Criteria from prompt file" is explicit
+
+The review mode (combined vs isolated) controls how criteria-FILE entries are bucketed among themselves; it does NOT control whether prompt-frontmatter criteria are separated. Source-separation is a harder rule than mode-separation.
+
+**Implementation:**
+- `buckets.go`: Refactored `BuildUnifiedReviewBuckets` to always prepend prompt-frontmatter bucket
+- `buckets_test.go`: Updated all combined-mode tests to expect 2 buckets; added edge-case tests
+- `engine_reviewbuckets_test.go` and `engine_reviewmode_runtime_test.go`: Updated integration tests
+
+**Verification:**
+- ✅ All tests pass: `go test -race ./hyoka/...`
+- ✅ Build clean
+- 🔄 Live verification: observe TWO separate AI review grader entries in output
+
+**Reusable Principle:** Grader source-of-truth determines grader identity. When multiple criteria sources contribute (prompt frontmatter, criteria files, future: remote criteria), each source must produce a separate grader instance if we want distinguishable pass/fail reporting. The `--review-mode` flag is SECONDARY — it partitions WITHIN a single source's bucket set.
+
+---
+
+### 2026-04-24: Phase-State Guard for Reviewer Event Suppression
+
+**Agent:** Tank ⚛️
+
+**Status:** ✅ Implemented (Commit 6f2e1f03)
+
+**What:** Add a **phase-state guard** at the top of `renderAgentEvent` to suppress activity events from downstream reviewer sessions once the generation phase is complete.
+
+**Root Cause of Bug 3:** The PromptReviewGrader runs a real Copilot SDK session that emits the same generation events (EventReasoning, EventToolStart, EventToolComplete) through the shared progress event channel. After EventSessionDetails flipped Agent Attempt → Completed, subsequent reviewer activity events were still landing in `renderAgentEvent` and creating duplicate "Agent Attempt: ✅ Completed" rows.
+
+**Decision:**
+```go
+// Agent Attempt is already finalized — generation phase is over. Ignore
+// activity events from downstream sessions (reviewer Copilot sessions
+// emit the same EventReasoning/EventToolStart/etc. through the shared
+// event channel, but they belong to grader rows, not the agent tail).
+if r.cur != nil && (r.cur.agentState == agentStateCompleted || r.cur.agentState == agentStateGuardrail) {
+    return
+}
+```
+
+**Rationale:**
+- The agent tail belongs to GENERATION phase only
+- Once `agentState` is Completed or Guardrail, generation phase is closed
+- Downstream sessions (reviewers) emit same event types but belong to grader rows, NOT agent tail
+- Renderer must filter events by phase-ownership, not just event type
+
+**Implementation:**
+- `display_interactive.go` (+5 lines): phase-state guard in `renderAgentEvent`
+- `display_interactive_test.go` (+56 lines): regression test `TestInteractive_ReviewerEventsAfterCompletionIgnored`
+
+**Test Coverage:**
+`TestInteractive_ReviewerEventsAfterCompletionIgnored` drives full sequence: generation → EventSessionDetails (completes agent) → typed grader → AI review grader start → EventReasoning/EventToolStart/EventToolComplete from reviewer → grader complete → passed. Asserts exactly ONE "Agent Attempt:" row.
+
+**Verification:**
+- `go test -race ./hyoka/internal/progress/...` — all tests pass
+- Live eval (key-vault-dp-python-crud / python-pairwise) — zero duplicate rows
+
+**Alternatives Considered:**
+1. **Filter at event emission:** Rejected — couples eval package to display semantics
+2. **Add "review phase" state:** Rejected — over-engineered; agent tail is generation-only
+3. **Change event types:** Rejected — would break existing event consumers
+
+**Lessons:**
+- Phase-state guards are critical in event-driven terminal renderers
+- When multiple concurrent processes emit through shared channel, filter by phase, not event type
+- Test for phase isolation — events from one phase must not bleed into another's rendering
+
+---
+

@@ -474,3 +474,26 @@ Ran: `hyoka run --prompt-id key-vault-dp-python-crud --config baseline/gpt-5.3-c
 
 **Empty workspace behavior:** With the artifact in place, AI graders can now evaluate agent work even when no files were created. This fixes the codex/GPT-5 series models that often produce explanatory responses instead of files.
 
+
+---
+
+## TEAM UPDATE (2026-04-24T12:00:00Z) — Generator.json Artifact Arc Complete
+
+**Status:** ✅ LANDED on ronniegeraghty/dev
+
+**Summary:** Neo (Phase 1) + Trinity (Phase 2) + Tank (parallel) coordinated full generator.json artifact pipeline:
+
+1. **Neo Phase 1 (commit d1ed5f61):** Engine emits generator.json for graders. Removed grader-execution guard; added `AgentFinalResponse` to GraderInput. **Test discipline violated** — tests broken at EOD.
+
+2. **Trinity Phase 2 (commits 9f34f072, 72a4d3c3):** Silently fixed all 6 broken Reviewer test stubs. Added comprehensive artifact_test.go. Wired artifact into report layer (v3 schema). Implemented "Generator Session" collapsible panel on eval-detail-page.tsx. **Tests restored green.**
+
+3. **Neo Phase 2b (commit d4b7cbaf):** Verified Trinity's test fixes complete. Added 6 more review_test.go edge cases. Ran live eval (key-vault-dp-python-crud / baseline/gpt-5.3-codex) — generator.json emitted correctly, site panel renders, no regressions.
+
+4. **Tank parallel (commit 6f2e1f03):** Fixed duplicate "Agent Attempt" rows in interactive display via phase-state guard. Unrelated to artifact arc but coordinated through shared sprint.
+
+**Decisions merged:** All inbox files consolidated into decisions.md (coordinator-grader-input-always.md, coordinator-grader-input-model.md, coordinator-generator-json-on-site.md, trinity-generator-artifact-site.md, trinity-eval-page-file-contents.md, trinity-grader-points-denominator.md, neo-prompt-criteria-own-bucket.md, tank-reviewer-event-suppression.md).
+
+**Next:** Neo Phase 3 — prompt-criteria bucket separation (separate review-grader for prompt-frontmatter criteria vs criteria-file entries).
+
+**Orchestration logs:** 2026-04-24T09:15:00Z-neo.md, 2026-04-24T10:30:00Z-trinity.md, 2026-04-24T11:45:00Z-neo-followup.md  
+**Session log:** 2026-04-24T12:00:00Z-generator-json-artifact-arc.md
