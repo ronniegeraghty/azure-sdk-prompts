@@ -379,6 +379,13 @@ export interface EvalReport {
   review_duration_seconds?: number;
   generated_files?: string[];
   reviewed_files?: ReviewedFile[];
+  /**
+   * `file_contents` maps generated file paths to their full text contents.
+   * Populated by the engine for every eval that produced files (#bug-2).
+   * Used as the fallback content source on the eval-detail page when the
+   * reviewer did not annotate a file (`reviewed_files` lookup misses).
+   */
+  file_contents?: Record<string, string>;
   session_events?: SessionEvent[];
   event_count?: number;
   tool_calls?: string[];

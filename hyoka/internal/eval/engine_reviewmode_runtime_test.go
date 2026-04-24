@@ -100,14 +100,15 @@ func TestIntegrationReviewModeIsolatedFiresBuckets(t *testing.T) {
 		t.Fatalf("engine.Run() error: %v", err)
 	}
 
+	// Phase 2 per-bucket grading: the engine creates one PromptReviewGrader
+	// per bucket, so we expect N Review() calls (one per bucket) instead of
+	// one ReviewBuckets() call. The per-bucket approach prioritizes display
+	// clarity (each bucket renders as its own grader line) over batch-API
+	// efficiency.
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	if rec.reviewBucketCalls < 1 {
-		t.Fatalf("expected ReviewBuckets() to be called at least once in isolated mode, got %d (Review calls=%d)",
-			rec.reviewBucketCalls, rec.reviewCalls)
-	}
-	if rec.lastBucketCount < 2 {
-		t.Errorf("expected at least 2 buckets passed to ReviewBuckets() (isolated + combined), got %d", rec.lastBucketCount)
+	if rec.reviewCalls < 2 {
+		t.Fatalf("expected at least 2 Review() calls (one per bucket) in isolated mode, got %d", rec.reviewCalls)
 	}
 }
 
@@ -147,12 +148,12 @@ func TestIntegrationReviewModeCombinedSkipsBuckets(t *testing.T) {
 		t.Fatalf("engine.Run() error: %v", err)
 	}
 
+	// Phase 2 per-bucket grading: the engine creates one PromptReviewGrader
+	// per bucket (prompt + criteria files = 2 buckets in this test), so we
+	// expect 2 Review() calls instead of one ReviewBuckets() call.
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	if rec.reviewBucketCalls < 1 {
-		t.Errorf("combined mode should call ReviewBuckets() (2 buckets: prompt + criteria files), got %d calls", rec.reviewBucketCalls)
-	}
-	if rec.lastBucketCount != 2 {
-		t.Errorf("expected 2 buckets (prompt + criteria files) in combined mode, got %d", rec.lastBucketCount)
+	if rec.reviewCalls != 2 {
+		t.Errorf("combined mode should call Review() twice (once per bucket: prompt + criteria files), got %d calls", rec.reviewCalls)
 	}
 }

@@ -212,9 +212,12 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		var msg string
 		switch {
 		case len(produced) == 0:
+			// No files = no file met the minimum. Treat as fail
+			// (vacuous-truth bug fix). If a config doesn't care
+			// about file existence, drop min_bytes_per_file.
+			pass = false
 			msg = fmt.Sprintf("min_bytes_per_file: no produced files to check (>= %d required)",
 				g.cfg.MinBytesPerFile)
-			pass = true // nothing to violate; pair with min_files if this matters
 		case pass:
 			msg = fmt.Sprintf("min_bytes_per_file: all %d file(s) >= %d byte(s)",
 				len(produced), g.cfg.MinBytesPerFile)

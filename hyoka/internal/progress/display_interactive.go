@@ -901,11 +901,22 @@ func (r *interactiveRenderer) onSessionDetails(evt ProgressEvent) {
 	if len(evt.Files) > 0 {
 		r.writeLine(fmt.Sprintf("  Files: %s", joinTruncated(evt.Files, 6)))
 	}
-	r.writeLine(fmt.Sprintf("  Turns: %d   Tool calls: %d   Cost: %s",
-		evt.Turns, evt.ToolCalls, fmtCost(evt.Cost)))
+	r.writeLine(fmt.Sprintf("  Turns: %d   Tool calls: %d   Tokens: %s in / %s out",
+		evt.Turns, evt.ToolCalls, fmtTokens(evt.InputTokens), fmtTokens(evt.OutputTokens)))
 }
 
 // --- Graders section ---
+
+// displayKind maps internal grader kinds to user-facing labels.
+// Prompt-review and prompt graders both display as "prompt".
+func displayKind(kind string) string {
+	switch kind {
+	case "prompt_review", "prompt":
+		return "prompt"
+	default:
+		return kind
+	}
+}
 
 func (r *interactiveRenderer) ensureGradersHeader() {
 	if r.cur.gradersHeaderPrinted {
@@ -923,7 +934,7 @@ func (r *interactiveRenderer) onGraderStart(evt ProgressEvent) {
 	r.freezeTail()
 	line := fmt.Sprintf("  - %s %s: 🔄 %s",
 		evt.GraderID,
-		r.sty.Muted("("+evt.GraderKind+")"),
+		r.sty.Muted("("+displayKind(evt.GraderKind)+")"),
 		r.sty.Muted("Running…"))
 	r.writeTail(tailGrader, line)
 	// Track which grader owns the current tail so that, if some other
@@ -958,7 +969,7 @@ func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 	}
 	line := fmt.Sprintf("  - %s %s: %s",
 		evt.GraderID,
-		r.sty.Muted("("+evt.GraderKind+")"),
+		r.sty.Muted("("+displayKind(evt.GraderKind)+")"),
 		outcome)
 	if evt.Message != "" && evt.Result == GraderResultFail {
 		line += " " + r.sty.Muted("— "+evt.Message)
@@ -1009,7 +1020,7 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 	}
 	header := fmt.Sprintf("  - %s %s: %s",
 		evt.GraderID,
-		r.sty.Muted("("+evt.GraderKind+")"),
+		r.sty.Muted("("+displayKind(evt.GraderKind)+")"),
 		badge)
 
 	// Place the header. Three cases mirror the flat path:
@@ -1345,6 +1356,25 @@ func fmtCost(c float64) string {
 		return "—"
 	}
 	return fmt.Sprintf("$%.2f", c)
+}
+
+// fmtTokens renders a token count with thousands separators ("12,345"),
+// or "—" when zero/unknown. Replaces the deprecated fmtCost in the live
+// session-details line.
+func fmtTokens(n int) string {
+	if n <= 0 {
+		return "—"
+	}
+	s := fmt.Sprintf("%d", n)
+	// Insert commas from the right.
+	out := make([]byte, 0, len(s)+len(s)/3)
+	for i, ch := range []byte(s) {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, ch)
+	}
+	return string(out)
 }
 
 func formatScore(score float64) string {

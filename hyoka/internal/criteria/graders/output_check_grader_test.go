@@ -382,10 +382,10 @@ func TestOutputCheckGrader_BoundaryConditions(t *testing.T) {
 			wantPass: true,
 		},
 		{
-			name:     "min_bytes_per_file with empty delta is vacuously true",
+			name:     "min_bytes_per_file with empty delta fails (no files to check)",
 			cfg:      OutputCheckConfig{MinBytesPerFile: 10},
 			delta:    &WorkspaceDelta{},
-			wantPass: true,
+			wantPass: false,
 		},
 	}
 	for _, tt := range tests {

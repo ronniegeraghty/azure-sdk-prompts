@@ -131,10 +131,12 @@ type ProgressEvent struct {
 	Points []GraderPoint
 
 	// Session summary fields (EventSessionDetails).
-	Files     []string // Files written by the session
-	Turns     int      // Total turns consumed
-	ToolCalls int      // Total tool calls made
-	Cost      float64  // Session cost in USD
+	Files        []string // Files written by the session
+	Turns        int      // Total turns consumed
+	ToolCalls    int      // Total tool calls made
+	Cost         float64  // Session cost in USD (deprecated — kept for back-compat with old recordings)
+	InputTokens  int      // Total input tokens consumed by the generator session
+	OutputTokens int      // Total output tokens emitted by the generator session
 
 	// Guardrail fields (EventFailed, EventError).
 	GuardrailReason string // Populated when a guardrail terminated the run (e.g., "turn limit (25)")

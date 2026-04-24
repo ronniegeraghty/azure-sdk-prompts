@@ -1040,32 +1040,40 @@ export function EvalDetailPage() {
               <div className="border-t border-white/8 p-5 space-y-2">
                 {generatedFiles.map((filePath, i) => {
                   const reviewed = reviewedFiles.find(rf => rf.path === filePath);
+                  // Fallback: when the reviewer didn't annotate this file
+                  // (e.g., grader was skipped, or file was excluded from
+                  // review), still surface the raw content from
+                  // file_contents so users can inspect what was generated.
+                  const rawContent = r.file_contents?.[filePath];
+                  const content = reviewed?.content ?? rawContent ?? "";
+                  const hasContent = content.length > 0;
                   const isExpanded = expandedFile === filePath;
-                  
+
                   return (
                     <div key={i} className="rounded-lg border border-white/5 bg-black/20">
                       <button
-                        onClick={() => setExpandedFile(isExpanded ? null : filePath)}
+                        onClick={() => hasContent && setExpandedFile(isExpanded ? null : filePath)}
                         className="flex w-full items-center justify-between px-4 py-2 text-left"
+                        disabled={!hasContent}
                       >
                         <div className="flex items-center gap-2">
                           <FileCode2 className="h-3.5 w-3.5 text-emerald-400/50" />
                           <span className="text-emerald-400/70" style={{ ...mono, fontSize: 12 }}>{filePath}</span>
                         </div>
-                        {reviewed && (
+                        {hasContent && (
                           isExpanded
                             ? <ChevronDown className="h-3.5 w-3.5 text-white/30" />
                             : <ChevronRight className="h-3.5 w-3.5 text-white/30" />
                         )}
                       </button>
-                      {reviewed && isExpanded && (
+                      {hasContent && isExpanded && (
                         <div className="border-t border-white/5 p-4">
                           {(() => {
                             const MAX_CONTENT_BYTES = 256 * 1024; // 256 KiB
-                            const tooBig = reviewed.content.length > MAX_CONTENT_BYTES;
+                            const tooBig = content.length > MAX_CONTENT_BYTES;
                             const display = tooBig
-                              ? reviewed.content.slice(0, MAX_CONTENT_BYTES)
-                              : reviewed.content;
+                              ? content.slice(0, MAX_CONTENT_BYTES)
+                              : content;
                             return (
                               <>
                                 <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-white/70" style={{ ...mono, fontSize: 11, lineHeight: 1.5 }}>
@@ -1073,7 +1081,7 @@ export function EvalDetailPage() {
                                 </pre>
                                 {tooBig && (
                                   <div className="mt-2 text-amber-400/70" style={{ fontSize: 11 }}>
-                                    File truncated for display ({reviewed.content.length.toLocaleString()} bytes; showing first {MAX_CONTENT_BYTES.toLocaleString()}).
+                                    File truncated for display ({content.length.toLocaleString()} bytes; showing first {MAX_CONTENT_BYTES.toLocaleString()}).
                                   </div>
                                 )}
                               </>

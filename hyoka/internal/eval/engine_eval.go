@@ -480,19 +480,26 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			turnCount++
 		}
 	}
-	// Compute cost from token usage
+	// Aggregate token usage from assistant.usage events. Cost stays as a
+	// rough estimate for back-compat with old recordings, but the live
+	// session-details line now renders Tokens (in/out) instead.
 	cost := 0.0
+	var totalIn, totalOut int
 	for _, ev := range evalReport.SessionEvents {
 		if ev.Type == "assistant.usage" {
+			totalIn += ev.InputTokens
+			totalOut += ev.OutputTokens
 			cost += float64(ev.InputTokens+ev.OutputTokens) * 0.00001 // rough estimate
 		}
 	}
 	sendRawEvent(progress.ProgressEvent{
-		Type:      progress.EventSessionDetails,
-		Files:     generatedFiles,
-		Turns:     turnCount,
-		ToolCalls: len(evalReport.ToolCalls),
-		Cost:      cost,
+		Type:         progress.EventSessionDetails,
+		Files:        generatedFiles,
+		Turns:        turnCount,
+		ToolCalls:    len(evalReport.ToolCalls),
+		Cost:         cost,
+		InputTokens:  totalIn,
+		OutputTokens: totalOut,
 	})
 
 	// Unified grading pipeline (#625) — the single Bundle drives both
@@ -547,12 +554,16 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 
 		// Build common grader input shared by all grader types.
+		// GeneratorArtifact is threaded through so AI prompt graders can
+		// always run, even when the agent produced zero files (#empty-ws-bug).
 		graderInput := graders.GraderInput{
-			WorkspacePath:       genWs.Dir,
-			OriginalPrompt:      task.Prompt.PromptText,
-			EvalCriteria:        e.mergedCriteria(task.Prompt, props),
-			EvalCriteriaBuckets: e.reviewBuckets(task.Prompt, props),
-			WorkspaceDelta:      evalReport.WorkspaceDelta,
+			WorkspacePath:         genWs.Dir,
+			OriginalPrompt:        task.Prompt.PromptText,
+			EvalCriteria:          e.mergedCriteria(task.Prompt, props),
+			EvalCriteriaBuckets:   e.reviewBuckets(task.Prompt, props),
+			WorkspaceDelta:        evalReport.WorkspaceDelta,
+			GeneratorArtifact:     genArtifact,
+			GeneratorArtifactPath: generatorArtifactPath,
 		}
 		if task.Prompt.ReferenceAnswer != "" {
 			graderInput.ReferenceDir = task.Prompt.ReferenceAnswer
@@ -582,8 +593,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	// --- Phase 2: AI review grader (runs alongside typed graders) ---
-	var reviewGrader *graders.PromptReviewGrader
+	// --- Phase 2: AI review graders (one per bucket) ---
+	var lastReviewGrader *graders.PromptReviewGrader
 	if !e.opts.SkipReview {
 		sendPhase(progress.PhaseReviewing)
 
@@ -597,46 +608,65 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 
 		if panelReviewer != nil || reviewer != nil {
-			reviewGrader = graders.NewPromptReviewGrader("ai_review", reviewer, panelReviewer)
-
-			// NOTE: Do NOT bracket this with sendEvent(EventToolStart)/
-			// sendEvent(EventToolComplete). The grader Start/Complete
-			// events emitted just below already convey this state for
-			// the renderer; the dual emission disturbs the active tail
-			// right around the grader handoff and produces duplicate
-			// rendered rows for ai_review (see Tank Phase 1 issue (e)).
+			// Create one grader per ReviewBucket so each bucket's criteria
+			// render as a separate grader line in the display. This replaces
+			// the legacy single "ai_review" grader aggregating all buckets.
+			buckets := e.reviewBuckets(task.Prompt, props)
+			if len(buckets) == 0 {
+				// No buckets (no criteria or prompt frontmatter) — fall back to
+				// creating a single grader with empty criteria so the reviewer
+				// still runs. This preserves the behavior for tests/configs that
+				// expect review to run even without explicit criteria.
+				buckets = []graders.ReviewBucket{{Name: "ai_review", Criteria: ""}}
+				glg.Debug("No review buckets; falling back to single empty review grader")
+			}
 			if panelReviewer != nil {
 				glg.Debug("Review panel models", "models", panelReviewer.Models())
 			}
+			glg.Debug("Running AI review graders", "bucket_count", len(buckets))
 
-			emitGraderStart(sendRawEvent, reviewGrader)
-			reviewResult, reviewErr := reviewGrader.Grade(ctx, graderInput)
-			if reviewErr != nil {
-				glg.Error("Review grader failed", "error", reviewErr)
-				sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", reviewErr))
-				// Add a failing result so aggregation accounts for the review attempt.
-				reviewResult = graders.GraderResult{
-					Kind:    graders.KindPromptReview,
-					Name:    "ai_review",
-					Pass:    false,
-					Score:   0,
-					Message: fmt.Sprintf("review grader error: %v", reviewErr),
+				for i, bucket := range buckets {
+					reviewGrader := graders.NewPromptReviewGrader(bucket.Name, reviewer, panelReviewer)
+					lastReviewGrader = reviewGrader
+
+					// Build a per-bucket grader input with only this bucket's criteria.
+					bucketInput := graderInput
+					bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{bucket}
+
+					emitGraderStart(sendRawEvent, reviewGrader)
+					reviewResult, reviewErr := reviewGrader.Grade(ctx, bucketInput)
+					if reviewErr != nil {
+						glg.Error("Review grader failed", "bucket", bucket.Name, "error", reviewErr)
+						sendEvent(progress.EventReasoning, fmt.Sprintf("Review bucket %q failed: %v", bucket.Name, reviewErr))
+						// Add a failing result so aggregation accounts for the review attempt.
+						reviewResult = graders.GraderResult{
+							Kind:    graders.KindPromptReview,
+							Name:    bucket.Name,
+							Pass:    false,
+							Score:   0,
+							Message: fmt.Sprintf("review grader error: %v", reviewErr),
+						}
+					} else if reviewGrader.LastConsolidated != nil {
+						glg.Debug("Review bucket complete",
+							"bucket", bucket.Name,
+							"passed", reviewGrader.LastConsolidated.OverallScore,
+							"max", reviewGrader.LastConsolidated.MaxScore)
+					}
+					// Apply default weight — review has weight 1.0, not a gate grader.
+					if reviewResult.Weight == 0 {
+						reviewResult.Weight = 1.0
+					}
+					emitGraderComplete(sendRawEvent, reviewGrader, reviewResult)
+					allGraderResults = append(allGraderResults, reviewResult)
+
+					// Populate backward-compat report fields from the LAST bucket.
+					// (Site only expects one consolidated review; multi-bucket
+					// per-grader breakdown is a display-only enhancement for now.)
+					if i == len(buckets)-1 {
+						evalReport.ReviewPanel = reviewGrader.LastPanel
+						evalReport.Review = reviewGrader.LastConsolidated
+					}
 				}
-			} else if reviewGrader.LastConsolidated != nil {
-				glg.Debug("Review complete",
-					"passed", reviewGrader.LastConsolidated.OverallScore,
-					"max", reviewGrader.LastConsolidated.MaxScore)
-			}
-			// Apply default weight — review has weight 1.0, not a gate grader.
-			if reviewResult.Weight == 0 {
-				reviewResult.Weight = 1.0
-			}
-			emitGraderComplete(sendRawEvent, reviewGrader, reviewResult)
-			allGraderResults = append(allGraderResults, reviewResult)
-
-			// Populate backward-compat report fields.
-			evalReport.ReviewPanel = reviewGrader.LastPanel
-			evalReport.Review = reviewGrader.LastConsolidated
 		}
 	}
 
@@ -675,13 +705,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 
 	// Capture reviewed (annotated) files from the reviewer workspace.
-	if reviewGrader != nil && reviewGrader.LastReviewWorkDir != "" {
-		reviewedFiles, rfErr := readReviewedFiles(reviewGrader.LastReviewWorkDir)
+	if lastReviewGrader != nil && lastReviewGrader.LastReviewWorkDir != "" {
+		reviewedFiles, rfErr := readReviewedFiles(lastReviewGrader.LastReviewWorkDir)
 		if rfErr == nil && len(reviewedFiles) > 0 {
 			evalReport.ReviewedFiles = reviewedFiles
 			glg.Debug("Captured reviewed files", "count", len(reviewedFiles))
 		}
-		reviewGrader.CleanupWorkspace()
+		lastReviewGrader.CleanupWorkspace()
 	}
 
 	evalReport.ReviewDuration = time.Since(gradeStart).Seconds()
@@ -1208,14 +1238,14 @@ func convertGraderResults(results []graders.GraderResult) []report.GraderResult 
 				ToolCounts:       r.BehaviorDetails.ToolCounts,
 			}
 		}
-		// prompt_review graders: re-shape the grader's name to a stable
-		// "ai_review" identifier (the panel-member-expansion code used to
-		// produce one row per model — site filters keyed off "ai_review"
-		// or "review" type for years) and copy the existing ReviewDetails
-		// struct verbatim so static Markdown/HTML templates keep working.
+		// v3 schema: pre-Phase 2, prompt_review graders had the name "ai_review"
+		// for backward compat. Phase 2 splits AI review into per-bucket graders
+		// named after the bucket (e.g., "Criteria from prompt file"). The
+		// site/report layers expect GraderName to match the Name field, so we
+		// preserve r.Name verbatim here rather than rewriting to "ai_review".
 		if r.Kind == graders.KindPromptReview && r.ReviewDetails != nil {
 			rd := r.ReviewDetails
-			rr.GraderName = "ai_review"
+			rr.GraderName = r.Name
 			rr.GraderType = "prompt_review"
 			rr.Model = rd.Model
 			rr.OverallScore = rd.OverallScore

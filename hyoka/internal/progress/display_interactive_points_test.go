@@ -37,7 +37,8 @@ func TestInteractive_GraderPointsRendersNestedBlock(t *testing.T) {
 	out := buf.String()
 
 	// Header summarizes aggregate pass/fail count.
-	if !strings.Contains(out, "ai_review") || !strings.Contains(out, "(prompt_review)") {
+	// Expect grader kind to display as "prompt" (mapped from "prompt_review")
+	if !strings.Contains(out, "ai_review") || !strings.Contains(out, "(prompt)") {
 		t.Errorf("missing grader header\n--- got ---\n%s", out)
 	}
 	if !strings.Contains(out, "2/3 passed") {
