@@ -1,7 +1,17 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { CheckCircle2, XCircle, ChevronDown, ChevronRight } from "lucide-react";
 import type { GraderResult } from "../data/types";
-import { graderPasses } from "../lib/evalPass";
+import { formatGraderScore } from "../lib/graderScore";
+import {
+  FileExtras,
+  ProgramExtras,
+  PromptExtras,
+  BehaviorExtras,
+  ActionSequenceExtras,
+  ToolConstraintExtras,
+  OutputCheckExtras,
+  ReviewExtras,
+} from "./grader-extras";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -11,104 +21,46 @@ export interface GraderResultRowProps {
 }
 
 export function GraderResultRow({ result, defaultExpanded = false }: GraderResultRowProps) {
-  const points = result.points ?? [];
-  const hasMultiplePoints = points.length > 1;
-  // Auto-expand multi-point graders by default so users see the per-check
-  // breakdown at a glance — that's the whole reason Points exist.
-  const [expanded, setExpanded] = useState(defaultExpanded || hasMultiplePoints);
-
-  // Determine pass/fail status. Single source of truth lives in evalPass.ts;
-  // we mirror its tri-state here for the badge color. graderPasses returns
-  // false for genuinely failed graders AND for unknown/N/A — we re-derive
-  // the N/A state separately so the badge can show "N/A" when nothing is
-  // known.
-  let passed: boolean | null;
-  if (points.length > 0) {
-    passed = points.every(p => p.pass);
-  } else if (result.pass != null) {
-    passed = result.pass;
-  } else if ((result.scores?.criteria?.length ?? 0) > 0) {
-    passed = result.scores!.criteria!.every(c => c.passed);
-  } else if (
-    result.overall_score != null &&
-    result.max_score != null &&
-    result.max_score > 0
-  ) {
-    passed = result.overall_score === result.max_score;
-  } else {
-    passed = null;
-  }
-  // Sanity: for graders WITH data, the row's pass state must match the
-  // canonical helper. If they ever diverge, the helper wins — but during
-  // dev this assertion catches future regressions.
-  void graderPasses; // referenced for the import; tested in GraderResultRow.test.tsx
-  const hasScore = result.score !== undefined && result.score !== null;
-  const hasOverallScore = result.overall_score !== undefined && result.max_score !== undefined;
-
-  const pointsPassed = points.filter(p => p.pass).length;
-  const pointsTotal = points.length;
-
-  // Formatted score display
-  let scoreDisplay = "—";
-  if (hasMultiplePoints) {
-    // For multi-point graders the points count IS the score metaphor; the
-    // numeric overall_score (often 0/1) just adds noise.
-    scoreDisplay = `${pointsPassed}/${pointsTotal} points`;
-  } else if (hasScore && result.score !== undefined) {
-    scoreDisplay = `${(result.score * 100).toFixed(0)}%`;
-  } else if (hasOverallScore && result.overall_score !== undefined && result.max_score !== undefined) {
-    scoreDisplay = `${result.overall_score}/${result.max_score}`;
-  }
-
-  // Badge color logic
-  const badgeColor = passed === true
-    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-    : passed === false
-    ? "bg-red-500/10 text-red-400 border-red-500/20"
-    : "bg-white/5 text-white/30 border-white/10";
-
-  const badgeIcon = passed === true
-    ? <CheckCircle2 className="h-3 w-3" />
-    : passed === false
-    ? <XCircle className="h-3 w-3" />
-    : <AlertCircle className="h-3 w-3" />;
-
-  // Multi-point header label: emphasizes the points count over PASS/FAIL
-  // because that's the truth users need on this row.
-  const badgeLabel = hasMultiplePoints
-    ? `${passed === true ? "✓" : "✗"} ${pointsPassed}/${pointsTotal} passed`
-    : passed === true ? "PASS" : passed === false ? "FAIL" : "N/A";
-
-  // Check if there's expandable content
-  const hasDetails = hasMultiplePoints || !!(
-    result.summary ||
-    result.issues?.length ||
-    result.strengths?.length ||
-    result.file_details ||
-    result.program_details ||
-    result.prompt_details ||
-    result.behavior_details ||
-    result.review_details
+  // v4 schema: Points is required, pass is always boolean
+  const hasMultiplePoints = result.points.length > 1;
+  const hasFailed = !result.pass;
+  
+  // Auto-expand multi-point graders OR failed graders by default
+  const [expanded, setExpanded] = useState(
+    defaultExpanded || hasMultiplePoints || hasFailed
   );
+
+  // Badge color based on result.pass (v4: always boolean)
+  const badgeColor = result.pass
+    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+    : "bg-red-500/10 text-red-400 border-red-500/20";
+
+  const badgeIcon = result.pass ? (
+    <CheckCircle2 className="h-3 w-3" />
+  ) : (
+    <XCircle className="h-3 w-3" />
+  );
+
+  // Check if there's expandable content (Points list + Extras)
+  const hasDetails = result.points.length > 0 || !!result.extras;
 
   const graderTypeLabel = result.grader_type
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 
+  // Get model from extras if present (for review graders)
+  const modelName = result.extras?.review?.model || result.extras?.prompt?.model;
+
   return (
     <div className="rounded-lg border border-white/5 bg-white/[0.02]">
-      {/* Header Row */}
+      {/* Header Row — single source of truth for score, no duplication */}
       <div
         onClick={() => hasDetails && setExpanded(!expanded)}
-        className={`flex items-center gap-3 p-3 ${hasDetails ? "cursor-pointer select-none" : ""}`}
+        className={`flex items-center gap-3 p-3 ${
+          hasDetails ? "cursor-pointer select-none" : ""
+        }`}
       >
-        {/* Pass/Fail Badge */}
-        <div className={`flex items-center gap-1.5 rounded-md border px-2 py-1 ${badgeColor}`} style={{ fontSize: 10 }}>
-          {badgeIcon}
-          <span>{badgeLabel}</span>
-        </div>
-
         {/* Grader Name & Type */}
         <div className="flex-1 min-w-0">
           <div className="text-white/80 truncate" style={{ fontSize: 13 }}>
@@ -116,52 +68,55 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
           </div>
           <div className="text-white/30 truncate" style={{ fontSize: 10 }}>
             {graderTypeLabel}
-            {result.model && ` • ${result.model}`}
+            {modelName && ` • ${modelName}`}
           </div>
         </div>
 
-        {/* Score */}
-        {(hasScore || hasOverallScore) && (
-          <div className="text-white/50" style={{ ...mono, fontSize: 12 }}>
-            {scoreDisplay}
-          </div>
-        )}
+        {/* Score (canonical format: "N/M points") */}
+        <div className="text-white/50" style={{ ...mono, fontSize: 12 }}>
+          {formatGraderScore(result)}
+        </div>
+
+        {/* Pass/Fail Icon Badge (icon-only, score string already shows count) */}
+        <div
+          className={`flex items-center justify-center rounded-md border w-6 h-6 ${badgeColor}`}
+        >
+          {badgeIcon}
+        </div>
 
         {/* Gate indicator */}
         {result.gate && (
-          <div className="rounded bg-amber-500/10 px-2 py-0.5 text-amber-400/80" style={{ fontSize: 9 }}>
+          <div
+            className="rounded bg-amber-500/10 px-2 py-0.5 text-amber-400/80"
+            style={{ fontSize: 9 }}
+          >
             GATE
           </div>
         )}
 
         {/* Expand arrow */}
-        {hasDetails && (
-          expanded ? (
+        {hasDetails &&
+          (expanded ? (
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-white/20" />
           ) : (
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/20" />
-          )
-        )}
+          ))}
       </div>
 
-      {/* Expanded Details */}
+      {/* Expanded Details — v4: Points list (always) + KindExtras (when present) */}
       {expanded && hasDetails && (
         <div className="border-t border-white/5 p-3 space-y-3">
-          {/* Per-Point breakdown (Phase 6.2) — the canonical view of a
-              multi-check grader. Indented like the criterion pills below
-              so the visual rhythm matches the rest of the panel. */}
-          {hasMultiplePoints && (
+          {/* Points List — ALWAYS rendered when there are points */}
+          {result.points.length > 0 && (
             <div>
-              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>Points</div>
+              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>
+                Points
+              </div>
               <div className="ml-6 space-y-1">
-                {points.map((p, i) => (
+                {result.points.map((p, i) => (
                   <div
                     key={i}
-                    className={`flex items-start gap-2 rounded-md border px-2 py-1 ${
-                      p.pass
-                        ? "border-emerald-500/15 bg-emerald-500/5"
-                        : "border-red-500/20 bg-red-500/5"
-                    }`}
+                    className="flex items-start gap-2 py-1"
                   >
                     {p.pass ? (
                       <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/80" />
@@ -170,14 +125,30 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
                     )}
                     <div className="min-w-0 flex-1">
                       <div
-                        className={p.pass ? "text-emerald-400/90" : "text-red-400/90"}
-                        style={{ ...mono, fontSize: 11 }}
+                        className={p.pass ? "text-white/70" : "text-red-400/80"}
+                        style={{ fontSize: 12 }}
                       >
-                        {p.name}
+                        {p.label}
                       </div>
                       {p.message && (
-                        <div className="text-white/50" style={{ fontSize: 11, lineHeight: 1.5 }}>
+                        <div
+                          className="text-white/40"
+                          style={{ fontSize: 11, lineHeight: 1.5 }}
+                        >
                           {p.message}
+                        </div>
+                      )}
+                      {p.evidence && Object.keys(p.evidence).length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {Object.entries(p.evidence).map(([k, v]) => (
+                            <span
+                              key={k}
+                              className="rounded bg-white/5 px-1.5 py-0.5 text-white/30"
+                              style={{ fontSize: 9 }}
+                            >
+                              {k}: {v}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -187,191 +158,35 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
             </div>
           )}
 
-          {/* Summary */}
-          {result.summary && (
+          {/* Message (headline summary) */}
+          {result.message && (
             <div>
-              <div className="mb-1 text-white/25" style={{ fontSize: 10 }}>Summary</div>
+              <div className="mb-1 text-white/25" style={{ fontSize: 10 }}>
+                Summary
+              </div>
               <p className="text-white/60" style={{ fontSize: 12, lineHeight: 1.5 }}>
-                {result.summary}
+                {result.message}
               </p>
             </div>
           )}
 
-          {/* Issues & Strengths */}
-          {(result.issues?.length || result.strengths?.length) && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {result.issues && result.issues.length > 0 && (
-                <div>
-                  <div className="mb-1.5 text-red-400/60" style={{ fontSize: 11 }}>Issues</div>
-                  {result.issues.map((issue, i) => (
-                    <div key={i} className="mb-1 flex gap-1.5">
-                      <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/50" />
-                      <span className="text-white/50" style={{ fontSize: 11 }}>{issue}</span>
-                    </div>
-                  ))}
-                </div>
+          {/* Kind-specific Extras — single dispatcher */}
+          {result.extras && (
+            <div>
+              {result.extras.file && <FileExtras extras={result.extras.file} />}
+              {result.extras.program && <ProgramExtras extras={result.extras.program} />}
+              {result.extras.prompt && <PromptExtras extras={result.extras.prompt} />}
+              {result.extras.behavior && <BehaviorExtras extras={result.extras.behavior} />}
+              {result.extras.action_sequence && (
+                <ActionSequenceExtras extras={result.extras.action_sequence} />
               )}
-              {result.strengths && result.strengths.length > 0 && (
-                <div>
-                  <div className="mb-1.5 text-emerald-400/60" style={{ fontSize: 11 }}>Strengths</div>
-                  {result.strengths.map((strength, i) => (
-                    <div key={i} className="mb-1 flex gap-1.5">
-                      <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/50" />
-                      <span className="text-white/50" style={{ fontSize: 11 }}>{strength}</span>
-                    </div>
-                  ))}
-                </div>
+              {result.extras.tool_constraint && (
+                <ToolConstraintExtras extras={result.extras.tool_constraint} />
               )}
-            </div>
-          )}
-
-          {/* File Details */}
-          {result.file_details && (
-            <div>
-              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>File Checks</div>
-              <div className="space-y-1">
-                {result.file_details.checked_files.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-white/40" style={{ fontSize: 11 }}>
-                    {f.exists ? (
-                      <CheckCircle2 className="h-3 w-3 text-emerald-400/50" />
-                    ) : (
-                      <XCircle className="h-3 w-3 text-red-400/50" />
-                    )}
-                    <span style={mono}>{f.path}</span>
-                    {f.pattern && (
-                      <span className="text-white/25">
-                        • pattern {f.pattern_matched ? "matched" : "not matched"}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Program Details */}
-          {result.program_details && (
-            <div>
-              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>Program Execution</div>
-              <div className="rounded-md bg-black/30 p-3 space-y-2">
-                <div>
-                  <span className="text-white/25" style={{ fontSize: 10 }}>Command: </span>
-                  <code className="text-white/60" style={{ ...mono, fontSize: 11 }}>
-                    {result.program_details.command}
-                  </code>
-                </div>
-                <div>
-                  <span className="text-white/25" style={{ fontSize: 10 }}>Exit code: </span>
-                  <span
-                    className={result.program_details.exit_code === 0 ? "text-emerald-400" : "text-red-400"}
-                    style={{ ...mono, fontSize: 11 }}
-                  >
-                    {result.program_details.exit_code}
-                  </span>
-                </div>
-                {result.program_details.stdout && (
-                  <div>
-                    <div className="text-white/25 mb-1" style={{ fontSize: 10 }}>Stdout:</div>
-                    <pre className="text-white/50 overflow-auto max-h-40" style={{ ...mono, fontSize: 10 }}>
-                      {result.program_details.stdout}
-                    </pre>
-                  </div>
-                )}
-                {result.program_details.stderr && (
-                  <div>
-                    <div className="text-red-400/60 mb-1" style={{ fontSize: 10 }}>Stderr:</div>
-                    <pre className="text-red-400/50 overflow-auto max-h-40" style={{ ...mono, fontSize: 10 }}>
-                      {result.program_details.stderr}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Prompt Details (LLM-as-judge) */}
-          {result.prompt_details && (
-            <div>
-              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>LLM Review</div>
-              <div className="space-y-2">
-                {result.prompt_details.model && (
-                  <div className="text-white/40" style={{ fontSize: 11 }}>
-                    Model: <span style={mono}>{result.prompt_details.model}</span>
-                  </div>
-                )}
-                {result.prompt_details.reasoning && (
-                  <div>
-                    <div className="text-white/25 mb-1" style={{ fontSize: 10 }}>Reasoning:</div>
-                    <p className="text-white/50" style={{ fontSize: 11, lineHeight: 1.5 }}>
-                      {result.prompt_details.reasoning}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Behavior Details */}
-          {result.behavior_details && (
-            <div>
-              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>Behavior Analysis</div>
-              <div className="grid gap-2 sm:grid-cols-2 text-white/40" style={{ fontSize: 11 }}>
-                {result.behavior_details.tools_used && result.behavior_details.tools_used.length > 0 && (
-                  <div>
-                    <span className="text-white/25">Tools used: </span>
-                    {result.behavior_details.tools_used.join(", ")}
-                  </div>
-                )}
-                {result.behavior_details.turn_count !== undefined && (
-                  <div>
-                    <span className="text-white/25">Turns: </span>
-                    {result.behavior_details.turn_count}
-                  </div>
-                )}
-                {result.behavior_details.total_actions !== undefined && (
-                  <div>
-                    <span className="text-white/25">Total actions: </span>
-                    {result.behavior_details.total_actions}
-                  </div>
-                )}
-                {result.behavior_details.violations && result.behavior_details.violations.length > 0 && (
-                  <div className="col-span-2">
-                    <span className="text-red-400/60">Violations: </span>
-                    {result.behavior_details.violations.join(", ")}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Review Details (multi-model review panel) */}
-          {result.review_details && (
-            <div>
-              <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>Review Panel</div>
-              <div className="space-y-2">
-                {result.review_details.criteria && result.review_details.criteria.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.review_details.criteria.map((c, i) => (
-                      <span
-                        key={i}
-                        className={`flex items-center gap-1 rounded-md px-2 py-0.5 ${
-                          c.passed
-                            ? "bg-emerald-500/10 text-emerald-400/70"
-                            : "bg-red-500/10 text-red-400/70"
-                        }`}
-                        style={{ fontSize: 10 }}
-                      >
-                        {c.passed ? (
-                          <CheckCircle2 className="h-2.5 w-2.5" />
-                        ) : (
-                          <XCircle className="h-2.5 w-2.5" />
-                        )}
-                        {c.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {result.extras.output_check && (
+                <OutputCheckExtras extras={result.extras.output_check} />
+              )}
+              {result.extras.review && <ReviewExtras extras={result.extras.review} />}
             </div>
           )}
         </div>

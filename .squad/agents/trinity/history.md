@@ -133,6 +133,92 @@ Audited `hyoka/internal/serve/` + React `site/src/` against anchor run `20260423
 **Commit:** c06ca9e2 (merged with Neo's bucket separation fix)
 - `playwright-cli` is restricted to roots `/home/rgeraghty/projects/hyoka` and `.playwright-cli` — screenshot output must land inside the repo (or be copied to `/tmp/` after).
 - Read-only investigations on `ronniegeraghty/dev` while Tank is concurrently editing means I never `git add` or commit; screenshots into `.trinity-screenshots/` (gitignored) + copy to `/tmp/trinity-site-review/`.
+
+---
+
+## 2026-04-24: v4 Grader Unification — Site Implementation (Option B)
+
+**Task:** Implement site-side changes for Morpheus's v4 grader unification plan (Option B). Work in parallel with Neo's engine implementation per `.squad/decisions/inbox/morpheus-grader-unification-plan.md`.
+
+**Changes made:**
+
+1. **Updated `site/src/app/data/types.ts`** — replaced v3 GraderResult with v4 schema:
+   - `GraderResult` now has required `points: GraderPoint[]` (always populated, len ≥ 1)
+   - `pass: boolean` (no longer nullable — derived from Points in engine)
+   - `message: string` (renamed from Summary — headline summary ≤ 120 chars)
+   - `extras?: GraderExtras` (discriminated union replacing 6 separate `*_details` fields)
+   - Removed: `model`, `scores`, `overall_score`, `max_score`, `summary`, `issues`, `strengths`, `duration_seconds`, `is_consensus`, `file_details`, `program_details`, `prompt_details`, `behavior_details`, `review_details`
+   - Added: `GraderPoint{label, pass, message, weight, evidence}`, `GraderExtras` with 8 kind-specific structs
+
+2. **Created `site/src/app/lib/graderScore.ts`** — canonical score formatting helper:
+   - `formatGraderScore(result)` — ALWAYS returns `"N/M points"` (even for single-point graders)
+   - No "Passed", no "100%", no special-casing
+   - This is the ONLY score string format shown in grader row headers
+
+3. **Created `site/src/app/components/grader-extras/`** — 8 kind-specific Extras components:
+   - `FileExtras.tsx` — per-file existence + pattern checks
+   - `ProgramExtras.tsx` — command, exit code, stdout/stderr
+   - `PromptExtras.tsx` — LLM judge model, rubric, reasoning
+   - `BehaviorExtras.tsx` — tools used, turn counts, violations
+   - `ActionSequenceExtras.tsx` — **NEW**: expected-vs-actual sequence diff (fixes missing visibility bug)
+   - `ToolConstraintExtras.tsx` — per-tool call constraints, violations
+   - `OutputCheckExtras.tsx` — **NEW**: produced files list (fixes missing ProducedFiles bug)
+   - `ReviewExtras.tsx` — multi-model panel breakdown, consensus marker
+   - `index.ts` — barrel export
+
+4. **Rewrote `site/src/app/components/GraderResultRow.tsx`**:
+   - Header: **ONE** canonical score `formatGraderScore(result)` + icon-only pass/fail badge
+   - **REMOVED** right-side duplicate score display (the inconsistency Ronnie reported)
+   - Body: Points list (always) + KindExtras dispatcher (when present)
+   - Per-point rendering: icon + label + message (on failure) + evidence chips (if present)
+   - Auto-expand when `points.length > 1` OR `!result.pass` (failed graders)
+   - Removed 6-way `if (file_details) …` cascade — replaced with single `extras` switch
+
+5. **Updated `site/src/app/lib/evalPass.ts`** — simplified for v4:
+   - `graderPasses(g)` now just returns `g.pass` (always boolean in v4)
+   - Removed tri-state fallback cascade (Points > pass > criteria > overall_score) — no longer needed
+   - `evalPointTotals()` updated to use `g.pass` directly (no more `graderPasses(g)` call)
+
+**Key design decisions per Morpheus's spec:**
+
+- **Score appears ONCE** in the header — no duplication on the right
+- **Canonical format: "N/M points"** for ALL graders (fixes "Passed" / "100%" inconsistency)
+- **Points list ALWAYS shown** when points exist (not just multi-point graders)
+- **Extras render via dispatcher** — one switch on `result.grader_type`, no cascading conditionals
+- **Auto-expand failed graders** — user sees the reason immediately
+
+**Verified:**
+
+- Site build passes: `npm run build` succeeded (1.1 MB bundle, no errors)
+- Go build expected to fail until Neo lands engine v4 — my types are ready for the new JSON contract
+
+**What's still needed (blocked on Neo):**
+
+- Neo's engine-side v4 implementation (graders emitting Points, Extras, new report.GraderResult shape)
+- Fresh v4 report to dogfood the rendering end-to-end
+- Playwright visual test once Neo's code lands (verify score format, no duplication, expandable file viewer regression check)
+
+**Files changed:**
+
+- `site/src/app/data/types.ts` — v4 schema
+- `site/src/app/lib/graderScore.ts` — new canonical formatter
+- `site/src/app/lib/evalPass.ts` — simplified for v4
+- `site/src/app/components/GraderResultRow.tsx` — full rewrite
+- `site/src/app/components/grader-extras/*.tsx` — 8 new components + barrel export
+
+**Notes for future dogfooding:**
+
+1. After Neo lands, run: `go run ./hyoka run --prompt-id test-dp-test-hello-markdown --config "test/sonnet"` then `go run ./hyoka clean`
+2. Start site: `go run ./hyoka serve` (background)
+3. Playwright check:
+   - Every grader row shows `N/M points` (no "Passed")
+   - Right-side score duplication gone
+   - Each point lists pass/fail + reason on failure
+   - ActionSequence extras show expected-vs-actual diff
+   - OutputCheck extras show ProducedFiles
+4. Screenshot for verification
+
+**Schema v4 contract established** — Neo and I are now building to the same JSON shape. Site is ready to render when the engine catches up.
 - Coordination boundary: data-model and roll-up structural critique is Morpheus; presentation/UX critique is mine. Deliverables link rather than overlap.
 
 ## Phase 4 — Site quick wins shipped — 2026-04-23 (Ronnie)

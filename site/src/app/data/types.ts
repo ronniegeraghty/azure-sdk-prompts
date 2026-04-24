@@ -33,101 +33,149 @@ export interface ReviewPanelEntry {
   events?: unknown[];
 }
 
-// ── Grader system types (Phase 3) ────────────────────────────────
+// ── Grader system types (v4 unified) ────────────────────────────────
 
-export interface FileCheckDetail {
+/**
+ * GraderPoint is the canonical sub-check unit. Every grader emits at least
+ * one Point. Pass and Score on GraderResult are derived from Points.
+ * Schema v4.
+ */
+export interface GraderPoint {
+  label: string;
+  pass: boolean;
+  message?: string;
+  weight?: number;
+  evidence?: Record<string, string>;
+}
+
+/**
+ * File grader extras — per-file details for file existence and pattern checks.
+ */
+export interface FileExtra {
   path: string;
   exists: boolean;
-  pattern_matched?: boolean | null;
   pattern?: string;
+  pattern_matched?: boolean;
+  size?: number;
 }
 
-export interface FileGraderDetail {
-  checked_files: FileCheckDetail[];
+export interface FileExtras {
+  files: FileExtra[];
 }
 
-export interface ProgramGraderDetail {
+/**
+ * Program grader extras — command execution details.
+ */
+export interface ProgramExtras {
   command: string;
+  args?: string[];
   exit_code: number;
   stdout: string;
   stderr: string;
+  duration_ms?: number;
 }
 
-export interface PromptGraderDetail {
+/**
+ * Prompt grader extras — LLM-as-judge details.
+ */
+export interface PromptExtras {
   model: string;
   rubric: string;
   reasoning: string;
-  raw_score?: number;
-  max_score?: number;
+  raw_score: number;
+  max_score: number;
 }
 
-export interface BehaviorGraderDetail {
-  tools_used?: string[];
+/**
+ * Behavior grader extras — tool usage and turn analysis.
+ */
+export interface BehaviorExtras {
+  tools_used: string[];
   missing_tools?: string[];
   forbidden_used?: string[];
-  turn_count?: number;
+  turn_count: number;
   max_turns?: number;
-  actual_turns?: number;
-  total_actions?: number;
+  total_actions: number;
   turn_limit_hit?: boolean;
   violations?: string[];
-  sequence_match?: boolean;
-  expected_sequence?: string[];
-  actual_sequence?: string[];
-  matched_actions?: number;
-  constraints_met?: boolean;
-  tool_counts?: Record<string, number>;
 }
 
-export interface ReviewGraderDetail {
-  model?: string;
-  overall_score: number;
-  max_score: number;
+/**
+ * Action sequence grader extras — expected vs actual sequence diff.
+ */
+export interface ActionSequenceExtras {
+  expected_sequence: string[];
+  actual_sequence: string[];
+  matched_actions: number;
+  tools_used: string[];
+  total_actions: number;
+}
+
+/**
+ * Tool constraint grader extras — per-tool call constraints.
+ */
+export interface ToolConstraintExtras {
+  tools_used: string[];
+  tool_counts: Record<string, number>;
+  missing_tools?: string[];
+  forbidden_used?: string[];
+  violations?: string[];
+  constraints_met: boolean;
+}
+
+/**
+ * Output check grader extras — produced files list.
+ */
+export interface FileEntry {
+  path: string;
+  size: number;
+}
+
+export interface OutputCheckExtras {
+  produced_files: FileEntry[];
+}
+
+/**
+ * Review grader extras — multi-model panel breakdown.
+ */
+export interface ReviewExtras {
+  model: string;
   summary: string;
-  issues?: string[];
-  strengths?: string[];
   is_consensus?: boolean;
-  criteria?: ReviewCriteria[];
   panel_results?: ReviewPanelEntry[];
-}
-
-// GraderPoint mirrors hyoka/internal/graders.GraderPoint and the report-side
-// `points` array introduced in schema v3 (Phase 2). Each grader emits one or
-// more sub-checks; the site renders these directly instead of re-deriving
-// pass/fail from the legacy expanded review entries. Empty for v2 reports.
-export interface GraderPoint {
-  name: string;
-  pass: boolean;
-  message?: string;
-}
-
-export interface GraderResult {
-  grader_name: string;
-  grader_type: string;
-  model?: string;
-  scores?: ReviewScores;
-  overall_score?: number;
-  max_score?: number;
-  summary?: string;
   issues?: string[];
   strengths?: string[];
   duration_seconds?: number;
-  is_consensus?: boolean;
-  score?: number;
-  weight?: number;
-  pass?: boolean | null;
+}
+
+/**
+ * GraderExtras is a discriminated union — only one branch is populated per grader.
+ */
+export interface GraderExtras {
+  file?: FileExtras;
+  program?: ProgramExtras;
+  prompt?: PromptExtras;
+  behavior?: BehaviorExtras;
+  action_sequence?: ActionSequenceExtras;
+  tool_constraint?: ToolConstraintExtras;
+  output_check?: OutputCheckExtras;
+  review?: ReviewExtras;
+}
+
+/**
+ * GraderResult is the unified shape every grader returns. Pass and Score
+ * are derived from Points. Schema v4.
+ */
+export interface GraderResult {
+  grader_name: string;
+  grader_type: string;
+  score: number;
+  weight: number;
+  pass: boolean;
   gate?: boolean;
-  file_details?: FileGraderDetail;
-  program_details?: ProgramGraderDetail;
-  prompt_details?: PromptGraderDetail;
-  behavior_details?: BehaviorGraderDetail;
-  review_details?: ReviewGraderDetail;
-  /**
-   * Per-sub-check rows from the grader. Populated in v3 reports. The site
-   * AND-rolls these to derive overall pass/fail (see lib/evalPass.ts) so
-   * eval-detail and run-detail never disagree on a grader's verdict.
-   */
-  points?: GraderPoint[];
+  message: string;
+  points: GraderPoint[];
+  extras?: GraderExtras;
 }
 
 // ── Workspace Delta types (#566) ──────────────────────────────────

@@ -5,16 +5,12 @@
 // helper is the only place that decision lives. Every page-level pass/fail
 // rollup MUST call evalPassFromPoints.
 //
-// Source-of-truth precedence:
-//   1. Schema-v3 roll-up totals on the report (graders_passed / graders_total)
+// v4 schema: GraderResult.pass is always boolean, derived from Points.
+// The source-of-truth precedence is simplified:
+//   1. Schema-v4 roll-up totals on the report (graders_passed / graders_total)
 //      — engine already AND-rolled the unified grader aggregate. Trust them.
-//   2. grader_results[*].points — AND every Point across every grader. This
-//      is the v3 fallback when the roll-up totals are absent (e.g. test
-//      fixtures, partial reports).
-//   3. grader_results[*].pass — older v3 fallback when a grader emitted
-//      no Points but did set pass.
-//   4. r.success — final fallback for v2 reports / EvalResult summaries
-//      that don't carry grader_results.
+//   2. grader_results[*].pass — v4: always boolean, AND of all points.
+//   3. r.success — final fallback for older reports or error rows.
 //
 // The shape is intentionally loose so it accepts both EvalReport (full
 // detail) and EvalResult (summary). Pages that only have summaries
@@ -36,53 +32,30 @@ export interface EvalPassInput {
  * this helper exists to prevent.
  */
 export function evalPassFromPoints(r: EvalPassInput): boolean {
-  // Schema v3: trust the engine's roll-up totals when present.
+  // Schema v4: trust the engine's roll-up totals when present.
   if (typeof r.graders_total === "number" && r.graders_total > 0) {
     return (r.graders_passed ?? 0) === r.graders_total;
   }
 
-  // Fall back to per-grader AND rollup over Points / pass / derived score.
+  // Fall back to per-grader AND rollup over pass field (v4: always boolean).
   if (r.grader_results && r.grader_results.length > 0) {
-    return r.grader_results.every(graderPasses);
+    return r.grader_results.every((g) => g.pass);
   }
 
-  // No grader data at all (v2 EvalResult summary, error rows). Trust the
-  // engine's success bit.
+  // No grader data at all (error rows, etc.). Trust the engine's success bit.
   return r.success === true;
 }
 
 /**
- * True iff a single grader is considered "passed". Mirrors the engine's
- * tri-state aware rollup: Points beat pass beats derived-from-score.
+ * True iff a single grader is considered "passed".
+ * v4: GraderResult.pass is always boolean (derived from Points in the engine).
  */
 export function graderPasses(g: GraderResult): boolean {
-  // Points are authoritative when present.
-  if (g.points && g.points.length > 0) {
-    return g.points.every(p => p.pass);
-  }
-
-  // Explicit pass field (v2 graders that don't emit points).
-  if (g.pass === true) return true;
-  if (g.pass === false) return false;
-
-  // pass is null/undefined — fall back to derived truth.
-  const criteria = g.scores?.criteria;
-  if (criteria && criteria.length > 0) {
-    return criteria.every(c => c.passed);
-  }
-  if (
-    g.overall_score != null &&
-    g.max_score != null &&
-    g.max_score > 0 &&
-    g.overall_score === g.max_score
-  ) {
-    return true;
-  }
-  return false;
+  return g.pass;
 }
 
 /**
- * Roll-up totals for the eval. Prefers v3 engine-side totals; falls back
+ * Roll-up totals for the eval. Prefers v4 engine-side totals; falls back
  * to recomputing from grader_results. Returned object is `{passed, total}`.
  *
  * Used by the eval-detail score card and any other surface that wants to
@@ -94,7 +67,7 @@ export function evalGraderTotals(r: EvalPassInput): { passed: number; total: num
   }
   const grs = r.grader_results ?? [];
   return {
-    passed: grs.filter(graderPasses).length,
+    passed: grs.filter((g) => g.pass).length,
     total: grs.length,
   };
 }
@@ -105,19 +78,22 @@ export function evalGraderTotals(r: EvalPassInput): { passed: number; total: num
  * virtual point so the count remains meaningful (`✓ N / N points across M
  * graders` reads correctly even when one grader is points-less).
  */
-export function evalPointTotals(r: EvalPassInput): { passed: number; total: number; graders: number } {
+export function evalPointTotals(
+  r: EvalPassInput
+): { passed: number; total: number; graders: number } {
   const grs = r.grader_results ?? [];
   let passed = 0;
   let total = 0;
   for (const g of grs) {
     if (g.points && g.points.length > 0) {
       total += g.points.length;
-      passed += g.points.filter(p => p.pass).length;
+      passed += g.points.filter((p) => p.pass).length;
     } else {
       // Synthesize a single point from this grader's verdict.
       total += 1;
-      if (graderPasses(g)) passed += 1;
+      if (g.pass) passed += 1;
     }
   }
   return { passed, total, graders: grs.length };
 }
+
