@@ -21,14 +21,26 @@ export interface GraderResultRowProps {
 }
 
 export function GraderResultRow({ result, defaultExpanded = false }: GraderResultRowProps) {
-  // v4 schema: Points is required, pass is always boolean
-  const hasMultiplePoints = result.points.length > 1;
-  const hasFailed = !result.pass;
-  
-  // Auto-expand multi-point graders OR failed graders by default
-  const [expanded, setExpanded] = useState(
-    defaultExpanded || hasMultiplePoints || hasFailed
-  );
+  // Collapsed by default — user opens individual graders on demand.
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  // Defensive: if the engine emitted a grader with no Points (Neo is fixing the
+  // root cause in parallel), synthesize a single fallback Point so the UI never
+  // renders an empty-bodied grader. See decisions/inbox.
+  let points = result.points;
+  if (!points || points.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[graderless] Grader '${result.grader_name}' (${result.grader_type}) shipped no Points — synthesized fallback`,
+    );
+    points = [
+      {
+        label: `${result.grader_name} result`,
+        pass: result.pass,
+        message: result.message,
+      },
+    ];
+  }
 
   // Badge color based on result.pass (v4: always boolean)
   const badgeColor = result.pass
@@ -41,8 +53,8 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
     <XCircle className="h-3 w-3" />
   );
 
-  // Check if there's expandable content (Points list + Extras)
-  const hasDetails = result.points.length > 0 || !!result.extras;
+  // Always have details now — Points list is always non-empty after synthesis.
+  const hasDetails = points.length > 0 || !!result.extras;
 
   const graderTypeLabel = result.grader_type
     .split("_")
@@ -106,54 +118,68 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
       {/* Expanded Details — v4: Points list (always) + KindExtras (when present) */}
       {expanded && hasDetails && (
         <div className="border-t border-white/5 p-3 space-y-3">
-          {/* Points List — ALWAYS rendered when there are points */}
-          {result.points.length > 0 && (
+          {/* Points List — ALWAYS rendered (synthesized if engine omitted) */}
+          {points.length > 0 && (
             <div>
               <div className="mb-1.5 text-white/25" style={{ fontSize: 10 }}>
                 Points
               </div>
               <div className="ml-6 space-y-1">
-                {result.points.map((p, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-2 py-1"
-                  >
-                    {p.pass ? (
-                      <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/80" />
-                    ) : (
-                      <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/80" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={p.pass ? "text-white/70" : "text-red-400/80"}
-                        style={{ fontSize: 12 }}
-                      >
-                        {p.label}
-                      </div>
-                      {p.message && (
+                {points.map((p, i) => {
+                  // Label fallback chain — handles legacy `name`/`title`/`check`
+                  // fields and engine-side blanks. Every Point gets visible text.
+                  const labelText =
+                    p.label ||
+                    p.name ||
+                    p.title ||
+                    p.check ||
+                    p.message ||
+                    p.reason ||
+                    (p.pass ? "Check passed" : "Check failed");
+                  // Show message as secondary line only when distinct from label.
+                  const secondary = p.message && p.message !== labelText ? p.message : null;
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-start gap-2 py-1"
+                    >
+                      {p.pass ? (
+                        <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/80" />
+                      ) : (
+                        <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/80" />
+                      )}
+                      <div className="min-w-0 flex-1">
                         <div
-                          className="text-white/40"
-                          style={{ fontSize: 11, lineHeight: 1.5 }}
+                          className={p.pass ? "text-white/70" : "text-red-400/80"}
+                          style={{ fontSize: 12 }}
                         >
-                          {p.message}
+                          {labelText}
                         </div>
-                      )}
-                      {p.evidence && Object.keys(p.evidence).length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {Object.entries(p.evidence).map(([k, v]) => (
-                            <span
-                              key={k}
-                              className="rounded bg-white/5 px-1.5 py-0.5 text-white/30"
-                              style={{ fontSize: 9 }}
-                            >
-                              {k}: {v}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                        {secondary && (
+                          <div
+                            className="text-white/40"
+                            style={{ fontSize: 11, lineHeight: 1.5 }}
+                          >
+                            {secondary}
+                          </div>
+                        )}
+                        {p.evidence && Object.keys(p.evidence).length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {Object.entries(p.evidence).map(([k, v]) => (
+                              <span
+                                key={k}
+                                className="rounded bg-white/5 px-1.5 py-0.5 text-white/30"
+                                style={{ fontSize: 9 }}
+                              >
+                                {k}: {v}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

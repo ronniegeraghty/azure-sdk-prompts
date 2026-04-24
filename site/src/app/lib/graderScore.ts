@@ -9,8 +9,14 @@ import type { GraderResult } from "../data/types";
  * This is the ONLY score string format shown in the row header.
  */
 export function formatGraderScore(result: GraderResult): string {
-  const passed = result.points.filter((p) => p.pass).length;
-  const total = result.points.length;
+  const points = result.points ?? [];
+  const total = points.length;
+  // Defensive: if no detail points were emitted, treat the grader itself as a
+  // single implicit point so we never render bare "PASS" / "100%" / "0/0".
+  if (total === 0) {
+    return result.pass ? "1/1 points" : "0/1 points";
+  }
+  const passed = points.filter((p) => p.pass).length;
   return `${passed}/${total} points`;
 }
 

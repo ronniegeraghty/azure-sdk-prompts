@@ -46,6 +46,14 @@ export interface GraderPoint {
   message?: string;
   weight?: number;
   evidence?: Record<string, string>;
+  /** Legacy field name from pre-v4 reports — kept for backward-compat fallback. */
+  name?: string;
+  /** Some older renderers used `title`. */
+  title?: string;
+  /** Some older renderers used `check`. */
+  check?: string;
+  /** Older synonym for message used by some graders. */
+  reason?: string;
 }
 
 /**
