@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
@@ -14,6 +15,11 @@ import (
 // This allows report consumers to access workspace.WorkspaceDelta
 // without creating an import cycle.
 type WorkspaceDelta = workspace.WorkspaceDelta
+
+// GeneratorArtifact is a type alias for the generator artifact type.
+// This allows report consumers to access artifact.GeneratorArtifact
+// without creating an import cycle.
+type GeneratorArtifact = artifact.GeneratorArtifact
 
 // CurrentSchemaVersion is the latest report schema version.
 //
@@ -338,6 +344,9 @@ type EvalReport struct {
 	// Populated at report-build time from the workspace directory. Files
 	// exceeding 1MB are capped with a truncation marker.
 	FileContents       map[string]string     `json:"file_contents,omitempty"`
+	// GeneratorArtifact captures the complete state of the generator session.
+	// Populated at report-build time from generator.json if it exists.
+	GeneratorArtifact  *GeneratorArtifact    `json:"generator_artifact,omitempty"`
 	Review             *review.ReviewResult     `json:"review,omitempty"`
 	ReviewPanel        []review.ReviewResult    `json:"review_panel,omitempty"`
 	SkippedReviewers   []review.SkippedReviewer `json:"skipped_reviewers,omitempty"`

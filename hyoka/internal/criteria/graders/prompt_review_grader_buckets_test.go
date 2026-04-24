@@ -22,7 +22,7 @@ type recordingReviewer struct {
 	lastCriteria     string
 }
 
-func (r *recordingReviewer) Review(_ context.Context, _, _, _, criteria string) (*review.ReviewResult, error) {
+func (r *recordingReviewer) Review(_ context.Context, _, _, _, criteria string, _ *review.GeneratorArtifact) (*review.ReviewResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.reviewCalls++
@@ -30,7 +30,7 @@ func (r *recordingReviewer) Review(_ context.Context, _, _, _, criteria string) 
 	return stubResult(1, 1, "ok"), nil
 }
 
-func (r *recordingReviewer) ReviewBuckets(_ context.Context, _, _, _ string, buckets []review.Bucket) (*review.ReviewResult, error) {
+func (r *recordingReviewer) ReviewBuckets(_ context.Context, _, _, _ string, buckets []review.Bucket, _ *review.GeneratorArtifact) (*review.ReviewResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.reviewBucketCalls++
@@ -47,7 +47,7 @@ type reviewOnlyReviewer struct {
 	lastCriteria string
 }
 
-func (r *reviewOnlyReviewer) Review(_ context.Context, _, _, _, criteria string) (*review.ReviewResult, error) {
+func (r *reviewOnlyReviewer) Review(_ context.Context, _, _, _, criteria string, _ *review.GeneratorArtifact) (*review.ReviewResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls++

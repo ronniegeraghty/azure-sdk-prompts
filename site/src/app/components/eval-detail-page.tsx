@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
-import type { RunSummary, EvalResult, EvalReport, SessionEvent, ReviewPanelEntry, GraderResult, ReviewedFile } from "../data/types";
+import type { RunSummary, EvalResult, EvalReport, SessionEvent, ReviewPanelEntry, GraderResult, ReviewedFile, GeneratorArtifact } from "../data/types";
 import {
   ArrowLeft, CheckCircle2, XCircle, Clock, FileCode2, Cpu,
   MessageSquare, Wrench, Terminal, ChevronDown, ChevronRight,
@@ -339,6 +339,7 @@ export function EvalDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedReviewer, setExpandedReviewer] = useState<number>(0);
   const [showTimeline, setShowTimeline] = useState(true);
+  const [showGenSession, setShowGenSession] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
 
@@ -418,6 +419,7 @@ export function EvalDetailPage() {
   const guardrailReason = r.guardrail_abort_reason || "";
   const errorMsg = r.error || guardrailReason || "";
   const workspaceDelta = r.workspace_delta;
+  const generatorArtifact = r.generator_artifact;
 
   const envModel = environment?.model || "";
   const envInputTokens = environment?.totalInputTokens ?? environment?.total_input_tokens ?? 0;
@@ -866,6 +868,161 @@ export function EvalDetailPage() {
                 <ReviewerTimeline key={i} reviewer={rev} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Generator Session */}
+        {generatorArtifact && (
+          <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.03]">
+            <button
+              onClick={() => setShowGenSession(!showGenSession)}
+              className="flex w-full items-center justify-between p-5"
+            >
+              <h3 className="flex items-center gap-2 text-white" style={{ fontSize: 14 }}>
+                <Zap className="h-4 w-4 text-amber-400" />
+                Generator Session
+              </h3>
+              {showGenSession ? (
+                <ChevronDown className="h-4 w-4 text-white/20" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-white/20" />
+              )}
+            </button>
+            {showGenSession && (
+              <div className="border-t border-white/8 p-5 space-y-4">
+                {/* Termination badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-white/40" style={{ fontSize: 11 }}>Status:</span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 ${
+                      generatorArtifact.terminated_by === "completed"
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : generatorArtifact.terminated_by === "max_actions"
+                        ? "bg-amber-500/10 text-amber-400"
+                        : generatorArtifact.terminated_by === "error"
+                        ? "bg-red-500/10 text-red-400"
+                        : "bg-orange-500/10 text-orange-400"
+                    }`}
+                    style={{ fontSize: 11, fontWeight: 500 }}
+                  >
+                    {generatorArtifact.terminated_by === "completed" && <CheckCircle2 className="h-3 w-3" />}
+                    {generatorArtifact.terminated_by === "max_actions" && <AlertTriangle className="h-3 w-3" />}
+                    {generatorArtifact.terminated_by === "error" && <XCircle className="h-3 w-3" />}
+                    {generatorArtifact.terminated_by}
+                  </span>
+                  {generatorArtifact.error && (
+                    <span className="text-red-400/70" style={{ fontSize: 11 }}>
+                      {generatorArtifact.error}
+                    </span>
+                  )}
+                </div>
+
+                {/* Timing */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-white/40 mb-1" style={{ fontSize: 11 }}>Duration</div>
+                    <div className="text-white/70" style={{ ...mono, fontSize: 12 }}>
+                      {Math.floor(generatorArtifact.duration_ms / 1000 / 60)}m {Math.floor((generatorArtifact.duration_ms / 1000) % 60)}s
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-white/40 mb-1" style={{ fontSize: 11 }}>Started</div>
+                    <div className="text-white/70" style={{ ...mono, fontSize: 12 }}>
+                      {new Date(generatorArtifact.started_at).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions summary */}
+                <div>
+                  <div className="text-white/40 mb-2" style={{ fontSize: 11 }}>Actions</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2">
+                      <div className="text-white/40" style={{ fontSize: 10 }}>Total</div>
+                      <div className="text-white/80" style={{ fontSize: 14, fontWeight: 500 }}>
+                        {generatorArtifact.actions_summary.total_actions}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2">
+                      <div className="text-white/40" style={{ fontSize: 10 }}>Tool Calls</div>
+                      <div className="text-white/80" style={{ fontSize: 14, fontWeight: 500 }}>
+                        {generatorArtifact.actions_summary.tool_calls}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2">
+                      <div className="text-white/40" style={{ fontSize: 10 }}>Reasoning</div>
+                      <div className="text-white/80" style={{ fontSize: 14, fontWeight: 500 }}>
+                        {generatorArtifact.actions_summary.reasoning_steps}
+                      </div>
+                    </div>
+                  </div>
+                  {generatorArtifact.actions_summary.truncated && (
+                    <div className="mt-2 text-amber-400/70" style={{ fontSize: 11 }}>
+                      <AlertTriangle className="inline h-3 w-3 mr-1" />
+                      Action limit reached
+                    </div>
+                  )}
+                </div>
+
+                {/* Workspace delta */}
+                {generatorArtifact.workspace_delta && (
+                  <div>
+                    <div className="text-white/40 mb-2" style={{ fontSize: 11 }}>Workspace Changes</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {generatorArtifact.workspace_delta.new_file_count > 0 && (
+                        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+                          <div className="text-emerald-400/70" style={{ fontSize: 10 }}>Created</div>
+                          <div className="text-emerald-400" style={{ fontSize: 14, fontWeight: 500 }}>
+                            {generatorArtifact.workspace_delta.new_file_count} files
+                          </div>
+                        </div>
+                      )}
+                      {generatorArtifact.workspace_delta.modified_file_count > 0 && (
+                        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                          <div className="text-amber-400/70" style={{ fontSize: 10 }}>Modified</div>
+                          <div className="text-amber-400" style={{ fontSize: 14, fontWeight: 500 }}>
+                            {generatorArtifact.workspace_delta.modified_file_count} files
+                          </div>
+                        </div>
+                      )}
+                      {generatorArtifact.workspace_delta.deleted_file_count > 0 && (
+                        <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+                          <div className="text-red-400/70" style={{ fontSize: 10 }}>Deleted</div>
+                          <div className="text-red-400" style={{ fontSize: 14, fontWeight: 500 }}>
+                            {generatorArtifact.workspace_delta.deleted_file_count} files
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Final response */}
+                {generatorArtifact.final_response && generatorArtifact.final_response.trim().length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-white/40" style={{ fontSize: 11 }}>Final Response</div>
+                      <CopyButton text={generatorArtifact.final_response} />
+                    </div>
+                    <div className="rounded-lg border border-white/5 bg-black/20 p-4">
+                      <pre
+                        className="overflow-x-auto text-white/70 whitespace-pre-wrap"
+                        style={{ ...mono, fontSize: 11, lineHeight: 1.5 }}
+                      >
+                        {generatorArtifact.final_response.length > 500 && generatedFiles.length > 0
+                          ? generatorArtifact.final_response.slice(0, 500) + "..."
+                          : generatorArtifact.final_response}
+                      </pre>
+                      {generatorArtifact.final_response.length > 500 && generatedFiles.length > 0 && (
+                        <div className="mt-2 text-white/40" style={{ fontSize: 10 }}>
+                          Response truncated for display. Full response available in generator.json.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

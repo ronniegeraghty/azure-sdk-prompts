@@ -366,3 +366,64 @@ Commit `6df67540` (renderer task) inadvertently captured Trinity's parallel site
 - The bundle-error check (`e.graderBundle.MatchingErrors(props)`) remains — config errors still skip grading
 
 **Commit**: 8794e70b — "Remove empty-workspace grader guard and add agent response to graders"
+
+## 2026-04-24 — Generator Artifact System (Neo Task)
+
+**Branch:** `ronniegeraghty/dev`
+**Commit:** bae1c6d9 (amended)
+
+### Task
+
+Implement generator.json artifact to fix the "no files → no AI review" bug. When the generator produces no code files (e.g., codex generators), AI review graders should still run, evaluating the agent's final response instead.
+
+### Implementation
+
+- Created `hyoka/internal/artifact` package with `GeneratorArtifact` struct
+- Artifact schema: prompt_id, config_name, generator_model, original_prompt, final_response, workspace_delta, actions_summary, timestamps, terminated_by, error
+- Engine writes artifact to `{reportDir}/generator.json` after generation completes, before graders run
+- Added `GeneratorArtifactPath` and `GeneratorArtifact` to `GraderInput` — pre-parsed for grader convenience
+- Updated `Reviewer` interface: all Review methods now accept `artifact *GeneratorArtifact` parameter
+- Fixed `CopilotReviewer.Review`: empty workDir is acceptable if artifact has FinalResponse
+- Updated `BuildReviewPrompt`: when no files exist, shows "Agent's Final Response" + workspace delta summary; when files exist, appends response as additional context
+- Updated `PanelReviewer`, `MultiBucketReviewer` interfaces and implementations
+- Updated `PromptReviewGrader` to pass artifact to reviewers
+
+### Schema
+
+```json
+{
+  "prompt_id": "...",
+  "config_name": "...",
+  "generator_model": "...",
+  "original_prompt": "... [truncated at 16KB]",
+  "final_response": "... [truncated at 16KB]",
+  "workspace_delta": {
+    "bytes_added": 0,
+    "new_file_count": 0,
+    "created_files": [],
+    "modified_files": [],
+    "deleted_files": []
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 5,
+    "reasoning_steps": 3,
+    "truncated": false
+  },
+  "started_at": "2026-04-24T02:00:00Z",
+  "ended_at": "2026-04-24T02:01:30Z",
+  "duration_ms": 90000,
+  "terminated_by": "completed",
+  "error": ""
+}
+```
+
+### Backward Compatibility
+
+Existing `GraderInput` fields (`WorkspacePath`, `AgentFinalResponse`, `WorkspaceDelta`, `OriginalPrompt`) remain populated. The artifact is the canonical source; loose fields are convenience accessors.
+
+### Status
+
+✅ Builds successfully
+⚠️ **Needs testing:** Live run with python-pairwise (codex generator that produces no files) to verify AI graders execute
+⚠️ **Needs tests:** Unit tests for artifact round-trip, engine write, reviewer empty-workdir path

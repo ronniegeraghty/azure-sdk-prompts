@@ -1030,7 +1030,7 @@ type capturingReviewer struct {
 	capturedCriteria string
 }
 
-func (c *capturingReviewer) Review(_ context.Context, _ string, _ string, _ string, evaluationCriteria string) (*review.ReviewResult, error) {
+func (c *capturingReviewer) Review(_ context.Context, _ string, _ string, _ string, evaluationCriteria string, _ *review.GeneratorArtifact) (*review.ReviewResult, error) {
 	c.capturedCriteria = evaluationCriteria
 	return &review.ReviewResult{
 		OverallScore: 5,

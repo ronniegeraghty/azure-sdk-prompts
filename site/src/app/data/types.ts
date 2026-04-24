@@ -306,6 +306,50 @@ export interface PairwiseRunReport {
   aggregate_impacts?: ToolImpact[];
 }
 
+// ── Generator Artifact (schema v3 addition for site display) ──────────
+
+export interface ArtifactFileInfo {
+  path: string;
+  size: number;
+}
+
+export interface ArtifactWorkspaceDelta {
+  bytes_added: number;
+  bytes_removed: number;
+  bytes_net: number;
+  new_file_count: number;
+  modified_file_count: number;
+  deleted_file_count: number;
+  created_files: ArtifactFileInfo[];
+  modified_files: ArtifactFileInfo[];
+  deleted_files: ArtifactFileInfo[];
+}
+
+export interface ActionsSummary {
+  total_actions: number;
+  tool_calls: number;
+  reasoning_steps: number;
+  truncated: boolean;
+}
+
+export interface GeneratorArtifact {
+  prompt_id: string;
+  eval_id?: string;
+  config_name: string;
+  generator_model: string;
+  original_prompt: string;
+  final_response: string;
+  workspace_delta: ArtifactWorkspaceDelta;
+  actions_summary: ActionsSummary;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number;
+  terminated_by: string;
+  error?: string;
+}
+
+// ── Run summary and eval result types ──────────────────────────────
+
 export interface RunSummary {
   run_id: string;
   timestamp: string;
@@ -347,6 +391,13 @@ export interface EvalReport {
   config_used?: { model: string; name: string };
   rerunCommand?: string;
   guardrail_abort_reason?: string;
+  /**
+   * `generator_artifact` captures the complete generator session state.
+   * Populated at report-build time from generator.json when it exists.
+   * Schema v3 addition for site display of session details, final response,
+   * workspace delta, timing, and termination reason.
+   */
+  generator_artifact?: GeneratorArtifact;
   /**
    * `tool_availability` rows from the Go report (#348). Populated in v2
    * and v3. v3 may eventually include parent linkage on each entry.

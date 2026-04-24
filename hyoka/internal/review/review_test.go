@@ -25,7 +25,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 		"Program.cs": "using Azure.Storage.Blobs;\n// reference",
 	}
 
-	result := BuildReviewPrompt(prompt, generated, reference, "")
+	result := BuildReviewPrompt(prompt, generated, reference, "", nil)
 
 	if result == "" {
 		t.Fatal("expected non-empty review prompt")
@@ -50,7 +50,7 @@ func TestBuildReviewPromptNoReference(t *testing.T) {
 	prompt := "Write code"
 	generated := map[string]string{"main.go": "package main"}
 
-	result := BuildReviewPrompt(prompt, generated, nil, "")
+	result := BuildReviewPrompt(prompt, generated, nil, "", nil)
 
 	if !strings.Contains(result, "No reference answer provided") {
 		t.Error("expected 'No reference answer provided' when no reference given")
@@ -58,7 +58,7 @@ func TestBuildReviewPromptNoReference(t *testing.T) {
 }
 
 func TestBuildReviewPromptEmptyReference(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, map[string]string{}, "")
+	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, map[string]string{}, "", nil)
 	if !strings.Contains(result, "No reference answer provided") {
 		t.Error("empty reference map should show 'No reference answer provided'")
 	}
@@ -69,7 +69,7 @@ func TestBuildReviewPromptWithEvaluationCriteria(t *testing.T) {
 	generated := map[string]string{"main.go": "package main"}
 	criteria := "- Must use DefaultAzureCredential\n- Must handle errors"
 
-	result := BuildReviewPrompt(prompt, generated, nil, criteria)
+	result := BuildReviewPrompt(prompt, generated, nil, criteria, nil)
 
 	if !strings.Contains(result, "Evaluation Criteria") {
 		t.Error("expected evaluation criteria section")
@@ -80,7 +80,7 @@ func TestBuildReviewPromptWithEvaluationCriteria(t *testing.T) {
 }
 
 func TestBuildReviewPromptNoCriteria(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, nil, "")
+	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, nil, "", nil)
 	// When no criteria are passed, the "Evaluation Criteria" section should not appear.
 	if strings.Contains(result, "## Evaluation Criteria") {
 		t.Error("should not contain criteria section header when criteria is empty")
@@ -98,7 +98,7 @@ func TestBuildReviewPromptMultipleFiles(t *testing.T) {
 		"ref_help.go": "package helper // ref",
 	}
 
-	result := BuildReviewPrompt("prompt", generated, reference, "criteria")
+	result := BuildReviewPrompt("prompt", generated, reference, "criteria", nil)
 
 	for name := range generated {
 		if !strings.Contains(result, name) {
@@ -113,14 +113,14 @@ func TestBuildReviewPromptMultipleFiles(t *testing.T) {
 }
 
 func TestBuildReviewPromptEmptyGeneratedFiles(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{}, nil, "")
+	result := BuildReviewPrompt("prompt", map[string]string{}, nil, "", nil)
 	if !strings.Contains(result, "Generated Code") {
 		t.Error("should still contain Generated Code header even with empty files")
 	}
 }
 
 func TestBuildReviewPromptContainsScoringInstructions(t *testing.T) {
-	result := BuildReviewPrompt("p", map[string]string{"f": "c"}, nil, "")
+	result := BuildReviewPrompt("p", map[string]string{"f": "c"}, nil, "", nil)
 	if !strings.Contains(result, "Scoring Instructions") {
 		t.Error("prompt should contain scoring instructions")
 	}
@@ -128,7 +128,7 @@ func TestBuildReviewPromptContainsScoringInstructions(t *testing.T) {
 
 func TestBuildReviewPromptPreservesOriginalPrompt(t *testing.T) {
 	original := "Write a Python script that uses azure-identity DefaultAzureCredential"
-	result := BuildReviewPrompt(original, map[string]string{"main.py": "pass"}, nil, "")
+	result := BuildReviewPrompt(original, map[string]string{"main.py": "pass"}, nil, "", nil)
 	if !strings.Contains(result, original) {
 		t.Error("prompt should contain the original prompt verbatim")
 	}
@@ -412,8 +412,8 @@ func TestStubReviewerScores(t *testing.T) {
 
 func TestStubReviewerIgnoresInputs(t *testing.T) {
 	s := &StubReviewer{}
-	r1, _ := s.Review(nil, "prompt1", "dir1", "ref1", "criteria1")
-	r2, _ := s.Review(nil, "prompt2", "dir2", "ref2", "criteria2")
+	r1, _ := s.Review(nil, "prompt1", "dir1", "ref1", "criteria1", nil)
+	r2, _ := s.Review(nil, "prompt2", "dir2", "ref2", "criteria2", nil)
 
 	if r1.Summary != r2.Summary {
 		t.Error("stub reviewer should return identical results regardless of inputs")
@@ -922,7 +922,7 @@ func TestPanelReviewer_SetSystemPrompt(t *testing.T) {
 func TestCopilotReviewerReviewNoGeneratedFiles(t *testing.T) {
 	emptyDir := t.TempDir()
 	r := NewCopilotReviewer(nil, "test-model", 50)
-	_, err := r.Review(context.Background(), "prompt", emptyDir, "", "")
+	_, err := r.Review(context.Background(), "prompt", emptyDir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty workDir")
 	}
@@ -933,7 +933,7 @@ func TestCopilotReviewerReviewNoGeneratedFiles(t *testing.T) {
 
 func TestCopilotReviewerReviewNonexistentWorkDir(t *testing.T) {
 	r := NewCopilotReviewer(nil, "test-model", 50)
-	_, err := r.Review(context.Background(), "prompt", "/nonexistent/dir/abc", "", "")
+	_, err := r.Review(context.Background(), "prompt", "/nonexistent/dir/abc", "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for nonexistent workDir")
 	}
@@ -988,7 +988,7 @@ func TestCopilotReviewerSettersEdgeCases(t *testing.T) {
 
 func TestPanelReviewerReviewPanelNoModels(t *testing.T) {
 	p := NewPanelReviewer(nil, []string{}, 50)
-	_, _, err := p.ReviewPanel(context.Background(), "prompt", t.TempDir(), "", "")
+	_, _, err := p.ReviewPanel(context.Background(), "prompt", t.TempDir(), "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty models")
 	}
@@ -1000,7 +1000,7 @@ func TestPanelReviewerReviewPanelNoModels(t *testing.T) {
 func TestPanelReviewerReviewPanelNoGeneratedFiles(t *testing.T) {
 	emptyDir := t.TempDir()
 	p := NewPanelReviewer(nil, []string{"model-a"}, 50)
-	_, _, err := p.ReviewPanel(context.Background(), "prompt", emptyDir, "", "")
+	_, _, err := p.ReviewPanel(context.Background(), "prompt", emptyDir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty workDir")
 	}
@@ -1011,7 +1011,7 @@ func TestPanelReviewerReviewPanelNoGeneratedFiles(t *testing.T) {
 
 func TestPanelReviewerReviewDelegatesToReviewPanel(t *testing.T) {
 	p := NewPanelReviewer(nil, []string{}, 50)
-	_, err := p.Review(context.Background(), "prompt", t.TempDir(), "", "")
+	_, err := p.Review(context.Background(), "prompt", t.TempDir(), "", "", nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1028,7 +1028,7 @@ func TestPanelReviewerReviewPanelCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "", "")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -1217,7 +1217,7 @@ func TestBuildReviewPromptSpecialChars(t *testing.T) {
 	generated := map[string]string{
 		"test.go": "package main\nfunc main() { fmt.Println(\"hello\") }",
 	}
-	result := BuildReviewPrompt(prompt, generated, nil, "")
+	result := BuildReviewPrompt(prompt, generated, nil, "", nil)
 	if !strings.Contains(result, "backticks") {
 		t.Error("should preserve special characters in prompt")
 	}
@@ -1283,7 +1283,7 @@ func TestPanelReviewerReviewPanelWithReferenceDir(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "some criteria")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "some criteria", nil)
 	if err == nil {
 		t.Fatal("expected error (cancelled context)")
 	}
@@ -1299,7 +1299,7 @@ func TestPanelReviewerReviewPanelWithInvalidReferenceDir(t *testing.T) {
 	cancel()
 
 	// Non-fatal: reference read failure should not prevent the run
-	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "/nonexistent/ref/dir", "criteria")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "/nonexistent/ref/dir", "criteria", nil)
 	if err == nil {
 		t.Fatal("expected error (cancelled context, not ref failure)")
 	}
@@ -1320,7 +1320,7 @@ func TestPanelReviewerReviewPanelWithEmptyReferenceDir(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "", nil)
 	if err == nil {
 		t.Fatal("expected error (cancelled context)")
 	}
@@ -1331,7 +1331,7 @@ func TestCopilotReviewerReviewWithOnlyHiddenFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.pyc"), 0644)
 
 	r := NewCopilotReviewer(nil, "test-model", 50)
-	_, err := r.Review(context.Background(), "prompt", dir, "", "")
+	_, err := r.Review(context.Background(), "prompt", dir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for dir with only hidden files")
 	}
@@ -1345,7 +1345,7 @@ func TestPanelReviewerReviewPanelWithOnlyHiddenFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.pyc"), 0644)
 
 	p := NewPanelReviewer(nil, []string{"model-a"}, 50)
-	_, _, err := p.ReviewPanel(context.Background(), "prompt", dir, "", "")
+	_, _, err := p.ReviewPanel(context.Background(), "prompt", dir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for dir with only hidden files")
 	}
@@ -1852,4 +1852,129 @@ func TestCriterionJudgmentJSONRoundTrip(t *testing.T) {
 	if decoded.Criteria[0].Criterion != "test criterion" {
 		t.Error("criterion text should round-trip")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// GeneratorArtifact integration tests
+// ---------------------------------------------------------------------------
+
+// TestBuildReviewPrompt_WithArtifactAndFiles verifies that when both generated
+// files AND a final response artifact are present, the prompt includes BOTH
+// sections unconditionally.
+func TestBuildReviewPrompt_WithArtifactAndFiles(t *testing.T) {
+prompt := "Write a Python script"
+files := map[string]string{
+"main.py": "print('hello')",
+}
+artifact := &GeneratorArtifact{
+FinalResponse: "I have created the script as requested.",
+}
+
+result := BuildReviewPrompt(prompt, files, nil, "Must run without errors", artifact)
+
+// Both sections must appear
+if !strings.Contains(result, "## Generated Code") {
+t.Error("prompt must include Generated Code section when files present")
+}
+if !strings.Contains(result, "main.py") {
+t.Error("prompt must include file content")
+}
+if !strings.Contains(result, "## Agent's Final Response") {
+t.Error("prompt must include Agent's Final Response section when artifact present")
+}
+if !strings.Contains(result, "I have created the script") {
+t.Error("prompt must include artifact's final response text")
+}
+}
+
+// TestBuildReviewPrompt_WithArtifactNoFiles verifies that when no files are
+// generated but an artifact with a final response exists, the prompt includes
+// the agent's response and indicates no files were created.
+func TestBuildReviewPrompt_WithArtifactNoFiles(t *testing.T) {
+prompt := "Explain how to use DefaultAzureCredential"
+artifact := &GeneratorArtifact{
+FinalResponse: "DefaultAzureCredential is a chained credential...",
+}
+
+result := BuildReviewPrompt(prompt, nil, nil, "Must be accurate", artifact)
+
+if !strings.Contains(result, "## Generated Code") {
+t.Error("prompt must include Generated Code section header")
+}
+if !strings.Contains(result, "No files were created") {
+t.Error("prompt must indicate no files when workspace is empty")
+}
+if !strings.Contains(result, "## Agent's Final Response") {
+t.Error("prompt must include Agent's Final Response section")
+}
+if !strings.Contains(result, "DefaultAzureCredential is a chained") {
+t.Error("prompt must include artifact response")
+}
+}
+
+// TestBuildReviewPrompt_NoArtifactWithFiles verifies that when files are
+// generated but no artifact is provided, the prompt still works (legacy behavior).
+func TestBuildReviewPrompt_NoArtifactWithFiles(t *testing.T) {
+prompt := "Write code"
+files := map[string]string{"test.py": "code"}
+
+result := BuildReviewPrompt(prompt, files, nil, "", nil)
+
+if !strings.Contains(result, "## Generated Code") {
+t.Error("prompt must include Generated Code section")
+}
+if !strings.Contains(result, "test.py") {
+t.Error("prompt must include file content")
+}
+if strings.Contains(result, "## Agent's Final Response") {
+t.Error("prompt should not include Agent's Final Response when artifact is nil")
+}
+}
+
+// TestBuildReviewPrompt_EmptyArtifactResponse verifies that an artifact with
+// an empty FinalResponse field does not add the Agent's Final Response section.
+func TestBuildReviewPrompt_EmptyArtifactResponse(t *testing.T) {
+prompt := "Write code"
+files := map[string]string{"test.py": "code"}
+artifact := &GeneratorArtifact{
+FinalResponse: "", // empty
+}
+
+result := BuildReviewPrompt(prompt, files, nil, "", artifact)
+
+if strings.Contains(result, "## Agent's Final Response") {
+t.Error("prompt should not include Agent's Final Response when FinalResponse is empty")
+}
+}
+
+// TestCopilotReviewer_EmptyWorkspaceWithArtifact verifies that the reviewer
+// accepts an empty workspace when a non-nil artifact with a response is provided.
+func TestCopilotReviewer_EmptyWorkspaceWithArtifact(t *testing.T) {
+	artifact := &GeneratorArtifact{
+		FinalResponse: "Here is my explanation of how to use the SDK...",
+	}
+
+	// We can't actually invoke the real reviewer without Copilot, but we can
+	// test that BuildReviewPrompt doesn't error and includes the response
+	prompt := BuildReviewPrompt("Explain Azure SDK", map[string]string{}, nil, "Must be clear", artifact)
+
+	if !strings.Contains(prompt, "Here is my explanation") {
+		t.Error("prompt must include artifact response when no files present")
+	}
+}
+
+// TestCopilotReviewer_EmptyWorkspaceNoArtifact verifies that the reviewer
+// errors when BOTH workspace is empty AND no artifact is provided (nothing to review).
+func TestCopilotReviewer_EmptyWorkspaceNoArtifact(t *testing.T) {
+emptyDir := t.TempDir()
+r := NewCopilotReviewer(nil, "test-model", 50)
+
+// This should error because there's nothing to review
+_, err := r.Review(context.Background(), "prompt", emptyDir, "", "criteria", nil)
+if err == nil {
+t.Fatal("expected error when workspace is empty and no artifact provided")
+}
+if !strings.Contains(err.Error(), "no generated files") && !strings.Contains(err.Error(), "no agent response") {
+t.Errorf("error should mention missing files or response, got: %v", err)
+}
 }

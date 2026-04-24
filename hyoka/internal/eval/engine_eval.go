@@ -9,12 +9,14 @@ import (
 "strings"
 "time"
 
+"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
@@ -526,6 +528,24 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		// Collect all grader results across typed graders and AI review.
 		var allGraderResults []graders.GraderResult
 
+		// Write generator.json artifact before graders run. This captures
+		// the full generation session state for both grader consumption
+		// (via GraderInput.GeneratorArtifactPath) and report display (#site).
+		generatorArtifactPath := filepath.Join(reportDir, "generator.json")
+		genArtifact := buildGeneratorArtifact(
+			task.Prompt,
+			task.Config,
+			result,
+			evalReport,
+			genStart,
+			evalFailed,
+		)
+		if writeErr := genArtifact.WriteToFile(generatorArtifactPath); writeErr != nil {
+			glg.Warn("Failed to write generator artifact", "error", writeErr, "path", generatorArtifactPath)
+		} else {
+			glg.Debug("Generator artifact written", "path", generatorArtifactPath)
+		}
+
 		// Build common grader input shared by all grader types.
 		graderInput := graders.GraderInput{
 			WorkspacePath:       genWs.Dir,
@@ -695,6 +715,18 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// Populate file contents for generated files (Bug #2: site display).
 	// Read each generated file from the workspace directory up to 1MB per file.
 	evalReport.FileContents = readGeneratedFileContents(ws.Dir, evalReport.GeneratedFiles, lg)
+
+	// Load generator artifact for site display. If generator.json exists in
+	// the report directory, attach it to the report so the eval-detail page
+	// can render session state (final response, workspace delta, timing, etc.).
+	generatorArtifactPath := filepath.Join(reportDir, "generator.json")
+	if genArtifact, loadErr := artifact.LoadGeneratorArtifact(generatorArtifactPath); loadErr == nil {
+		evalReport.GeneratorArtifact = genArtifact
+		lg.Debug("Generator artifact loaded for report", "path", generatorArtifactPath)
+	} else {
+		// Non-fatal: artifact may not exist for older evals or if write failed earlier
+		lg.Debug("Generator artifact not loaded (may be missing for older reports)", "path", generatorArtifactPath, "error", loadErr)
+	}
 
 	// Write JSON report
 	reportPath, err := report.WriteReport(evalReport, e.opts.OutputDir, runID, task.Prompt)
@@ -1269,6 +1301,87 @@ Type:       progress.EventGraderStart,
 GraderID:   g.Name(),
 GraderKind: g.Kind(),
 })
+}
+
+// buildGeneratorArtifact constructs a GeneratorArtifact from eval state.
+// Called after generation completes but before graders run, so graders
+// can consume the artifact via GraderInput.GeneratorArtifactPath and the
+// report layer can attach it for site display.
+func buildGeneratorArtifact(
+	prompt *prompt.Prompt,
+	cfg config.ToolConfig,
+	result *EvalResult,
+	evalReport *report.EvalReport,
+	genStart time.Time,
+	evalFailed bool,
+) *artifact.GeneratorArtifact {
+	// Determine termination reason from result and evalReport state
+	terminatedBy := "completed"
+	errorMsg := ""
+	
+	if evalFailed {
+		if evalReport.ErrorCategory == "timeout" || evalReport.ActionLimitReached {
+			terminatedBy = "max_actions"
+		} else if strings.Contains(evalReport.Error, "turn") {
+			terminatedBy = "max_turns"
+		} else if evalReport.GuardrailAbortReason != "" {
+			terminatedBy = "guardrail"
+		} else {
+			terminatedBy = "error"
+		}
+		errorMsg = evalReport.Error
+	}
+	
+	// Extract final response from result
+	finalResponse := ""
+	if result != nil {
+		finalResponse = result.FinalResponse
+	}
+	
+	// Build workspace delta for artifact (converting from report's WorkspaceDelta)
+	wsDelta := artifact.ArtifactWorkspaceDelta{}
+	if evalReport.WorkspaceDelta != nil {
+		wsDelta = artifact.FromWorkspaceDelta(evalReport.WorkspaceDelta)
+	}
+	
+	// Count actions from session events
+	totalActions := 0
+	toolCalls := 0
+	reasoningSteps := 0
+	for _, ev := range evalReport.SessionEvents {
+		switch ev.Type {
+		case "tool.call", "tool.result":
+			toolCalls++
+			totalActions++
+		case "assistant.message":
+			reasoningSteps++
+			totalActions++
+		}
+	}
+	
+	genEnd := time.Now()
+	durationMs := genEnd.Sub(genStart).Milliseconds()
+	
+	return &artifact.GeneratorArtifact{
+		PromptID:       prompt.ID,
+		EvalID:         "", // EvalID not available at this point; set by caller if needed
+		ConfigName:     cfg.Name,
+		GeneratorModel: cfg.Generator.Model,
+		OriginalPrompt: prompt.PromptText,
+		FinalResponse:  finalResponse,
+		WorkspaceDelta: wsDelta,
+		ActionsSummary: artifact.ActionsSummary{
+			TotalActions:   totalActions,
+			ToolCalls:      toolCalls,
+			ReasoningSteps: reasoningSteps,
+			Truncated:      evalReport.ActionLimitReached,
+		},
+		StartedAt:    genStart,
+		EndedAt:      genEnd,
+		DurationMs:   durationMs,
+		TerminatedBy: terminatedBy,
+		Error:        errorMsg,
+	}
 }
 
 // emitGraderComplete sends a GraderComplete progress event. Score is only

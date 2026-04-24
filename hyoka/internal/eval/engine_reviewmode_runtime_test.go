@@ -24,14 +24,14 @@ type recordingReviewer struct {
 	lastBucketCount  int
 }
 
-func (r *recordingReviewer) Review(_ context.Context, _, _, _, _ string) (*review.ReviewResult, error) {
+func (r *recordingReviewer) Review(_ context.Context, _, _, _, _ string, _ *review.GeneratorArtifact) (*review.ReviewResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.reviewCalls++
 	return stubResult(1, 1), nil
 }
 
-func (r *recordingReviewer) ReviewBuckets(_ context.Context, _, _, _ string, buckets []review.Bucket) (*review.ReviewResult, error) {
+func (r *recordingReviewer) ReviewBuckets(_ context.Context, _, _, _ string, buckets []review.Bucket, _ *review.GeneratorArtifact) (*review.ReviewResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.reviewBucketCalls++
