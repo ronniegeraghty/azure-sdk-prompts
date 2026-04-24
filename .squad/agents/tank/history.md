@@ -618,3 +618,103 @@ But `criteria` was already set from the merged `input.EvalCriteria`, so it never
 ### Pattern: Three-Attempt Chain (2026-04-24)
 
 Attempted fixes across this session: `4adc9288` (initial per-bucket refactor) → `84b1606d` (remove KindPromptReview) → **`609ff869` (per-bucket grader input isolation, SUCCESSFUL)**. Only the third attempt fixed the display bug. Key takeaway: when working with multi-stage review pipelines, always verify bucket-level isolation at the grader input construction point, not just the bucket initialization point. The one-line fix (clearing `EvalCriteria` after setting `EvalCriteriaBuckets`) was essential to prevent merged criteria bleed-through into per-bucket grading logic.
+
+## Session 2026-04-24: Fix AI Grader Bucket Structure (Fourth Pass)
+
+**Status:** COMPLETE (commit 9e2d8100 on ronniegeraghty/dev)
+
+**Issue:** User reported the grader display was STILL showing a "combined" bucket even after three prior fixes. The expected behavior: one top-level grader per criteria-file entry (using each entry's `name` field), NOT one "combined" bucket grouping all entries.
+
+**Expected display:**
+```
+- Output Files Exist (output_check)
+- Criteria from prompt file (prompt)
+- DefaultAzureCredential Authentication (prompt)
+```
+
+**Broken display (commit 609ff869):**
+```
+- Output Files Exist (output_check)
+- Criteria from prompt file (prompt)
+- combined (prompt)              ← THIS SHOULD NOT EXIST
+  - DefaultAzureCredential Authentication
+    - Uses DefaultAzureCredential...
+```
+
+**Root cause:** `BuildUnifiedReviewBuckets` in `hyoka/internal/criteria/buckets.go` (lines 184-189) grouped ALL criteria-file entries into a single "combined" bucket in combined mode. The previous fix (609ff869) only addressed bucket *contents* isolation (clearing `EvalCriteria` per-bucket), NOT bucket *structure*.
+
+**Investigation path:**
+1. Read charter and history (fourth attempt in chain: `4adc9288` → `84b1606d` → `609ff869` → this)
+2. Identified `BuildUnifiedReviewBuckets` as the bucket constructor
+3. Found line 186-187 calling `combinedCriteriaFileBucket(matched)` which created one bucket for all entries
+4. Changed combined mode to iterate through matched entries and create one bucket per entry
+
+**Solution:** Modified `BuildUnifiedReviewBuckets` to create one bucket per criteria-file entry in combined mode:
+```go
+// OLD (line 184-189):
+if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
+    if len(matched) > 0 {
+        buckets = append(buckets, combinedCriteriaFileBucket(matched))
+    }
+    return buckets
+}
+
+// NEW:
+if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
+    for _, m := range matched {
+        buckets = append(buckets, graders.ReviewBucket{
+            Name:     bucketName(m.Entry.Name, len(buckets)),
+            Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, ""),
+        })
+    }
+    return buckets
+}
+```
+
+**Files changed:**
+- `hyoka/internal/criteria/buckets.go` — changed combined mode to per-entry buckets
+- `hyoka/internal/criteria/buckets_test.go` — updated 3 tests to expect N+1 buckets (prompt + N entries) instead of 2 (prompt + combined)
+- `hyoka/internal/eval/engine.go` — updated `reviewBuckets` comment to reflect new behavior
+- `hyoka/internal/eval/engine_reviewbuckets_test.go` — updated 3 tests to expect 3 buckets
+- `hyoka/internal/eval/engine_reviewmode_runtime_test.go` — updated test to expect 3 Review() calls
+- `hyoka/internal/eval/engine_test.go` — changed `capturingReviewer` to accumulate all criteria (was overwriting on each call)
+
+**Testing:**
+- `go build ./...` — passed
+- `go test -race ./hyoka/internal/eval/... ./hyoka/internal/review/... ./hyoka/internal/criteria/...` — all tests pass
+- Live eval attempted but failed due to model availability (gemini-3-pro-preview unavailable)
+- Code inspection confirms per-entry bucket logic is correct
+
+**Behavior:**
+- Combined mode (default): one bucket per entry (prompt + entry1 + entry2 + ...)
+- Isolated mode: entries marked `isolate: true` get their own bucket, rest go into "combined" (behavior unchanged)
+- The "combined" bucket still exists in isolated mode for leftover entries
+- The `mergeBucketResults` function in `review/buckets.go` still has special handling for "combined" to avoid prefixing criteria names
+
+### Learnings
+
+**The difference between bucket *contents* and bucket *structure*:**
+- Fix #3 (609ff869) fixed bucket *contents*: cleared `EvalCriteria` per-bucket so each bucket's grader only saw its own criteria
+- Fix #4 (this) fixed bucket *structure*: changed the bucket construction layer to emit one bucket per entry instead of grouping all entries into a "combined" bucket
+- The issue chain: initial per-bucket refactor (4adc9288) → remove KindPromptReview (84b1606d) → fix bucket contents (609ff869) → fix bucket structure (THIS)
+
+**How buckets flow through the system:**
+1. `BuildUnifiedReviewBuckets` (criteria/buckets.go) constructs the bucket list
+2. Engine calls `e.reviewBuckets(task.Prompt, props)` which calls `BuildUnifiedReviewBuckets`
+3. Engine creates one `PromptReviewGrader` per bucket (engine_eval.go lines 628-671)
+4. Each grader processes ONE bucket and returns ONE `GraderResult`
+5. Display layer renders each `GraderResult` as a top-level grader row with sub-bullets for individual criteria
+
+**Why the "combined" name exists:**
+- Isolated mode needs a bucket for leftover (non-isolated) entries
+- The name "combined" signals to `mergeBucketResults` (review/buckets.go lines 172-174, 180-182) to NOT prefix criterion names with `[bucket-name]`
+- This special handling is still needed for isolated mode
+
+**Testing pattern:**
+- When changing bucket count, search for hardcoded bucket count expectations in tests
+- `capturingReviewer` pattern: if a reviewer is called multiple times, it must accumulate state (not overwrite)
+- The test fixture Switch built (`criteria/language/test.yaml`, `prompts/test/`) would have been faster for iteration (30s vs 2min)
+
+**Future:**
+- If ANOTHER pass is needed, the next place to look is the display layer (`display_interactive.go`) or the JSON report builder
+- The bucket names visible to the user are set in `BuildUnifiedReviewBuckets` — they come from `entry.Name` for criteria-file entries

@@ -1,6 +1,197 @@
 # Squad Decisions
 
 ## Active Decisions
+### Decision: Bucket-Per-Entry Structure for AI Grader Display (2026-04-24T04:55:03Z)
+
+**Agent:** Tank 📡  
+**Branch:** ronniegeraghty/dev  
+**Commit:** 9e2d8100  
+**Status:** Implemented
+
+## Context
+
+AI grader display was showing a single "combined" bucket grouping all criteria-file entries, instead of one top-level grader per entry. This was the fourth fix in a chain addressing the bucket display bug:
+
+- `4adc9288` — initial per-bucket refactor
+- `84b1606d` — remove KindPromptReview from validTypedKinds
+- `609ff869` — fix bucket contents (clear EvalCriteria per-bucket)
+- `9e2d8100` — **fix bucket structure (one bucket per entry)**
+
+## Problem
+
+User expected:
+```
+- Output Files Exist (output_check)
+- Criteria from prompt file (prompt)
+- DefaultAzureCredential Authentication (prompt)
+```
+
+But saw:
+```
+- Output Files Exist (output_check)
+- Criteria from prompt file (prompt)
+- combined (prompt)              ← grouping all entries
+  - DefaultAzureCredential Authentication
+```
+
+## Decision
+
+**Change `BuildUnifiedReviewBuckets` combined mode behavior to create one bucket per criteria-file entry.**
+
+- Each bucket uses the entry's `name` field as the bucket name
+- Prompt-frontmatter criteria continue to live in their own "Criteria from prompt file" bucket
+- Isolated mode behavior unchanged (entries marked `isolate: true` get their own bucket, rest go to "combined")
+
+## Implementation
+
+Modified `hyoka/internal/criteria/buckets.go` lines 184-189:
+
+**Before:**
+```go
+if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
+    if len(matched) > 0 {
+        buckets = append(buckets, combinedCriteriaFileBucket(matched))
+    }
+    return buckets
+}
+```
+
+**After:**
+```go
+if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
+    for _, m := range matched {
+        buckets = append(buckets, graders.ReviewBucket{
+            Name:     bucketName(m.Entry.Name, len(buckets)),
+            Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, ""),
+        })
+    }
+    return buckets
+}
+```
+
+## Impact
+
+- **Display:** Each criteria-file grader entry now renders as its own top-level grader with individual sub-criteria
+- **Test updates:** 6 test files updated to expect N+1 buckets (prompt + N entries) instead of 2 (prompt + combined)
+- **Backward compat:** The "combined" bucket name still exists in isolated mode for leftover entries, preserving its special handling in `mergeBucketResults`
+
+## Rationale
+
+1. **User expectation:** One grader per criteria entry matches the mental model ("I defined 3 criteria, I should see 3 graders")
+2. **Clarity:** Each criteria entry's name becomes a top-level display element
+3. **Consistency:** Matches the existing behavior for prompt-frontmatter criteria (separate bucket)
+
+## Alternatives Considered
+
+1. **Keep "combined" and rename it:** Would still group entries, defeating the purpose
+2. **Add a flag to toggle behavior:** Adds complexity; the per-entry behavior is always desired
+3. **Change display layer to unpack "combined":** Would require display logic to understand bucket internals
+
+## Related
+
+- Issue: User verbatim complaint about "combined" bucket
+- Commits: `4adc9288`, `84b1606d`, `609ff869`, `9e2d8100`
+- Files: `buckets.go`, `engine.go`, 6 test files
+
+---
+
+### Decision: Test Fixture Language Pattern (2026-04-24)
+
+**Agent:** Switch 🤍  
+**Status:** Implemented
+
+## Context
+
+Tank iterating on grader display bugs. Real Python Azure evals take 2-3 min each because Copilot generates substantial SDK code. Needed trivially fast fixture for grader rendering iteration.
+
+## Decision
+
+Built a "test fixture" prompt (`storage-dp-python-hello-markdown-test`) that:
+- Uses existing `language: python` (not a new "test" language)
+- Inherits `criteria/language/python.yaml` graders for realistic multi-grader test
+- Writes a single trivial markdown file (completes in 1 turn)
+- Runs in **29 seconds** end-to-end (83% faster than Azure prompts)
+
+## Rationale
+
+1. **Reuse existing language:** Avoids modifying prompt validation logic to add "test" to allowed languages
+2. **Inherit real graders:** Exercises the full grader pipeline with actual language criteria
+3. **Expected failures are OK:** DefaultAzureCredential grader fails (not applicable to markdown) — this is correct behavior
+4. **Fast iteration:** 29-second evals vs 2-3 min = rapid feedback loop for display bugs
+
+## Implementation
+
+- `prompts/test/hello-markdown.prompt.md` — trivial markdown-writing prompt
+- `criteria/language/test.yaml` — 4 graders (prompt, output_check, file, behavior)
+- `configs/test-baseline.yaml` — haiku model, no tools
+
+## Invocation
+
+```bash
+hyoka run --prompt-id storage-dp-python-hello-markdown-test \
+  --config test/haiku
+```
+
+## Status
+
+✅ Implemented and verified end-to-end. Validation passes. All configured graders execute.
+
+## Related
+
+- Tank's concurrent work: `criteria/language/python.yaml`, `internal/eval/engine_eval.go` (staged, not touched)
+- Future: Consider extracting "universally applicable" graders (output_check, file, behavior) into a `criteria/language/_common.yaml` to avoid per-language duplication
+
+---
+
+### Decision: Test Fixture Language Allowlist Extension (2026-04-24)
+
+**Agent:** Switch 🤍  
+**Status:** Implemented
+
+## Context
+
+Round 2 cleanup of test fixture (fixing language field divergence).
+
+## Decision
+
+Extended validation allowlists in `internal/validate/validate.go` to include `"test"` as a valid value for:
+- `ValidServices` (added `"test"`)
+- `ValidLanguages` (added `"test"`)
+- `ValidCategories` (added `"test"`)
+
+## Rationale
+
+1. **User spec:** Original test fixture request explicitly asked for `language: test` (quote: *"Maybe a prompt files in a test dir under the prompt dir that has a language of `test`"*)
+
+2. **Dual validation paths:** hyoka has two separate validation implementations:
+   - `schema.go:ValidatePromptStruct()` — Has `isTestValue()` escape hatch that accepts "test" prefix/suffix
+   - `validate.go:validatePrompt()` — Used by `hyoka validate` command, NO escape hatch
+   
+   The first pass assumed the escape hatch would work, but `hyoka validate` rejected `language: test`.
+
+3. **User preference:** When the divergence was discovered, the user said: *"If there's a hardcoded allowlist, ADD `test` to it (don't remove the allowlist — extend it). If `validate` complains, fix the validation rule rather than the prompt."*
+
+4. **Test fixture semantic:** The `test` value is explicitly for test/fixture purposes, not production Azure prompts. Adding it to the allowlist makes it a first-class fixture language alongside `python`, `dotnet`, etc.
+
+## Impact
+
+- Test prompts with `service: test`, `language: test`, `category: test` now pass validation
+- No impact on production prompts (they don't use these values)
+- Enables fast fixture iteration without validation gymnastics
+- Does NOT remove or weaken existing allowlists — purely additive
+
+## Files Modified
+
+- `hyoka/internal/validate/validate.go` (lines 15-31) — Extended `ValidServices`, `ValidLanguages`, `ValidCategories`
+
+## Verification
+
+- `go test -race ./internal/validate/...` — all green
+- `hyoka validate` — all 90 prompts valid (including test fixture)
+- End-to-end eval with `language: test` — runs cleanly, loads `criteria/language/test.yaml` graders
+
+---
+
 
 ### Decision: Per-Bucket Grader Input Isolation (Grader Display Fix V2) (2026-04-24T04:36:24Z)
 

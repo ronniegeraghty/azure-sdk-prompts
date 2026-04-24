@@ -10,6 +10,14 @@
 
 **Archived 8 entries from earlier sessions.**
 
+---
+
+## CROSS-AGENT UPDATE (2026-04-24T04:55:03Z — Tank: Bucket-Per-Entry Structure Change)
+
+**Grader Bucket Structure Refactor:** Tank changed `BuildUnifiedReviewBuckets` in `hyoka/internal/criteria/buckets.go` to create ONE bucket per criteria-file entry (instead of grouping all into "combined"). **Site Impact:** Each criteria entry now appears as a separate top-level grader with distinct name. The bucket count will increase proportionally to the number of criteria entries. This is visible in report JSON structure (`EvalCriteriaBuckets[]`). Commit: 9e2d8100. If you're working on grader display or report rendering, this structural change may affect layout calculations.
+
+---
+
 Historical patterns and learnings:
 
 - ## Core Context: Agent Trinity initialized as Site / UI architect. Charter: frontend components, data visualization, React patterns. Expertise: Vitest + React Testin...

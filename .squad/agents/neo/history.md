@@ -12,6 +12,12 @@
 
 ---
 
+## CROSS-AGENT UPDATE (2026-04-24T04:55:03Z — Tank: Bucket-Per-Entry Structure Fix)
+
+**Grader Bucket Structure:** Tank modified `BuildUnifiedReviewBuckets` to emit ONE bucket per criteria-file entry instead of bundling all entries into a single "combined" bucket. Each grader entry now renders as a top-level bucket with individual sub-criteria. **Impact on display:** The number of top-level graders will increase (one per criteria entry). Test updates: 6 files modified. Commit: 9e2d8100. If you touch the display/site layer (`site/src/`), be aware of this structural change in `internal/criteria/buckets.go`.
+
+---
+
 ## CROSS-AGENT UPDATE (2026-04-24T03:59:28Z — Tank: KindPromptReview Fix)
 
 **Engine Fix:** Tank removed `KindPromptReview` from `validTypedKinds` in `hyoka/internal/criteria/config.go`. This was engine-runtime-only (created manually by Phase 2 per-bucket review loop), not a valid criteria YAML type. Commits: 84b1606d (fix), a37763f3 (docs).
