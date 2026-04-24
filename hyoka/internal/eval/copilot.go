@@ -14,6 +14,7 @@ import (
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotperm"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
@@ -370,9 +371,32 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		case copilot.SessionEventTypeAbort:
 			lg.Error("Session aborted")
 		case copilot.SessionEventTypePermissionRequested:
-			// Audit trail
+			tn, tc := "", ""
+			if event.Data.ToolName != nil {
+				tn = *event.Data.ToolName
+			}
+			if event.Data.ToolCallID != nil {
+				tc = *event.Data.ToolCallID
+			}
+			lg.Debug("Permission requested", "toolName", tn, "toolCallID", tc)
 		case copilot.SessionEventTypePermissionCompleted:
-			// Audit trail
+			tn, tc, rsn, ern, msg := "", "", "", "", ""
+			if event.Data.ToolName != nil {
+				tn = *event.Data.ToolName
+			}
+			if event.Data.ToolCallID != nil {
+				tc = *event.Data.ToolCallID
+			}
+			if event.Data.Reason != nil {
+				rsn = *event.Data.Reason
+			}
+			if event.Data.ErrorReason != nil {
+				ern = *event.Data.ErrorReason
+			}
+			if event.Data.Message != nil {
+				msg = *event.Data.Message
+			}
+			lg.Debug("Permission completed", "toolName", tn, "toolCallID", tc, "reason", rsn, "errorReason", ern, "message", msg)
 		case copilot.SessionEventTypeSessionSkillsLoaded:
 			names := make([]string, 0, len(event.Data.Skills))
 			for _, s := range event.Data.Skills {
@@ -902,7 +926,7 @@ func (e *CopilotPromptRunner) buildSessionConfigForEval(ctx context.Context, cfg
 		Model:               cfg.Generator.Model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: copilotperm.ApproveAll,
 		Hooks: &copilot.SessionHooks{
 			OnPreToolUse: func(input copilot.PreToolUseHookInput, invocation copilot.HookInvocation) (*copilot.PreToolUseHookOutput, error) {
 				toolName := input.ToolName
@@ -910,12 +934,19 @@ func (e *CopilotPromptRunner) buildSessionConfigForEval(ctx context.Context, cfg
 				if isFileWriteTool(toolName) {
 					if args, ok := input.ToolArgs.(map[string]interface{}); ok {
 						if p, ok := args["path"].(string); ok {
-							if !strings.HasPrefix(p, workDir) {
+							resolved := p
+							if !filepath.IsAbs(resolved) {
+								resolved = filepath.Join(workDir, resolved)
+							}
+							resolved = filepath.Clean(resolved)
+							absWork := filepath.Clean(workDir)
+							rel, err := filepath.Rel(absWork, resolved)
+							if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 								slog.Warn("File path outside workspace",
-									"tool", toolName, "path", p, "workspace", workDir)
+									"tool", toolName, "path", p, "resolved", resolved, "workspace", absWork)
 								return &copilot.PreToolUseHookOutput{
 									PermissionDecision:       "deny",
-									PermissionDecisionReason: fmt.Sprintf("path %q is outside workspace %q", p, workDir),
+									PermissionDecisionReason: fmt.Sprintf("path %q is outside workspace %q", p, absWork),
 								}, nil
 							}
 						}

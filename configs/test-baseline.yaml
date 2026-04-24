@@ -13,3 +13,16 @@ configs:
     reviewer:
       models:
         - "claude-haiku-4.5"
+  - name: test/sonnet
+    description: "Test fixture with Claude Sonnet 4.6 (reliable for demos)"
+    generator:
+      model: "claude-sonnet-4.6"
+      tools:
+        - name: test-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/test"
+    reviewer:
+      models:
+        - "claude-haiku-4.5"

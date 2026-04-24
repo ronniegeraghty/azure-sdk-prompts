@@ -15,6 +15,7 @@ import (
 
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotperm"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
@@ -69,7 +70,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 	if err != nil {
 		return nil, fmt.Errorf("reading generated files: %w", err)
 	}
-	
+
 	// Empty workspace is acceptable if we have an artifact with a response
 	if len(generatedFiles) == 0 {
 		if artifact == nil || artifact.FinalResponse == "" {
@@ -112,7 +113,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		Model:               r.model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: copilotperm.ApproveAll,
 		SkillDirectories:    r.skillDirectories,
 		OnEvent:             collector.handleEvent,
 	}
@@ -458,7 +459,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		Model:               model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: copilotperm.ApproveAll,
 		SkillDirectories:    p.skillDirectories,
 		OnEvent:             collector.handleEvent,
 	}
