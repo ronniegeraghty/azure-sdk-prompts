@@ -682,6 +682,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				SessionEvents:  captured,
 				ActionTimeline: BuildActionTimeline(captured),
 				Success:        true, // Let engine.go guardrail set the proper failure
+				FinalResponse:  extractLastAssistantMessage(captured),
 				ToolReport:     toolReport,
 				CleanupFn:      buildCleanupFn(),
 			}, nil
@@ -694,6 +695,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			ToolCalls:      extractToolCalls(capturedEvts),
 			Error:          fmt.Sprintf("prompt send failed: %v", err),
 			ErrorDetails:   err.Error(),
+			FinalResponse:  extractLastAssistantMessage(captured),
 			ToolReport:     toolReport,
 			CleanupFn:      buildCleanupFn(),
 		}, fmt.Errorf("sending prompt: %w", err)
@@ -728,6 +730,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		ActionTimeline: BuildActionTimeline(capturedRecords),
 		Success:        !hasError,
 		Error:          "",
+		FinalResponse:  extractLastAssistantMessage(capturedRecords),
 		ToolReport:     toolReport,
 		CleanupFn:      buildCleanupFn(),
 	}, nil
@@ -1053,6 +1056,17 @@ func hasSessionError(events []copilot.SessionEvent) bool {
 		}
 	}
 	return false
+}
+
+// extractLastAssistantMessage returns the content of the last assistant message
+// from session event records. Returns empty string if no assistant messages found.
+func extractLastAssistantMessage(records []report.SessionEventRecord) string {
+	for i := len(records) - 1; i >= 0; i-- {
+		if records[i].Type == "assistant.message" && records[i].Content != "" {
+			return records[i].Content
+		}
+	}
+	return ""
 }
 
 // isFileWriteTool returns true for tools that create or modify files.

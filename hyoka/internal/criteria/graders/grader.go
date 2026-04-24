@@ -38,6 +38,12 @@ type GraderInput struct {
 	ReferenceDir   string // Directory containing reference answers
 	EvalCriteria   string // Merged evaluation criteria text
 
+	// AgentFinalResponse is the last assistant message from the generation
+	// session. For prompts that evaluate reasoning or explanations rather than
+	// files (e.g., planning tasks, recommendations), this is the primary
+	// artifact under review. Empty if no assistant messages were logged.
+	AgentFinalResponse string
+
 	// EvalCriteriaBuckets carries per-bucket criteria when --review-mode
 	// isolated produces multiple buckets. When non-empty and length > 1,
 	// review-aware graders should run one Copilot session per bucket

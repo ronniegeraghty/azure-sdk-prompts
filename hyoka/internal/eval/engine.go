@@ -40,6 +40,10 @@ type EvalResult struct {
 	ErrorCategory  string // e.g., "tool_load_failure", "timeout", "sdk_error"
 	IsStub         bool
 	StarterFiles   []string
+	// FinalResponse is the last assistant message from the session. For
+	// prompts that evaluate the agent's reasoning or explanation rather
+	// than files, this is the primary artifact under review.
+	FinalResponse string
 	// ToolReport carries the post-validation tool-load topology — flat list
 	// of leaves with Parent/ParentKind back-pointers — so engine_eval can
 	// persist parent linkage into report.ToolLoadResult and the new
