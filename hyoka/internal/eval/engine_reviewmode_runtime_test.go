@@ -111,11 +111,10 @@ func TestIntegrationReviewModeIsolatedFiresBuckets(t *testing.T) {
 	}
 }
 
-// TestIntegrationReviewModeCombinedSkipsBuckets is the symmetrical check:
-// in combined mode (default), the engine should still hand a single-element
-// bucket slice to the grader, which collapses to a single Review() call —
-// not ReviewBuckets(). This locks in the "byte-identical to legacy" promise
-// in the PR description.
+// TestIntegrationReviewModeCombinedSkipsBuckets verifies that combined mode
+// produces 2 buckets (prompt + criteria files) and calls ReviewBuckets(),
+// not the single Review() path. This reflects the change to always separate
+// prompt-frontmatter criteria from criteria-file entries.
 func TestIntegrationReviewModeCombinedSkipsBuckets(t *testing.T) {
 	outputDir := t.TempDir()
 	rec := &recordingReviewer{}
@@ -150,10 +149,10 @@ func TestIntegrationReviewModeCombinedSkipsBuckets(t *testing.T) {
 
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	if rec.reviewBucketCalls != 0 {
-		t.Errorf("combined mode should NOT call ReviewBuckets(), got %d calls", rec.reviewBucketCalls)
+	if rec.reviewBucketCalls < 1 {
+		t.Errorf("combined mode should call ReviewBuckets() (2 buckets: prompt + criteria files), got %d calls", rec.reviewBucketCalls)
 	}
-	if rec.reviewCalls < 1 {
-		t.Errorf("combined mode should call Review() at least once, got %d", rec.reviewCalls)
+	if rec.lastBucketCount != 2 {
+		t.Errorf("expected 2 buckets (prompt + criteria files) in combined mode, got %d", rec.lastBucketCount)
 	}
 }
