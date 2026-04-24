@@ -424,6 +424,53 @@ Existing `GraderInput` fields (`WorkspacePath`, `AgentFinalResponse`, `Workspace
 
 ### Status
 
-✅ Builds successfully
-⚠️ **Needs testing:** Live run with python-pairwise (codex generator that produces no files) to verify AI graders execute
-⚠️ **Needs tests:** Unit tests for artifact round-trip, engine write, reviewer empty-workdir path
+✅ All systems operational
+✅ Tests pass (`go test ./hyoka/...`)
+✅ Live verification complete (generator.json written, graders ran successfully)
+
+## Post-Commit Fix (2026-04-24)
+
+**Context:** Commit d1ed5f61 shipped the GeneratorArtifact system but violated test discipline — production build was green, but tests across 4+ packages no longer compiled due to `Reviewer.Review` and `BuildReviewPrompt` signature changes without updating stubs/callers.
+
+**Remediation (completed in commit 9f34f072 by Trinity):**
+
+### Phase 1: Fixed all broken tests
+- Updated 20+ test call sites for `BuildReviewPrompt` to include new `*GeneratorArtifact` parameter (passed `nil` where not needed)
+- Updated 6 test doubles (`recordingReviewer`, `reviewOnlyReviewer`, `capturingReviewer`, `StubReviewer`) to match new `Review` signature
+- All tests now pass (`go test ./hyoka/...`)
+
+### Phase 2: Added unit tests
+**artifact/artifact_test.go:**
+- `TestGeneratorArtifact_RoundTrip` — marshal/unmarshal JSON round-trip with deep-equal
+- `TestGeneratorArtifact_Truncation` — verify field truncation at 16KB with `[truncated]` marker
+- `TestGeneratorArtifact_WriteToFile_CreatesDirectory` — parent directory creation
+- Error cases: file not exists, invalid JSON
+
+**review/review_test.go (additions):**
+- `TestBuildReviewPrompt_WithArtifactAndFiles` — both sections appear unconditionally
+- `TestBuildReviewPrompt_WithArtifactNoFiles` — response shown when no files
+- `TestBuildReviewPrompt_NoArtifactWithFiles` — legacy behavior preserved
+- `TestCopilotReviewer_EmptyWorkspaceWithArtifact` — accepts empty workspace with artifact
+- `TestCopilotReviewer_EmptyWorkspaceNoArtifact` — errors correctly when both missing
+
+### Phase 3: Live verification
+Ran: `hyoka run --prompt-id key-vault-dp-python-crud --config baseline/gpt-5.3-codex`
+
+✅ generator.json written to `reports/.../generator.json` with correct schema:
+- All fields present: prompt_id, config_name, generator_model, original_prompt, final_response
+- workspace_delta with file details (created_files, bytes_added, etc.)
+- actions_summary (total_actions, tool_calls, reasoning_steps, truncated)
+- Timing fields (started_at, ended_at, duration_ms)
+- terminated_by: "completed"
+
+✅ AI review graders executed successfully (bucketed panel review with 3 models)
+✅ No orphaned sessions after run
+
+## Learnings
+
+**Test discipline:** When changing a public interface (`Reviewer.Review`, `BuildReviewPrompt`), **ALL** test doubles and call sites MUST be updated in the SAME commit. Always run `go test ./hyoka/...` before reporting "build green". Commit d1ed5f61 had a green production build but broken tests — this violates the test-discipline skill and creates immediate debt for the next engineer.
+
+**Artifact timing:** The artifact write happens AFTER workspace delta is computed (need full session state) but BEFORE graders run (graders may consume it via `GraderInput.GeneratorArtifactPath`). This ordering is critical.
+
+**Empty workspace behavior:** With the artifact in place, AI graders can now evaluate agent work even when no files were created. This fixes the codex/GPT-5 series models that often produce explanatory responses instead of files.
+
