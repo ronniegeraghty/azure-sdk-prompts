@@ -456,3 +456,36 @@ Implemented v4 grader schema in TypeScript (Point array, Pass/Score derivation, 
 Engine integration complete (Neo commit 4ef80d89). Dev branch ready for Ronnie's live evaluation testing.
 
 **Reference:** Orchestration logs (trinity-impl, trinity-verify).
+
+## Learnings — 2026-04-24 — Per-Eval Page Grader UI Cleanup
+
+Fixed four user-reported issues on the per-eval page (`/runs/:runId/eval/:promptId/*`):
+
+1. **Graders collapsed by default.** `GraderResultRow` previously auto-expanded any grader with multiple points OR any failing grader. Removed the auto-expand heuristics — `useState(defaultExpanded)` only. User opens individual graders on demand.
+
+2. **Passing-point label fallback.** The `points` map already rendered `{p.label}`, so true blanks only happen when the engine emits an empty `Label`. Added defensive fallback chain: `p.label || p.message || (p.pass ? "Check passed" : "Check failed")`. Also stopped duplicating the message when only the message is present.
+
+3. **No `PASS` / `100%` strings, even for empty Points arrays.** `formatGraderScore()` returned `"0/0 points"` for the (currently theoretical) empty-Points case. Now treats the grader itself as a single implicit point: `pass ? "1/1 points" : "0/1 points"`. Also defensively handles `result.points` being null/undefined. **Engine audit:** all observed graders in current reports already emit Points with non-empty labels — Neo's audit confirms that and our site-side change is purely defensive.
+
+4. **Reorder: Generator Session above Grader Results.** Cut the entire Generator Session JSX block (formerly lines 879–1032) and pasted it ahead of the Grader Results block. Done with a Python script — too large for an `edit` call.
+
+**Test debt cleanup.** `GraderResultRow.test.tsx` was a stale pre-v4 file (asserted `"PASS"`, `"100%"`, `program_details`, etc.) — 8 tests already failing before my change. Rewrote it for v4 schema with 8 new tests that lock in: collapsed-by-default, "N/M points" format, defensive empty-Points fallback, label fallback for blank labels, GATE indicator. All 131 site tests now pass.
+
+**Verification.** Built site, started `hyoka serve --port 8080 --site-dir site/dist`, drove playwright through `/runs/20260424-193812/eval/test-dp-test-hello-markdown/test/sonnet/baseline`. Screenshots in `verification-screenshots/`:
+- `01-eval-page-full.png` — initial load: Generator Session above Grader Results, all 6 graders show chevron-right (collapsed)
+- `02-grader-expanded.png` — first grader expanded with labeled points
+- `03-all-graders-expanded.png` — every passing point shows its label, no blanks
+
+All four conditions verified programmatically (genFirst=true; 6/6 collapsed; no PASS/100%/FAIL header text; all points have non-blank text).
+
+
+---
+
+## 2026-04-24: 🚨 Team default model is now claude-opus-4.7
+
+Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing policy at the top of `.squad/decisions.md`:
+
+- **Every agent spawn defaults to `claude-opus-4.7`.**
+- **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
+- **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
+- This affects what every future spawn looks like — expect opus-4.7 as your model.

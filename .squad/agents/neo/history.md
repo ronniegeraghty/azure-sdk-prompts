@@ -732,3 +732,15 @@ The graders that historically emitted only an aggregate verdict with no breakdow
 - **Stable identifier labels enable cross-run aggregation.** Free-form Labels like "min files: ≥ 5" make tests brittle and trend-analysis impossible. Snake_case identifiers (`min_files`) plus a separate human-readable Message give both worlds.
 - **Defensive code at multiple layers is fine when the layers are independent.** The converter's synth-Point fallback duplicates the constructor invariant, but it covers the legacy on-disk reports and the not-yet-discovered next bypass. Cheap insurance.
 - **The "no constraints" case is a real Point.** A behavior grader with no required/forbidden tools, or an output_check with no knobs, must still emit a "no constraints — trivially passed" Point. Otherwise it's invisible to the renderer's Points-driven UI.
+
+
+---
+
+## 2026-04-24: 🚨 Team default model is now claude-opus-4.7
+
+Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing policy at the top of `.squad/decisions.md`:
+
+- **Every agent spawn defaults to `claude-opus-4.7`.**
+- **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
+- **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
+- This affects what every future spawn looks like — expect opus-4.7 as your model.

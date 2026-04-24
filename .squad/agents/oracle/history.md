@@ -257,3 +257,15 @@ Going forward, the team works directly on the `ronniegeraghty/dev` branch with f
 **Rationale:** User request — streamline workflow, reduce branch proliferation, enable continuous integration of squad work.
 
 **Action:** Update your local branch strategy. All future work targets dev with regular commits.
+
+
+---
+
+## 2026-04-24: 🚨 Team default model is now claude-opus-4.7
+
+Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing policy at the top of `.squad/decisions.md`:
+
+- **Every agent spawn defaults to `claude-opus-4.7`.**
+- **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
+- **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
+- This affects what every future spawn looks like — expect opus-4.7 as your model.

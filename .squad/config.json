@@ -1,4 +1,4 @@
 {
-  "version": 1,
-  "defaultModel": "claude-opus-4.7"
+  "defaultModel": "claude-opus-4.7",
+  "agentModelOverrides": {}
 }
