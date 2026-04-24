@@ -243,3 +243,10 @@ Aligned the React/TypeScript site with schema-v3 reports in 7 commits on `ronnie
 
 **Orchestration logs:** 2026-04-24T09:15:00Z-neo.md, 2026-04-24T10:30:00Z-trinity.md, 2026-04-24T11:45:00Z-neo-followup.md  
 **Session log:** 2026-04-24T12:00:00Z-generator-json-artifact-arc.md
+
+## CROSS-AGENT UPDATE (2026-04-24T03:40:38Z — Tank + Coordinator)
+
+**Site File-Contents Fallback:**
+
+Coordinator identified and Tank fixed bug in `eval-detail-page.tsx`: file content only rendered when in reviewedFiles set, no fallback. Now uses `r.file_contents?.[filePath]` for generated-but-not-reviewed files. All generated files now visible on detail page.
+

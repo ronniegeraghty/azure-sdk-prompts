@@ -555,3 +555,8 @@ Asserts: `strings.Count(out, "\nAgent Attempt:")` equals 1 — exactly ONE Agent
 - `hyoka/internal/eval/engine_reviewmode_runtime_test.go` — updated bucket-mode tests
 
 **Verification**: All tests pass. Live run log shows bucket-level error messages ("Bucket review failed... bucket=Criteria from prompt file"), confirming per-bucket processing.
+
+## 2026-04-24T03:40:38Z: Per-Grader Display Refactor + Coordinator Fixes
+
+**Summary:** Per-bucket grader display landed (`4adc9288`, `4888a402`). During code review, Coordinator identified four critical bugs now fixed: (1) empty-workspace AI-grader bug (`engine_eval.go`), (2) `min_bytes_per_file` vacuous-pass (`output_check_grader.go`), (3) token usage display (`progress.go`), (4) site file-contents fallback (`eval-detail-page.tsx`). All tests pass.
+

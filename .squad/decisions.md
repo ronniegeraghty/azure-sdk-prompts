@@ -1601,3 +1601,69 @@ if r.cur != nil && (r.cur.agentState == agentStateCompleted || r.cur.agentState 
 
 ---
 
+
+### Decision: Grader Output Format — Per-Grader Display with Point Breakdown (2026-04-24T03:26Z)
+
+**Agent:** Coordinator (user direction via Ronnie)  
+**Branch:** ronniegeraghty/dev  
+**Implementation:** Tank (commit `4adc9288`)  
+
+## Context
+
+Current progress display lumped all AI-review grader points under a single `- ai_review` line, making it impossible to see which specific grader passed or failed which criteria point.
+
+## Decision
+
+**Grader output now displays per-grader with individual point breakdown.**
+
+Format:
+```
+- <grader-name> (<grader-type>): <score>
+  - <point.name or first ~60 chars of point.prompt>: <pass|fail>
+  - <point.name or first ~60 chars of point.prompt>: <pass|fail>
+```
+
+Examples:
+- `- DefaultAzureCredential Authentication (prompt): 3/4`
+  - `- Uses DefaultAzureCredential from azure.identity: pass`
+  - `- Wraps client construction in try/except: fail`
+- `- Criteria from prompt file (prompt): 5/5`
+- `- file_exists/keyvault_crud.py (file): pass`
+- `- behavior/runs_without_error (behavior): pass`
+
+## Rules
+
+1. **Grader name** comes from the grader entry's `name:` field. For prompt-frontmatter bucket, hard-coded to `Criteria from prompt file`.
+2. **Grader type** rendered in parens after name: `prompt` (AI review), `file`, `behavior`, `program`, `output_check`.
+3. **Points** indented as sub-bullets. Use point's `name` if present; else first ~60 chars of `prompt` with ellipsis.
+4. **Single-point graders** render on one line — no sub-bullets.
+5. **Score format:** `pass`/`fail` for binary; `X/Y` for multi-point counts.
+
+## Scope
+
+- Interactive CLI display
+- JSON report (`graders[].name`, `graders[].type`)
+- Site eval-detail page (Trinity's frontend panel)
+
+## Implementation
+
+Tank refactored engine to create one PromptReviewGrader per ReviewBucket instead of one "ai_review" grader for all buckets. Result:
+- `engine_eval.go`: Per-bucket grader iteration
+- `display_interactive.go`: `displayKind()` helper for type mapping
+- `display_interactive_points_test.go`: Updated assertions for multi-grader rendering
+
+## Rationale
+
+Single `- ai_review` row with nested points provides no signal about which grader (e.g., "DefaultAzureCredential") passed or failed. Per-grader rows with type labels and point-level breakdown enables users to:
+- Identify which criteria bucket failed
+- See exactly which individual points passed/failed
+- Correlate failures to grader source (prompt, file, behavior, etc.)
+
+## Verification
+
+✅ All tests pass  
+✅ Live evals display per-bucket graders with point breakdown  
+✅ Site renders grader names and types correctly
+
+---
+

@@ -497,3 +497,10 @@ Ran: `hyoka run --prompt-id key-vault-dp-python-crud --config baseline/gpt-5.3-c
 
 **Orchestration logs:** 2026-04-24T09:15:00Z-neo.md, 2026-04-24T10:30:00Z-trinity.md, 2026-04-24T11:45:00Z-neo-followup.md  
 **Session log:** 2026-04-24T12:00:00Z-generator-json-artifact-arc.md
+
+## CROSS-AGENT UPDATE (2026-04-24T03:40:38Z — Tank + Coordinator)
+
+**Surgical Fixes from Coordinator Review:**
+
+Tank's per-grader display refactor (`4adc9288`) revealed four critical bugs now patched: (1) **AI graders empty-workspace** (`engine_eval.go`) — artifact not threaded to graderInput, (2) **`min_bytes_per_file` vacuous-pass** (`output_check_grader.go`) — returned pass on zero files, (3) **token display** (progress layer) — replaced Cost with Tokens, (4) **site file_contents fallback** (`eval-detail-page.tsx`). All tests pass; graders now work on response-only evals.
+

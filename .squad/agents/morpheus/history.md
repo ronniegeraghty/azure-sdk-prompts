@@ -241,3 +241,7 @@ Neo shipped `4a8c4a0d` — container plugins now fan out into per-child `ToolLoa
 
 ## 2026-04-23 — Synthesized report+site reviews into plan
 Read trinity-site-ux-review.md and my own morpheus-report-architecture-review.md, appended Phases 4–6 to the session plan.md (Phase 4: Trinity site quick wins, independent; Phase 5: report schema v3 — Tank/Neo, sibling to Phase 2; Phase 6: site Phase-2 alignment, depends on both). Inserted 20 new SQL todos (p4-* x6, p5-* x7, p6-* x7) with dep edges so anything consuming Points/parent-linkage waits on Phase 2 + Phase 5. Made the structural connection explicit: Phase 2's grader Points work IS the fix for the "1/4 red on every row" bug — once each grader emits one GraderResult with Points[], expandReviewGraderResult disappears and the site stops seeing 3 nil-pass rows per ai_review. Did not touch existing Phases 1–3 (Tank mid-execution).
+
+## Learnings
+
+- **#634:** Show generated files as diffs against starter project — Filed issue for eval-detail diff visualization feature (gen vs. starter file comparison).
