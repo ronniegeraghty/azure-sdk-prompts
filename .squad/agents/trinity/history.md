@@ -444,3 +444,15 @@ After rebuild + explicit site-dir, all 7 criteria passed.
 - Used port 8090 with `--site-dir site/dist` for fresh build validation
 - Verified "100%" → "1/1 points" fix on Efficient Behavior grader (single-point case)
 
+
+## Session Complete: v4 Grader Unification (2026-04-24)
+
+**Date:** 2026-04-24  
+**Outcome:** ✅ SHIPPED  
+**Commits:** `1200140b` (Site impl) + `3ab4649d` (Verification)
+
+Implemented v4 grader schema in TypeScript (Point array, Pass/Score derivation, discriminated Extras union). All 7 UI criteria verified via Playwright. Ronnie's 3 original complaints (inconsistent scoring format, unclear breakdown, scattered extra data) all resolved end-to-end.
+
+Engine integration complete (Neo commit 4ef80d89). Dev branch ready for Ronnie's live evaluation testing.
+
+**Reference:** Orchestration logs (trinity-impl, trinity-verify).

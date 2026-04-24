@@ -425,3 +425,14 @@ No code changed yet. Awaiting Neo (engine + Go types) and Trinity (site
 + renderer) to pick up. Suggested split documented in plan §9 with
 parallelism opportunities — Trinity unblocked once Neo lands the type
 definitions in `grader.go` (Sync 1).
+
+## Session Complete: v4 Grader Unification (2026-04-24)
+
+**Date:** 2026-04-24  
+**Outcome:** ✅ SHIPPED
+
+Audit and Option B plan merged into `.squad/decisions.md`. v4 schema decision locked: "N/M points" format, auto-derived Pass/Score from Points, discriminated Extras union, schema version 4 with hard v3 rejection on engine load.
+
+Trinity and Neo implementation complete and verified. Site + engine integration on dev branch, ready for Ronnie's live testing.
+
+**Reference:** Orchestration logs (morpheus-audit, morpheus-plan, trinity-impl, neo-impl, trinity-verify).

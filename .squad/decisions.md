@@ -1000,3 +1000,725 @@ Including:
 |-------|--------|----------|
 | #586 | ❌ NOT FIXED | Live eval shows `customize-cloud-agent` still loads |
 | #619 | ✅ VERIFIED FIXED | 47 green tests, hard-fail path confirmed |
+
+
+---
+
+## Morpheus — Grader Structure Audit & Plan (2026-04-24)
+
+# Morpheus 🕶️ — Grader Structural Audit
+
+**Date:** 2026-04-23
+**Requested by:** Ronnie
+**Trigger:** "Looking at the report on the site, it seems like the graders have different output and vastly different structures. I would like to make the graders more structured."
+**Scope:** Analysis only — no code changes. Recommend options; team decides.
+
+---
+
+## TL;DR
+
+The graders share an **interface** (`Grader.Grade → GraderResult`) and a
+**core common surface** (`Kind`, `Name`, `Score`, `Pass`, `Weight`, `Gate`,
+`Message`, `Points`). They diverge on the **detail payload** (`*Details`
+struct) — every kind has its own bespoke shape, and three of them
+(behavior / action_sequence / tool_constraint) actually share one struct
+that is a bag of optional fields. Phase 2 introduced `Points` as the
+"generalized per-sub-check" channel and the React renderer now treats it
+as the canonical view, but the per-kind `*Details` structs still exist
+in parallel and the report layer marshals them inconsistently:
+
+- `OutputCheckGraderDetails` is **dropped on the floor** at the report
+  boundary (`report.GraderResult` has no field for it).
+- `ReviewGraderDetails` fields are also flattened to the top level of
+  `report.GraderResult` (`OverallScore`, `MaxScore`, `Summary`, `Issues`,
+  `Strengths`, `Scores`, `IsConsensus`), so the same data lives in two
+  places for one grader kind only.
+- `BehaviorGraderDetails` is a 14-field union used by three graders that
+  only set 3–6 fields each, with the renderer guessing which apply.
+
+The user-visible inconsistency is real and almost entirely a
+**data-shape problem**, not a CSS/template problem. Recommend Option B
+below (promote `Points` to be the single canonical sub-check channel and
+freeze each detail struct as kind-specific *display extras* with a tight
+common contract).
+
+---
+
+## 1. Common surface area
+
+Every grader implementation today produces a `graders.GraderResult` with
+these always-populated fields (`hyoka/internal/criteria/graders/grader.go:96-119`):
+
+| Field | Type | Meaning | Always set? |
+|---|---|---|---|
+| `Kind` | `string` | One of the 8 `KindXxx` constants | yes |
+| `Name` | `string` | Instance name from YAML `name:` | yes |
+| `Score` | `float64` | 0.0–1.0 normalized | yes (some graders only emit 0.0/1.0) |
+| `Weight` | `float64` | Aggregation weight (`EffectiveWeight`, defaults 1.0) | yes — copied from `input.Config.EffectiveWeight()` |
+| `Pass` | `bool` | Binary pass/fail | yes |
+| `Gate` | `bool` | Gate flag (no longer short-circuits — see `AggregateResults`) | yes — copied from `input.Config.Gate` |
+| `Message` | `string` | Human-readable summary | yes (every grader sets one) |
+| `Points` | `[]GraderPoint` | Per-sub-check rows — `{Name, Pass, Message}` | **yes after Phase 2** — every grader now populates ≥1 point |
+
+Plus one of the following, mutually-exclusive typed details (DM4):
+
+```
+FileDetails        *FileGraderDetails
+ProgramDetails     *ProgramGraderDetails
+PromptDetails      *PromptGraderDetails
+BehaviorDetails    *BehaviorGraderDetails
+ReviewDetails      *ReviewGraderDetails
+OutputCheckDetails *OutputCheckGraderDetails
+```
+
+The **shared input** (`GraderInput`, `grader.go:29-60`) is a single 11-field
+struct every grader receives; graders ignore what they don't need (DM5).
+This part is healthy.
+
+The **interface** (`Grader`, `grader.go:18-25`) is exactly three methods:
+`Kind() / Name() / Grade(ctx, GraderInput) (GraderResult, error)`. Healthy.
+
+---
+
+## 2. Divergent surface area
+
+### 2a. Per-kind config schema (the input side)
+
+| Kind | Config struct | Unique fields |
+|---|---|---|
+| `file` | `FileConfig` | `Path`, `Pattern` (regex), `MustExist *bool` |
+| `program` | `ProgramConfig` | `Command`, `Args[]`, `Timeout int` (seconds) |
+| `prompt` | `PromptConfig` | `Model`, `Rubric` |
+| `behavior` | `BehaviorConfig` | `RequiredTools[]`, `ForbiddenTools[]`, `MaxTurns int` |
+| `action_sequence` | `ActionSequenceConfig` | `ExpectedActions[]` |
+| `tool_constraint` | `ToolConstraintConfig` | `Required[]`, `Forbidden[]`, `MinCalls map`, `MaxCalls map` |
+| `output_check` | `OutputCheckConfig` | 7 knobs: `MinFiles`, `MaxFiles`, `RequireFiles[]`, `ForbidFiles[]`, `RequireUpdated[]`, `MinBytesPerFile`, `MaxBytesPerFile` |
+| `prompt_review` | *(constructed by engine, not from YAML)* | wraps `review.Reviewer` and/or `review.PanelReviewer` |
+
+Note: `prompt_review` is the only kind not configured via `DecodeConfig`
+in `types.go`. It's instantiated directly by the engine with reviewer
+deps. That asymmetry is fine — it has different lifecycle needs — but
+worth flagging.
+
+### 2b. Per-kind result detail (the output side)
+
+| Kind | Detail struct | Distinctive fields | Sub-check channel |
+|---|---|---|---|
+| `file` | `FileGraderDetails` | `CheckedFiles[]{Path, Exists, PatternMatched, Pattern}` | 1 `Point` per file |
+| `program` | `ProgramGraderDetails` | `Command, ExitCode, Stdout, Stderr` | 1 synthetic `Point` named "exit code 0" |
+| `prompt` | `PromptGraderDetails` | `Model, Rubric, Reasoning, RawScore, MaxScore` (int 0–10) | 1 synthetic `Point` named "LLM judge" |
+| `behavior` | `BehaviorGraderDetails` (shared) | sets `ToolsUsed, MissingTools, ForbiddenUsed, MaxTurns, ActualTurns, TotalActions, TurnLimitHit, Violations` | 1 `Point` per required/forbidden tool + 1 per turn_limit |
+| `action_sequence` | `BehaviorGraderDetails` (shared) | sets `SequenceMatch, ExpectedSequence, ActualSequence, MatchedActions, ToolsUsed, TotalActions` | 1 `Point` named "expected_sequence" |
+| `tool_constraint` | `BehaviorGraderDetails` (shared) | sets `ToolsUsed, ToolCounts, MissingTools, ForbiddenUsed, Violations, ConstraintsMet` | 1 `Point` per required/forbidden + per min/max constraint |
+| `output_check` | `OutputCheckGraderDetails` | `ProducedFiles[]`, `SubChecks[]{Check, Pass, Message}` | 1 `Point` per configured knob (mirror of `SubChecks`) |
+| `prompt_review` | `ReviewGraderDetails` | `Model, OverallScore, MaxScore, Summary, Issues[], Strengths[], IsConsensus, Criteria[], PanelResults[]` | 1 `Point` per criterion (or 1 fallback "consensus") |
+
+### 2c. Score semantics divergence
+
+This is also user-visible:
+
+- `file` — 1.0 / 0.5 (file exists, pattern fails) / 0.0
+- `program` — 1.0 or 0.0 only (exit code based)
+- `prompt` — `RawScore / MaxScore` (e.g., 7/10 → 0.7), so partial credit
+- `behavior`, `tool_constraint` — 1.0 or 0.0 (binary)
+- `action_sequence` — `matched / expected` (partial credit)
+- `output_check` — 1.0 or 0.0 (binary; AND of sub-checks)
+- `prompt_review` — `overallScore / maxScore` (partial credit, criteria-based)
+
+The aggregator (`AggregateResults`) does a weighted average on `Score`,
+which is fine, but the **renderer** has to decide whether to show
+`70%` vs `7/10` vs `2/3 points` vs `PASS` — and currently does this
+ad-hoc in `GraderResultRow.tsx:51-61`. That ad-hoc logic is a symptom,
+not a cause; it's downstream of the divergent score semantics.
+
+---
+
+## 3. Output-shape inconsistencies the user sees on the site
+
+Concretely, looking at what `GraderResultRow.tsx` does with each kind:
+
+| Kind | Header score shown | Expanded body |
+|---|---|---|
+| `file` | "100%" / "50%" / "0%" | "File Checks" list (one row per file) |
+| `program` | "100%" / "0%" | Code-styled command + exit code + stdout + stderr |
+| `prompt` | "70%" | "LLM Review" with Model + Reasoning paragraph |
+| `behavior` | "PASS"/"FAIL" or `N/N passed` | "Behavior Analysis" 2-col grid with tools/turns/violations |
+| `action_sequence` | "67%" (e.g. 2/3) | Same "Behavior Analysis" panel — but only `tools_used` + `total_actions` populated; **no sequence visualization** |
+| `tool_constraint` | "PASS"/"FAIL" | Same "Behavior Analysis" panel — but renderer has no idea that `tool_counts`/`min_calls` constraints exist; only the synthesized "Violations" line lands |
+| `output_check` | "N/N points" | **No bespoke rendering** — `OutputCheckDetails` is not even in `report.GraderResult`. Users only see the generic "Points" list. `ProducedFiles` and the per-knob `SubChecks.Message` are dropped. |
+| `prompt_review` | "8/10" + "Review Panel" | Pills for each criterion + Issues/Strengths/Summary at top level |
+
+Specific user-visible gaps Ronnie is likely reacting to:
+
+1. **`prompt_review` is the only kind that surfaces Summary / Issues /
+   Strengths.** Everything else has only a `Message` string. Looking at
+   the report, prompt_review feels like a different species.
+2. **`output_check` has zero kind-specific UI** — it relies entirely on
+   the generic `Points` list. The `ProducedFiles` array (which would
+   answer "what did the agent actually emit?") is not even marshalled
+   to the report (`report/types.go:38-70` has no `OutputCheckDetails`
+   field).
+3. **`action_sequence` has no sequence display.** It populates
+   `ExpectedSequence`/`ActualSequence` in `BehaviorGraderDetails`, but
+   the React component only renders `tools_used`, `turn_count`,
+   `total_actions`, `violations`. The expected vs actual diff — the
+   *whole point* of the grader — never reaches the user.
+4. **Three different graders sharing one detail struct** means the
+   renderer is guessing which fields to show. The shared
+   `BehaviorGraderDetail` is a "union of optionals" pattern that always
+   results in this kind of drift.
+5. **`prompt` shows `Rubric` in the Go struct but not in the React
+   renderer.** Probably intentional (rubrics are long), but never
+   stated.
+6. **Score formatting drift:** `file` shows "50%", `prompt` shows "70%",
+   `output_check` shows "3/3 points", `prompt_review` shows "8/10",
+   `behavior` shows "PASS". Same column, four different shapes, no
+   legend.
+
+---
+
+## 4. Where the inconsistency lives
+
+This is a three-layer problem and each layer contributes:
+
+### Layer 1 — `graders.GraderResult` (source)
+
+- Has 6 mutually-exclusive `*Details` pointers (DM4 design choice). The
+  contract "exactly one is non-nil" is informal — there's no Go-level
+  guarantee.
+- `BehaviorGraderDetails` is shared by three graders and has 14
+  optional fields, with no schema for "which fields each kind sets".
+- `ReviewGraderDetails` duplicates fields that other graders express via
+  `Message` (Summary) and `Points` (Criteria).
+
+### Layer 2 — `report.GraderResult` (the marshalling layer)
+
+`hyoka/internal/report/types.go:37-70` is where shape drift gets baked
+into the JSON the site consumes:
+
+- It **flattens** `ReviewDetails` fields to the top level: `Scores`,
+  `OverallScore`, `MaxScore`, `Summary`, `Issues`, `Strengths`,
+  `IsConsensus`, `Duration`, `Model` are all top-level fields that
+  **only `prompt_review` populates**. Every other grader has them as
+  zero-valued JSON noise.
+- It is **missing `OutputCheckDetails` entirely** — the engine's
+  copy-from-grader-to-report logic has nothing to copy into. So the
+  rich `ProducedFiles`/`SubChecks` data dies at this layer.
+- `Pass` becomes `*bool` here (vs `bool` in the grader layer) to support
+  "legacy review-type graders" — another carve-out for `prompt_review`.
+
+### Layer 3 — `GraderResultRow.tsx` (the renderer)
+
+`site/src/app/components/GraderResultRow.tsx`:
+
+- Has a hardcoded `if (file_details) … if (program_details) …` cascade
+  (lines 228–376). Six `if` blocks, one per detail kind. No `output_check`
+  block at all.
+- Re-derives `passed` from a 5-way `if/else if` (lines 26–40) because the
+  source-of-truth shifted from `pass` → `points` mid-Phase-2 and the
+  helper `graderPasses` exists but isn't called inline.
+- Score formatting cascade (lines 51–61) picks among `pointsPassed/total`,
+  `score%`, and `overall_score/max_score` based on which fields are set.
+
+Summary: **Layer 1 is the structural cause. Layers 2 and 3 are
+amplifying it.** Fixing only Layer 3 (template) would not solve the
+underlying drift — the `output_check` data wouldn't even reach it, and
+`action_sequence` data would still be hidden inside a 14-field union.
+
+---
+
+## 5. Recommended unification — three options
+
+### Option A — Minimum viable: just plumb the missing data through
+
+Don't change the grader type system. Just close the data loss:
+
+1. Add `OutputCheckDetails *OutputCheckGraderDetail` to
+   `report.GraderResult` and copy it across in the engine.
+2. Add an `output_check` rendering block to `GraderResultRow.tsx`
+   showing `ProducedFiles` and the per-knob `SubChecks` table.
+3. Add an `action_sequence` rendering branch (or extend the behavior
+   block) to render the expected vs actual sequence diff.
+4. Decide one score-display convention per kind and codify it in a
+   helper.
+
+**What changes:** ~50 LOC across 3 files (`report/types.go`,
+`engine/...` copy step, one TSX file). Site assets re-built. No config
+breakage.
+
+**Cost:** Low. ~1 day. No migration. No breaking change.
+
+**Trade-off:** Doesn't solve the underlying "every grader is its own
+snowflake" problem. Adding a 9th grader will require touching all
+three layers again. The "union of optionals" `BehaviorGraderDetails`
+sticks around. Renderer cascade still grows linearly.
+
+### Option B — Promote `Points` to the canonical sub-check channel; reduce `*Details` to display extras (RECOMMENDED)
+
+Make the contract explicit: **every grader's verdict is `Points[]`**.
+The detail struct is reduced to *kind-specific display extras* that
+can never affect pass/fail.
+
+Sketch:
+
+```go
+type GraderResult struct {
+    Kind    string
+    Name    string
+    Weight  float64
+    Gate    bool
+    Score   float64        // derived; for partial-credit kinds
+    Pass    bool           // = AND(Points[i].Pass)  — enforce at construction
+    Message string         // headline only
+
+    Points  []GraderPoint  // REQUIRED, ≥1; the canonical sub-checks
+
+    // Extras: opaque, kind-specific, render-only payload.
+    // No field in here may carry pass/fail signal.
+    Extras  GraderExtras
+}
+
+type GraderExtras struct {
+    File        *FileExtras        `json:"file,omitempty"`
+    Program     *ProgramExtras     `json:"program,omitempty"`
+    Prompt      *PromptExtras      `json:"prompt,omitempty"`
+    Behavior    *BehaviorExtras    `json:"behavior,omitempty"`    // shared by behavior/action_sequence/tool_constraint
+    Review      *ReviewExtras      `json:"review,omitempty"`
+    OutputCheck *OutputCheckExtras `json:"output_check,omitempty"`
+}
+```
+
+**What each grader changes:**
+
+- `file`: `FileExtras = { Path, Exists, Pattern, PatternMatched }`. Already aligned.
+- `program`: `ProgramExtras = { Command, ExitCode, Stdout, Stderr, DurationMs }`. Already aligned.
+- `prompt`: `PromptExtras = { Model, Reasoning }`. Drop `RawScore/MaxScore` from extras — `Score` carries it; rubric stays out (already not rendered).
+- `behavior`: split the shared union into THREE typed extras:
+  `BehaviorExtras`, `ActionSequenceExtras`, `ToolConstraintExtras`. Each
+  only carries fields its grader actually sets. Schema becomes
+  self-documenting.
+- `output_check`: `OutputCheckExtras = { ProducedFiles, SubChecks }`. Plumb through to `report.GraderResult`.
+- `prompt_review`: `ReviewExtras = { Model, Summary, Issues, Strengths, IsConsensus, PanelResults }`. **Drop `Criteria` from extras** — they're already in `Points`. **Drop `OverallScore/MaxScore`** — `Score` (0–1) plus the `Points` count carry it. `Summary`/`Issues`/`Strengths` become the only kind-special display data.
+
+**What `report.GraderResult` changes:** Stop flattening review fields to
+top level. Move them into `Extras.Review`. This is the breaking change —
+any existing JSON parser of the report will break. We control the
+sole consumer (the React app).
+
+**What the React renderer changes:** Three dispatchers replace six:
+`<HeaderBadge>` (uses Pass + Score uniformly), `<PointsList>` (always
+rendered, since Points is required), and `<KindExtras>` (one switch on
+`extras` discriminant). `output_check` and `action_sequence` get proper
+rendering for free because their extras are now first-class.
+
+**Cost:** Medium. ~300–500 LOC across:
+- `graders/grader.go`, all 8 grader impls (rename / split detail structs)
+- `report/types.go` (move fields under `Extras`)
+- `engine/...` copy step (one big rename, mechanical)
+- `site/src/app/data/types.ts` + `GraderResultRow.tsx` (rewrite render path)
+- All grader `_test.go` files (mostly find-replace)
+
+**Migration path:** Bump report schema to v4. Site can read v3 (legacy
+flat) and v4 (extras) side-by-side for one release, then v3 read path
+gets retired. The detail-loss in v3 (`OutputCheckDetails`) is not
+recoverable so v3 reports continue to look as broken as they do today.
+
+**Trade-offs:**
+- ✅ Self-documenting per-kind shape; no more "which fields does this kind
+  set" guessing.
+- ✅ Adding a 9th grader is mechanical: define `FooExtras`, set
+  `Extras.Foo`, add one render branch.
+- ✅ Closes the `OutputCheckDetails` data leak permanently.
+- ✅ Forces every grader to emit `Points`, which the renderer already
+  treats as canonical (`graderPasses` helper, multi-point UI). Removes a
+  whole source of "pass derived two ways" drift.
+- ⚠️ Breaking change to report JSON. Acceptable because we own the
+  consumer.
+- ⚠️ Splitting `BehaviorGraderDetails` into three structs touches the
+  three behavior-family graders' tests. Mechanical.
+
+### Option C — Maximally radical: a single `SubCheck` model, retire `*Details` entirely
+
+Reduce every grader to: `Points[]` + a free-form `Evidence map[string]any`
+for kind-specific display data. No typed extras at all.
+
+Cost: Largest refactor, but smallest type surface. Every site rendering
+becomes generic-with-overrides.
+
+Risk: We lose Go-side type safety on the detail payload. Bugs that
+are currently compile-time (typo in `tools_used`) become runtime
+("nothing rendered"). The Phase 1 → Phase 2 history shows we already
+walked back from "everything is `interface{}`" (DM4) — Option C
+re-opens that wound.
+
+**Not recommended** unless we want to genuinely commodity-ize graders
+to the point of dynamic registration from YAML alone. That's a
+different product.
+
+---
+
+## My recommendation
+
+**Option B.** Specifically:
+
+1. The work is mostly a rename + a struct-split + a renderer simplification.
+2. It closes the two real data losses (`output_check`, `action_sequence`).
+3. It makes the `Points`-as-canonical decision (already half-made in
+   Phase 2) finally complete instead of dual-channel.
+4. It cuts the "13 inconsistent fields per grader on the report" surface
+   down to "5 common + 1 kind-specific extras blob".
+5. The behavior-family split is a nice side win — `action_sequence`
+   stops pretending to be `behavior`.
+
+Option A is a safe stopgap if release pressure is high — pair it with
+"we'll do B in the next minor". But don't ship A alone for long; the
+underlying drift will keep biting.
+
+---
+
+## Open questions for Ronnie
+
+1. **Is the report JSON consumed by anything besides the React site?**
+   If yes, Option B becomes more expensive — we'd need to keep the v3
+   shape alive or ship a converter.
+2. **Should `prompt_review` lose the partial-credit `Score` semantics?**
+   Today it's the only grader where `Score` is a fraction of LLM-judge
+   points rather than "fraction of Points that passed". Aligning would
+   mean a grader's `Score` is *always* `passed_points / total_points`.
+   That's a stronger invariant but flattens the LLM's per-criterion
+   weighting if we ever add one.
+3. **Do we keep `FileGrader`'s 0.5 score (file exists, pattern fails) or
+   collapse to binary?** Today it's the only "partial credit single-
+   point" grader. Either drop it (binary, Pass=false) or model it as
+   two Points ("file present" + "pattern matches"), which is more
+   honest.
+
+
+---
+
+# Morpheus 🕶️ — Grader Unification Implementation Plan (Option B)
+
+**Date:** 2026-04-23
+**Status:** Greenlit by Ronnie ("fix the results payload so we can have the results of the graders on the site look more consistent and be handled consistently")
+**Foundation:** `.squad/decisions/inbox/morpheus-grader-structure-audit.md`
+**Owners:** Neo (engine + Go types) and Trinity (site + renderer)
+**Schema bump:** report v3 → **v4**
+
+---
+
+## 0. Decisions made (the three open questions)
+
+I'm picking sensible defaults rather than waiting on Ronnie. He's busy and trusts the call.
+
+### Q1. External report consumers — safe to bump to v4?
+
+**Decision: Yes, hard cutover to v4. No backward-compat read path for v3.**
+
+- The only first-party consumer is the React site (`site/`), which we control end-to-end.
+- Reports under `reports/` are git-ignored regenerable artifacts. Anyone who has stale reports re-runs them.
+- Maintaining a v3 read path doubles the renderer's complexity and would re-introduce the very ad-hoc cascade we're trying to delete.
+- `CurrentSchemaVersion` becomes `4`. Loader rejects v < 4 with a clear "regenerate this report" error.
+
+### Q2. `prompt_review` score semantics — keep OverallScore/MaxScore or fold into Points?
+
+**Decision: Fold into Points. Drop `OverallScore` / `MaxScore` from the report entirely.**
+
+- Every grader's Score becomes `passed_points / total_points` (with `Weight` per-point optional, see §2). That's the new invariant.
+- The LLM judge's per-criterion verdict already maps 1:1 to a Point (audit table, §2b). The "8/10" the user sees today is just the criteria pass count rephrased.
+- Per-criterion *scores* (the int 0–N the model emits per criterion) survive as a `Weight` field on each Point — see §2 — so partial-credit weighting isn't lost.
+- Result: same canonical score string for every grader (§4). No special case for `prompt_review`.
+
+### Q3. FileGrader's 0.5 partial-credit (file exists, pattern fails)
+
+**Decision: Normalize. Two Points per file: `{file present}` + `{pattern matches}` (the second only emitted when a Pattern is configured). Drop the 0.5.**
+
+- Honest to what was actually checked.
+- Aligns with the new invariant `Score = passed/total`.
+- Renderer gets a uniform multi-point row; no per-grader fudging.
+
+---
+
+## 1. Final unified `GraderResult` shape
+
+### Engine side: `hyoka/internal/criteria/graders/grader.go`
+
+```go
+// GraderResult is the single shape every grader returns. Pass and Score
+// are derived from Points at construction time — they are NOT independent
+// signals. Any field outside Points is render-only and may not influence
+// pass/fail.
+type GraderResult struct {
+    Kind    string  `json:"kind"`              // one of KindXxx
+    Name    string  `json:"name"`              // YAML instance name
+    Weight  float64 `json:"weight"`            // aggregation weight (from config)
+    Gate    bool    `json:"gate"`              // gate flag (from config)
+
+    // Derived from Points — see NewGraderResult helper in §2.
+    Score   float64 `json:"score"`             // sum(point.Weight * pass) / sum(point.Weight); 0 if no points
+    Pass    bool    `json:"pass"`              // AND over Points[i].Pass
+    Message string  `json:"message"`           // headline summary (≤ ~120 chars)
+
+    Points  []GraderPoint `json:"points"`      // REQUIRED, len ≥ 1; the canonical sub-checks
+    Extras  *GraderExtras `json:"extras,omitempty"` // kind-specific render-only payload
+}
+
+type GraderPoint struct {
+    Label    string  `json:"label"`              // short, what was checked (e.g. "file present: src/main.py")
+    Pass     bool    `json:"pass"`
+    Message  string  `json:"message,omitempty"`  // why it passed/failed (the "reason" Ronnie asked for)
+    Weight   float64 `json:"weight,omitempty"`   // for Score weighting; defaults to 1.0 when 0/omitted
+    Evidence map[string]string `json:"evidence,omitempty"` // tiny, optional, string-only KV (e.g. {"pattern":"^def "})
+}
+
+type GraderExtras struct {
+    File           *FileExtras           `json:"file,omitempty"`
+    Program        *ProgramExtras        `json:"program,omitempty"`
+    Prompt         *PromptExtras         `json:"prompt,omitempty"`
+    Behavior       *BehaviorExtras       `json:"behavior,omitempty"`
+    ActionSequence *ActionSequenceExtras `json:"action_sequence,omitempty"`
+    ToolConstraint *ToolConstraintExtras `json:"tool_constraint,omitempty"`
+    OutputCheck    *OutputCheckExtras    `json:"output_check,omitempty"`
+    Review         *ReviewExtras         `json:"review,omitempty"`
+}
+```
+
+### Report side: `hyoka/internal/report/types.go`
+
+`report.GraderResult` becomes a thin mirror of `graders.GraderResult` (no flattened review fields, no per-detail field cascade):
+
+```go
+type GraderResult struct {
+    GraderName string  `json:"grader_name"`
+    GraderType string  `json:"grader_type"` // == graders.Kind
+    Score      float64 `json:"score"`
+    Weight     float64 `json:"weight"`
+    Pass       bool    `json:"pass"`        // not *bool anymore — every grader has a verdict
+    Gate       bool    `json:"gate,omitempty"`
+    Message    string  `json:"message"`     // renamed from Summary
+
+    Points []GraderPoint `json:"points"` // required, len ≥ 1
+    Extras *GraderExtras `json:"extras,omitempty"`
+}
+```
+
+**Removed from `report.GraderResult`:** `Model`, `Scores`, `OverallScore`, `MaxScore`, `Summary`, `Issues`, `Strengths`, `Duration`, `IsConsensus`, `FileDetails`, `ProgramDetails`, `PromptDetails`, `BehaviorDetails`, `ReviewDetails`. (`Model`, `Issues`, `Strengths`, `IsConsensus`, etc. live inside `Extras.Review` now. `Duration` belonged in the run-level metrics; if we currently use it on the row it moves to `Extras.Review.DurationSeconds`.)
+
+---
+
+## 2. What `Points[]` looks like — the contract
+
+**The invariant that powers everything else:**
+
+```go
+// Constructor — every grader builds via this. Cannot construct a
+// GraderResult by literal; the type is unexported-fielded or the helper
+// just panics on len(points)==0. Either way: Points is required.
+func NewResult(kind, name string, cfg GraderConfig, points []GraderPoint, msg string, extras *GraderExtras) GraderResult
+```
+
+The helper computes:
+
+- `Pass = all(p.Pass for p in points)`
+- `Score = sum(p.weightOr1() * boolToFloat(p.Pass)) / sum(p.weightOr1())`
+- copies `Weight` and `Gate` from `cfg.EffectiveWeight()` / `cfg.Gate`
+
+**Each Point answers Ronnie's "why":**
+
+- `Label` — short noun phrase: *what was checked*. E.g. `file present: src/main.py`, `tool used: azure-cli`, `criterion: error handling`.
+- `Pass` — boolean.
+- `Message` — *why this point's verdict*. Always populated on failure (e.g. "file not found at workspace/src/main.py"), optional on pass.
+- `Weight` — for partial credit. Defaults to 1.0. Only `prompt_review` and `action_sequence` use non-1.0 today.
+- `Evidence` — small, string-only KV of supporting data. Lets the renderer surface things like `{"actual":"5","expected":">=3"}` without ad-hoc fields.
+
+**No grader may emit zero Points.** A grader that has nothing to check is a config error and should fail loudly at construction.
+
+---
+
+## 3. Per-grader mapping (all 8 kinds)
+
+For each kind, this table is the contract Neo implements:
+
+| Kind | What becomes a Point (one per…) | Extras type | Extras carries |
+|---|---|---|---|
+| `file` | one Point per file: `file present: <path>` (always); plus a second Point `pattern matches: <path>` per file when `Pattern` is set | `FileExtras` | `Files []FileExtra{Path, Exists, Pattern, PatternMatched, Size}` for syntax-highlighted display |
+| `program` | one Point: `exit code 0` (Pass=ExitCode==0; Message=stderr tail on fail) | `ProgramExtras` | `Command, Args, ExitCode, Stdout, Stderr, DurationMs` |
+| `prompt` | one Point: `LLM judge: <rubric short name>` (Pass = `RawScore >= passing threshold`; Message = model's reasoning summary, truncated) | `PromptExtras` | `Model, Rubric, Reasoning, RawScore, MaxScore` (RawScore/MaxScore retained here for transparency, NOT used to compute Score — Score is from the single Point) |
+| `behavior` | one Point per required tool (`tool required: X`), one per forbidden tool absent (`tool forbidden: Y`), one for turn-limit (`turn limit ≤ N`) when configured | `BehaviorExtras` | `ToolsUsed[], MissingTools[], ForbiddenUsed[], TurnCount, MaxTurns, TotalActions, TurnLimitHit, Violations[]` |
+| `action_sequence` | one Point per expected action position: `step N: expected <tool>` (Pass = matched at that index; Message = "got <actual>" on fail). Optionally use `Weight` if certain steps are weighted in YAML (future). | `ActionSequenceExtras` | `ExpectedSequence[], ActualSequence[], MatchedActions, ToolsUsed[], TotalActions` |
+| `tool_constraint` | one Point per required tool, per forbidden tool, per `MinCalls[t]` constraint (`tool X called ≥ N`), per `MaxCalls[t]` constraint (`tool X called ≤ N`) | `ToolConstraintExtras` | `ToolsUsed[], ToolCounts map[string]int, MissingTools[], ForbiddenUsed[], Violations[], ConstraintsMet bool` |
+| `output_check` | one Point per configured knob: `min files: ≥ N`, `max files: ≤ N`, `require file: <path>` (one per entry), `forbid file: <path>` (one per), `require updated: <path>` (one per), `min bytes/file: ≥ N`, `max bytes/file: ≤ N` | `OutputCheckExtras` | `ProducedFiles []FileEntry{Path, Size}` (the agent's actual output) |
+| `prompt_review` | one Point per criterion in the rubric. Label = criterion name; Pass = criterion passed per LLM; Message = LLM's per-criterion reasoning; **Weight = LLM's per-criterion max points** so weighted Score still reflects the rubric weighting | `ReviewExtras` | `Model, Summary, IsConsensus, PanelResults []PanelMemberResult{Model, Score, Pass, Issues[], Strengths[]}, Issues []string (consensus), Strengths []string (consensus), DurationSeconds` |
+
+**Key consequences:**
+- `output_check` finally has its `ProducedFiles` and per-knob results reach the site (current bug — they die in marshalling).
+- `action_sequence`'s expected-vs-actual diff is now first-class: each step is a Point, the full sequences live in Extras for visualization.
+- `prompt_review` no longer has a parallel score channel; its score is `pointsPassed/pointsTotal` weighted by criterion. The `Summary`/`Issues`/`Strengths` move to `Extras.Review` where they belong.
+- `behavior`/`action_sequence`/`tool_constraint` get **three separate Extras structs** instead of one 14-field union. Each grader sets only the struct it owns. No more "which fields apply".
+
+---
+
+## 4. Score display — one canonical format
+
+**The rule (Trinity, encode this once in a helper):**
+
+```ts
+// In site/src/app/lib/graderScore.ts
+export function formatGraderScore(r: GraderResult): string {
+  const passed = r.points.filter(p => p.pass).length;
+  const total  = r.points.length;
+  return `${passed}/${total} points`;   // ALWAYS this shape, even when total === 1
+}
+```
+
+- Single point that passed → `"1/1 points"`. Not "Passed", not "100%".
+- Three of three → `"3/3 points"`. Not "100%".
+- Two of three → `"2/3 points"`. Not "67%".
+- This is the *only* score string shown in the row header.
+- Internal numeric `Score` (the weighted float) is still emitted for aggregation/sort, but the row never displays it as a percentage.
+
+The pass/fail icon (✓/✗) still appears next to the score and is driven by `r.pass` (which equals `passed === total`).
+
+---
+
+## 5. Site rendering rules
+
+**Single source of truth in the row header. No duplicated info on the right.**
+
+Current state (the inconsistency Ronnie called out): the row shows e.g. `Passed` AND `100%` AND a separate `1/1 points` deeper in the body.
+
+New header layout (left-to-right):
+
+```
+[expand-chevron] [grader-name]  [kind-pill]  [score-string]  [✓/✗ badge]
+```
+
+- `score-string` = `formatGraderScore(r)` from §4.
+- The badge is icon-only (no "PASS"/"FAIL" text) — the score string already encodes the count, and the badge encodes the binary verdict.
+- **Remove** the right-side "100%" / "N/N" / "PASS" duplication entirely.
+
+Body (when expanded):
+
+1. **Always**: `<PointsList>` — `<ul>` of Points. Each row: `[✓/✗] <Label>` on left; `<Message>` on right (italic, muted). If `evidence` non-empty, render as small KV chips below the row.
+2. **If `extras` populated**: `<KindExtras kind={r.grader_type} extras={r.extras}>` — single dispatcher with one branch per kind, rendering only the render-only data (file lists, command output, sequence diff, panel breakdown, etc.).
+
+**Auto-expand rule:** expand by default when `points.length > 1` OR when `r.pass === false`. Single-passing-point graders stay collapsed.
+
+---
+
+## 6. File-by-file change list
+
+### Neo (engine + Go types) — work item N
+
+Order matters; later steps depend on earlier ones.
+
+1. **`hyoka/internal/criteria/graders/grader.go`** — replace `GraderResult` per §1; add `NewResult` constructor; add `GraderPoint.Weight` and `Evidence`; define `GraderExtras` and the seven `*Extras` structs.
+2. **`hyoka/internal/criteria/graders/file_grader.go`** — emit two-point pattern per file when Pattern set; build `FileExtras`. Drop 0.5.
+3. **`hyoka/internal/criteria/graders/program_grader.go`** — single Point `exit code 0`; `ProgramExtras`.
+4. **`hyoka/internal/criteria/graders/prompt_grader.go` + `prompt_grader_adapter.go`** — single Point; `PromptExtras` retains `RawScore/MaxScore` for display only.
+5. **`hyoka/internal/criteria/graders/behavior_grader.go`** — split: produce per-tool Points + turn-limit Point; `BehaviorExtras`. (This file currently holds all three behavior-family graders' shared details — Neo splits the Extras here.)
+6. **`hyoka/internal/criteria/graders/behavior_grader.go`** (action_sequence path) — per-step Points + `ActionSequenceExtras`.
+7. **`hyoka/internal/criteria/graders/behavior_grader.go`** (tool_constraint path) — per-constraint Points + `ToolConstraintExtras`.
+8. **`hyoka/internal/criteria/graders/output_check_grader.go`** — per-knob Points (already has SubChecks; just promote them); `OutputCheckExtras` with `ProducedFiles`.
+9. **`hyoka/internal/criteria/graders/prompt_review_grader.go`** — per-criterion Points (with Weight = criterion max); `ReviewExtras` with Summary/Issues/Strengths/PanelResults.
+10. **`hyoka/internal/report/types.go`** — replace `GraderResult` per §1 (mirror); bump `CurrentSchemaVersion = 4`; add the seven `*Extras` mirror types; remove the flattened review fields and the per-kind detail fields.
+11. **`hyoka/internal/eval/engine_eval.go`** — rewrite `convertGraderResults` (lines 1186+): drop the six `if .XDetails` branches; replace with one `Extras` copy; drop the `prompt_review`-special-case block (lines 1248+); copy `Points` and `Extras` mechanically.
+12. **`hyoka/internal/report/`** loader/reader — reject `schema_version < 4` with explicit error message ("regenerate report; v3 → v4 schema bump").
+13. **All `_test.go` files in `hyoka/internal/criteria/graders/`** — update to new shape (mostly mechanical: replace `result.FileDetails.X` with assertions on Points / Extras.File).
+14. **`hyoka/internal/criteria/graders/points_test.go`** — see §8.
+
+### Trinity (site + renderer) — work item T
+
+Trinity can start as soon as Neo lands step 1 (the Go types) — frontend types/components don't need the back-end implementations yet, just the JSON shape contract.
+
+1. **`site/src/app/data/types.ts`** — replace `GraderResult` interface to match new JSON shape (§1, report side). Add `GraderPoint` (with `weight`, `evidence`), `GraderExtras`, and seven `*Extras` interfaces.
+2. **`site/src/app/lib/graderScore.ts`** (new) — `formatGraderScore` per §4. Plus `graderPasses` cleanup: now just `r.pass`.
+3. **`site/src/app/lib/evalPass.ts`** — collapse the tri-state `graderPasses` cascade to `r => r.pass`. Old field-existence checks no longer needed.
+4. **`site/src/app/components/GraderResultRow.tsx`** — full rewrite of body:
+    - Header per §5 (drop right-side duplicate).
+    - Replace 6-way `if (file_details) … if (program_details) …` cascade with `<PointsList>` (always) + `<KindExtras>` (one switch).
+5. **`site/src/app/components/grader-extras/`** (new directory) — one component per kind: `FileExtras.tsx`, `ProgramExtras.tsx`, `PromptExtras.tsx`, `BehaviorExtras.tsx`, `ActionSequenceExtras.tsx` (now finally renders the expected-vs-actual sequence!), `ToolConstraintExtras.tsx`, `OutputCheckExtras.tsx` (finally renders ProducedFiles!), `ReviewExtras.tsx`.
+6. **`site/src/app/components/GraderResultRow.test.tsx`** — rewrite assertions against new shape; add cases for each Extras kind; add a test asserting the score string is `N/M points` for both single-point and multi-point graders.
+7. **JSON consumers elsewhere in `site/`** — `grep -rn "overall_score\|max_score\|file_details\|program_details\|behavior_details\|review_details\|summary"` and migrate each. Likely hits in `eval-detail-page.tsx` and `prompt-detail-page.tsx`.
+
+### Sync points
+
+- **Sync 1 (after Neo step 1 + Trinity step 1):** Neo and Trinity confirm JSON shape parity. Lock the contract. Trinity unblocked to build components against fixtures.
+- **Sync 2 (after Neo step 11):** Neo produces a single fresh report from a real run; Trinity hits it with the new renderer end-to-end.
+- **Sync 3 (before merge):** dogfood — `go run ./hyoka serve` against a fresh full-run report; Morpheus walks the site looking at every kind's row.
+
+---
+
+## 7. Migration / breaking-change handling
+
+- **Schema:** v3 → v4. Hard cutover.
+- **Old reports:** the loader emits `fmt.Errorf("report schema v%d is no longer supported; regenerate with: hyoka run …", v)`. No silent migration. (Auto-migration is impossible anyway: v3 dropped `OutputCheckDetails` on the floor — the data we'd want isn't there to migrate.)
+- **`reports/` is git-ignored** — no commit fallout.
+- **Doc updates:** `docs/architecture.md` grader section, any sample `criteria/*.yaml` whose comments reference per-kind detail fields.
+- **Issue + PR:** Neo opens a tracking issue ("v4: unified GraderResult"), links this plan, ships the engine half as one PR; Trinity ships the site half as a stacked PR. Do NOT split per-grader — Phase 1 of v4 must be atomic so the JSON shape never lives half-migrated on `dev`.
+
+---
+
+## 8. Test plan
+
+### `hyoka/internal/criteria/graders/points_test.go` (Switch will pick this up)
+
+Add table-driven coverage:
+
+1. **Invariant tests on `NewResult`:**
+    - `Pass == true` iff every Point passes.
+    - `Score == sum(weight*pass)/sum(weight)`.
+    - Empty Points panics (or returns sentinel error) — Points is required.
+    - Default Weight 1.0 when Point.Weight == 0.
+2. **Per-grader Points-shape tests** (one per kind):
+    - `file`: with/without Pattern → 1 vs 2 Points per file; failing pattern produces failing Point with informative Message.
+    - `program`: exit 0 / exit non-0; Message contains stderr tail on fail.
+    - `prompt`: rubric pass → single Point pass; rubric fail → fail with reasoning in Message.
+    - `behavior`: required tool present/absent; forbidden tool absent/present; turn-limit hit/not.
+    - `action_sequence`: per-step Points produced in order; Message on mismatch is "got <actual>".
+    - `tool_constraint`: each of the 4 knob types produces a distinct Point.
+    - `output_check`: each of the 7 knobs produces a Point only when configured (no Point for unset knobs).
+    - `prompt_review`: per-criterion Points; weighted Score recovers original `OverallScore/MaxScore` ratio.
+3. **Round-trip JSON test:** marshal a `report.GraderResult` of each kind → unmarshal → assert no field loss; Extras discriminant lights up only the expected branch.
+4. **Schema-version test:** loading a v3 report returns the explicit "regenerate" error.
+
+### Site (`site/src/app/components/GraderResultRow.test.tsx`)
+
+1. Score string is `N/M points` for single-point AND multi-point.
+2. No "100%", "PASS", or duplicated score on the right of the header.
+3. PointsList renders one row per point with Pass icon and Message.
+4. `KindExtras` dispatches to the correct component per `grader_type`; output_check and action_sequence extras render their distinctive content.
+
+---
+
+## 9. Suggested split — Neo vs. Trinity
+
+| Phase | Neo | Trinity | Sync |
+|---|---|---|---|
+| **0** | — | — | Both read this plan |
+| **1** | Step 1: define new `graders.GraderResult` + `GraderPoint` + `GraderExtras` types in `grader.go`. Push to a branch with type definitions only. | Step 1: define matching TS interfaces in `data/types.ts`. Hand-write fixture JSON for each kind. | **Sync 1**: confirm shape parity |
+| **2** | Steps 2–9: rewrite each grader (parallel-safe internally — one grader per commit). | Steps 2–5: write `formatGraderScore` helper, new `GraderResultRow.tsx`, the seven `grader-extras/*.tsx` components. Use Trinity's fixtures. | Trinity unblocked; works in parallel |
+| **3** | Steps 10–12: report layer + engine conversion + loader version check. | Step 6: tests. Step 7: sweep other site consumers. | — |
+| **4** | Step 13–14: grader tests + `points_test.go`. | — | — |
+| **5** | — | — | **Sync 2**: Neo produces fresh report; Trinity verifies E2E with playwright |
+| **6** | PR engine half. | Stacked PR for site half. | **Sync 3**: Morpheus dogfoods, then approves both PRs together |
+
+**Parallelism:** Trinity is unblocked from end of Phase 1. Neo's per-grader work in Phase 2 is independent across graders (one commit each). The only true serialization is Phase 3 (Neo's engine conversion) before Sync 2.
+
+**Estimated size:** ~400–600 LOC across ~20 files for Neo; ~400–500 LOC across ~12 files for Trinity (mostly the new components + test fixtures).
+
+---
+
+## Appendix A — what gets *deleted*
+
+Tracking what ships out the door so future readers can confirm cleanup happened:
+
+- `report.GraderResult.{Model, Scores, OverallScore, MaxScore, Summary, Issues, Strengths, Duration, IsConsensus}` — gone (Summary lives on as `Message`; Model/Issues/Strengths/IsConsensus/Duration move to `Extras.Review`).
+- `report.GraderResult.Pass` flips from `*bool` to `bool` — every grader emits a verdict now.
+- `report.{FileGraderDetail, ProgramGraderDetail, PromptGraderDetail, BehaviorGraderDetail, ReviewGraderDetail}` — replaced by `*Extras` mirrors.
+- `graders.{FileGraderDetails, …, ReviewGraderDetails}` — replaced by `*Extras`.
+- `graders.GraderResult.{FileDetails, ProgramDetails, PromptDetails, BehaviorDetails, ReviewDetails, OutputCheckDetails}` — collapsed into single `Extras *GraderExtras` field.
+- `BehaviorGraderDetails` 14-field union — split into three single-purpose Extras.
+- The 6-way `if (X_details)` cascade in `GraderResultRow.tsx` — replaced by single `KindExtras` dispatcher.
+- The 5-way `passed` derivation cascade in `GraderResultRow.tsx` — replaced by `r.pass`.
+- The score-format cascade (`pointsPassed/total` vs `score%` vs `overall_score/max_score`) — replaced by `formatGraderScore`.
+- `convertGraderResults` six-detail copy block + `prompt_review` special-case block — replaced by mechanical Points + Extras copy.
