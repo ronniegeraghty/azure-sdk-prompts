@@ -33,7 +33,7 @@ logs/
 skills-lock.json
 
 # Node modules
-site/node_modules/
+node_modules/
 
 # Site build output (embedded copy lives in hyoka/internal/serve/site/)
 site/dist/
