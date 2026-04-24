@@ -560,3 +560,23 @@ Asserts: `strings.Count(out, "\nAgent Attempt:")` equals 1 — exactly ONE Agent
 
 **Summary:** Per-bucket grader display landed (`4adc9288`, `4888a402`). During code review, Coordinator identified four critical bugs now fixed: (1) empty-workspace AI-grader bug (`engine_eval.go`), (2) `min_bytes_per_file` vacuous-pass (`output_check_grader.go`), (3) token usage display (`progress.go`), (4) site file-contents fallback (`eval-detail-page.tsx`). All tests pass.
 
+
+## Session 2026-04-24: Fix KindPromptReview in validTypedKinds
+
+**Status:** COMPLETE (commit 84b1606d on ronniegeraghty/dev)
+
+**Issue:** User reported potential duplicate AI grader execution after commit 4adc9288. Investigation revealed that `graders.KindPromptReview` was incorrectly listed in `validTypedKinds` (hyoka/internal/criteria/config.go:86).
+
+**Root cause:** `KindPromptReview` is the kind returned by manually-created `PromptReviewGrader` instances in engine_eval.go (Phase 2, lines 596-671). It should NOT be a valid criteria-file type. Only `type: prompt` should be used in YAML files for LLM-review graders. Leaving it in `validTypedKinds` suggested `type: prompt_review` was valid, but `NewGrader` doesn't handle it, which would cause instantiation errors if anyone added such entries.
+
+**Fix:** Removed `graders.KindPromptReview` from `validTypedKinds` map in config.go.
+
+**Testing:** go build, go test (eval + criteria packages) passed. Live eval completed successfully.
+
+### Learnings
+
+- `KindPromptReview` is NOT a criteria-file type — it's the kind of runtime graders created by the engine
+- `PartitionMatched` filters `type: prompt` entries into `promptEntries`; everything else goes to `typedEntries`
+- `NewGrader` handles only the typed grader kinds (file, program, behavior, action_sequence, tool_constraint, output_check)
+- Per-bucket `PromptReviewGrader` creation is separate from the criteria-file typed graders path
+- Criteria YAML schema: `type: prompt` for LLM-review graders, never `type: prompt_review`
