@@ -41,10 +41,6 @@ Prompt files demonstrate different prompt formats and features:
 - **`existing-files-example.prompt.md`** — Demonstrates `starter_project` feature:
   - `project_context: type: existing` — agent works on pre-existing code
   - `starter_project:` path — files copied to agent workspace before session starts
-- **`graders-frontmatter-example.prompt.md`** — Demonstrates optional `graders:` frontmatter:
-  - Prompt-level grading criteria
-  - Graders specified directly in prompt frontmatter
-  - Example of different grader kinds (prompt_review, file, etc.)
 
 ### Criteria (`examples/criteria/`)
 
@@ -112,31 +108,6 @@ when:
 graders:
   - name: "Rust-specific grader"
     prompt: "Applies to all Rust prompts"
-```
-
-### Prompt-Level Graders
-
-Prompts can include optional `graders:` section in frontmatter:
-
-```yaml
----
-id: my-prompt-id
-properties:
-  service: key-vault
-  language: python
-
-# Optional: specify graders directly in the prompt
-graders:
-  - name: "Custom grader"
-    weight: 1.0
-    kind: prompt_review
-    prompt: "Custom evaluation criteria"
-
----
-
-## Prompt
-
-Your prompt text here...
 ```
 
 ## Running Examples
