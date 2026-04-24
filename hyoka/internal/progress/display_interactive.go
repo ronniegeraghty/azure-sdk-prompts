@@ -792,6 +792,13 @@ func (r *interactiveRenderer) onAgentActivity(evt ProgressEvent) {
 // Factored out so both buffered-flush and direct rendering use the same logic.
 // With the three-state model, we just transition to Running on first event.
 func (r *interactiveRenderer) renderAgentEvent(evt ProgressEvent) {
+	// Agent Attempt is already finalized — generation phase is over. Ignore
+	// activity events from downstream sessions (reviewer Copilot sessions
+	// emit the same EventReasoning/EventToolStart/etc. through the shared
+	// event channel, but they belong to grader rows, not the agent tail).
+	if r.cur != nil && (r.cur.agentState == agentStateCompleted || r.cur.agentState == agentStateGuardrail) {
+		return
+	}
 	r.ensureAgentHeader()
 	// First agent event transitions to Running state if not already set.
 	if r.cur.agentState == 0 { // zero value means not initialized

@@ -516,6 +516,60 @@ func TestInteractive_AgentCompletedRowRewritesFrozenLine(t *testing.T) {
 	}
 }
 
+// TestInteractive_ReviewerEventsAfterCompletionIgnored regresses Bug 3:
+// reviewer Copilot sessions emit EventReasoning/EventToolStart/EventToolComplete
+// through the same event channel as the generator. Once EventSessionDetails
+// flips Agent Attempt → Completed, subsequent activity events from reviewer
+// sessions MUST NOT reopen the agent tail or create duplicate "Agent Attempt:
+// ✅ Completed" rows at the bottom of the transcript.
+func TestInteractive_ReviewerEventsAfterCompletionIgnored(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+
+	id := "reviewer-events"
+	d.HandleEvent(ProgressEvent{EvalID: id, PromptID: "p", ConfigName: "c", Type: EventStarting})
+	// No tools configured — gate opens on first activity.
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventReasoning, Message: "generator thinking"})
+	// Generation completes; Agent Attempt → Completed
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventSessionDetails, Files: []string{"a.py"}, Turns: 2, ToolCalls: 1, Cost: 0.01})
+	// Start a typed grader (e.g., files_present) and complete it.
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderStart, GraderID: "files_present", GraderKind: "files_present"})
+	score := 10.0
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderComplete, GraderID: "files_present", GraderKind: "files_present", Result: GraderResultPass, Score: &score})
+	// Start the AI review grader (reviewer Copilot session)
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderStart, GraderID: "ai_review", GraderKind: "claude-opus-4.6"})
+	// THESE are the problematic events: the reviewer session emits the same
+	// EventReasoning/EventToolStart/EventToolComplete as the generator did,
+	// and they get routed to onAgentActivity → renderAgentEvent. Before the
+	// fix, these would create duplicate "Agent Attempt: ✅ Completed" rows.
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventReasoning, Message: "reviewer thinking"})
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventToolStart, Message: "reviewer tool 1"})
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventToolComplete, Message: "reviewer tool 1 done"})
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventToolStart, Message: "reviewer tool 2"})
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventToolComplete, Message: "reviewer tool 2 done"})
+	// Reviewer completes
+	reviewScore := 8.0
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventGraderComplete, GraderID: "ai_review", GraderKind: "claude-opus-4.6", Result: GraderResultPass, Score: &reviewScore})
+	// Eval passes
+	d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 1})
+	d.Finish()
+
+	out := buf.String()
+	// The fix: renderAgentEvent must return early when agentState is already
+	// terminal. Assert exactly ONE "Agent Attempt:" row exists in the transcript.
+	if got := strings.Count(out, "\nAgent Attempt:"); got != 1 {
+		t.Errorf("want exactly 1 'Agent Attempt:' row, got %d (duplicate rows after reviewer events):\n%q", got, out)
+	}
+	// The Agent Attempt line must show Completed (not stuck on Running).
+	if !strings.Contains(out, "✅ Completed") {
+		t.Errorf("expected '✅ Completed' in Agent Attempt line; got:\n%q", out)
+	}
+	// Both graders should be present in the transcript.
+	if !strings.Contains(out, "files_present") || !strings.Contains(out, "ai_review") {
+		t.Errorf("expected both 'files_present' and 'ai_review' graders; got:\n%q", out)
+	}
+}
+
 // TestInteractive_AgentAttemptSingleLineInvariant guards the single-line
 // invariant: the "Agent Attempt:" prefix must appear EXACTLY ONCE as the
 // start of a physical row in the rendered transcript — never split across
