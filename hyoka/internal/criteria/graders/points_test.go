@@ -39,7 +39,7 @@ func TestOutputCheckGraderPoints(t *testing.T) {
 	}
 	pointByName := make(map[string]GraderPoint, len(res.Points))
 	for _, p := range res.Points {
-		pointByName[p.Name] = p
+		pointByName[p.Label] = p
 	}
 	if p, ok := pointByName["min_files"]; !ok || !p.Pass {
 		t.Errorf("min_files point: got %+v, want present and Pass=true", p)
@@ -72,7 +72,7 @@ func TestProgramGraderEmitsSinglePoint(t *testing.T) {
 	if got, want := len(res.Points), 1; got != want {
 		t.Fatalf("len(Points) = %d, want %d", got, want)
 	}
-	if res.Points[0].Name != "exit code 0" || !res.Points[0].Pass {
+	if res.Points[0].Label != "exit code 0" || !res.Points[0].Pass {
 		t.Errorf("Point[0] = %+v, want Name=\"exit code 0\" Pass=true", res.Points[0])
 	}
 }

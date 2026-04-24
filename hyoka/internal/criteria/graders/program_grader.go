@@ -51,72 +51,79 @@ func (g *ProgramGrader) Name() string { return g.name }
 
 // Grade executes the configured command in the workspace directory.
 // Exit code 0 produces Pass=true/Score=1.0; non-zero produces Pass=false/Score=0.0.
+// Per v4 spec: emits single point "exit code 0", with stderr tail in Message on fail.
 func (g *ProgramGrader) Grade(ctx context.Context, input GraderInput) (GraderResult, error) {
-ctx, cancel := context.WithTimeout(ctx, g.timeout)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
 
-var stdout, stderr bytes.Buffer
+	var stdout, stderr bytes.Buffer
 
-cmd := exec.CommandContext(ctx, g.command, g.args...)
-cmd.Dir = input.WorkspacePath
-cmd.Stdout = &stdout
-cmd.Stderr = &stderr
+	cmd := exec.CommandContext(ctx, g.command, g.args...)
+	cmd.Dir = input.WorkspacePath
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-result := GraderResult{
-Kind:   KindProgram,
-Name:   g.name,
-Weight: input.Config.EffectiveWeight(),
-Gate:   input.Config.Gate,
-}
+	start := time.Now()
+	err := cmd.Run()
+	elapsed := time.Since(start)
 
-start := time.Now()
-err := cmd.Run()
-elapsed := time.Since(start)
+	extras := &ProgramExtras{
+		Command:    g.command,
+		Args:       g.args,
+		ExitCode:   0,
+		Stdout:     stdout.String(),
+		Stderr:     stderr.String(),
+		DurationMs: elapsed.Milliseconds(),
+	}
 
-details := &ProgramGraderDetails{
-Command:  g.command,
-ExitCode: 0,
-Stdout:   stdout.String(),
-Stderr:   stderr.String(),
-}
+	var points []GraderPoint
+	var msg string
 
-if err != nil {
-if ctx.Err() != nil {
-details.ExitCode = -1
-result.Score = 0.0
-result.Pass = false
-if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-result.Message = fmt.Sprintf("command timed out after %s", g.timeout)
-} else {
-result.Message = fmt.Sprintf("command cancelled: %v", ctx.Err())
-}
-result.ProgramDetails = details
-result.Points = []GraderPoint{{Name: "exit code 0", Pass: false, Message: result.Message}}
-return result, nil
-}
+	if err != nil {
+		if ctx.Err() != nil {
+			extras.ExitCode = -1
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				msg = fmt.Sprintf("command timed out after %s", g.timeout)
+			} else {
+				msg = fmt.Sprintf("command cancelled: %v", ctx.Err())
+			}
+			points = append(points, GraderPoint{
+				Label:   "exit code 0",
+				Pass:    false,
+				Message: msg,
+			})
+			return NewResult(KindProgram, g.name, input.Config, points, msg, &GraderExtras{Program: extras}), nil
+		}
 
-var exitErr *exec.ExitError
-if errors.As(err, &exitErr) {
-details.ExitCode = exitErr.ExitCode()
-result.Score = 0.0
-result.Pass = false
-result.Message = fmt.Sprintf("command exited with code %d (took %s)", exitErr.ExitCode(), elapsed)
-result.ProgramDetails = details
-result.Points = []GraderPoint{{
-Name:    "exit code 0",
-Pass:    false,
-Message: fmt.Sprintf("exited with code %d", exitErr.ExitCode()),
-}}
-return result, nil
-}
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			extras.ExitCode = exitErr.ExitCode()
+			msg = fmt.Sprintf("command exited with code %d (took %s)", exitErr.ExitCode(), elapsed)
+			// Include stderr tail in point Message for debugging
+			stderrTail := stderr.String()
+			if len(stderrTail) > 500 {
+				stderrTail = "..." + stderrTail[len(stderrTail)-500:]
+			}
+			pointMsg := fmt.Sprintf("exited with code %d", exitErr.ExitCode())
+			if stderrTail != "" {
+				pointMsg = fmt.Sprintf("exited with code %d; stderr: %s", exitErr.ExitCode(), stderrTail)
+			}
+			points = append(points, GraderPoint{
+				Label:   "exit code 0",
+				Pass:    false,
+				Message: pointMsg,
+			})
+			return NewResult(KindProgram, g.name, input.Config, points, msg, &GraderExtras{Program: extras}), nil
+		}
 
-return GraderResult{}, fmt.Errorf("program grader %q: %w", g.name, err)
-}
+		return GraderResult{}, fmt.Errorf("program grader %q: %w", g.name, err)
+	}
 
-result.Score = 1.0
-result.Pass = true
-result.Message = fmt.Sprintf("command succeeded (took %s)", elapsed)
-result.ProgramDetails = details
-result.Points = []GraderPoint{{Name: "exit code 0", Pass: true, Message: "exited 0"}}
-return result, nil
+	msg = fmt.Sprintf("command succeeded (took %s)", elapsed)
+	points = append(points, GraderPoint{
+		Label:   "exit code 0",
+		Pass:    true,
+		Message: "",
+	})
+	return NewResult(KindProgram, g.name, input.Config, points, msg, &GraderExtras{Program: extras}), nil
 }

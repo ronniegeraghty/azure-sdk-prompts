@@ -70,10 +70,10 @@ func TestFileGrader_FileExists_NoPattern(t *testing.T) {
 	if result.Score != 1.0 {
 		t.Errorf("Score = %f, want 1.0", result.Score)
 	}
-	if result.FileDetails == nil || len(result.FileDetails.CheckedFiles) != 1 {
-		t.Fatal("expected exactly 1 checked file")
+	if result.Extras == nil || result.Extras.File == nil || len(result.Extras.File.Files) != 1 {
+		t.Fatal("expected exactly 1 checked file in Extras.File.Files")
 	}
-	if !result.FileDetails.CheckedFiles[0].Exists {
+	if !result.Extras.File.Files[0].Exists {
 		t.Error("file should be marked as existing")
 	}
 }
@@ -96,7 +96,7 @@ func TestFileGrader_FileMissing_MustExist(t *testing.T) {
 	if result.Score != 0 {
 		t.Errorf("Score = %f, want 0", result.Score)
 	}
-	if result.FileDetails.CheckedFiles[0].Exists {
+	if result.Extras.File.Files[0].Exists {
 		t.Error("file should be marked as not existing")
 	}
 }
@@ -146,8 +146,8 @@ func TestFileGrader_PatternMatches(t *testing.T) {
 	if result.Score != 1.0 {
 		t.Errorf("Score = %f, want 1.0", result.Score)
 	}
-	cf := result.FileDetails.CheckedFiles[0]
-	if cf.PatternMatched == nil || !*cf.PatternMatched {
+	cf := result.Extras.File.Files[0]
+	if !cf.PatternMatched {
 		t.Error("expected PatternMatched=true")
 	}
 }
@@ -176,8 +176,8 @@ func TestFileGrader_PatternDoesNotMatch(t *testing.T) {
 	if result.Score != 0.5 {
 		t.Errorf("Score = %f, want 0.5", result.Score)
 	}
-	cf := result.FileDetails.CheckedFiles[0]
-	if cf.PatternMatched == nil || *cf.PatternMatched {
+	cf := result.Extras.File.Files[0]
+	if cf.PatternMatched {
 		t.Error("expected PatternMatched=false")
 	}
 }

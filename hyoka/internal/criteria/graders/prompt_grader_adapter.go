@@ -17,34 +17,44 @@ func (a *PromptGraderAdapter) Kind() string { return KindPrompt }
 func (a *PromptGraderAdapter) Name() string { return a.inner.Name }
 
 // Grade adapts the PromptGrader's standalone Grade method to the Grader interface.
+// Per v4 spec: emits single point "LLM judge: <rubric>", PromptExtras carries RawScore/MaxScore for display.
 func (a *PromptGraderAdapter) Grade(ctx context.Context, input GraderInput) (GraderResult, error) {
-result := GraderResult{
-Kind:   KindPrompt,
-Name:   a.inner.Name,
-Weight: input.Config.EffectiveWeight(),
-Gate:   input.Config.Gate,
-}
+	pr, err := a.inner.Grade(ctx, input.WorkspacePath)
+	if err != nil {
+		return GraderResult{}, fmt.Errorf("prompt grader %q: %w", a.inner.Name, err)
+	}
 
-pr, err := a.inner.Grade(ctx, input.WorkspacePath)
-if err != nil {
-return GraderResult{}, fmt.Errorf("prompt grader %q: %w", a.inner.Name, err)
-}
+	var points []GraderPoint
+	label := fmt.Sprintf("LLM judge: %s", a.inner.Name)
+	pointMsg := ""
+	if !pr.Passed {
+		// Include reasoning summary on failure (truncate if needed)
+		reasoning := pr.Details.Reasoning
+		if len(reasoning) > 200 {
+			reasoning = reasoning[:200] + "..."
+		}
+		pointMsg = fmt.Sprintf("score %d/%d: %s", pr.Details.RawScore, pr.Details.MaxScore, reasoning)
+	}
+	points = append(points, GraderPoint{
+		Label:   label,
+		Pass:    pr.Passed,
+		Message: pointMsg,
+		Evidence: map[string]string{
+			"raw_score": fmt.Sprintf("%d", pr.Details.RawScore),
+			"max_score": fmt.Sprintf("%d", pr.Details.MaxScore),
+		},
+	})
 
-result.Score = pr.Score
-result.Pass = pr.Passed
-result.Message = fmt.Sprintf("LLM review: %d/%d", pr.Details.RawScore, pr.Details.MaxScore)
-result.PromptDetails = &PromptGraderDetails{
-Model:     pr.Details.Model,
-Rubric:    pr.Details.Rubric,
-Reasoning: pr.Details.Reasoning,
-RawScore:  pr.Details.RawScore,
-MaxScore:  pr.Details.MaxScore,
-}
-result.Points = []GraderPoint{{
-Name:    "LLM judge",
-Pass:    pr.Passed,
-Message: fmt.Sprintf("score %d/%d", pr.Details.RawScore, pr.Details.MaxScore),
-}}
+	msg := fmt.Sprintf("LLM review: %d/%d", pr.Details.RawScore, pr.Details.MaxScore)
+	extras := &GraderExtras{
+		Prompt: &PromptExtras{
+			Model:     pr.Details.Model,
+			Rubric:    pr.Details.Rubric,
+			Reasoning: pr.Details.Reasoning,
+			RawScore:  pr.Details.RawScore,
+			MaxScore:  pr.Details.MaxScore,
+		},
+	}
 
-return result, nil
+	return NewResult(KindPrompt, a.inner.Name, input.Config, points, msg, extras), nil
 }

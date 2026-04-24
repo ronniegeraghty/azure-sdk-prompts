@@ -380,3 +380,48 @@ to Neo (engine + types) and Trinity (site renderer).
 
 **Action:** #586 remains open; requires session config implementation (Neo/Tank).
 
+
+
+## 2026-04-23 — Grader Unification Plan (Option B greenlit)
+
+Ronnie greenlit Option B from the structural audit and added concrete UI
+requirements: row header shows ONE canonical score string (not "Passed"
+AND "100%" AND "1/1 points" simultaneously), Points are the single
+source of truth for sub-checks, every grader explains *why* each point
+passed or failed.
+
+**Three open questions decided (documented in plan):**
+1. External report consumers? → No. Hard cutover to schema v4. Loader
+   rejects v3 with explicit "regenerate" error. Reports are git-ignored.
+2. `prompt_review` score semantics? → Fold into Points. Per-criterion
+   Points carry `Weight = criterion max points` so weighted scoring
+   survives. Drop `OverallScore`/`MaxScore` from report entirely.
+3. FileGrader 0.5 partial credit? → Normalize. Two Points per file
+   (`file present` + `pattern matches`) when Pattern is set. Drop 0.5.
+
+**Plan delivered:** `.squad/decisions/inbox/morpheus-grader-unification-
+plan.md` covers final `GraderResult` shape, `GraderPoint` contract
+(label/pass/message/weight/evidence), per-kind mapping for all 8
+graders, canonical score format (`N/M points` always), site rendering
+rules, file-by-file change list for Neo and Trinity, schema migration,
+test plan, and a phased Neo/Trinity work split with three sync points.
+
+**Key invariant introduced:** `GraderResult.Pass` and `GraderResult.Score`
+are derived from Points — never set independently. `NewResult`
+constructor enforces it. Empty Points panics (config error).
+
+**Behavior-family graders split:** `BehaviorGraderDetails` (14-field
+union shared by behavior/action_sequence/tool_constraint) becomes three
+single-purpose `*Extras` structs. action_sequence's expected-vs-actual
+diff finally reaches the site. output_check's ProducedFiles finally
+reaches the site (was being dropped at marshalling).
+
+**Rendering simplification:** the 6-way `if (X_details)` cascade and
+the 5-way `passed` derivation cascade in `GraderResultRow.tsx` both
+collapse — passed becomes `r.pass`; body becomes `<PointsList>` (always)
++ `<KindExtras>` (single switch).
+
+No code changed yet. Awaiting Neo (engine + Go types) and Trinity (site
++ renderer) to pick up. Suggested split documented in plan §9 with
+parallelism opportunities — Trinity unblocked once Neo lands the type
+definitions in `grader.go` (Sync 1).

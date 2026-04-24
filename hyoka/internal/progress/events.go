@@ -62,7 +62,7 @@ const (
 // graders package (which would invert the existing layering). The engine
 // copies values across at emission time.
 type GraderPoint struct {
-	Name    string
+	Label   string // v4: renamed from Name to match graders.GraderPoint
 	Pass    bool
 	Message string
 }

@@ -23,9 +23,18 @@ type LLMCaller interface {
 
 // PromptGradeResult holds the normalized output of a prompt grader.
 type PromptGradeResult struct {
-	Score   float64             `json:"score"`   // 0.0–1.0
-	Passed  bool                `json:"passed"`  // score > 0
-	Details PromptGraderDetails `json:"details"`
+	Score   float64       `json:"score"`   // 0.0–1.0
+	Passed  bool          `json:"passed"`  // score > 0
+	Details PromptDetails `json:"details"`
+}
+
+// PromptDetails is a temporary alias for PromptExtras during migration.
+type PromptDetails struct {
+	Model     string `json:"model"`
+	Rubric    string `json:"rubric"`
+	Reasoning string `json:"reasoning"`
+	RawScore  int    `json:"raw_score,omitempty"`
+	MaxScore  int    `json:"max_score,omitempty"`
 }
 
 // LLMResponse is the JSON schema the LLM is expected to return.
@@ -184,7 +193,7 @@ func (pg *PromptGrader) Grade(ctx context.Context, workDir string) (*PromptGrade
 	return &PromptGradeResult{
 		Score:  normalized,
 		Passed: resp.Score > 0,
-		Details: PromptGraderDetails{
+		Details: PromptDetails{
 			Model:     pg.Model,
 			Rubric:    pg.Rubric,
 			Reasoning: resp.Reasoning,

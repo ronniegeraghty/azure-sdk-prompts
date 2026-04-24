@@ -379,11 +379,11 @@ func graderDiffs(a, b *report.EvalReport) []GraderDiff {
 		gd := GraderDiff{Name: name}
 		if ga, ok := indexA[name]; ok {
 			gd.ScoreA = ga.Score
-			gd.PassA = ga.Pass != nil && *ga.Pass
+			gd.PassA = ga.Pass
 		}
 		if gb, ok := indexB[name]; ok {
 			gd.ScoreB = gb.Score
-			gd.PassB = gb.Pass != nil && *gb.Pass
+			gd.PassB = gb.Pass
 		}
 		gd.Delta = gd.ScoreB - gd.ScoreA
 		diffs = append(diffs, gd)

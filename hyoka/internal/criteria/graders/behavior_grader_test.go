@@ -54,12 +54,12 @@ t.Error("expected Pass=false when required tool is missing")
 if result.Score != 0.0 {
 t.Errorf("expected Score=0.0, got %f", result.Score)
 }
-details := result.BehaviorDetails
-if details == nil {
+extras := result.Extras.Behavior
+if extras == nil {
 t.Fatal("expected BehaviorDetails to be set")
 }
-if len(details.MissingTools) != 1 || details.MissingTools[0] != "azure-mcp" {
-t.Errorf("expected MissingTools=[azure-mcp], got %v", details.MissingTools)
+if len(extras.MissingTools) != 1 || extras.MissingTools[0] != "azure-mcp" {
+t.Errorf("expected MissingTools=[azure-mcp], got %v", extras.MissingTools)
 }
 }
 
@@ -79,12 +79,12 @@ t.Fatal(err)
 if result.Pass {
 t.Error("expected Pass=false when forbidden tool is used")
 }
-details := result.BehaviorDetails
-if details == nil {
+extras := result.Extras.Behavior
+if extras == nil {
 t.Fatal("expected BehaviorDetails")
 }
-if len(details.ForbiddenUsed) != 1 || details.ForbiddenUsed[0] != "rm" {
-t.Errorf("expected ForbiddenUsed=[rm], got %v", details.ForbiddenUsed)
+if len(extras.ForbiddenUsed) != 1 || extras.ForbiddenUsed[0] != "rm" {
+t.Errorf("expected ForbiddenUsed=[rm], got %v", extras.ForbiddenUsed)
 }
 }
 
@@ -102,7 +102,7 @@ t.Fatal(err)
 if result.Pass {
 t.Error("expected Pass=false when turn limit exceeded")
 }
-if result.BehaviorDetails == nil || !result.BehaviorDetails.TurnLimitHit {
+if result.Extras.Behavior == nil || !result.Extras.Behavior.TurnLimitHit {
 t.Error("expected TurnLimitHit=true")
 }
 }
@@ -198,12 +198,12 @@ t.Errorf("expected Score=1.0, got %f", result.Score)
 if result.Kind != KindActionSequence {
 t.Errorf("expected Kind=%s, got %s", KindActionSequence, result.Kind)
 }
-details := result.BehaviorDetails
-if details == nil || !details.SequenceMatch {
+extras := result.Extras.ActionSequence
+if extras == nil {
 t.Error("expected SequenceMatch=true")
 }
-if details.MatchedActions != 3 {
-t.Errorf("expected MatchedActions=3, got %d", details.MatchedActions)
+if extras.MatchedActions != 3 {
+t.Errorf("expected MatchedActions=3, got %d", extras.MatchedActions)
 }
 }
 
@@ -229,9 +229,9 @@ ActionLog: []ActionEvent{{Tool: "read_file"}, {Tool: "edit_file"}},
 if result.Pass {
 t.Error("expected Pass=false when step is missing")
 }
-details := result.BehaviorDetails
-if details == nil || details.MatchedActions != 2 {
-t.Errorf("expected MatchedActions=2, got %v", details)
+extras := result.Extras.ActionSequence
+if extras.MatchedActions != 2 {
+t.Errorf("expected MatchedActions=2, got %v", extras.MatchedActions)
 }
 expected := 2.0 / 3.0
 if result.Score < expected-0.01 || result.Score > expected+0.01 {
@@ -333,11 +333,11 @@ t.Errorf("expected Score=1.0, got %f", result.Score)
 if result.Kind != KindToolConstraint {
 t.Errorf("expected Kind=%s, got %s", KindToolConstraint, result.Kind)
 }
-details := result.BehaviorDetails
-if details == nil || details.ToolCounts["azure-mcp"] != 3 {
+extras := result.Extras.ToolConstraint
+if extras == nil || extras.ToolCounts["azure-mcp"] != 3 {
 t.Errorf("expected azure-mcp count=3")
 }
-if !details.ConstraintsMet {
+if !extras.ConstraintsMet {
 t.Error("expected ConstraintsMet=true")
 }
 }
@@ -360,8 +360,8 @@ ActionLog: []ActionEvent{{Tool: "read_file"}, {Tool: "dangerous"}},
 if result.Pass {
 t.Error("expected Pass=false when forbidden tool used")
 }
-details := result.BehaviorDetails
-if details == nil || len(details.Violations) == 0 {
+extras := result.Extras.Behavior
+if extras == nil || len(extras.Violations) == 0 {
 t.Error("expected violations")
 }
 }

@@ -38,19 +38,15 @@ func buildDelta(files []dFile) *WorkspaceDelta {
 	return d
 }
 
-func subCheckByName(t *testing.T, res GraderResult, check string) OutputCheckSubResult {
+func findPoint(t *testing.T, res GraderResult, labelSubstr string) GraderPoint {
 	t.Helper()
-	if res.OutputCheckDetails == nil {
-		t.Fatalf("OutputCheckDetails is nil; result: %+v", res)
-	}
-	for _, sc := range res.OutputCheckDetails.SubChecks {
-		if sc.Check == check {
-			return sc
+	for _, p := range res.Points {
+		if strings.Contains(p.Label, labelSubstr) {
+			return p
 		}
 	}
-	t.Fatalf("sub-check %q not found in result (have %d sub-checks)",
-		check, len(res.OutputCheckDetails.SubChecks))
-	return OutputCheckSubResult{}
+	t.Fatalf("point with label containing %q not found in result (have %d points)", labelSubstr, len(res.Points))
+	return GraderPoint{}
 }
 
 func TestOutputCheckGrader_NoKnobs_TriviallyPasses(t *testing.T) {
@@ -65,8 +61,8 @@ func TestOutputCheckGrader_NoKnobs_TriviallyPasses(t *testing.T) {
 	if !res.Pass || res.Score != 1.0 {
 		t.Errorf("want trivial pass, got Pass=%v Score=%v", res.Pass, res.Score)
 	}
-	if len(res.OutputCheckDetails.SubChecks) != 0 {
-		t.Errorf("expected zero sub-checks, got %d", len(res.OutputCheckDetails.SubChecks))
+	if len(res.Points) != 0 {
+		t.Errorf("expected zero sub-checks, got %d", len(res.Points))
 	}
 	if !strings.Contains(res.Message, "no knobs configured") {
 		t.Errorf("unexpected message: %q", res.Message)
@@ -79,9 +75,9 @@ func TestOutputCheckGrader_NilDelta_TreatedAsEmpty(t *testing.T) {
 	if res.Pass {
 		t.Errorf("nil delta with min_files=1 should fail; msg=%q", res.Message)
 	}
-	sc := subCheckByName(t, res, "min_files")
-	if sc.Pass {
-		t.Errorf("min_files sub-check should fail, got pass: %q", sc.Message)
+	point := findPoint(t, res, "min files")
+	if point.Pass {
+		t.Errorf("min_files point should fail, got pass: %q", point.Message)
 	}
 }
 
@@ -234,14 +230,14 @@ func TestOutputCheckGrader_KnobsIndividually(t *testing.T) {
 			if !tt.wantPass && res.Score != 0 {
 				t.Errorf("Pass=false but Score=%v want 0", res.Score)
 			}
-			sc := subCheckByName(t, res, tt.wantCheck)
-			if sc.Pass != tt.wantSubOK {
+			point := findPoint(t, res, tt.wantCheck)
+			if point.Pass != tt.wantSubOK {
 				t.Errorf("sub-check %q Pass=%v want %v (msg=%q)",
-					tt.wantCheck, sc.Pass, tt.wantSubOK, sc.Message)
+					tt.wantCheck, point.Pass, tt.wantSubOK, point.Message)
 			}
-			if !strings.Contains(sc.Message, tt.wantMsgSub) {
+			if !strings.Contains(point.Message, tt.wantMsgSub) {
 				t.Errorf("sub-check %q message %q does not contain %q",
-					tt.wantCheck, sc.Message, tt.wantMsgSub)
+					tt.wantCheck, point.Message, tt.wantMsgSub)
 			}
 			if res.Kind != KindOutputCheck {
 				t.Errorf("Kind=%q want %q", res.Kind, KindOutputCheck)
@@ -280,21 +276,21 @@ func TestOutputCheckGrader_AllChecksReported_NoEarlyExit(t *testing.T) {
 	if res.Pass {
 		t.Fatalf("expected overall fail, got pass; msg=%q", res.Message)
 	}
-	if n := len(res.OutputCheckDetails.SubChecks); n != 5 {
-		t.Errorf("expected 5 sub-checks, got %d: %+v", n, res.OutputCheckDetails.SubChecks)
+	if n := len(res.Points); n != 5 {
+		t.Errorf("expected 5 sub-checks, got %d: %+v", n, res.Points)
 	}
 	// min_files, forbid_files, max_bytes_per_file should fail;
 	// require_files and min_bytes_per_file should pass.
 	wantFail := map[string]bool{"min_files": true, "forbid_files": true, "max_bytes_per_file": true}
 	wantPass := map[string]bool{"require_files": true, "min_bytes_per_file": true}
 	seen := map[string]bool{}
-	for _, sc := range res.OutputCheckDetails.SubChecks {
-		seen[sc.Check] = true
-		if wantFail[sc.Check] && sc.Pass {
-			t.Errorf("sub-check %q expected fail, passed: %q", sc.Check, sc.Message)
+	for _, sc := range res.Points {
+		seen[sc.Label] = true
+		if wantFail[sc.Label] && sc.Pass {
+			t.Errorf("sub-check %q expected fail, passed: %q", sc.Label, sc.Message)
 		}
-		if wantPass[sc.Check] && !sc.Pass {
-			t.Errorf("sub-check %q expected pass, failed: %q", sc.Check, sc.Message)
+		if wantPass[sc.Label] && !sc.Pass {
+			t.Errorf("sub-check %q expected pass, failed: %q", sc.Label, sc.Message)
 		}
 	}
 	for k := range wantFail {
@@ -328,12 +324,12 @@ func TestOutputCheckGrader_AllChecksPass_OverallPass(t *testing.T) {
 	if !res.Pass || res.Score != 1.0 {
 		t.Errorf("want overall pass, got Pass=%v Score=%v msg=%q", res.Pass, res.Score, res.Message)
 	}
-	if len(res.OutputCheckDetails.SubChecks) != 7 {
-		t.Errorf("expected 7 sub-checks, got %d", len(res.OutputCheckDetails.SubChecks))
+	if len(res.Points) != 7 {
+		t.Errorf("expected 7 points, got %d", len(res.Points))
 	}
-	for _, sc := range res.OutputCheckDetails.SubChecks {
-		if !sc.Pass {
-			t.Errorf("sub-check %q unexpectedly failed: %q", sc.Check, sc.Message)
+	for _, point := range res.Points {
+		if !point.Pass {
+			t.Errorf("point %q unexpectedly failed: %q", point.Label, point.Message)
 		}
 	}
 }

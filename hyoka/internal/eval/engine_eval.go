@@ -1177,131 +1177,198 @@ func readGeneratedFileContents(workspaceDir string, generatedFiles []string, lg 
 // existing ReviewDetails struct still carries PanelResults / Criteria for
 // backward-compat with the static Markdown/HTML report templates.
 //
+// convertGraderResults maps graders.GraderResult to report.GraderResult.
+//
+// v4 schema: the conversion is now a direct copy. Both types share the same
+// shape (Points, Extras, Kind/Name/Weight/Gate/Message/Pass/Score). The
+// legacy per-kind detail fields and the prompt_review snowflake are gone.
+//
 // The legacy "expand to one entry per panel member + one consensus row"
 // behaviour was removed in Phase 5 — its expanded shape was the structural
 // cause of the "all panel members passed but rows render red" bug, since
 // site renderers had no way to distinguish a panel-member entry (no Points,
 // no Pass) from a real grader failure. Old v2 reports on disk keep the
-// expanded shape on read; only freshly written v3 reports use this path.
+// expanded shape on read; only freshly written v3+ reports use this path.
 func convertGraderResults(results []graders.GraderResult) []report.GraderResult {
 	var reportResults []report.GraderResult
 	for _, r := range results {
-		pass := r.Pass
 		rr := report.GraderResult{
 			GraderName: r.Name,
 			GraderType: r.Kind,
-			Summary:    r.Message,
 			Score:      r.Score,
 			Weight:     r.Weight,
-			Pass:       &pass,
+			Pass:       r.Pass,
 			Gate:       r.Gate,
+			Message:    r.Message,
 		}
+		// Copy Points array.
 		if len(r.Points) > 0 {
 			rr.Points = make([]report.GraderPoint, len(r.Points))
 			for j, p := range r.Points {
-				rr.Points[j] = report.GraderPoint{Name: p.Name, Pass: p.Pass, Message: p.Message}
-			}
-		}
-		if r.FileDetails != nil {
-			checks := make([]report.FileCheckDetail, len(r.FileDetails.CheckedFiles))
-			for j, c := range r.FileDetails.CheckedFiles {
-				checks[j] = report.FileCheckDetail{
-					Path: c.Path, Exists: c.Exists,
-					PatternMatched: c.PatternMatched, Pattern: c.Pattern,
+				rr.Points[j] = report.GraderPoint{
+					Label:    p.Label,
+					Pass:     p.Pass,
+					Message:  p.Message,
+					Weight:   p.Weight,
+					Evidence: p.Evidence,
 				}
 			}
-			rr.FileDetails = &report.FileGraderDetail{CheckedFiles: checks}
 		}
-		if r.ProgramDetails != nil {
-			rr.ProgramDetails = &report.ProgramGraderDetail{
-				Command: r.ProgramDetails.Command, ExitCode: r.ProgramDetails.ExitCode,
-				Stdout: r.ProgramDetails.Stdout, Stderr: r.ProgramDetails.Stderr,
-			}
-		}
-		if r.PromptDetails != nil {
-			rr.PromptDetails = &report.PromptGraderDetail{
-				Model: r.PromptDetails.Model, Rubric: r.PromptDetails.Rubric,
-				Reasoning: r.PromptDetails.Reasoning,
-				RawScore:  r.PromptDetails.RawScore, MaxScore: r.PromptDetails.MaxScore,
-			}
-		}
-		if r.BehaviorDetails != nil {
-			rr.BehaviorDetails = &report.BehaviorGraderDetail{
-				ToolsUsed: r.BehaviorDetails.ToolsUsed, MissingTools: r.BehaviorDetails.MissingTools,
-				ForbiddenUsed: r.BehaviorDetails.ForbiddenUsed,
-				TurnCount:     r.BehaviorDetails.TurnCount, MaxTurns: r.BehaviorDetails.MaxTurns,
-				ActualTurns: r.BehaviorDetails.ActualTurns, TotalActions: r.BehaviorDetails.TotalActions,
-				TurnLimitHit: r.BehaviorDetails.TurnLimitHit, Violations: r.BehaviorDetails.Violations,
-				SequenceMatch:    r.BehaviorDetails.SequenceMatch,
-				ExpectedSequence: r.BehaviorDetails.ExpectedSequence,
-				ActualSequence:   r.BehaviorDetails.ActualSequence,
-				MatchedActions:   r.BehaviorDetails.MatchedActions,
-				ConstraintsMet:   r.BehaviorDetails.ConstraintsMet,
-				ToolCounts:       r.BehaviorDetails.ToolCounts,
-			}
-		}
-		// v3 schema: pre-Phase 2, prompt_review graders had the name "ai_review"
-		// for backward compat. Phase 2 splits AI review into per-bucket graders
-		// named after the bucket (e.g., "Criteria from prompt file"). The
-		// site/report layers expect GraderName to match the Name field, so we
-		// preserve r.Name verbatim here rather than rewriting to "ai_review".
-		if r.Kind == graders.KindPromptReview && r.ReviewDetails != nil {
-			rd := r.ReviewDetails
-			rr.GraderName = r.Name
-			rr.GraderType = "prompt_review"
-			rr.Model = rd.Model
-			rr.OverallScore = rd.OverallScore
-			rr.MaxScore = rd.MaxScore
-			rr.Issues = rd.Issues
-			rr.Strengths = rd.Strengths
-			rr.IsConsensus = len(rd.PanelResults) > 0
-			scores := review.ReviewScores{}
-			for _, c := range rd.Criteria {
-				scores.Criteria = append(scores.Criteria, review.CriterionResult{
-					Name: c.Name, Passed: c.Passed, Reason: c.Reason,
-				})
-			}
-			rr.Scores = scores
-			// ReviewDetails struct is preserved for templates that walk
-			// PanelResults / Criteria directly.
-			panelDetails := make([]report.ReviewGraderPanelEntry, 0, len(rd.PanelResults))
-			for _, p := range rd.PanelResults {
-				crit := make([]report.ReviewGraderCriterion, 0, len(p.Criteria))
-				for _, c := range p.Criteria {
-					crit = append(crit, report.ReviewGraderCriterion{
-						Name: c.Name, Passed: c.Passed, Reason: c.Reason,
-					})
-				}
-				panelDetails = append(panelDetails, report.ReviewGraderPanelEntry{
-					Model:        p.Model,
-					OverallScore: p.OverallScore,
-					MaxScore:     p.MaxScore,
-					Summary:      p.Summary,
-					Issues:       p.Issues,
-					Strengths:    p.Strengths,
-					Criteria:     crit,
-				})
-			}
-			critDetails := make([]report.ReviewGraderCriterion, 0, len(rd.Criteria))
-			for _, c := range rd.Criteria {
-				critDetails = append(critDetails, report.ReviewGraderCriterion{
-					Name: c.Name, Passed: c.Passed, Reason: c.Reason,
-				})
-			}
-			rr.ReviewDetails = &report.ReviewGraderDetail{
-				Model:        rd.Model,
-				PanelResults: panelDetails,
-				Criteria:     critDetails,
-				OverallScore: rd.OverallScore,
-				MaxScore:     rd.MaxScore,
-				Issues:       rd.Issues,
-				Strengths:    rd.Strengths,
-				IsConsensus:  len(rd.PanelResults) > 0,
+		// Copy Extras (discriminated union).
+		if r.Extras != nil {
+			rr.Extras = &report.GraderExtras{
+				File:           convertFileExtras(r.Extras.File),
+				Program:        convertProgramExtras(r.Extras.Program),
+				Prompt:         convertPromptExtras(r.Extras.Prompt),
+				Behavior:       convertBehaviorExtras(r.Extras.Behavior),
+				ActionSequence: convertActionSequenceExtras(r.Extras.ActionSequence),
+				ToolConstraint: convertToolConstraintExtras(r.Extras.ToolConstraint),
+				OutputCheck:    convertOutputCheckExtras(r.Extras.OutputCheck),
+				Review:         convertReviewExtras(r.Extras.Review),
 			}
 		}
 		reportResults = append(reportResults, rr)
 	}
 	return reportResults
+}
+
+// Per-kind Extras conversion helpers (one per discriminator arm).
+
+func convertFileExtras(fe *graders.FileExtras) *report.FileExtras {
+	if fe == nil {
+		return nil
+	}
+	files := make([]report.FileExtra, len(fe.Files))
+	for i, f := range fe.Files {
+		files[i] = report.FileExtra{
+			Path:           f.Path,
+			Exists:         f.Exists,
+			Pattern:        f.Pattern,
+			PatternMatched: f.PatternMatched,
+			Size:           f.Size,
+		}
+	}
+	return &report.FileExtras{Files: files}
+}
+
+func convertProgramExtras(pe *graders.ProgramExtras) *report.ProgramExtras {
+	if pe == nil {
+		return nil
+	}
+	return &report.ProgramExtras{
+		Command:    pe.Command,
+		Args:       pe.Args,
+		ExitCode:   pe.ExitCode,
+		Stdout:     pe.Stdout,
+		Stderr:     pe.Stderr,
+		DurationMs: pe.DurationMs,
+	}
+}
+
+func convertPromptExtras(pe *graders.PromptExtras) *report.PromptExtras {
+	if pe == nil {
+		return nil
+	}
+	return &report.PromptExtras{
+		Model:     pe.Model,
+		Rubric:    pe.Rubric,
+		Reasoning: pe.Reasoning,
+		RawScore:  pe.RawScore,
+		MaxScore:  pe.MaxScore,
+	}
+}
+
+func convertBehaviorExtras(be *graders.BehaviorExtras) *report.BehaviorExtras {
+	if be == nil {
+		return nil
+	}
+	return &report.BehaviorExtras{
+		ToolsUsed:      be.ToolsUsed,
+		MissingTools:   be.MissingTools,
+		ForbiddenUsed:  be.ForbiddenUsed,
+		TurnCount:      be.TurnCount,
+		MaxTurns:       be.MaxTurns,
+		TotalActions:   be.TotalActions,
+		TurnLimitHit:   be.TurnLimitHit,
+		Violations:     be.Violations,
+	}
+}
+
+func convertActionSequenceExtras(ase *graders.ActionSequenceExtras) *report.ActionSequenceExtras {
+	if ase == nil {
+		return nil
+	}
+	return &report.ActionSequenceExtras{
+		ExpectedSequence: ase.ExpectedSequence,
+		ActualSequence:   ase.ActualSequence,
+		MatchedActions:   ase.MatchedActions,
+		ToolsUsed:        ase.ToolsUsed,
+		TotalActions:     ase.TotalActions,
+	}
+}
+
+func convertToolConstraintExtras(tce *graders.ToolConstraintExtras) *report.ToolConstraintExtras {
+	if tce == nil {
+		return nil
+	}
+	return &report.ToolConstraintExtras{
+		ToolsUsed:      tce.ToolsUsed,
+		ToolCounts:     tce.ToolCounts,
+		MissingTools:   tce.MissingTools,
+		ForbiddenUsed:  tce.ForbiddenUsed,
+		Violations:     tce.Violations,
+		ConstraintsMet: tce.ConstraintsMet,
+	}
+}
+
+func convertOutputCheckExtras(oce *graders.OutputCheckExtras) *report.OutputCheckExtras {
+	if oce == nil {
+		return nil
+	}
+	files := make([]report.FileEntry, len(oce.ProducedFiles))
+	for i, f := range oce.ProducedFiles {
+		files[i] = report.FileEntry{
+			Path: f.Path,
+			Size: f.Size,
+		}
+	}
+	return &report.OutputCheckExtras{ProducedFiles: files}
+}
+
+func convertReviewExtras(re *graders.ReviewExtras) *report.ReviewExtras {
+	if re == nil {
+		return nil
+	}
+	// Convert panel results.
+	panelResults := make([]report.ReviewPanelResult, len(re.PanelResults))
+	for i, pr := range re.PanelResults {
+		criteria := make([]report.ReviewCriterionResult, len(pr.Criteria))
+		for j, c := range pr.Criteria {
+			criteria[j] = report.ReviewCriterionResult{
+				Name:   c.Name,
+				Passed: c.Passed,
+				Reason: c.Reason,
+				Weight: c.Weight,
+			}
+		}
+		panelResults[i] = report.ReviewPanelResult{
+			Model:     pr.Model,
+			Score:     pr.Score,
+			Pass:      pr.Pass,
+			Issues:    pr.Issues,
+			Strengths: pr.Strengths,
+			Criteria:  criteria,
+		}
+	}
+	return &report.ReviewExtras{
+		Model:           re.Model,
+		Summary:         re.Summary,
+		IsConsensus:     re.IsConsensus,
+		PanelResults:    panelResults,
+		Issues:          re.Issues,
+		Strengths:       re.Strengths,
+		DurationSeconds: re.DurationSeconds,
+	}
 }
 
 // buildGraderHooks wires criteria.GraderHooks to a raw progress emitter so
@@ -1439,7 +1506,7 @@ var points []progress.GraderPoint
 if len(result.Points) > 0 {
 points = make([]progress.GraderPoint, len(result.Points))
 for i, p := range result.Points {
-points[i] = progress.GraderPoint{Name: p.Name, Pass: p.Pass, Message: p.Message}
+points[i] = progress.GraderPoint{Label: p.Label, Pass: p.Pass, Message: p.Message}
 }
 }
 sendRawEvent(progress.ProgressEvent{

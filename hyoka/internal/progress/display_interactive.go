@@ -1056,7 +1056,7 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 		} else {
 			status = r.sty.Fail("❌ Fail")
 		}
-		name := truncateToWidth(p.Name, maxPointNameWidth)
+		name := truncateToWidth(p.Label, maxPointNameWidth)
 		line := fmt.Sprintf("    - %s: %s", name, status)
 		if !p.Pass && p.Message != "" {
 			line += " " + r.sty.Muted("— "+p.Message)

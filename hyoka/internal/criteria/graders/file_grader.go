@@ -53,84 +53,90 @@ func (g *FileGrader) Kind() string { return KindFile }
 func (g *FileGrader) Name() string { return g.name }
 
 // Grade checks file existence and optionally matches content against the pattern.
+// Per v4 spec: emits two points when Pattern is set (file present + pattern matches),
+// one point otherwise (file present). No 0.5 partial credit.
 func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, error) {
 	fullPath := filepath.Join(input.WorkspacePath, g.path)
 
-	result := GraderResult{
-		Kind:   KindFile,
-		Name:   g.name,
-		Weight: input.Config.EffectiveWeight(),
-		Gate:   input.Config.Gate,
-		FileDetails: &FileGraderDetails{
-			CheckedFiles: make([]FileCheckResult, 0, 1),
-		},
-	}
+	var points []GraderPoint
+	var fileExtra FileExtra
 
-	check := FileCheckResult{
-		Path:    g.path,
-		Pattern: g.rawPat,
-	}
+	fileExtra.Path = g.path
+	fileExtra.Pattern = g.rawPat
 
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
-		check.Exists = false
-		result.FileDetails.CheckedFiles = append(result.FileDetails.CheckedFiles, check)
+		// File doesn't exist
+		fileExtra.Exists = false
 
 		if g.mustExist {
-			result.Score = 0
-			result.Pass = false
-			result.Message = fmt.Sprintf("required file %q not found", g.path)
-			result.Points = []GraderPoint{{
-				Name:    g.path,
+			// Required file missing → fail
+			points = append(points, GraderPoint{
+				Label:   fmt.Sprintf("file present: %s", g.path),
 				Pass:    false,
-				Message: fmt.Sprintf("required file %q not found", g.path),
-			}}
-			return result, nil
+				Message: fmt.Sprintf("file not found at %s", fullPath),
+			})
+			msg := fmt.Sprintf("required file %q not found", g.path)
+			return NewResult(KindFile, g.name, input.Config, points, msg, &GraderExtras{
+				File: &FileExtras{Files: []FileExtra{fileExtra}},
+			}), nil
 		}
-		// File not required and doesn't exist — that's fine.
-		result.Score = 1.0
-		result.Pass = true
-		result.Message = fmt.Sprintf("optional file %q not found (ok)", g.path)
-		result.Points = []GraderPoint{{
-			Name:    g.path,
+
+		// Optional file missing → pass
+		points = append(points, GraderPoint{
+			Label:   fmt.Sprintf("file present: %s", g.path),
 			Pass:    true,
-			Message: fmt.Sprintf("optional file %q not found (ok)", g.path),
-		}}
-		return result, nil
+			Message: fmt.Sprintf("optional file %q not required", g.path),
+		})
+		msg := fmt.Sprintf("optional file %q not found (ok)", g.path)
+		return NewResult(KindFile, g.name, input.Config, points, msg, &GraderExtras{
+			File: &FileExtras{Files: []FileExtra{fileExtra}},
+		}), nil
 	}
 
-	check.Exists = true
+	// File exists
+	fileExtra.Exists = true
+	stat, _ := os.Stat(fullPath)
+	if stat != nil {
+		fileExtra.Size = stat.Size()
+	}
 
+	// First point: file present
+	points = append(points, GraderPoint{
+		Label:   fmt.Sprintf("file present: %s", g.path),
+		Pass:    true,
+		Message: "",
+	})
+
+	// Second point (if pattern configured): pattern matches
 	if g.pattern != nil {
 		matched := g.pattern.Match(data)
-		check.PatternMatched = &matched
+		fileExtra.PatternMatched = matched
 
-		if !matched {
-			result.FileDetails.CheckedFiles = append(result.FileDetails.CheckedFiles, check)
-			result.Score = 0.5 // File exists but content doesn't match
-			result.Pass = false
-			result.Message = fmt.Sprintf("file %q exists but pattern %q not matched", g.path, g.rawPat)
-			result.Points = []GraderPoint{{
-				Name:    g.path,
-				Pass:    false,
-				Message: fmt.Sprintf("pattern %q not matched", g.rawPat),
-			}}
-			return result, nil
+		label := fmt.Sprintf("pattern matches: %s", g.path)
+		if matched {
+			points = append(points, GraderPoint{
+				Label:    label,
+				Pass:     true,
+				Message:  "",
+				Evidence: map[string]string{"pattern": g.rawPat},
+			})
+		} else {
+			points = append(points, GraderPoint{
+				Label:    label,
+				Pass:     false,
+				Message:  fmt.Sprintf("pattern %q not found in file", g.rawPat),
+				Evidence: map[string]string{"pattern": g.rawPat},
+			})
 		}
 	}
 
-	result.FileDetails.CheckedFiles = append(result.FileDetails.CheckedFiles, check)
-	result.Score = 1.0
-	result.Pass = true
-	result.Message = fmt.Sprintf("file %q check passed", g.path)
-	pointMsg := fmt.Sprintf("file %q present", g.path)
-	if g.pattern != nil {
-		pointMsg = fmt.Sprintf("file %q present and matches %q", g.path, g.rawPat)
+	msg := fmt.Sprintf("file %q check passed", g.path)
+	if g.pattern != nil && !fileExtra.PatternMatched {
+		msg = fmt.Sprintf("file %q exists but pattern %q not matched", g.path, g.rawPat)
 	}
-	result.Points = []GraderPoint{{
-		Name:    g.path,
-		Pass:    true,
-		Message: pointMsg,
-	}}
-	return result, nil
+
+	return NewResult(KindFile, g.name, input.Config, points, msg, &GraderExtras{
+		File: &FileExtras{Files: []FileExtra{fileExtra}},
+	}), nil
 }

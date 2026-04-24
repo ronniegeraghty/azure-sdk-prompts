@@ -103,61 +103,73 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 		return result, fmt.Errorf("review panel failed: %w", err)
 	}
 
-g.LastPanel = panel
-g.LastConsolidated = consolidated
+	g.LastPanel = panel
+	g.LastConsolidated = consolidated
 
-logCriteriaCountMismatch(g.name, input, len(consolidated.Scores.Criteria))
+	logCriteriaCountMismatch(g.name, input, len(consolidated.Scores.Criteria))
 
-result.Pass = consolidated.Scores.AllPassed()
-result.Score = criteriaScore(consolidated)
-result.Message = consolidated.Summary
-
-details := &ReviewGraderDetails{
-	Model:        consolidated.Model,
-	OverallScore: consolidated.OverallScore,
-	MaxScore:     consolidated.MaxScore,
-	Summary:      consolidated.Summary,
-	Issues:       consolidated.Issues,
-	Strengths:    consolidated.Strengths,
-	IsConsensus:  true,
-}
-for _, c := range consolidated.Scores.Criteria {
-	details.Criteria = append(details.Criteria, ReviewCriterion{
-		Name: c.Name, Passed: c.Passed, Reason: c.Reason,
-	})
-	result.Points = append(result.Points, GraderPoint{
-		Name: c.Name, Pass: c.Passed, Message: c.Reason,
-	})
-}
-if len(result.Points) == 0 {
-	// Fallback: review with no criteria — synthesize one point from the
-	// consolidated overall pass state so the renderer still has something
-	// to nest. This keeps the "every grader emits at least one point"
-	// invariant intact.
-	result.Points = []GraderPoint{{
-		Name:    "consensus",
-		Pass:    result.Pass,
-		Message: consolidated.Summary,
-	}}
-}
-for _, p := range panel {
-	entry := ReviewPanelEntry{
-		Model:        p.Model,
-		OverallScore: p.OverallScore,
-		MaxScore:     p.MaxScore,
-		Summary:      p.Summary,
-		Issues:       p.Issues,
-		Strengths:    p.Strengths,
-	}
-	for _, c := range p.Scores.Criteria {
-		entry.Criteria = append(entry.Criteria, ReviewCriterion{
-			Name: c.Name, Passed: c.Passed, Reason: c.Reason,
+	// Per v4 spec: one Point per criterion, Weight = criterion max
+	var points []GraderPoint
+	for _, c := range consolidated.Scores.Criteria {
+		label := fmt.Sprintf("criterion: %s", c.Name)
+		pointMsg := ""
+		if !c.Passed {
+			pointMsg = c.Reason
+		}
+		// Default weight to 1.0 (review package doesn't track per-criterion max)
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    c.Passed,
+			Message: pointMsg,
+			Weight:  1.0,
 		})
 	}
-	details.PanelResults = append(details.PanelResults, entry)
-}
-result.ReviewDetails = details
-return result, nil
+	
+	if len(points) == 0 {
+		// Fallback: review with no criteria — synthesize one point
+		points = []GraderPoint{{
+			Label:   "consensus",
+			Pass:    consolidated.Scores.AllPassed(),
+			Message: consolidated.Summary,
+			Weight:  1.0,
+		}}
+	}
+
+	// Build ReviewExtras
+	var panelResults []ReviewPanelResult
+	for _, p := range panel {
+		var criteria []ReviewCriterionResult
+		for _, c := range p.Scores.Criteria {
+			criteria = append(criteria, ReviewCriterionResult{
+				Name:   c.Name,
+				Passed: c.Passed,
+				Reason: c.Reason,
+				Weight: 1, // Default weight (review package doesn't track per-criterion max)
+			})
+		}
+		panelResults = append(panelResults, ReviewPanelResult{
+			Model:     p.Model,
+			Score:     p.OverallScore,
+			Pass:      p.Scores.AllPassed(),
+			Issues:    p.Issues,
+			Strengths: p.Strengths,
+			Criteria:  criteria,
+		})
+	}
+
+	extras := &GraderExtras{
+		Review: &ReviewExtras{
+			Model:       consolidated.Model,
+			Summary:     consolidated.Summary,
+			IsConsensus: true,
+			PanelResults: panelResults,
+			Issues:       consolidated.Issues,
+			Strengths:    consolidated.Strengths,
+		},
+	}
+
+	msg := consolidated.Summary
+	return NewResult(KindPromptReview, g.name, input.Config, points, msg, extras), nil
 }
 
 func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput, workDir string, result GraderResult, artifact *review.GeneratorArtifact) (GraderResult, error) {
@@ -186,39 +198,49 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 		return result, fmt.Errorf("review failed: %w", err)
 	}
 
-g.LastConsolidated = reviewResult
+	g.LastConsolidated = reviewResult
 
-logCriteriaCountMismatch(g.name, input, len(reviewResult.Scores.Criteria))
+	logCriteriaCountMismatch(g.name, input, len(reviewResult.Scores.Criteria))
 
-result.Pass = reviewResult.Scores.AllPassed()
-result.Score = criteriaScore(reviewResult)
-result.Message = reviewResult.Summary
+	// Per v4 spec: one Point per criterion, Weight = criterion max
+	var points []GraderPoint
+	for _, c := range reviewResult.Scores.Criteria {
+		label := fmt.Sprintf("criterion: %s", c.Name)
+		pointMsg := ""
+		if !c.Passed {
+			pointMsg = c.Reason
+		}
+		// Default weight to 1.0 (review package doesn't track per-criterion max)
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    c.Passed,
+			Message: pointMsg,
+			Weight:  1.0,
+		})
+	}
+	
+	if len(points) == 0 {
+		points = []GraderPoint{{
+			Label:   "review",
+			Pass:    reviewResult.Scores.AllPassed(),
+			Message: reviewResult.Summary,
+			Weight:  1.0,
+		}}
+	}
 
-details := &ReviewGraderDetails{
-	Model:        reviewResult.Model,
-	OverallScore: reviewResult.OverallScore,
-	MaxScore:     reviewResult.MaxScore,
-	Summary:      reviewResult.Summary,
-	Issues:       reviewResult.Issues,
-	Strengths:    reviewResult.Strengths,
-}
-for _, c := range reviewResult.Scores.Criteria {
-	details.Criteria = append(details.Criteria, ReviewCriterion{
-		Name: c.Name, Passed: c.Passed, Reason: c.Reason,
-	})
-	result.Points = append(result.Points, GraderPoint{
-		Name: c.Name, Pass: c.Passed, Message: c.Reason,
-	})
-}
-if len(result.Points) == 0 {
-	result.Points = []GraderPoint{{
-		Name:    "review",
-		Pass:    result.Pass,
-		Message: reviewResult.Summary,
-	}}
-}
-result.ReviewDetails = details
-return result, nil
+	// Build ReviewExtras
+	extras := &GraderExtras{
+		Review: &ReviewExtras{
+			Model:       reviewResult.Model,
+			Summary:     reviewResult.Summary,
+			IsConsensus: false,
+			Issues:      reviewResult.Issues,
+			Strengths:   reviewResult.Strengths,
+		},
+	}
+
+	msg := reviewResult.Summary
+	return NewResult(KindPromptReview, g.name, input.Config, points, msg, extras), nil
 }
 
 // toReviewBuckets converts grader-package buckets to review-package buckets.

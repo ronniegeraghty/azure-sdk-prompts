@@ -305,14 +305,17 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		b.WriteString("|--------|------|-------|----------|\n")
 		for _, g := range r.GraderResults {
 			prefix := ""
-			if g.IsConsensus {
+			// Check if this is a consensus review (IsConsensus lives in Extras.Review now)
+			if g.Extras != nil && g.Extras.Review != nil && g.Extras.Review.IsConsensus {
 				prefix = "🏆 "
 			}
-			summary := g.Summary
+			// Message is the new Summary field
+			summary := g.Message
 			if len(summary) > 80 {
 				summary = summary[:80] + "…"
 			}
-			fmt.Fprintf(&b, "| %s`%s` | %s | %d/%d | %s |\n", prefix, g.GraderName, g.GraderType, g.OverallScore, g.MaxScore, summary)
+			// Score is now 0.0-1.0, format as percentage
+			fmt.Fprintf(&b, "| %s`%s` | %s | %.1f%% | %s |\n", prefix, g.GraderName, g.GraderType, g.Score*100, summary)
 		}
 		b.WriteString("\n")
 	}

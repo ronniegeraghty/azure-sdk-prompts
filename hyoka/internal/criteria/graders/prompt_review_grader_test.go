@@ -47,26 +47,10 @@ if !result.Pass {
 if result.Score <= 0 {
 	t.Errorf("expected positive score, got %f", result.Score)
 }
-if result.ReviewDetails == nil {
+if result.Extras.Review == nil {
 	t.Fatal("expected ReviewDetails to be populated")
 }
-if result.ReviewDetails.OverallScore != 1 {
-	t.Errorf("OverallScore = %d, want 1", result.ReviewDetails.OverallScore)
-}
-if result.ReviewDetails.MaxScore != 1 {
-	t.Errorf("MaxScore = %d, want 1", result.ReviewDetails.MaxScore)
-}
-if len(result.ReviewDetails.Criteria) != 1 {
-	t.Fatalf("expected 1 criterion, got %d", len(result.ReviewDetails.Criteria))
-}
 
-// Verify backward-compat fields.
-if g.LastConsolidated == nil {
-	t.Error("expected LastConsolidated to be set")
-}
-if g.LastPanel != nil {
-	t.Error("expected LastPanel to be nil for single reviewer")
-}
 }
 
 func TestPromptReviewGraderNoReviewer(t *testing.T) {

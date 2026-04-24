@@ -91,147 +91,191 @@ Path string `json:"path"` // Relative to workspace root
 Size int64  `json:"size"`
 }
 
-// GraderResult uses typed optional fields instead of interface{} (DM4).
-// Templates check `if .FileDetails` directly — no type assertions needed.
+// GraderResult is the single shape every grader returns. Pass and Score
+// are derived from Points at construction time — they are NOT independent
+// signals. Any field outside Points is render-only and may not influence
+// pass/fail.
 type GraderResult struct {
-Kind    string  `json:"kind"`
-Name    string  `json:"name"`
-Score   float64 `json:"score"`   // 0.0–1.0 normalized
-Weight  float64 `json:"weight"`  // Weight for aggregation
-Pass    bool    `json:"pass"`    // Binary pass/fail
-Gate    bool    `json:"gate"`    // If true, failure overrides weighted scoring (DM3)
-Message string  `json:"message"` // Human-readable summary
+	Kind    string  `json:"kind"`              // one of KindXxx
+	Name    string  `json:"name"`              // YAML instance name
+	Weight  float64 `json:"weight"`            // aggregation weight (from config)
+	Gate    bool    `json:"gate"`              // gate flag (from config)
 
-// Typed details — only one populated per result (DM4).
-FileDetails     *FileGraderDetails     `json:"file_details,omitempty"`
-ProgramDetails  *ProgramGraderDetails  `json:"program_details,omitempty"`
-PromptDetails   *PromptGraderDetails   `json:"prompt_details,omitempty"`
-BehaviorDetails *BehaviorGraderDetails `json:"behavior_details,omitempty"`
-ReviewDetails   *ReviewGraderDetails   `json:"review_details,omitempty"`
-OutputCheckDetails *OutputCheckGraderDetails `json:"output_check_details,omitempty"`
+	// Derived from Points — see NewResult helper.
+	Score   float64 `json:"score"`             // sum(point.Weight * pass) / sum(point.Weight); 0 if no points
+	Pass    bool    `json:"pass"`              // AND over Points[i].Pass
+	Message string  `json:"message"`           // headline summary (≤ ~120 chars)
 
-// Points is the generalized per-sub-check projection introduced in
-// Phase 2 (#GraderPoints). Every grader emits one or more Points; the
-// grader's overall Pass is the AND of every Point.Pass. The legacy
-// per-kind detail structs above remain alongside Points for report-
-// template fidelity until Phase 5/6 retires them.
-Points []GraderPoint `json:"points,omitempty"`
+	Points  []GraderPoint  `json:"points"`           // REQUIRED, len ≥ 1; the canonical sub-checks
+	Extras  *GraderExtras  `json:"extras,omitempty"` // kind-specific render-only payload
 }
 
-// GraderPoint is one binary pass/fail check inside a grader. A grader's
-// overall Pass is the AND of every Point.Pass. Each grader implementation
-// is responsible for projecting its internal sub-results into Points so
-// the renderer and report layers can show nested pass/fail rows without
-// reaching into per-kind detail structs.
+// GraderPoint represents one binary pass/fail check inside a grader.
+// A grader's overall Pass is the AND of every Point.Pass.
 type GraderPoint struct {
-	Name    string `json:"name"`
-	Pass    bool   `json:"pass"`
-	Message string `json:"message,omitempty"`
+	Label    string             `json:"label"`              // short, what was checked (e.g. "file present: src/main.py")
+	Pass     bool               `json:"pass"`
+	Message  string             `json:"message,omitempty"`  // why it passed/failed (the "reason" Ronnie asked for)
+	Weight   float64            `json:"weight,omitempty"`   // for Score weighting; defaults to 1.0 when 0/omitted
+	Evidence map[string]string  `json:"evidence,omitempty"` // tiny, optional, string-only KV (e.g. {"pattern":"^def "})
 }
 
-// FileGraderDetails holds file-check specifics.
-type FileGraderDetails struct {
-CheckedFiles []FileCheckResult `json:"checked_files"`
+// GraderExtras is a discriminated union carrying kind-specific render-only data.
+// Only one field should be populated per result.
+type GraderExtras struct {
+	File           *FileExtras           `json:"file,omitempty"`
+	Program        *ProgramExtras        `json:"program,omitempty"`
+	Prompt         *PromptExtras         `json:"prompt,omitempty"`
+	Behavior       *BehaviorExtras       `json:"behavior,omitempty"`
+	ActionSequence *ActionSequenceExtras `json:"action_sequence,omitempty"`
+	ToolConstraint *ToolConstraintExtras `json:"tool_constraint,omitempty"`
+	OutputCheck    *OutputCheckExtras    `json:"output_check,omitempty"`
+	Review         *ReviewExtras         `json:"review,omitempty"`
 }
 
-// OutputCheckGraderDetails holds per-sub-check results for the output_check
-// grader. Each configured knob (min_files, require_files, etc.) produces
-// one OutputCheckSubResult. The grader's overall Pass is the AND of every
-// SubCheck.Pass.
-type OutputCheckGraderDetails struct {
-	// ProducedFiles is the flat list of files the agent created or modified
-	// (NewFiles ∪ ModifiedFiles from WorkspaceDelta), rendered as paths.
-	ProducedFiles []string `json:"produced_files,omitempty"`
-	// SubChecks reports one entry per configured knob, in a stable order.
-	SubChecks []OutputCheckSubResult `json:"sub_checks"`
+// FileExtras holds file-check render-only data.
+type FileExtras struct {
+	Files []FileExtra `json:"files"`
 }
 
-// OutputCheckSubResult records one configured output_check knob's outcome.
-type OutputCheckSubResult struct {
-	// Check is the knob name (e.g. "min_files", "require_files").
-	Check string `json:"check"`
-	// Pass is true iff the knob's constraint was satisfied.
-	Pass bool `json:"pass"`
-	// Message is a human-readable description of what was checked and why
-	// it passed or failed.
-	Message string `json:"message"`
+// FileExtra records one file check's outcome.
+type FileExtra struct {
+	Path           string `json:"path"`
+	Exists         bool   `json:"exists"`
+	Pattern        string `json:"pattern,omitempty"`
+	PatternMatched bool   `json:"pattern_matched,omitempty"`
+	Size           int64  `json:"size,omitempty"`
 }
 
-// FileCheckResult records the outcome of a single file check.
-type FileCheckResult struct {
-Path           string `json:"path"`
-Exists         bool   `json:"exists"`
-PatternMatched *bool  `json:"pattern_matched,omitempty"` // nil if no pattern configured
-Pattern        string `json:"pattern,omitempty"`
+// ProgramExtras holds program execution render-only data.
+type ProgramExtras struct {
+	Command    string `json:"command"`
+	Args       []string `json:"args,omitempty"`
+	ExitCode   int    `json:"exit_code"`
+	Stdout     string `json:"stdout,omitempty"`
+	Stderr     string `json:"stderr,omitempty"`
+	DurationMs int64  `json:"duration_ms,omitempty"`
 }
 
-// ProgramGraderDetails holds program execution specifics.
-type ProgramGraderDetails struct {
-Command  string `json:"command"`
-ExitCode int    `json:"exit_code"`
-Stdout   string `json:"stdout"`
-Stderr   string `json:"stderr"`
+// PromptExtras holds LLM-as-judge render-only data.
+type PromptExtras struct {
+	Model     string `json:"model"`
+	Rubric    string `json:"rubric"`
+	Reasoning string `json:"reasoning"`
+	RawScore  int    `json:"raw_score,omitempty"`
+	MaxScore  int    `json:"max_score,omitempty"`
 }
 
-// PromptGraderDetails holds LLM-as-judge specifics.
-type PromptGraderDetails struct {
-Model     string `json:"model"`
-Rubric    string `json:"rubric"`
-Reasoning string `json:"reasoning"`
-RawScore  int    `json:"raw_score,omitempty"`
-MaxScore  int    `json:"max_score,omitempty"`
+// BehaviorExtras holds behavior grader render-only data.
+type BehaviorExtras struct {
+	ToolsUsed      []string `json:"tools_used,omitempty"`
+	MissingTools   []string `json:"missing_tools,omitempty"`
+	ForbiddenUsed  []string `json:"forbidden_used,omitempty"`
+	TurnCount      int      `json:"turn_count,omitempty"`
+	MaxTurns       int      `json:"max_turns,omitempty"`
+	TotalActions   int      `json:"total_actions,omitempty"`
+	TurnLimitHit   bool     `json:"turn_limit_hit,omitempty"`
+	Violations     []string `json:"violations,omitempty"`
 }
 
-// BehaviorGraderDetails holds agent behavior analysis specifics.
-type BehaviorGraderDetails struct {
-ToolsUsed        []string       `json:"tools_used,omitempty"`
-MissingTools     []string       `json:"missing_tools,omitempty"`
-ForbiddenUsed    []string       `json:"forbidden_used,omitempty"`
-TurnCount        int            `json:"turn_count,omitempty"`
-MaxTurns         int            `json:"max_turns,omitempty"`
-ActualTurns      int            `json:"actual_turns,omitempty"`
-TotalActions     int            `json:"total_actions,omitempty"`
-TurnLimitHit     bool           `json:"turn_limit_hit,omitempty"`
-Violations       []string       `json:"violations,omitempty"`
-SequenceMatch    bool           `json:"sequence_match,omitempty"`
-ExpectedSequence []string       `json:"expected_sequence,omitempty"`
-ActualSequence   []string       `json:"actual_sequence,omitempty"`
-MatchedActions   int            `json:"matched_actions,omitempty"`
-ConstraintsMet   bool           `json:"constraints_met,omitempty"`
-ToolCounts       map[string]int `json:"tool_counts,omitempty"`
+// ActionSequenceExtras holds action_sequence grader render-only data.
+type ActionSequenceExtras struct {
+	ExpectedSequence []string `json:"expected_sequence"`
+	ActualSequence   []string `json:"actual_sequence"`
+	MatchedActions   int      `json:"matched_actions"`
+	ToolsUsed        []string `json:"tools_used,omitempty"`
+	TotalActions     int      `json:"total_actions"`
 }
 
-// ReviewGraderDetails holds AI review specifics (WI-023).
-// The consolidated result is stored in the parent GraderResult fields.
-// Panel member results are stored in PanelResults.
-type ReviewGraderDetails struct {
-Model        string                `json:"model,omitempty"`
-OverallScore int                   `json:"overall_score"`
-MaxScore     int                   `json:"max_score"`
-Summary      string                `json:"summary"`
-Issues       []string              `json:"issues,omitempty"`
-Strengths    []string              `json:"strengths,omitempty"`
-IsConsensus  bool                  `json:"is_consensus,omitempty"`
-Criteria     []ReviewCriterion     `json:"criteria,omitempty"`
-PanelResults []ReviewPanelEntry    `json:"panel_results,omitempty"`
+// ToolConstraintExtras holds tool_constraint grader render-only data.
+type ToolConstraintExtras struct {
+	ToolsUsed      []string       `json:"tools_used,omitempty"`
+	ToolCounts     map[string]int `json:"tool_counts,omitempty"`
+	MissingTools   []string       `json:"missing_tools,omitempty"`
+	ForbiddenUsed  []string       `json:"forbidden_used,omitempty"`
+	Violations     []string       `json:"violations,omitempty"`
+	ConstraintsMet bool           `json:"constraints_met"`
 }
 
-// ReviewCriterion holds a single criterion pass/fail from review.
-type ReviewCriterion struct {
-Name   string `json:"name"`
-Passed bool   `json:"passed"`
-Reason string `json:"reason,omitempty"`
+// OutputCheckExtras holds output_check grader render-only data.
+type OutputCheckExtras struct {
+	ProducedFiles []FileEntry `json:"produced_files"`
 }
 
-// ReviewPanelEntry holds one panel member's review result.
-type ReviewPanelEntry struct {
-Model        string            `json:"model"`
-OverallScore int               `json:"overall_score"`
-MaxScore     int               `json:"max_score"`
-Summary      string            `json:"summary"`
-Issues       []string          `json:"issues,omitempty"`
-Strengths    []string          `json:"strengths,omitempty"`
-Criteria     []ReviewCriterion `json:"criteria,omitempty"`
+// ReviewExtras holds prompt_review grader render-only data.
+type ReviewExtras struct {
+	Model           string              `json:"model,omitempty"`
+	Summary         string              `json:"summary"`
+	IsConsensus     bool                `json:"is_consensus"`
+	PanelResults    []ReviewPanelResult `json:"panel_results,omitempty"`
+	Issues          []string            `json:"issues,omitempty"`
+	Strengths       []string            `json:"strengths,omitempty"`
+	DurationSeconds float64             `json:"duration_seconds,omitempty"`
+}
+
+// ReviewPanelResult holds one panel member's review result.
+type ReviewPanelResult struct {
+	Model     string                   `json:"model"`
+	Score     int                      `json:"score"`      // points earned
+	Pass      bool                     `json:"pass"`       // all criteria passed
+	Issues    []string                 `json:"issues,omitempty"`
+	Strengths []string                 `json:"strengths,omitempty"`
+	Criteria  []ReviewCriterionResult  `json:"criteria"`
+}
+
+// ReviewCriterionResult holds one criterion's outcome.
+type ReviewCriterionResult struct {
+	Name   string `json:"name"`
+	Passed bool   `json:"passed"`
+	Reason string `json:"reason,omitempty"`
+	Weight int    `json:"weight,omitempty"` // max points for this criterion
+}
+
+// NewResult constructs a GraderResult with Pass and Score derived from Points.
+// Points must be non-empty; panics if empty. Each point's Weight defaults to 1.0
+// when zero or omitted.
+func NewResult(kind, name string, cfg GraderConfig, points []GraderPoint, msg string, extras *GraderExtras) GraderResult {
+	if len(points) == 0 {
+		panic(fmt.Sprintf("grader %s (%s) must emit at least one Point", name, kind))
+	}
+
+	// Derive Pass: AND over all Points
+	pass := true
+	for _, p := range points {
+		if !p.Pass {
+			pass = false
+			break
+		}
+	}
+
+	// Derive Score: weighted sum / total weight
+	var weightedSum, totalWeight float64
+	for _, p := range points {
+		w := p.Weight
+		if w == 0 {
+			w = 1.0
+		}
+		totalWeight += w
+		if p.Pass {
+			weightedSum += w
+		}
+	}
+	score := 0.0
+	if totalWeight > 0 {
+		score = weightedSum / totalWeight
+	}
+
+	return GraderResult{
+		Kind:    kind,
+		Name:    name,
+		Weight:  cfg.EffectiveWeight(),
+		Gate:    cfg.Gate,
+		Score:   score,
+		Pass:    pass,
+		Message: msg,
+		Points:  points,
+		Extras:  extras,
+	}
 }
 
 // AggregateResult holds the final aggregated score from all graders.

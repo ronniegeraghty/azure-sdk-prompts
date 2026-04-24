@@ -36,14 +36,14 @@ t.Errorf("expected Score=1.0, got %f", result.Score)
 if result.Name != "echo-test" {
 t.Errorf("expected Name=echo-test, got %s", result.Name)
 }
-if result.ProgramDetails == nil {
+if result.Extras.Program == nil {
 t.Fatal("expected ProgramDetails to be set")
 }
-if result.ProgramDetails.ExitCode != 0 {
-t.Errorf("expected ExitCode=0, got %d", result.ProgramDetails.ExitCode)
+if result.Extras.Program.ExitCode != 0 {
+t.Errorf("expected ExitCode=0, got %d", result.Extras.Program.ExitCode)
 }
-if result.ProgramDetails.Stdout != "hello world\n" {
-t.Errorf("expected stdout 'hello world\\n', got %q", result.ProgramDetails.Stdout)
+if result.Extras.Program.Stdout != "hello world\n" {
+t.Errorf("expected stdout 'hello world\\n', got %q", result.Extras.Program.Stdout)
 }
 }
 
@@ -70,10 +70,10 @@ t.Error("expected Pass=false")
 if result.Score != 0.0 {
 t.Errorf("expected Score=0.0, got %f", result.Score)
 }
-if result.ProgramDetails == nil {
+if result.Extras.Program == nil {
 t.Fatal("expected ProgramDetails to be set")
 }
-if result.ProgramDetails.ExitCode == 0 {
+if result.Extras.Program.ExitCode == 0 {
 t.Error("expected non-zero exit code")
 }
 }
@@ -112,11 +112,11 @@ t.Errorf("expected Score=0.0, got %f", result.Score)
 if elapsed > 5*time.Second {
 t.Errorf("timeout not enforced: took %s", elapsed)
 }
-if result.ProgramDetails == nil {
+if result.Extras.Program == nil {
 t.Fatal("expected ProgramDetails to be set")
 }
-if result.ProgramDetails.ExitCode != -1 {
-t.Errorf("expected ExitCode=-1 for timeout, got %d", result.ProgramDetails.ExitCode)
+if result.Extras.Program.ExitCode != -1 {
+t.Errorf("expected ExitCode=-1 for timeout, got %d", result.Extras.Program.ExitCode)
 }
 }
 
@@ -138,14 +138,14 @@ if err != nil {
 t.Fatalf("Grade: %v", err)
 }
 
-if result.ProgramDetails == nil {
+if result.Extras.Program == nil {
 t.Fatal("expected ProgramDetails to be set")
 }
-if result.ProgramDetails.Stdout != "out-content\n" {
-t.Errorf("stdout: expected 'out-content\\n', got %q", result.ProgramDetails.Stdout)
+if result.Extras.Program.Stdout != "out-content\n" {
+t.Errorf("stdout: expected 'out-content\\n', got %q", result.Extras.Program.Stdout)
 }
-if result.ProgramDetails.Stderr != "err-content\n" {
-t.Errorf("stderr: expected 'err-content\\n', got %q", result.ProgramDetails.Stderr)
+if result.Extras.Program.Stderr != "err-content\n" {
+t.Errorf("stderr: expected 'err-content\\n', got %q", result.Extras.Program.Stderr)
 }
 }
 
@@ -176,11 +176,11 @@ t.Fatalf("Grade: %v", err)
 if !result.Pass {
 t.Error("expected Pass=true when file exists in workspace")
 }
-if result.ProgramDetails == nil {
+if result.Extras.Program == nil {
 t.Fatal("expected ProgramDetails to be set")
 }
-if result.ProgramDetails.Stdout != "ok" {
-t.Errorf("expected stdout 'ok', got %q", result.ProgramDetails.Stdout)
+if result.Extras.Program.Stdout != "ok" {
+t.Errorf("expected stdout 'ok', got %q", result.Extras.Program.Stdout)
 }
 }
 
@@ -319,10 +319,10 @@ if err != nil {
 t.Fatalf("Grade: %v", err)
 }
 
-if result.ProgramDetails == nil {
+if result.Extras.Program == nil {
 t.Fatal("expected ProgramDetails to be set")
 }
-if result.ProgramDetails.ExitCode != 42 {
-t.Errorf("expected exit code 42, got %d", result.ProgramDetails.ExitCode)
+if result.Extras.Program.ExitCode != 42 {
+t.Errorf("expected exit code 42, got %d", result.Extras.Program.ExitCode)
 }
 }

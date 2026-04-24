@@ -28,55 +28,153 @@ type GeneratorArtifact = artifact.GeneratorArtifact
 //	     one consensus row for prompt_review graders.
 //	v3 = single-entry ai_review row carrying GraderPoints; ToolLoadResult
 //	     and EnvironmentInfo carry parent linkage; pre-computed roll-ups.
+//	v4 = unified Points-first GraderResult; all graders emit Points; Extras
+//	     discriminated union replaces per-kind detail fields.
 //
-// v3 is a one-way cut: no de-expansion of v2 reports is attempted (the
-// expansion is too lossy to invert). v2 reports are read as-is and keep
-// their N-entry shape; freshly written reports use the v3 shape.
-const CurrentSchemaVersion = 3
+// v4 is a hard cutover: v3 reports are rejected at load time (regenerate required).
+const CurrentSchemaVersion = 4
 
-// GraderResult holds the output from a single grader (LLM reviewer, build check, etc.).
+// GraderResult holds the output from a single grader (v4 schema).
+// Pass and Score are derived from Points. Every grader emits at least one Point.
 type GraderResult struct {
-	GraderName   string              `json:"grader_name"`
-	GraderType   string              `json:"grader_type"` // "review", "file", "program", "prompt", "behavior", etc.
-	Model        string              `json:"model,omitempty"`
-	Scores       review.ReviewScores `json:"scores"`
-	OverallScore int                 `json:"overall_score"`
-	MaxScore     int                 `json:"max_score"`
-	Summary      string              `json:"summary"`
-	Issues       []string            `json:"issues,omitempty"`
-	Strengths    []string            `json:"strengths,omitempty"`
-	Duration     float64             `json:"duration_seconds,omitempty"`
-	IsConsensus  bool                `json:"is_consensus,omitempty"`
+	GraderName string  `json:"grader_name"`
+	GraderType string  `json:"grader_type"` // "file", "program", "prompt", "behavior", etc.
+	Score      float64 `json:"score"`       // 0.0–1.0 weighted average from Points
+	Weight     float64 `json:"weight"`      // Weight for aggregation
+	Pass       bool    `json:"pass"`        // AND of all Points[i].Pass
+	Gate       bool    `json:"gate,omitempty"`
+	Message    string  `json:"message"`     // Human-readable summary
 
-	// Grader-system fields (populated for pluggable graders).
-	Score  float64 `json:"score,omitempty"`  // 0.0–1.0 normalized
-	Weight float64 `json:"weight,omitempty"` // Weight for aggregation
-	Pass   *bool   `json:"pass,omitempty"`   // nil for legacy review-type graders
-	Gate   bool    `json:"gate,omitempty"`   // Gate grader flag
-
-	// Typed details — only one populated per result.
-	FileDetails     *FileGraderDetail     `json:"file_details,omitempty"`
-	ProgramDetails  *ProgramGraderDetail  `json:"program_details,omitempty"`
-	PromptDetails   *PromptGraderDetail   `json:"prompt_details,omitempty"`
-	BehaviorDetails *BehaviorGraderDetail `json:"behavior_details,omitempty"`
-	ReviewDetails   *ReviewGraderDetail   `json:"review_details,omitempty"`
-
-	// Points is the report-side mirror of graders.GraderPoint introduced in
-	// Phase 2 (#GraderPoints). Each grader emits one or more sub-checks; the
-	// site renders these directly instead of re-deriving pass/fail from the
-	// expanded review entries. Detail structs above remain populated for
-	// backward-compat with existing markdown/HTML report templates.
-	Points []GraderPoint `json:"points,omitempty"`
+	Points []GraderPoint  `json:"points"`           // REQUIRED, len ≥ 1
+	Extras *GraderExtras  `json:"extras,omitempty"` // kind-specific render-only data
 }
 
-// GraderPoint mirrors graders.GraderPoint in the report layer so JSON reports
-// carry the per-sub-check rows. The eval engine copies values across at
-// report-build time.
+// GraderPoint is one binary pass/fail check inside a grader.
 type GraderPoint struct {
-	Name    string `json:"name"`
-	Pass    bool   `json:"pass"`
-	Message string `json:"message,omitempty"`
+	Label    string             `json:"label"`              // what was checked
+	Pass     bool               `json:"pass"`
+	Message  string             `json:"message,omitempty"`  // why it passed/failed
+	Weight   float64            `json:"weight,omitempty"`   // for Score weighting; defaults to 1.0
+	Evidence map[string]string  `json:"evidence,omitempty"` // optional string-only KV
 }
+
+// GraderExtras is a discriminated union carrying kind-specific render-only data.
+type GraderExtras struct {
+	File           *FileExtras           `json:"file,omitempty"`
+	Program        *ProgramExtras        `json:"program,omitempty"`
+	Prompt         *PromptExtras         `json:"prompt,omitempty"`
+	Behavior       *BehaviorExtras       `json:"behavior,omitempty"`
+	ActionSequence *ActionSequenceExtras `json:"action_sequence,omitempty"`
+	ToolConstraint *ToolConstraintExtras `json:"tool_constraint,omitempty"`
+	OutputCheck    *OutputCheckExtras    `json:"output_check,omitempty"`
+	Review         *ReviewExtras         `json:"review,omitempty"`
+}
+
+// FileExtras holds file-check render-only data.
+type FileExtras struct {
+	Files []FileExtra `json:"files"`
+}
+
+// FileExtra records one file check's outcome.
+type FileExtra struct {
+	Path           string `json:"path"`
+	Exists         bool   `json:"exists"`
+	Pattern        string `json:"pattern,omitempty"`
+	PatternMatched bool   `json:"pattern_matched,omitempty"`
+	Size           int64  `json:"size,omitempty"`
+}
+
+// ProgramExtras holds program execution render-only data.
+type ProgramExtras struct {
+	Command    string   `json:"command"`
+	Args       []string `json:"args,omitempty"`
+	ExitCode   int      `json:"exit_code"`
+	Stdout     string   `json:"stdout,omitempty"`
+	Stderr     string   `json:"stderr,omitempty"`
+	DurationMs int64    `json:"duration_ms,omitempty"`
+}
+
+// PromptExtras holds LLM-as-judge render-only data.
+type PromptExtras struct {
+	Model     string `json:"model"`
+	Rubric    string `json:"rubric"`
+	Reasoning string `json:"reasoning"`
+	RawScore  int    `json:"raw_score,omitempty"`
+	MaxScore  int    `json:"max_score,omitempty"`
+}
+
+// BehaviorExtras holds behavior grader render-only data.
+type BehaviorExtras struct {
+	ToolsUsed      []string `json:"tools_used,omitempty"`
+	MissingTools   []string `json:"missing_tools,omitempty"`
+	ForbiddenUsed  []string `json:"forbidden_used,omitempty"`
+	TurnCount      int      `json:"turn_count,omitempty"`
+	MaxTurns       int      `json:"max_turns,omitempty"`
+	TotalActions   int      `json:"total_actions,omitempty"`
+	TurnLimitHit   bool     `json:"turn_limit_hit,omitempty"`
+	Violations     []string `json:"violations,omitempty"`
+}
+
+// ActionSequenceExtras holds action_sequence grader render-only data.
+type ActionSequenceExtras struct {
+	ExpectedSequence []string `json:"expected_sequence"`
+	ActualSequence   []string `json:"actual_sequence"`
+	MatchedActions   int      `json:"matched_actions"`
+	ToolsUsed        []string `json:"tools_used,omitempty"`
+	TotalActions     int      `json:"total_actions"`
+}
+
+// ToolConstraintExtras holds tool_constraint grader render-only data.
+type ToolConstraintExtras struct {
+	ToolsUsed      []string       `json:"tools_used,omitempty"`
+	ToolCounts     map[string]int `json:"tool_counts,omitempty"`
+	MissingTools   []string       `json:"missing_tools,omitempty"`
+	ForbiddenUsed  []string       `json:"forbidden_used,omitempty"`
+	Violations     []string       `json:"violations,omitempty"`
+	ConstraintsMet bool           `json:"constraints_met"`
+}
+
+// OutputCheckExtras holds output_check grader render-only data.
+type OutputCheckExtras struct {
+	ProducedFiles []FileEntry `json:"produced_files"`
+}
+
+// FileEntry describes a file in the agent workspace.
+type FileEntry struct {
+	Path string `json:"path"` // Relative to workspace root
+	Size int64  `json:"size"`
+}
+
+// ReviewExtras holds prompt_review grader render-only data.
+type ReviewExtras struct {
+	Model           string              `json:"model,omitempty"`
+	Summary         string              `json:"summary"`
+	IsConsensus     bool                `json:"is_consensus"`
+	PanelResults    []ReviewPanelResult `json:"panel_results,omitempty"`
+	Issues          []string            `json:"issues,omitempty"`
+	Strengths       []string            `json:"strengths,omitempty"`
+	DurationSeconds float64             `json:"duration_seconds,omitempty"`
+}
+
+// ReviewPanelResult holds one panel member's review result.
+type ReviewPanelResult struct {
+	Model     string                   `json:"model"`
+	Score     int                      `json:"score"`
+	Pass      bool                     `json:"pass"`
+	Issues    []string                 `json:"issues,omitempty"`
+	Strengths []string                 `json:"strengths,omitempty"`
+	Criteria  []ReviewCriterionResult  `json:"criteria"`
+}
+
+// ReviewCriterionResult holds one criterion's outcome.
+type ReviewCriterionResult struct {
+	Name   string `json:"name"`
+	Passed bool   `json:"passed"`
+	Reason string `json:"reason,omitempty"`
+	Weight int    `json:"weight,omitempty"`
+}
+
+// --- Legacy detail types below (v3 compat; will be removed in future cleanup) ---
 
 // FileCheckDetail records the outcome of a single file check.
 type FileCheckDetail struct {
@@ -680,7 +778,7 @@ func BuildScoreBreakdown(results []GraderResult) *ScoreBreakdown {
 
 	// Check gate failures first.
 	for _, r := range results {
-		if r.Gate && (r.Pass == nil || !*r.Pass) {
+		if r.Gate && !r.Pass {
 			sb.GateFailed = true
 			sb.GateFailedNames = append(sb.GateFailedNames, r.GraderName)
 		}
@@ -704,7 +802,7 @@ func BuildScoreBreakdown(results []GraderResult) *ScoreBreakdown {
 			Weight:        w,
 			WeightedScore: ws,
 			Gate:          r.Gate,
-			Pass:          r.Pass != nil && *r.Pass,
+			Pass:          r.Pass,
 		})
 	}
 
@@ -732,44 +830,132 @@ func BuildScoreBreakdown(results []GraderResult) *ScoreBreakdown {
 // GraderResultsFromReview converts legacy ReviewResult data into []GraderResult.
 // If panel is non-empty, each panel member becomes a grader entry and the
 // consolidated review becomes the consensus entry.
+//
+// NOTE: This function is deprecated in v4 but kept for v1→v2 migration path.
+// v4 reports never call this; only legacy migration uses it.
 func GraderResultsFromReview(consolidated *review.ReviewResult, panel []review.ReviewResult) []GraderResult {
 	if consolidated == nil {
 		return nil
 	}
 	var results []GraderResult
+	// v1→v2 migration stub: create minimal grader entries from legacy review data.
+	// In v4, all new reports come from graders directly via convertGraderResults().
 	for i := range panel {
 		r := &panel[i]
 		name := r.Model
 		if name == "" {
 			name = "reviewer"
 		}
+		// Create stub Points from legacy Scores (each criterion → one Point).
+		var points []GraderPoint
+		for _, crit := range r.Scores.Criteria {
+			points = append(points, GraderPoint{
+				Label:   crit.Name,
+				Pass:    crit.Passed,
+				Message: crit.Reason,
+				Weight:  1.0,
+			})
+		}
+		if len(points) == 0 {
+			// Fallback: create one point from OverallScore.
+			points = []GraderPoint{{
+				Label:  "overall",
+				Pass:   r.OverallScore >= r.MaxScore,
+				Weight: 1.0,
+			}}
+		}
+		// Derive Score from Points (matching v4 invariant).
+		var totalWeight, weightedSum float64
+		for _, p := range points {
+			w := p.Weight
+			if w == 0 {
+				w = 1.0
+			}
+			totalWeight += w
+			if p.Pass {
+				weightedSum += w
+			}
+		}
+		score := 0.0
+		if totalWeight > 0 {
+			score = weightedSum / totalWeight
+		}
+
 		results = append(results, GraderResult{
-			GraderName:   name,
-			GraderType:   "review",
-			Model:        r.Model,
-			Scores:       r.Scores,
-			OverallScore: r.OverallScore,
-			MaxScore:     r.MaxScore,
-			Summary:      r.Summary,
-			Issues:       r.Issues,
-			Strengths:    r.Strengths,
+			GraderName: name,
+			GraderType: "review",
+			Score:      score,
+			Weight:     1.0,
+			Pass:       r.OverallScore >= r.MaxScore,
+			Message:    r.Summary,
+			Points:     points,
+			Extras: &GraderExtras{
+				Review: &ReviewExtras{
+					Model:       r.Model,
+					Summary:     r.Summary,
+					IsConsensus: false,
+					Issues:      r.Issues,
+					Strengths:   r.Strengths,
+				},
+			},
 		})
 	}
 	consensusName := consolidated.Model
 	if consensusName == "" {
 		consensusName = "consensus"
 	}
+
+	// Convert consensus result.
+	var consPoints []GraderPoint
+	for _, crit := range consolidated.Scores.Criteria {
+		consPoints = append(consPoints, GraderPoint{
+			Label:   crit.Name,
+			Pass:    crit.Passed,
+			Message: crit.Reason,
+			Weight:  1.0,
+		})
+	}
+	if len(consPoints) == 0 {
+		consPoints = []GraderPoint{{
+			Label:  "overall",
+			Pass:   consolidated.OverallScore >= consolidated.MaxScore,
+			Weight: 1.0,
+		}}
+	}
+
+	var consTotalWeight, consWeightedSum float64
+	for _, p := range consPoints {
+		w := p.Weight
+		if w == 0 {
+			w = 1.0
+		}
+		consTotalWeight += w
+		if p.Pass {
+			consWeightedSum += w
+		}
+	}
+	consScore := 0.0
+	if consTotalWeight > 0 {
+		consScore = consWeightedSum / consTotalWeight
+	}
+
 	results = append(results, GraderResult{
-		GraderName:   consensusName,
-		GraderType:   "review",
-		Model:        consolidated.Model,
-		Scores:       consolidated.Scores,
-		OverallScore: consolidated.OverallScore,
-		MaxScore:     consolidated.MaxScore,
-		Summary:      consolidated.Summary,
-		Issues:       consolidated.Issues,
-		Strengths:    consolidated.Strengths,
-		IsConsensus:  len(panel) > 0,
+		GraderName: consensusName,
+		GraderType: "review",
+		Score:      consScore,
+		Weight:     1.0,
+		Pass:       consolidated.OverallScore >= consolidated.MaxScore,
+		Message:    consolidated.Summary,
+		Points:     consPoints,
+		Extras: &GraderExtras{
+			Review: &ReviewExtras{
+				Model:       consolidated.Model,
+				Summary:     consolidated.Summary,
+				IsConsensus: len(panel) > 0,
+				Issues:      consolidated.Issues,
+				Strengths:   consolidated.Strengths,
+			},
+		},
 	})
 	return results
 }
@@ -790,36 +976,20 @@ func MigrateToV2(r *EvalReport) {
 	r.SchemaVersion = 2
 }
 
-// MigrateToV3 upgrades a v2 EvalReport to v3. v3 introduced:
+// MigrateToV3 was the v2→v3 migration stub. As of v4, we enforce a hard cutover:
+// v3 and earlier reports are rejected at load time.
 //
-//   - report.GraderResult.Points (already populated by Phase 2 graders).
-//   - report.ToolLoadResult.Kind / Parent / ParentKind.
-//   - report.EnvironmentInfo.SkillGroups (sibling to flat SkillsLoaded;
-//     Option B in the Phase 5 plan — chosen because Option A's full
-//     SkillsLoaded shape change cascades into site components that are
-//     out-of-scope for this commit).
-//   - EvalReport.GradersPassed / GradersTotal pre-computed roll-ups.
-//
-// No data is migrated automatically: the v2 → v3 transformation for
-// GraderResults (collapsing the panel-member expansion back into a single
-// ai_review row carrying Points) is lossy in reverse — Points are not
-// derivable from the panel-member entries Phase 2 wrote out. Old v2
-// reports are left intact and their grader rows continue to render via
-// the legacy expansion path. Fresh v3 reports use the new single-row
-// shape from the moment they are written.
-//
-// SkillGroups intentionally has no v2 source either: skill parent linkage
-// was not persisted in v2 (it was rendered live but never stored), so a
-// migration would have to fabricate parents. We skip it.
+// v4 introduced unified Points-first GraderResult; all graders emit Points;
+// Extras is a discriminated union replacing per-kind detail fields. The v3→v4
+// transformation is lossy in reverse (old detail fields cannot be reconstructed
+// from v4's Extras), and the only first-party consumer (site/) is versioned
+// alongside the engine. Old reports must be regenerated.
 func MigrateToV3(r *EvalReport) {
 	if r.SchemaVersion >= CurrentSchemaVersion {
 		return
 	}
-	// First lift to v2 if needed.
-	MigrateToV2(r)
-	// v2 → v3 is a metadata-only bump. New fields (Points,
-	// SkillGroups, ToolLoadResult.Parent/ParentKind/Kind, GradersPassed,
-	// GradersTotal) all use omitempty and are simply absent on
-	// migrated-from-v2 reports.
-	r.SchemaVersion = CurrentSchemaVersion
+	// v4 hard cutover: reject v < 4 with a clear error.
+	// (Note: this function is named MigrateToV3 for historical reasons, but
+	// CurrentSchemaVersion is 4 now. The name stuck from when v3 was current.)
+	panic(fmt.Sprintf("report schema v%d is no longer supported; regenerate with: hyoka run ... (current schema: v%d)", r.SchemaVersion, CurrentSchemaVersion))
 }

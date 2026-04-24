@@ -53,90 +53,87 @@ func (g *BehaviorGrader) Kind() string { return KindBehavior }
 func (g *BehaviorGrader) Name() string { return g.name }
 
 func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResult, error) {
-toolSet := collectToolSet(input.ActionLog)
-maxTurn := maxTurnNumber(input.ActionLog)
-details := &BehaviorGraderDetails{
-ToolsUsed:    sortedStringKeys(toolSet),
-MaxTurns:     g.maxTurns,
-ActualTurns:  maxTurn,
-TotalActions: len(input.ActionLog),
-}
-var violations []string
-var points []GraderPoint
-for _, tool := range g.requiredTools {
-present := toolSet[tool]
-if !present {
-details.MissingTools = append(details.MissingTools, tool)
-violations = append(violations, fmt.Sprintf("required tool %q not found", tool))
-}
-msg := fmt.Sprintf("required tool %q used", tool)
-if !present {
-msg = fmt.Sprintf("required tool %q not found", tool)
-}
-points = append(points, GraderPoint{
-Name:    "required: " + tool,
-Pass:    present,
-Message: msg,
-})
-}
-for _, tool := range g.forbiddenTools {
-used := toolSet[tool]
-if used {
-details.ForbiddenUsed = append(details.ForbiddenUsed, tool)
-violations = append(violations, fmt.Sprintf("forbidden tool %q was used", tool))
-}
-msg := fmt.Sprintf("forbidden tool %q absent", tool)
-if used {
-msg = fmt.Sprintf("forbidden tool %q was used", tool)
-}
-points = append(points, GraderPoint{
-Name:    "forbidden: " + tool,
-Pass:    !used,
-Message: msg,
-})
-}
-if g.maxTurns > 0 {
-within := maxTurn <= g.maxTurns
-if !within {
-details.TurnLimitHit = true
-violations = append(violations, fmt.Sprintf("turn count %d exceeds limit %d", maxTurn, g.maxTurns))
-}
-msg := fmt.Sprintf("turn count %d within limit %d", maxTurn, g.maxTurns)
-if !within {
-msg = fmt.Sprintf("turn count %d exceeds limit %d", maxTurn, g.maxTurns)
-}
-points = append(points, GraderPoint{
-Name:    "turn_limit",
-Pass:    within,
-Message: msg,
-})
-}
-details.Violations = violations
-pass := len(violations) == 0
-score := 0.0
-if pass {
-score = 1.0
-}
-msg := "all behavior constraints satisfied"
-if !pass {
-msg = strings.Join(violations, "; ")
-}
-if len(points) == 0 {
-points = []GraderPoint{{
-Name:    "no_constraints",
-Pass:    true,
-Message: "no behavior constraints configured — trivially passed",
-}}
-}
-return GraderResult{
-Kind:            KindBehavior,
-Name:            g.name,
-Pass:            pass,
-Score:           score,
-Message:         msg,
-BehaviorDetails: details,
-Points:          points,
-}, nil
+	toolSet := collectToolSet(input.ActionLog)
+	maxTurn := maxTurnNumber(input.ActionLog)
+	
+	extras := &BehaviorExtras{
+		ToolsUsed:    sortedStringKeys(toolSet),
+		MaxTurns:     g.maxTurns,
+		TotalActions: len(input.ActionLog),
+		TurnCount:    maxTurn,
+	}
+	
+	var violations []string
+	var points []GraderPoint
+	
+	// Per-tool Points for required tools
+	for _, tool := range g.requiredTools {
+		present := toolSet[tool]
+		label := fmt.Sprintf("tool required: %s", tool)
+		var pointMsg string
+		if !present {
+			extras.MissingTools = append(extras.MissingTools, tool)
+			violations = append(violations, fmt.Sprintf("required tool %q not found", tool))
+			pointMsg = fmt.Sprintf("required tool %q not found", tool)
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    present,
+			Message: pointMsg,
+		})
+	}
+	
+	// Per-tool Points for forbidden tools
+	for _, tool := range g.forbiddenTools {
+		used := toolSet[tool]
+		label := fmt.Sprintf("tool forbidden: %s", tool)
+		var pointMsg string
+		if used {
+			extras.ForbiddenUsed = append(extras.ForbiddenUsed, tool)
+			violations = append(violations, fmt.Sprintf("forbidden tool %q was used", tool))
+			pointMsg = fmt.Sprintf("forbidden tool %q was used", tool)
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    !used,
+			Message: pointMsg,
+		})
+	}
+	
+	// Turn limit Point (if configured)
+	if g.maxTurns > 0 {
+		within := maxTurn <= g.maxTurns
+		label := fmt.Sprintf("turn limit ≤ %d", g.maxTurns)
+		var pointMsg string
+		if !within {
+			extras.TurnLimitHit = true
+			violations = append(violations, fmt.Sprintf("turn count %d exceeds limit %d", maxTurn, g.maxTurns))
+			pointMsg = fmt.Sprintf("turn count %d exceeds limit %d", maxTurn, g.maxTurns)
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    within,
+			Message: pointMsg,
+		})
+	}
+	
+	extras.Violations = violations
+	
+	msg := "all behavior constraints satisfied"
+	if len(violations) > 0 {
+		msg = strings.Join(violations, "; ")
+	}
+	
+	// Handle no-constraints case (per spec: must emit at least one Point)
+	if len(points) == 0 {
+		points = []GraderPoint{{
+			Label:   "no constraints",
+			Pass:    true,
+			Message: "no behavior constraints configured — trivially passed",
+		}}
+	}
+	
+	return NewResult(KindBehavior, g.name, input.Config, points, msg, &GraderExtras{Behavior: extras}), nil
 }
 
 // ActionSequenceGrader verifies that the action log contains an expected
@@ -169,43 +166,55 @@ func (g *ActionSequenceGrader) Kind() string { return KindActionSequence }
 func (g *ActionSequenceGrader) Name() string { return g.name }
 
 func (g *ActionSequenceGrader) Grade(_ context.Context, input GraderInput) (GraderResult, error) {
-actual := make([]string, 0, len(input.ActionLog))
-for _, e := range input.ActionLog {
-actual = append(actual, e.Tool)
-}
-matchIdx := 0
-for _, action := range actual {
-if matchIdx < len(g.expectedActions) && action == g.expectedActions[matchIdx] {
-matchIdx++
-}
-}
-fullMatch := matchIdx == len(g.expectedActions)
-details := &BehaviorGraderDetails{
-SequenceMatch:    fullMatch,
-ExpectedSequence: g.expectedActions,
-ActualSequence:   actual,
-MatchedActions:   matchIdx,
-TotalActions:     len(input.ActionLog),
-ToolsUsed:        uniqueTools(actual),
-}
-score := float64(matchIdx) / float64(len(g.expectedActions))
-msg := "action sequence fully matched"
-if !fullMatch {
-msg = fmt.Sprintf("matched %d/%d expected actions", matchIdx, len(g.expectedActions))
-}
-return GraderResult{
-Kind:            KindActionSequence,
-Name:            g.name,
-Pass:            fullMatch,
-Score:           score,
-Message:         msg,
-BehaviorDetails: details,
-Points: []GraderPoint{{
-Name:    "expected_sequence",
-Pass:    fullMatch,
-Message: fmt.Sprintf("matched %d/%d expected actions", matchIdx, len(g.expectedActions)),
-}},
-}, nil
+	actual := make([]string, 0, len(input.ActionLog))
+	for _, e := range input.ActionLog {
+		actual = append(actual, e.Tool)
+	}
+	
+	// Match expected sequence against actual
+	matchIdx := 0
+	for _, action := range actual {
+		if matchIdx < len(g.expectedActions) && action == g.expectedActions[matchIdx] {
+			matchIdx++
+		}
+	}
+	fullMatch := matchIdx == len(g.expectedActions)
+	
+	extras := &ActionSequenceExtras{
+		ExpectedSequence: g.expectedActions,
+		ActualSequence:   actual,
+		MatchedActions:   matchIdx,
+		ToolsUsed:        uniqueTools(actual),
+		TotalActions:     len(input.ActionLog),
+	}
+	
+	// Per-step Points: one Point per expected action position
+	var points []GraderPoint
+	for i, expectedTool := range g.expectedActions {
+		label := fmt.Sprintf("step %d: expected %s", i+1, expectedTool)
+		matched := i < matchIdx
+		var pointMsg string
+		if !matched {
+			// Find what was at this position (if anything)
+			if i < len(actual) {
+				pointMsg = fmt.Sprintf("got %s", actual[i])
+			} else {
+				pointMsg = "sequence too short"
+			}
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    matched,
+			Message: pointMsg,
+		})
+	}
+	
+	msg := "action sequence fully matched"
+	if !fullMatch {
+		msg = fmt.Sprintf("matched %d/%d expected actions", matchIdx, len(g.expectedActions))
+	}
+	
+	return NewResult(KindActionSequence, g.name, input.Config, points, msg, &GraderExtras{ActionSequence: extras}), nil
 }
 
 // ToolConstraintGrader enforces granular tool usage constraints:
@@ -259,80 +268,110 @@ func (g *ToolConstraintGrader) Kind() string { return KindToolConstraint }
 func (g *ToolConstraintGrader) Name() string { return g.name }
 
 func (g *ToolConstraintGrader) Grade(_ context.Context, input GraderInput) (GraderResult, error) {
-toolCounts := countTools(input.ActionLog)
-details := &BehaviorGraderDetails{
-ToolsUsed:    sortedStringKeys(collectToolSet(input.ActionLog)),
-ToolCounts:   toolCounts,
-TotalActions: len(input.ActionLog),
-}
-var violations []string
-var points []GraderPoint
-for _, tool := range g.required {
-called := toolCounts[tool] > 0
-if !called {
-details.MissingTools = append(details.MissingTools, tool)
-violations = append(violations, fmt.Sprintf("required tool %q not called", tool))
-}
-msg := fmt.Sprintf("required tool %q called %d time(s)", tool, toolCounts[tool])
-if !called {
-msg = fmt.Sprintf("required tool %q not called", tool)
-}
-points = append(points, GraderPoint{Name: "required: " + tool, Pass: called, Message: msg})
-}
-for _, tool := range g.forbidden {
-used := toolCounts[tool] > 0
-if used {
-details.ForbiddenUsed = append(details.ForbiddenUsed, tool)
-violations = append(violations, fmt.Sprintf("forbidden tool %q called %d time(s)", tool, toolCounts[tool]))
-}
-msg := fmt.Sprintf("forbidden tool %q absent", tool)
-if used {
-msg = fmt.Sprintf("forbidden tool %q called %d time(s)", tool, toolCounts[tool])
-}
-points = append(points, GraderPoint{Name: "forbidden: " + tool, Pass: !used, Message: msg})
-}
-// Iterate min/max calls in sorted key order so Points ordering is stable.
-for _, tool := range sortedMapKeys(g.minCalls) {
-minCount := g.minCalls[tool]
-ok := toolCounts[tool] >= minCount
-if !ok {
-violations = append(violations, fmt.Sprintf("tool %q called %d time(s), minimum is %d", tool, toolCounts[tool], minCount))
-}
-msg := fmt.Sprintf("tool %q called %d time(s) (min %d)", tool, toolCounts[tool], minCount)
-points = append(points, GraderPoint{Name: fmt.Sprintf("min_calls: %s>=%d", tool, minCount), Pass: ok, Message: msg})
-}
-for _, tool := range sortedMapKeys(g.maxCalls) {
-maxCount := g.maxCalls[tool]
-ok := toolCounts[tool] <= maxCount
-if !ok {
-violations = append(violations, fmt.Sprintf("tool %q called %d time(s), maximum is %d", tool, toolCounts[tool], maxCount))
-}
-msg := fmt.Sprintf("tool %q called %d time(s) (max %d)", tool, toolCounts[tool], maxCount)
-points = append(points, GraderPoint{Name: fmt.Sprintf("max_calls: %s<=%d", tool, maxCount), Pass: ok, Message: msg})
-}
-details.Violations = violations
-details.ConstraintsMet = len(violations) == 0
-pass := len(violations) == 0
-score := 0.0
-if pass {
-score = 1.0
-}
-msg := "all tool constraints satisfied"
-if !pass {
-msg = strings.Join(violations, "; ")
-}
-if len(points) == 0 {
-points = []GraderPoint{{Name: "no_constraints", Pass: true, Message: "no tool constraints configured — trivially passed"}}
-}
-return GraderResult{
-Kind:            KindToolConstraint,
-Name:            g.name,
-Pass:            pass,
-Score:           score,
-Message:         msg,
-BehaviorDetails: details,
-Points:          points,
-}, nil
+	toolCounts := countTools(input.ActionLog)
+	
+	extras := &ToolConstraintExtras{
+		ToolsUsed:    sortedStringKeys(collectToolSet(input.ActionLog)),
+		ToolCounts:   toolCounts,
+	}
+	
+	var violations []string
+	var points []GraderPoint
+	
+	// Required tools
+	for _, tool := range g.required {
+		called := toolCounts[tool] > 0
+		label := fmt.Sprintf("tool required: %s", tool)
+		var pointMsg string
+		if !called {
+			extras.MissingTools = append(extras.MissingTools, tool)
+			violations = append(violations, fmt.Sprintf("required tool %q not called", tool))
+			pointMsg = fmt.Sprintf("required tool %q not called", tool)
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    called,
+			Message: pointMsg,
+		})
+	}
+	
+	// Forbidden tools
+	for _, tool := range g.forbidden {
+		used := toolCounts[tool] > 0
+		label := fmt.Sprintf("tool forbidden: %s", tool)
+		var pointMsg string
+		if used {
+			extras.ForbiddenUsed = append(extras.ForbiddenUsed, tool)
+			violations = append(violations, fmt.Sprintf("forbidden tool %q called %d time(s)", tool, toolCounts[tool]))
+			pointMsg = fmt.Sprintf("forbidden tool %q called %d time(s)", tool, toolCounts[tool])
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    !used,
+			Message: pointMsg,
+		})
+	}
+	
+	// Min calls constraints (sorted for stable Points order)
+	for _, tool := range sortedMapKeys(g.minCalls) {
+		minCount := g.minCalls[tool]
+		ok := toolCounts[tool] >= minCount
+		label := fmt.Sprintf("tool %s called ≥ %d", tool, minCount)
+		var pointMsg string
+		if !ok {
+			violations = append(violations, fmt.Sprintf("tool %q called %d time(s), minimum is %d", tool, toolCounts[tool], minCount))
+			pointMsg = fmt.Sprintf("tool %q called %d time(s), minimum is %d", tool, toolCounts[tool], minCount)
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    ok,
+			Message: pointMsg,
+			Evidence: map[string]string{
+				"actual": fmt.Sprintf("%d", toolCounts[tool]),
+				"expected": fmt.Sprintf(">=%d", minCount),
+			},
+		})
+	}
+	
+	// Max calls constraints (sorted for stable Points order)
+	for _, tool := range sortedMapKeys(g.maxCalls) {
+		maxCount := g.maxCalls[tool]
+		ok := toolCounts[tool] <= maxCount
+		label := fmt.Sprintf("tool %s called ≤ %d", tool, maxCount)
+		var pointMsg string
+		if !ok {
+			violations = append(violations, fmt.Sprintf("tool %q called %d time(s), maximum is %d", tool, toolCounts[tool], maxCount))
+			pointMsg = fmt.Sprintf("tool %q called %d time(s), maximum is %d", tool, toolCounts[tool], maxCount)
+		}
+		points = append(points, GraderPoint{
+			Label:   label,
+			Pass:    ok,
+			Message: pointMsg,
+			Evidence: map[string]string{
+				"actual": fmt.Sprintf("%d", toolCounts[tool]),
+				"expected": fmt.Sprintf("<=%d", maxCount),
+			},
+		})
+	}
+	
+	extras.Violations = violations
+	extras.ConstraintsMet = len(violations) == 0
+	
+	msg := "all tool constraints satisfied"
+	if len(violations) > 0 {
+		msg = strings.Join(violations, "; ")
+	}
+	
+	// Handle no-constraints case (per spec: must emit at least one Point)
+	if len(points) == 0 {
+		points = []GraderPoint{{
+			Label:   "no constraints",
+			Pass:    true,
+			Message: "no tool constraints configured — trivially passed",
+		}}
+	}
+	
+	return NewResult(KindToolConstraint, g.name, input.Config, points, msg, &GraderExtras{ToolConstraint: extras}), nil
 }
 
 // ---------------------------------------------------------------------------
