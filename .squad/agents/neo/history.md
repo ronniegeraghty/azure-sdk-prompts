@@ -12,6 +12,12 @@
 
 ---
 
+## CROSS-AGENT UPDATE (2026-04-24T03:59:28Z — Tank: KindPromptReview Fix)
+
+**Engine Fix:** Tank removed `KindPromptReview` from `validTypedKinds` in `hyoka/internal/criteria/config.go`. This was engine-runtime-only (created manually by Phase 2 per-bucket review loop), not a valid criteria YAML type. Commits: 84b1606d (fix), a37763f3 (docs).
+
+---
+
 ## CROSS-AGENT UPDATE (2026-04-24T00:37:44Z — Tank)
 
 **Display Bug Fixes in engine_eval.go:**

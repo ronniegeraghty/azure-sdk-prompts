@@ -2,6 +2,66 @@
 
 ## Active Decisions
 
+### Decision: KindPromptReview Removed from validTypedKinds (2026-04-24T03:59:28Z)
+
+**Agent:** Tank 🎖️  
+**Branch:** ronniegeraghty/dev  
+**Commits:** `84b1606d`, `a37763f3`
+
+## Context
+
+After commit 4adc9288 (per-grader display refactor), user reported potential duplicate AI grader execution. Investigation revealed that `graders.KindPromptReview` was incorrectly listed in `validTypedKinds` in `hyoka/internal/criteria/config.go`.
+
+## Problem
+
+`KindPromptReview` being in `validTypedKinds` suggested that `type: prompt_review` was a valid criteria-file type, but:
+
+1. `NewGrader` in `graders/registry.go` doesn't handle `KindPromptReview` — it would error on instantiation
+2. `PromptReviewGrader` instances are created manually by the engine in `engine_eval.go` Phase 2 (lines 596-671), not via the criteria-file system
+3. Criteria YAML files should only use `type: prompt` for LLM-review graders, never `type: prompt_review`
+
+## Decision
+
+**Removed `graders.KindPromptReview` from the `validTypedKinds` map.**
+
+The valid typed kinds are now:
+- `file` — file existence/content graders
+- `program` — external program graders
+- `behavior` — tool usage behavioral graders
+- `action_sequence` — action timeline graders
+- `tool_constraint` — tool call constraint graders
+- `output_check` — output validation graders
+
+`KindPromptReview` is NOT a criteria-file type — it's the kind returned by runtime `PromptReviewGrader` instances created by the engine's per-bucket review loop.
+
+## Rationale
+
+1. **Schema correctness:** Criteria files define grader configuration, not runtime grader kinds. `type: prompt` entries are partitioned into `promptEntries` by `PartitionMatched` and used to build review buckets, not instantiated via `NewGrader`.
+
+2. **Error prevention:** If someone added a `type: prompt_review` entry to a criteria file, it would pass validation (because it was in `validTypedKinds`) but fail during instantiation (because `NewGrader` doesn't handle it).
+
+3. **Clear separation:** The typed graders path (Phase 1) uses `NewGrader` for instantiation. The AI review path (Phase 2) manually creates `PromptReviewGrader` instances, one per bucket.
+
+## Implementation
+
+**File:** `hyoka/internal/criteria/config.go`  
+**Change:** Removed `graders.KindPromptReview` from the `validTypedKinds` map, added comment clarifying that `KindPromptReview` is not included because it's the kind of manually-created instances, not a valid criteria-file type.
+
+## Verification
+
+- Build: ✅ `go build ./...`
+- Tests: ✅ `go test ./hyoka/internal/criteria/... ./hyoka/internal/eval/...`
+- Live eval: ✅ Completed successfully (no errors)
+
+## Related
+
+- Commit 4adc9288: Per-grader display refactor (created per-bucket review loop)
+- `engine_eval.go` lines 596-671: Phase 2 per-bucket grader creation
+- `buckets.go`: `BuildUnifiedReviewBuckets` — creates review buckets from `type: prompt` entries
+- `registry.go`: `NewGrader` — handles typed graders (does NOT handle `KindPromptReview`)
+
+---
+
 ### Decision: Graders Run on Every Eval; Generator Response Threaded Through (2026-04-24T00:56:09Z)
 
 **Agent:** Neo 💊
