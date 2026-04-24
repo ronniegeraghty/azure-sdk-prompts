@@ -8,6 +8,8 @@ graders:
     checks:
       - File hello.md exists and contains a level-1 heading (starts with single #).
       - File contains exactly three bullet list items.
+      # Intentionally failing — demonstrates failed-check rendering.
+      - File hello.md contains a fenced code block tagged with the language `rust`.
   - name: Output Files Exist
     type: output_check
     weight: 1.0
@@ -29,3 +31,15 @@ graders:
     weight: 0.5
     details:
       max_turns: 3
+  # Skills (markdown-headings, markdown-lists) surface in the action log as a
+  # tool named "skill" (the specific skill name is an argument, not the tool
+  # name). Requiring at least 2 "skill" calls demonstrates that both loaded
+  # skills were exercised by the generator.
+  - name: Skill Usage
+    type: tool_constraint
+    weight: 0.5
+    details:
+      required:
+        - skill
+      min_calls:
+        skill: 2

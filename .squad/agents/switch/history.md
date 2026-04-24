@@ -387,3 +387,24 @@ go run . clean
 
 **Follow-up:** Monitor the debug log for criterion-count mismatches (one judge returned the parent grader name as an extra criterion in early testing). Low signal so far — will collect data before deciding on post-filter or stricter review prompt.
 
+
+## 2026-04-24 — test.yaml fixture: skill-usage grader + intentionally-failing check
+
+Extended `criteria/language/test.yaml` to demo two more grader behaviors on the `test-dp-test-hello-markdown` fixture (branch `ronniegeraghty/prompt-grader-checks`).
+
+**Findings:**
+- Copilot **skills surface as a single tool name `skill`** in `ActionEvent.Tool` — the specific skill (markdown-headings, markdown-lists) is an argument, not the tool name. Verified via `reports/20260424-045906/.../report.json` → `tool_calls: ["skill", "create"]`.
+- Therefore `behavior` `required_tools: [markdown-headings]` would always fail; `tool_constraint` with `required: [skill]` + `min_calls: {skill: 2}` is the correct expression of "both loaded skills were exercised".
+
+**Changes (3 lines added to the `Markdown Structure` checks list, ~12 lines for new Skill Usage grader):**
+- New `Skill Usage` grader (`tool_constraint`, weight 0.5).
+- New 3rd `checks:` entry on `Markdown Structure`: requires a fenced rust code block. Tiny hello.md cannot satisfy → reliable red badge.
+
+**Smoke (run `20260424-053907`, generator misfired so no hello.md, but graders all wired):**
+- `Skill Usage` ✅ Pass — both `required: skill` and `min_calls: skill>=2` satisfied.
+- `Markdown Structure` ❌ Fail (0/3) — all three checks rendered, including the new rust-code-block one. Log: `bucket="Markdown Structure" passed=0 max=3`.
+- `Efficient Behavior` ✅ Pass.
+
+**Caveat:** `hyoka clean` hung this session — needed `kill -9` on orphaned subprocess. Pre-existing flake unrelated to this change. Worth flagging to whoever owns cleanup.
+
+**Decision note:** `.squad/decisions/inbox/switch-test-fixtures.md`
