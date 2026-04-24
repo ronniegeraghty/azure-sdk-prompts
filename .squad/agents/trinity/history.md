@@ -98,6 +98,31 @@ Audited `hyoka/internal/serve/` + React `site/src/` against anchor run `20260423
 
 **Conventions reaffirmed:**
 - The site is a Vite/React SPA (`site/src/`) embedded into the Go binary at `hyoka/internal/serve/site/`. Source-of-truth code is the React, not the embedded `index.html`.
+
+---
+
+## 2026-04-24: Bug Fixes — Grader Point Scoring & File Contents Display
+
+**Bugs fixed:**
+1. **Total score denominator** (user report: "x/2 instead of x/all-grader-points")
+   - Root cause: `engine_eval.go:636` used `len(graders)` instead of summing grader points.
+   - Fix: Added `countTotalPoints()` and `countPassedPoints()` helpers that sum points across all graders, treating graders with zero points as 1 point for backward compat.
+   - Changed `GradersTotal` and `GradersPassed` to use point-level counts.
+2. **File contents missing on eval detail pages** (user report: "can see file names but not contents")
+   - Root cause: `EvalReport.FileContents` field was unused (existed on `ReportTemplateData` but never populated).
+   - Fix: Added `readGeneratedFileContents()` helper that reads each generated file from the workspace directory (up to 1MB per file), detects binary files by extension, and populates `EvalReport.FileContents` before writing the report.
+   - Binary files (`.png`, `.pdf`, etc.) show `[Binary file — not displayed]`.
+   - Files >1MB show `[File too large to display (N bytes) — view on disk at {path}]`.
+
+**Learnings:**
+- **Grader point denominator rule**: When computing total score, the denominator is the sum of `len(g.Points)` across all graders. Graders with zero points contribute 1 to the total (backward compat for legacy graders that don't populate Points).
+- **File contents rendering pattern**: Store file contents in `EvalReport.FileContents` at report-build time (not serve time). Use size caps (1MB) and binary detection (by extension) to avoid blowing up JSON reports. Site can render inside `<details>` elements for collapsibility.
+
+**Tests:**
+- Added `grader_scoring_test.go` with table-driven tests for `countTotalPoints()` and `countPassedPoints()` covering: multiple points per grader, zero-point graders, mixed scenarios, empty results.
+- All existing tests pass (`go test ./hyoka/...`).
+
+**Commit:** c06ca9e2 (merged with Neo's bucket separation fix)
 - `playwright-cli` is restricted to roots `/home/rgeraghty/projects/hyoka` and `.playwright-cli` — screenshot output must land inside the repo (or be copied to `/tmp/` after).
 - Read-only investigations on `ronniegeraghty/dev` while Tank is concurrently editing means I never `git add` or commit; screenshots into `.trinity-screenshots/` (gitignored) + copy to `/tmp/trinity-site-review/`.
 - Coordination boundary: data-model and roll-up structural critique is Morpheus; presentation/UX critique is mine. Deliverables link rather than overlap.
