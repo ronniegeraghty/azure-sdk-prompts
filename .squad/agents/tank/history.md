@@ -308,3 +308,104 @@ it was rewriting a line that should never have been split off.
 tracking, ask whether the line being tracked should exist as a standalone
 row at all. Two-line layouts paired with in-place updates of only one line
 are a smell.
+
+---
+
+## 2026-04-24: Pairwise Display Bugs — Agent Attempt Completion Timing (commit dcff4f68)
+
+**Branch:** ronniegeraghty/dev  
+**Commit:** dcff4f68 `fix(progress): emit EventSessionDetails before graders to fix Agent Attempt completion timing`
+
+### Root Causes
+
+**Bug 1 (gpt-5.3-codex):** Grader output missing even though generation showed "Agent Attempt: Completed". Root cause was NOT display-specific — graders only run when `len(generatedFiles) > 0` (engine_eval.go:472). If codex generated zero files, the grader block was skipped entirely. The terminal event still arrived and showed "Completed" because the generation phase succeeded. Without EventSessionDetails, there was no Session Details section to visually signal the gap between generation and (skipped) grading.
+
+**Bug 2 (claude-opus-4.6, claude-sonnet-4.5):** Agent Attempt line showed "Running" while graders rendered, then "Agent Attempt: Completed" appeared as a duplicate row at the bottom. Root cause: terminal event (EventPassed/EventFailed) was the ONLY trigger for `agentComplete()`, but it arrived AFTER all graders had already completed. By that time, `onGraderStart` had frozen the agent tail and written multiple grader rows, so `agentComplete()`'s call to `rewriteFrozenLine(e.agentLineRow, line)` used a stale row index — the cursor was now many rows below where `agentLineRow` pointed.
+
+### Solution
+
+Emit EventSessionDetails right after generation completes (engine_eval.go:467-495), BEFORE the grader block starts at line 497. The interactive renderer's `onSessionDetails` handler (display_interactive.go:876-899) now:
+1. Calls `agentComplete(evt.FileCount, true, "")` if the agent is still in Running state
+2. Renders the Session Details section (Files, Turns, Tool calls, Cost)
+
+This flips the Agent Attempt line to "Completed" while it's still the active tail, so:
+- **Bug 2 fix:** completion happens via `rewriteTail()` (in-place update while agent owns the tail) instead of `rewriteFrozenLine()` with a stale index after graders have written rows
+- **Bug 1 behavior improved:** the Session Details section now renders between Agent Attempt and the terminal event, making the no-graders flow clearer (generation → session summary → pass/fail, no grader section)
+
+### Implementation Details
+
+- **Event emission:** Computed turn count and cost from `evalReport.SessionEvents`, emitted EventSessionDetails with `Files`, `Turns`, `ToolCalls`, `Cost`
+- **Idempotent guards:** Updated `onPassed`, `onFailed`, `onError` to skip calling `agentComplete()` if `r.cur.agentState` is already `agentStateCompleted` or `agentStateGuardrail`. This prevents duplicate rewrites when the terminal event arrives after EventSessionDetails has already transitioned the state.
+- **Test update:** `TestInteractive_AgentCompletedRowRewritesFrozenLine` now includes EventSessionDetails in the event sequence and verifies Session Details section renders correctly between Agent Attempt and Graders.
+
+### Learnings
+
+- **Event ordering drives display correctness.** Grader events were always emitted AFTER generation completed (engine_eval.go:561-583), but the renderer had no signal that generation itself was done until the terminal event arrived. EventSessionDetails closes that gap and gives the display a reliable "generation phase complete" marker.
+- **Frozen-row rewrite works ONLY when no intervening rows are written.** `rewriteFrozenLine` calculates `up = r.cur.linesWritten - row`, which breaks if `linesWritten` increments between when `row` was recorded and when the rewrite fires. The fix avoids frozen-row rewrites entirely by completing the Agent Attempt while it's still the tail.
+- **Per-eval state isolation in pairwise mode.** Workers=1 means one eval at a time, but multiple evals run back-to-back in the same display. Each eval's `interactiveEval` struct tracks its own `linesWritten`, `agentLineRow`, `graderRowByID`, etc. — state resets between evals via `startEval()`. No bleed observed during pairwise runs.
+- **Cost calculation is a rough estimate.** `cost += float64(ev.InputTokens+ev.OutputTokens) * 0.00001` is a placeholder. Real cost depends on the model's pricing tier (input vs output rates, prompt caching). Good enough for display; report consumers should use structured token fields from `Environment.TotalInputTokens`/`TotalOutputTokens`.
+
+### Verification
+
+- `go build ./hyoka/...` — clean
+- `go test -race ./hyoka/internal/progress/...` — all 27 tests pass (23 existing + 4 from prior wave)
+- `go test ./hyoka/...` — all packages pass
+
+Live eval (post-fix) not performed — working tree is on ronniegeraghty/dev with other in-flight work. The test update validates the event flow; Ronnie will verify on the next pairwise run.
+
+### Files Changed
+
+- `hyoka/internal/eval/engine_eval.go` (+28 lines): EventSessionDetails emission after guardrail checks
+- `hyoka/internal/progress/display_interactive.go` (+40 lines, -6 lines): onSessionDetails calls agentComplete early; terminal event handlers guard against duplicate calls
+- `hyoka/internal/progress/display_interactive_test.go` (+33 lines, -33 lines): TestInteractive_AgentCompletedRowRewritesFrozenLine updated to include EventSessionDetails and verify Session Details section
+
+
+---
+
+## 2026-04-24: Pairwise Display Bugs — Agent Attempt Completion Timing (commit dcff4f68)
+
+**Branch:** ronniegeraghty/dev  
+**Commit:** dcff4f68 `fix(progress): emit EventSessionDetails before graders to fix Agent Attempt completion timing`
+
+### Root Causes
+
+**Bug 1 (gpt-5.3-codex):** Grader output missing even though generation showed "Agent Attempt: Completed". Root cause was NOT display-specific — graders only run when `len(generatedFiles) > 0` (engine_eval.go:472). If codex generated zero files, the grader block was skipped entirely. The terminal event still arrived and showed "Completed" because the generation phase succeeded. Without EventSessionDetails, there was no Session Details section to visually signal the gap between generation and (skipped) grading.
+
+**Bug 2 (claude-opus-4.6, claude-sonnet-4.5):** Agent Attempt line showed "Running" while graders rendered, then "Agent Attempt: Completed" appeared as a duplicate row at the bottom. Root cause: terminal event (EventPassed/EventFailed) was the ONLY trigger for `agentComplete()`, but it arrived AFTER all graders had already completed. By that time, `onGraderStart` had frozen the agent tail and written multiple grader rows, so `agentComplete()`'s call to `rewriteFrozenLine(e.agentLineRow, line)` used a stale row index — the cursor was now many rows below where `agentLineRow` pointed.
+
+### Solution
+
+Emit EventSessionDetails right after generation completes (engine_eval.go:467-495), BEFORE the grader block starts at line 497. The interactive renderer's `onSessionDetails` handler (display_interactive.go:876-899) now:
+1. Calls `agentComplete(evt.FileCount, true, "")` if the agent is still in Running state
+2. Renders the Session Details section (Files, Turns, Tool calls, Cost)
+
+This flips the Agent Attempt line to "Completed" while it's still the active tail, so:
+- **Bug 2 fix:** completion happens via `rewriteTail()` (in-place update while agent owns the tail) instead of `rewriteFrozenLine()` with a stale index after graders have written rows
+- **Bug 1 behavior improved:** the Session Details section now renders between Agent Attempt and the terminal event, making the no-graders flow clearer (generation → session summary → pass/fail, no grader section)
+
+### Implementation Details
+
+- **Event emission:** Computed turn count and cost from `evalReport.SessionEvents`, emitted EventSessionDetails with `Files`, `Turns`, `ToolCalls`, `Cost`
+- **Idempotent guards:** Updated `onPassed`, `onFailed`, `onError` to skip calling `agentComplete()` if `r.cur.agentState` is already `agentStateCompleted` or `agentStateGuardrail`. This prevents duplicate rewrites when the terminal event arrives after EventSessionDetails has already transitioned the state.
+- **Test update:** `TestInteractive_AgentCompletedRowRewritesFrozenLine` now includes EventSessionDetails in the event sequence and verifies Session Details section renders correctly between Agent Attempt and Graders.
+
+### Learnings
+
+- **Event ordering drives display correctness.** Grader events were always emitted AFTER generation completed (engine_eval.go:561-583), but the renderer had no signal that generation itself was done until the terminal event arrived. EventSessionDetails closes that gap and gives the display a reliable "generation phase complete" marker.
+- **Frozen-row rewrite works ONLY when no intervening rows are written.** `rewriteFrozenLine` calculates `up = r.cur.linesWritten - row`, which breaks if `linesWritten` increments between when `row` was recorded and when the rewrite fires. The fix avoids frozen-row rewrites entirely by completing the Agent Attempt while it's still the tail.
+- **Per-eval state isolation in pairwise mode.** Workers=1 means one eval at a time, but multiple evals run back-to-back in the same display. Each eval's `interactiveEval` struct tracks its own `linesWritten`, `agentLineRow`, `graderRowByID`, etc. — state resets between evals via `startEval()`. No bleed observed during pairwise runs.
+- **Cost calculation is a rough estimate.** `cost += float64(ev.InputTokens+ev.OutputTokens) * 0.00001` is a placeholder. Real cost depends on the model's pricing tier (input vs output rates, prompt caching). Good enough for display; report consumers should use structured token fields from `Environment.TotalInputTokens`/`TotalOutputTokens`.
+
+### Verification
+
+- `go build ./hyoka/...` — clean
+- `go test -race ./hyoka/internal/progress/...` — all 27 tests pass (23 existing + 4 from prior wave)
+- `go test ./hyoka/...` — all packages pass
+
+Live eval (post-fix) not performed — working tree is on ronniegeraghty/dev with other in-flight work. The test update validates the event flow; Ronnie will verify on the next pairwise run.
+
+### Files Changed
+
+- `hyoka/internal/eval/engine_eval.go` (+28 lines): EventSessionDetails emission after guardrail checks
+- `hyoka/internal/progress/display_interactive.go` (+40 lines, -6 lines): onSessionDetails calls agentComplete early; terminal event handlers guard against duplicate calls
+- `hyoka/internal/progress/display_interactive_test.go` (+33 lines, -33 lines): TestInteractive_AgentCompletedRowRewritesFrozenLine updated to include EventSessionDetails and verify Session Details section
