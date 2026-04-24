@@ -362,3 +362,28 @@ go run . clean
 ```
 
 **Status:** ✅ Both divergences fixed, end-to-end verified, tests passing, ~30s runtime maintained.
+
+## CROSS-AGENT UPDATE (2026-04-24T05:37:56Z — Neo + Tank + Scribe: Prompt Grader Checks Landed)
+
+**Feature:** Prompt Grader `checks:` field is now fully implemented, tested, and documented.
+
+**What this means for your work:**
+- YAML prompt graders can now declare `checks: [list of items]` instead of smuggling numbered lists in `prompt:`.
+- Each check becomes a separate Point in the report and a nested row in the interactive display.
+- Badge format updated to `✅ Pass (X/Y)` / `❌ Fail (X/Y)` for clarity.
+- Two criteria files migrated (`criteria/language/python.yaml`, `criteria/language/test.yaml`).
+- Debug logging added: `slog.Debug` fires when judge returns criterion count ≠ expected (helps track outliers).
+
+**Commits:**
+- Neo: `2949f578` — Schema, validation, rendering, migrations
+- Tank: `a47cb97d` — Badge format, truncation, display verification
+
+**Branch:** `ronniegeraghty/prompt-grader-checks` (both commits)
+
+**If you touch:**
+- Criteria YAML files → respect the new `checks:` shape
+- Interactive display logic → Points are now per-check (more rows than before)
+- Report-layer rendering → Points flow through unchanged (schema v3 already supports it)
+
+**Follow-up:** Monitor the debug log for criterion-count mismatches (one judge returned the parent grader name as an extra criterion in early testing). Low signal so far — will collect data before deciding on post-filter or stricter review prompt.
+

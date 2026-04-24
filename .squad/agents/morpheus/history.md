@@ -245,3 +245,28 @@ Read trinity-site-ux-review.md and my own morpheus-report-architecture-review.md
 ## Learnings
 
 - **#634:** Show generated files as diffs against starter project — Filed issue for eval-detail diff visualization feature (gen vs. starter file comparison).
+
+## 2026-04-24 — Learnings: hardcoded taxonomy drift (issue #635)
+
+- **Bug pattern.** `Valid*` slices in `internal/validate/validate.go:14-42` are duplicated as inline map/equality literals in `internal/validate/schema.go:176-213` (`isValidPlane`, `isValidLanguage`, `isValidService`, `isValidCategory`, `isValidDifficulty`). The two sets have already drifted: `validate.go:26` has `"test"` in `ValidLanguages`; `schema.go:181-189` does not. Adding any taxonomy value requires editing two files, and forgetting one half silently rejects valid inputs at `schema.go:63`.
+- **Escape-hatch smell.** `isTestValue` (`schema.go:215-219`) and the appended `"test"` entries in services/languages/categories are workarounds for the same problem — should disappear once discovery lands.
+- **Third-place duplication.** `planeAbbrev` map at `validate.go:53-56` is yet another hardcoded plane-axis location, used by the ID-prefix check at `schema.go:166`. Discovery design must accommodate per-axis structure (abbreviations) for plane.
+- **Consumers are small.** Only `cmd/new_prompt.go:14-32` consumes the exported `Valid*` slices outside the validate package itself. Site (`internal/serve/dashboard.go:240-243`) takes filter values as opaque strings — no server-side allowlist, so taxonomy discovery is API-compatible for serve.
+- **Proposed shape (filed as #635).** `internal/taxonomy` package walks `prompts/`/`criteria/`/`configs/` once per process, unions observed values, optionally augmented by a forward-declaration `taxonomy.yaml` at repo root. Validation switches to set-membership + Levenshtein "did you mean" suggestion. Single-PR migration; primary owner suggested as Neo.
+- **Issue:** https://github.com/ronniegeraghty/hyoka/issues/635
+
+## 2026-04-24 — Scoped: Prompt grader `checks:` field
+
+- **Scope doc:** `.squad/decisions/inbox/morpheus-prompt-grader-checks-scope.md`. Two-collaborator split: Neo owns schema + bucket text rendering + YAML migration + grader-side log; Tank owns badge format + report Points verification + e2e smoke. Parallel-safe.
+- **Backward compat call:** Hard-migrate the two affected files (`criteria/language/python.yaml`, `criteria/language/test.yaml`) — both currently smuggle `1. … 2. …` numbered checks inside a single `prompt:` blob. java.yaml/rust.yaml use one-grader-per-criterion already, no migration. Single-`prompt:`/no-`checks:` case continues to work unchanged.
+- **Execution model:** ONE LLM call per grader with N checks rendered as N numbered criteria — NOT one call per check. The existing review prompt (`internal/review/prompt.go:60-75`) already says "Each criterion … MUST appear exactly once in the criteria array," and the parser at `prompt_review_grader.go:120-127`/`:199-206` already maps returned criteria 1:1 into `result.Points`.
+- **Renderer state:** Multi-Point nested rendering ALREADY EXISTS in `display_interactive.go:1003-1062` (`renderGraderWithPoints`). The reason YAML graders look bad isn't missing renderer code — it's that each YAML entry produces only one Point because the LLM gets only one criterion. Fixing the bucket text rendering (Neo) makes the existing renderer (Tank just tweaks badge format) Just Work.
+- **Path unification:** REJECTED introducing a shared `PromptCheck` struct. The prompt-file path's `ParsedCriteria` and the YAML path's `Checks` already converge at the rendered-bucket-text layer. No need to lift the abstraction higher.
+- **Two open questions** with reasonable defaults documented in scope (truncation behavior, preamble visibility) — implementation should not block on them.
+
+### Time spent
+~25 minutes (read existing graders + bucket builder + renderer + criteria YAMLs + scope draft).
+
+### Learnings
+- The prompt-grader Points pipeline is fully wired end-to-end since Phase 2; the YAML-side gap is purely a bucket-text-rendering issue, not a missing-feature issue. Future scopes touching grader output should look at the bucket text first before assuming renderer work is needed.
+- `internal/criteria/buckets.go:119` (`FormatUnifiedPromptEntries`) is the single render point for YAML prompt-grader → review-LLM input. Anything that needs to change how the LLM sees the criteria text passes through here.
