@@ -77,13 +77,14 @@ type UnifiedGraderConfig struct {
 
 // validTypedKinds enumerates the non-prompt grader types accepted by the
 // unified schema. Mirrors validKinds in types.go minus graders.KindPrompt.
+// KindPromptReview is NOT included — it's the kind of manually-created
+// PromptReviewGrader instances, not a valid criteria-file type.
 var validTypedKinds = map[string]bool{
 	graders.KindFile:           true,
 	graders.KindProgram:        true,
 	graders.KindBehavior:       true,
 	graders.KindActionSequence: true,
 	graders.KindToolConstraint: true,
-	graders.KindPromptReview:   true,
 	graders.KindOutputCheck:    true,
 }
 
