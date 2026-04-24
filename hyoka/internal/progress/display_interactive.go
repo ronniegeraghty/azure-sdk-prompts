@@ -87,9 +87,8 @@ func decodeRune(s string) (rune, int) {
 //	Tools:
 //	  - <name> (<kind>): 🔄 Loading…              (tail; flips to ✅/❌ in place)
 //	  - <name> (<kind>): ✅ Loaded
-//	Agent Attempt:
-//	  🔄 Running… turn X/Y, N tool calls  (MM:SS) (tail; per-second ticker refresh)
-//	  ✅ Complete — N files, M turns        (MM:SS)
+//	Agent Attempt: 🔄 Running                       (single-line tail; flips in place)
+//	Agent Attempt: ✅ Completed                      (final state — same row, rewritten)
 //	Session Details:
 //	  Files: …
 //	  Turns: …   Tool calls: …   Cost: …
@@ -149,11 +148,11 @@ type interactiveEval struct {
 
 	// Tools section.
 	toolsHeaderPrinted bool
-	toolsFirstLine     int                 // linesWritten index of first tool line ("  - …")
-	toolLines          []toolLine          // bookkeeping for every Start-seen tool, in order
-	toolsVerified      bool                // guard so we only redraw once
-	toolIndexByName    map[string]int      // name -> index in toolLines
-	emittedParents     map[parentKey]bool  // parent headers already written to output
+	toolsFirstLine     int                // linesWritten index of first tool line ("  - …")
+	toolLines          []toolLine         // bookkeeping for every Start-seen tool, in order
+	toolsVerified      bool               // guard so we only redraw once
+	toolIndexByName    map[string]int     // name -> index in toolLines
+	emittedParents     map[parentKey]bool // parent headers already written to output
 
 	// Agent Attempt section — simplified to a three-state machine (Running, Completed, Guardrail).
 	agentHeaderPrinted bool
@@ -237,12 +236,12 @@ const (
 // ANSI cursor helpers. Kept private to this file so the rest of the package
 // doesn't rely on raw escapes.
 const (
-	ansiClearLine    = "\x1b[2K"
-	ansiCR           = "\r"
-	ansiCursorUp1    = "\x1b[1A"
-	ansiSaveCursor   = "\x1b7" // DECSC — same convention display.go uses
-	ansiRestoreCurs  = "\x1b8" // DECRC
-	ansiCursorUpFmt  = "\x1b[%dA"
+	ansiClearLine   = "\x1b[2K"
+	ansiCR          = "\r"
+	ansiCursorUp1   = "\x1b[1A"
+	ansiSaveCursor  = "\x1b7" // DECSC — same convention display.go uses
+	ansiRestoreCurs = "\x1b8" // DECRC
+	ansiCursorUpFmt = "\x1b[%dA"
 )
 
 // newInteractiveRenderer constructs the renderer. When total==0 we still
@@ -580,7 +579,7 @@ func (r *interactiveRenderer) redrawToolsBlock() {
 	buf.WriteString(ansiSaveCursor)
 	fmt.Fprintf(&buf, ansiCursorUpFmt, up)
 	buf.WriteString(ansiCR)
-	
+
 	// Group tools by (ParentKind, ParentName). Preserve insertion order.
 	grouped := r.groupToolLines(e.toolLines)
 	for _, line := range grouped {
@@ -588,7 +587,7 @@ func (r *interactiveRenderer) redrawToolsBlock() {
 		buf.WriteString(line)
 		buf.WriteByte('\n')
 	}
-	
+
 	buf.WriteString(ansiRestoreCurs)
 	r.w.Write(buf.Bytes())
 }
@@ -700,13 +699,13 @@ func (r *interactiveRenderer) renderToolLine(tl toolLine, indented bool) string 
 	if indented {
 		indent = "      " // Extra 4 spaces for grouped children
 	}
-	
+
 	// Always render the kind label, including for grouped children. Without
 	// this, children under a plugin/skill_dir header read as bare names with
 	// no indication of skill vs MCP — visually ambiguous when the parent
 	// container mixes both.
 	kindStr := " " + r.sty.Muted(fmt.Sprintf("(%s)", tl.kind))
-	
+
 	switch tl.status {
 	case "", "loading":
 		return fmt.Sprintf("%s- %s%s: 🔄 %s", indent, name, kindStr, r.sty.Muted("Loading…"))
@@ -747,12 +746,17 @@ func (r *interactiveRenderer) detectNoTools() bool {
 	return !r.cur.toolsHeaderPrinted && len(r.cur.toolLines) == 0
 }
 
+// ensureAgentHeader marks the Agent Attempt section as opened and freezes any
+// active tail so the next writeTail starts on a fresh row. It does NOT write a
+// standalone "Agent Attempt:" header — the section is rendered as a single
+// combined line ("Agent Attempt: 🔄 Running") by renderAgentStateLine.
+// agentHeaderPrinted means "section opened; the single-line tail has been
+// (or is about to be) written at least once."
 func (r *interactiveRenderer) ensureAgentHeader() {
 	if r.cur.agentHeaderPrinted {
 		return
 	}
 	r.freezeTail()
-	r.writeLine("Agent Attempt:")
 	r.cur.agentHeaderPrinted = true
 	r.cur.agentStartTime = time.Now()
 }
@@ -807,23 +811,23 @@ func (r *interactiveRenderer) rewriteAgentTail() {
 	r.rewriteTail(r.renderAgentStateLine())
 }
 
-// renderAgentStateLine renders the single-line status based on current state.
+// renderAgentStateLine renders the single-line Agent Attempt status (header
+// and state combined on ONE row) based on current state.
 func (r *interactiveRenderer) renderAgentStateLine() string {
 	e := r.cur
 	switch e.agentState {
 	case agentStateRunning:
-		// Show simple "Running" with a spinner character
-		return fmt.Sprintf("  🔄 %s", r.sty.Info("Running"))
+		return fmt.Sprintf("Agent Attempt: 🔄 %s", r.sty.Info("Running"))
 	case agentStateCompleted:
-		return fmt.Sprintf("  %s", r.sty.OK("✅ Completed"))
+		return fmt.Sprintf("Agent Attempt: %s", r.sty.OK("✅ Completed"))
 	case agentStateGuardrail:
-		msg := "Guardrail hit"
+		msg := "⚠ Guardrail hit"
 		if e.agentGuardrailMsg != "" {
-			msg = fmt.Sprintf("Guardrail hit — %s", e.agentGuardrailMsg)
+			msg = fmt.Sprintf("⚠ Guardrail hit — %s", e.agentGuardrailMsg)
 		}
-		return fmt.Sprintf("  %s", r.sty.Warn(msg))
+		return fmt.Sprintf("Agent Attempt: %s", r.sty.Warn(msg))
 	default:
-		return "  🔄 Running"
+		return "Agent Attempt: 🔄 Running"
 	}
 }
 

@@ -498,10 +498,61 @@ t.Errorf("expected DECSC save sequence (\\x1b7) from in-place rewrite; got:\n%q"
 if strings.Contains(out, "Completed\n") {
 t.Errorf("'Completed' must not be terminated by a writeLine newline (would be a stale duplicate):\n%q", out)
 }
+// (2a) The rewritten line must begin with the full "Agent Attempt:"
+// prefix — header and state are merged into a SINGLE row, so the
+// rewrite payload must contain both, not just the state icon.
+if !strings.Contains(out, "Agent Attempt: ") {
+t.Errorf("expected 'Agent Attempt: ' prefix in rewritten single-line tail; got:\n%q", out)
+}
 // (3) The grader's Pass content should appear exactly once — also
 // rewritten in place via the same mechanism (issue (e) regression).
 if got := strings.Count(out, "Pass (9/10)"); got != 1 {
 t.Errorf("want exactly 1 'Pass (9/10)' rewrite, got %d:\n%q", got, out)
+}
+}
+
+// TestInteractive_AgentAttemptSingleLineInvariant guards the single-line
+// invariant: the "Agent Attempt:" prefix must appear EXACTLY ONCE as the
+// start of a physical row in the rendered transcript — never split across
+// two rows (a standalone header followed by a separate state row). This
+// regresses the bug where ensureAgentHeader wrote "Agent Attempt:" via
+// writeLine and renderAgentEvent then wrote "  🔄 Running" as a separate
+// tail.
+func TestInteractive_AgentAttemptSingleLineInvariant(t *testing.T) {
+var buf bytes.Buffer
+d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
+
+id := "agent-single-line"
+d.HandleEvent(ProgressEvent{EvalID: id, PromptID: "p", ConfigName: "c", Type: EventStarting})
+// No tools — opens the agent gate immediately on the first activity event.
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventReasoning, Message: "thinking"})
+// Mid-flight: exactly one "Agent Attempt:" should have been emitted, and
+// it must NOT be followed by a newline (header + state must share a row).
+mid := buf.String()
+if got := strings.Count(mid, "Agent Attempt:"); got != 1 {
+t.Errorf("want exactly 1 'Agent Attempt:' occurrence after first activity, got %d:\n%q", got, mid)
+}
+if strings.Contains(mid, "Agent Attempt:\n") {
+t.Errorf("'Agent Attempt:' must not be followed by a newline (header and state must share a row):\n%q", mid)
+}
+// Drive to completion.
+d.HandleEvent(ProgressEvent{EvalID: id, Type: EventPassed, FileCount: 0})
+d.Finish()
+
+out := buf.String()
+// After completion, exactly one "Agent Attempt:" should start a new
+// physical line (i.e. follow a newline). The in-place rewrite uses
+// \r\x1b[2K to overwrite, so a second textual occurrence may exist
+// in the byte buffer — but it must NOT be preceded by a newline,
+// which would mean it landed on a separate row.
+if got := strings.Count(out, "\nAgent Attempt:"); got != 1 {
+t.Errorf("want exactly 1 'Agent Attempt:' starting a new line after completion, got %d:\n%q", got, out)
+}
+if !strings.Contains(out, "✅ Completed") {
+t.Errorf("expected '✅ Completed' in final transcript; got:\n%q", out)
+}
+if strings.Contains(out, "Agent Attempt:\n") {
+t.Errorf("final transcript must not split 'Agent Attempt:' from its state:\n%q", out)
 }
 }
 

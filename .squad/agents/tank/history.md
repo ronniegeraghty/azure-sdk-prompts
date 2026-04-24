@@ -269,3 +269,42 @@ Commits (oldest → newest):
 - Trinity (Phase 6): Final site alignment to schema v3 Points display.
 
 **Status:** All 6 phases shipped. 3 open questions for user (zero-files default, review pass rule, plugin collapsibility). Ready for release decision (merge dev → main, tag v0.3.1).
+
+## 2026-04-24 — Agent Attempt single-line fix (follow-up to Phase 1.4)
+
+Phase 1.4 (`9f994107`) only fixed the rewrite-tracking machinery — it did NOT
+address the structural problem: `ensureAgentHeader()` wrote `"Agent Attempt:"`
+as one committed line via `writeLine`, then `renderAgentEvent()` wrote the
+state (`"  🔄 Running"`) as a separate tail line. Two physical rows. The
+rewrite-in-place logic only ever targeted the tail row, so when graders stole
+the tail, completion landed in the wrong place — and visually the header and
+state were always on different lines.
+
+**What I missed in 1.4:** I treated this as a row-tracking bug. It was a
+layout bug. The whole "header on its own line" decision was wrong from the
+start of the Agent Attempt section design. The rewrite machinery worked, but
+it was rewriting a line that should never have been split off.
+
+**Fix this round (single commit):**
+- Dropped the standalone `r.writeLine("Agent Attempt:")` from
+  `ensureAgentHeader()`. The function is now just a "section opened" gate.
+- Updated `renderAgentStateLine()` to return the full
+  `"Agent Attempt: 🔄 Running"` / `"Agent Attempt: ✅ Completed"` /
+  `"Agent Attempt: ⚠ Guardrail hit — …"` line. Header and state share one row.
+- The `agentLineFrozen` / `agentLineRow` / `rewriteFrozenLine` machinery from
+  1.4 still applies — it now targets the SINGLE combined line, which is what
+  it should have been doing all along.
+- Updated `TestInteractive_AgentCompletedRowRewritesFrozenLine` to assert the
+  rewritten payload contains `"Agent Attempt: "` (header + state), not just
+  the icon.
+- Added `TestInteractive_AgentAttemptSingleLineInvariant`: counts
+  `\nAgent Attempt:` occurrences (i.e. distinct physical rows) — must be
+  exactly 1 both mid-flight and post-completion. Guards against any future
+  regression that splits the header off again.
+- Updated the layout docstring at the top of `display_interactive.go` to
+  reflect the single-line rendering.
+
+**Lesson:** when a "rewrite in place" bug surfaces, before fixing the
+tracking, ask whether the line being tracked should exist as a standalone
+row at all. Two-line layouts paired with in-place updates of only one line
+are a smell.
