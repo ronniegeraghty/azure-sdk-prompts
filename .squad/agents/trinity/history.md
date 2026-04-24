@@ -276,3 +276,29 @@ Going forward, the team works directly on the `ronniegeraghty/dev` branch with f
 **Rationale:** User request — streamline workflow, reduce branch proliferation, enable continuous integration of squad work.
 
 **Action:** Update your local branch strategy. All future work targets dev with regular commits.
+
+---
+
+## 2026-04-24 — Per-Eval Page: File Expander + Grader Subtitle Fix
+
+**Trigger:** Ronnie reported (a) generated-file rows wouldn't expand to show contents, and (b) the per-eval headline still framed pass/fail as "graders passed" instead of "grader points passed."
+
+**Root cause:**
+1. **File expander:** Source-side fix already landed (`r.file_contents?.[filePath]` fallback in `eval-detail-page.tsx`), but `hyoka/internal/serve/site/` was last embedded at commit `65f1e3a8` (Phase 6) — well behind several site-only commits (`9f34f072`, `1b736119`, `438edaf4`, `4adc9288`). The released binary was serving stale JS that lacked the fallback, so any file the reviewer didn't annotate showed as a non-expandable row.
+2. **Grader subtitle:** Engine emits `graders_total` / `graders_passed` containing POINTS counts (per `engine_eval.go` lines 690-691: `countTotalPoints`, `countPassedPoints`). `evalGraderTotals()` returns those verbatim. The score card subtitle "across {graderTotals.total} graders" therefore showed `across 14 graders` for an eval with 6 graders / 14 points — wrong number, wrong noun.
+
+**Fix:**
+- `make site-embed` to refresh `hyoka/internal/serve/site/` from latest source. This alone fixed the file-expand bug.
+- One-line correction in `eval-detail-page.tsx`: switch the subtitle to `pointTotals.graders` (the live count of `r.grader_results.length`) and drop the now-unused `graderTotals` variable + `evalGraderTotals` import. Score numerator/denominator (`13 / 14`) and "POINTS" label remain unchanged — already correct.
+
+**Verification:** Built `hyoka serve`, drove a headless Chrome to `/runs/20260424-173723/eval/test-dp-test-hello-markdown/test/sonnet`. Confirmed:
+- Headline reads `POINTS 13 / 14 across 6 graders` ✅
+- Clicking `hello.md` row expands to reveal `# Hello\n- First\n- Second\n- Third\n` ✅
+- All 6 grader rows render via `GraderResultRow` with per-Point sub-checks beneath multi-point graders ✅
+- 133 site tests pass; full Go test suite passes.
+
+**Lessons / pattern alert:**
+- The schema field `graders_total` / `graders_passed` is misleadingly named — it actually carries POINTS counts. Renaming would be a v4 schema bump (out of scope for this fix) but worth flagging. Tank's run-detail-page table also relies on `evalGraderTotals` for its score badge; semantically OK because users read `13/14` as "points passed" but the variable names there (`gradersPassed`, `gradersTotal`) lie about what they hold.
+- **Embedded-site freshness is a recurring footgun.** The Makefile already has `make verify-embed` for CI but it's only run by humans. Worth promoting to a pre-commit / CI gate if not already.
+
+**Decision note:** Filed `.squad/decisions/inbox/trinity-points-vs-graders-naming.md` flagging the schema-field-naming confusion for the team to consider.

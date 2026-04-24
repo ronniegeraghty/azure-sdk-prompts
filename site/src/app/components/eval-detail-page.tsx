@@ -8,7 +8,7 @@ import {
   AlertTriangle, Zap, Copy, Check, Loader2
 } from "lucide-react";
 import { GraderResultRow } from "./GraderResultRow";
-import { evalPassFromPoints, evalGraderTotals, evalPointTotals, graderPasses } from "../lib/evalPass";
+import { evalPassFromPoints, evalPointTotals, graderPasses } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -394,7 +394,6 @@ export function EvalDetailPage() {
   // 12/12 number that ignored file/program/behavior graders.
   const evalPassed = evalPassFromPoints(r);
   const pointTotals = evalPointTotals(r);
-  const graderTotals = evalGraderTotals(r);
 
   // Per-grader breakdown (used in the score card detail row + run-detail
   // tooltip). Each entry: name + points-passed + points-total + pass.
@@ -463,7 +462,13 @@ export function EvalDetailPage() {
               review-only 12/12 number which ignored file/program/behavior
               graders. The dominant number is `N / N points`, qualified by
               `across M graders`. The hover tooltip lists per-grader
-              breakdown so users can drill down without scrolling. */}
+              breakdown so users can drill down without scrolling.
+
+              NOTE: the subtitle uses pointTotals.graders (actual grader
+              count), NOT graderTotals.total — the engine stuffs the
+              POINTS total into the legacy `graders_total` field and
+              evalGraderTotals returns it verbatim, which would otherwise
+              render the misleading "across N graders" where N is points. */}
           {hasGraders ? (
             <div
               className={`rounded-xl border px-6 py-3 text-center ${evalPassed ? "border-emerald-500/20 bg-emerald-500/10" : "border-red-500/20 bg-red-500/10"}`}
@@ -481,7 +486,7 @@ export function EvalDetailPage() {
                 {pointTotals.passed} / {pointTotals.total}
               </div>
               <div className="text-white/30" style={{ fontSize: 11 }}>
-                across {graderTotals.total} grader{graderTotals.total === 1 ? "" : "s"}
+                across {pointTotals.graders} grader{pointTotals.graders === 1 ? "" : "s"}
               </div>
             </div>
           ) : (
