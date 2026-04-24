@@ -409,3 +409,20 @@ Live eval (post-fix) not performed — working tree is on ronniegeraghty/dev wit
 - `hyoka/internal/eval/engine_eval.go` (+28 lines): EventSessionDetails emission after guardrail checks
 - `hyoka/internal/progress/display_interactive.go` (+40 lines, -6 lines): onSessionDetails calls agentComplete early; terminal event handlers guard against duplicate calls
 - `hyoka/internal/progress/display_interactive_test.go` (+33 lines, -33 lines): TestInteractive_AgentCompletedRowRewritesFrozenLine updated to include EventSessionDetails and verify Session Details section
+
+---
+
+## 2026-04-24 — Bug 1 Root Cause Fixed by Neo (Grader Guard Removal)
+
+**Context:** Tank's earlier sessions documented Bug 1 as: "Grader output missing even though generation showed 'Agent Attempt: Completed'". Root cause was NOT display-specific — graders only ran when `len(generatedFiles) > 0` (engine_eval.go:500). If a generator produced zero files, the grader block was skipped entirely by the engine.
+
+**Tank's fix (2026-04-23/24):** Added EventSessionDetails to signal generation completion, allowing the display to render a Session Details section between Agent Attempt and the terminal event. This improved the *visual UX* of empty-grader flows but did NOT fix the underlying issue.
+
+**Neo's fix (2026-04-24, commit 8794e70b):** Removed the `len(generatedFiles) > 0` guard entirely. Graders now run on every eval, regardless of file count. The engine threads the agent's final response through to graders, enabling:
+- Response-only evaluation prompts
+- Configurable graders like `output_check` to enforce rules on empty workspaces
+- Pure logic-based graders independent of workspace state
+
+**Status:** ✅ Bug 1 is now properly fixed at the source. Tank's display work and Neo's engine work are complementary — Tank clarifies *when* graders run; Neo ensures graders *always* run when they should. Both patches are needed for full correctness.
+
+**See:** `.squad/decisions.md` — "Graders Run on Every Eval; Generator Response Threaded Through (2026-04-24T00:56:09Z)"

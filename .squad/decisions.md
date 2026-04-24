@@ -2,6 +2,76 @@
 
 ## Active Decisions
 
+### Decision: Graders Run on Every Eval; Generator Response Threaded Through (2026-04-24T00:56:09Z)
+
+**Agent:** Neo 💊
+**Branch:** ronniegeraghty/dev
+**Commit:** `8794e70b`
+
+## Context
+
+The grading pipeline was historically guarded with `if len(generatedFiles) > 0` (engine_eval.go:500), preventing graders from running when the agent produced no files. This was a legacy artifact from when the engine itself enforced a "no files generated" failure condition. This guard created two problems:
+
+1. **Bug 1 root cause:** When agents generated zero files, the grader block was skipped entirely, even if graders had validation logic (`output_check` with `min_files: 1` to fail intentionally).
+2. **No response-only evals:** Prompts evaluating agent reasoning, planning, or explanation text could not run graders because the guard prevented them from executing.
+
+**User directive:** "Graders should run on every eval, even when no files are produced; pass generator's final response through to graders for response-only evaluations."
+
+## Decision
+
+**Graders now run on every eval, regardless of file count.**
+
+1. **Removed guard in engine_eval.go:500** — Deleted the conditional that skipped grader execution when generated files were empty.
+2. **Added `AgentFinalResponse` to `GraderInput`** — hyoka/internal/criteria/graders/types.go now carries the agent's final assistant message through the grading pipeline.
+3. **Implemented `extractLastAssistantMessage` helper** — Scans session events backwards to capture the last assistant message, populates `EvalResult.FinalResponse` in success/action-limit/error paths.
+4. **Graders have autonomy** — Individual graders decide whether to use:
+   - `GraderInput.WorkspaceDelta` (file changes)
+   - `GraderInput.AgentFinalResponse` (agent's last message)
+   - Both
+   - Neither (e.g., action-sequence graders that only look at ActionLog)
+
+## Rationale
+
+1. **Configurable graders, not engine guards:** The `output_check` grader could never enforce file-count rules on empty workspaces because the guard prevented it from running. Engine-level guards must not pre-empt configurable graders.
+
+2. **Agent responses are first-class artifacts:** Some prompts evaluate the agent's reasoning, planning, or explanation *text*, not files. Examples:
+   - "Explain the trade-offs between approach A and B"
+   - "Recommend a design pattern for this scenario"
+   - "Analyze these requirements and propose a plan"
+
+3. **Grader autonomy:** Each grader is responsible for its own scoring logic. If a grader doesn't care about empty workspaces, it passes. If it does care, it fails.
+
+## Implementation
+
+**Files changed:**
+- `hyoka/internal/eval/engine_eval.go` — Removed `len(generatedFiles) > 0` guard
+- `hyoka/internal/criteria/graders/types.go` — Added `AgentFinalResponse string` to GraderInput
+- `hyoka/internal/eval/copilot.go` — Added `extractLastAssistantMessage` helper, populates `EvalResult.FinalResponse` in all terminal paths
+- PromptReviewGrader and output_check — Now have access to AgentFinalResponse
+
+## Verification
+
+- All tests pass: `go test -race ./...`
+- Build clean
+- Live eval verified: generator response threaded through to graders
+- No regressions on existing file-based evals
+
+## Impact
+
+- **Fixes Bug 1 root cause:** Graders now run on empty workspaces, enabling `output_check` and similar rules to fire
+- **Enables new eval modes:** Prompts can now evaluate pure response quality without generating files
+- **Backward compatible:** Existing evals unchanged — graders that don't use `AgentFinalResponse` ignore it
+
+## Exception
+
+The bundle-error check (`e.graderBundle.MatchingErrors(props)`) remains in place. Config errors still skip grading entirely — we don't trust partial results when the grader bundle couldn't be fully parsed.
+
+## Future Enhancement
+
+The `PromptReviewGrader` passes files to the review panel via `workDir`. When the workspace is empty, the panel has nothing to review. Future enhancement could write `AgentFinalResponse` to a file in `workDir` (e.g., `_agent_response.txt`) when no files exist, labeled as "Agent's final response" for the review panel.
+
+---
+
 ### Decision: Plugins May Be Single-Skill OR Container; Container Plugins Fan Out Per Child (2026-04-23T19:42Z)
 
 **Agent:** Neo 💊

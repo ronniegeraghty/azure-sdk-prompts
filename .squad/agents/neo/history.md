@@ -318,3 +318,28 @@ Commit `6df67540` (renderer task) inadvertently captured Trinity's parallel site
 - Tank (Phase 5): Schema v3 grader Points extensions.
 
 **Status:** All phases complete. Core fix (commit 992ed39e) eliminates "all passed but rows red" bug. 33 todos closed, ~30 commits on dev. Ready for release.
+
+## 2025-06-01: Removed empty-workspace grader guard
+
+**Problem**: The grading pipeline was wrapped in `if len(generatedFiles) > 0`, preventing graders from running when the agent produced no files. This broke two use cases:
+1. The `output_check` grader (which replaced the legacy "no files" engine failure) could never fire on empty workspaces
+2. Evals that evaluate the agent's *final response text* rather than files (e.g., planning, recommendations, explanations) had no way to grade the response
+
+**Solution**:
+- Removed the `len(generatedFiles) > 0` guard in `engine_eval.go` so graders run unconditionally
+- Added `FinalResponse` field to `EvalResult` to capture the last assistant message
+- Added `AgentFinalResponse` field to `GraderInput` so graders can access the agent's response
+- Added `extractLastAssistantMessage` helper to extract final response from session events
+- Populated `FinalResponse` in all EvalResult construction paths (success, error, action-limit)
+
+**Design choice**: Individual graders decide whether to use `AgentFinalResponse`, `WorkspaceDelta`, or both. The `PromptReviewGrader` passes files via `workDir` (unchanged); future enhancement could write `AgentFinalResponse` to a file in the workspace when no files exist, making it visible to the review panel.
+
+**Why the guard was wrong**: It pre-empted configurable graders from making their own decisions about empty workspaces. The `output_check` grader is the correct place to enforce file production requirements, not the engine.
+
+**Learnings**:
+- Engine guards must not pre-empt configurable graders
+- Agent responses are first-class artifacts, not just file production
+- `EvalResult.FinalResponse` is populated from `SessionEvents` by scanning backwards for the last `assistant.message` event
+- The bundle-error check (`e.graderBundle.MatchingErrors(props)`) remains — config errors still skip grading
+
+**Commit**: 8794e70b — "Remove empty-workspace grader guard and add agent response to graders"
