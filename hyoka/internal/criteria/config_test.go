@@ -88,13 +88,99 @@ func TestValidateEntry_TypedMissingDetails(t *testing.T) {
 	}
 }
 
-func TestValidateEntry_PromptMissingPrompt(t *testing.T) {
+func TestValidateEntry_PromptMissingPromptAndChecks(t *testing.T) {
 	_, err := ParseUnified([]byte(`graders:
   - type: prompt
     name: bad
 `))
-	if err == nil || !strings.Contains(err.Error(), "requires non-empty prompt") {
-		t.Fatalf("want missing-prompt error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "requires non-empty prompt or checks") {
+		t.Fatalf("want missing-prompt-or-checks error, got %v", err)
+	}
+}
+
+// --- prompt grader checks: field -------------------------------------------
+
+func TestValidateEntry_PromptChecks(t *testing.T) {
+	cases := []struct {
+		name    string
+		yaml    string
+		wantErr string // substring; "" means must succeed
+	}{
+		{
+			name: "checks only",
+			yaml: `graders:
+  - type: prompt
+    name: x
+    checks:
+      - first check
+      - second check
+`,
+		},
+		{
+			name: "prompt preamble plus checks",
+			yaml: `graders:
+  - type: prompt
+    name: x
+    prompt: "Check the following:"
+    checks:
+      - first check
+`,
+		},
+		{
+			name: "prompt only (legacy single-check)",
+			yaml: `graders:
+  - type: prompt
+    name: x
+    prompt: "do it"
+`,
+		},
+		{
+			name: "empty string in checks",
+			yaml: `graders:
+  - type: prompt
+    name: x
+    checks:
+      - "valid"
+      - ""
+`,
+			wantErr: "checks[1] must be a non-empty string",
+		},
+		{
+			name: "whitespace-only check",
+			yaml: `graders:
+  - type: prompt
+    name: x
+    checks:
+      - "   "
+`,
+			wantErr: "checks[0] must be a non-empty string",
+		},
+		{
+			name: "checks on non-prompt type",
+			yaml: `graders:
+  - type: output_check
+    name: x
+    checks:
+      - nope
+    details:
+      min_files: 1
+`,
+			wantErr: "must not set checks",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseUnified([]byte(tc.yaml))
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("want success, got %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("want error containing %q, got %v", tc.wantErr, err)
+			}
+		})
 	}
 }
 

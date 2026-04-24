@@ -264,3 +264,74 @@ func TestUnifiedGraderEntry_ToRuntimeConfig_CopiesFields(t *testing.T) {
 		t.Errorf("runtime config unexpected: %+v", rc)
 	}
 }
+
+func TestFormatUnifiedPromptEntries_Shapes(t *testing.T) {
+cases := []struct {
+name    string
+entries []UnifiedGraderEntry
+want    string
+}{
+{
+name:    "empty",
+entries: nil,
+want:    "",
+},
+{
+name: "legacy single-prompt no checks",
+entries: []UnifiedGraderEntry{
+{Type: graders.KindPrompt, Name: "Auth", Prompt: "Uses managed identity"},
+},
+want: "1. **Auth** — Uses managed identity\n",
+},
+{
+name: "checks with preamble",
+entries: []UnifiedGraderEntry{
+{
+Type:   graders.KindPrompt,
+Name:   "Markdown Structure",
+Prompt: "Check the following criteria:",
+Checks: []string{
+"File hello.md exists and contains a level-1 heading.",
+"File contains exactly three bullet list items.",
+},
+},
+},
+want: "1. **Markdown Structure**\n" +
+"   Check the following criteria:\n" +
+"   1. File hello.md exists and contains a level-1 heading.\n" +
+"   2. File contains exactly three bullet list items.\n",
+},
+{
+name: "checks without preamble",
+entries: []UnifiedGraderEntry{
+{
+Type:   graders.KindPrompt,
+Name:   "X",
+Checks: []string{"a", "b"},
+},
+},
+want: "1. **X**\n" +
+"   1. a\n" +
+"   2. b\n",
+},
+{
+name: "mixed legacy + checks",
+entries: []UnifiedGraderEntry{
+{Type: graders.KindPrompt, Name: "Old", Prompt: "p"},
+{Type: graders.KindPrompt, Name: "New", Prompt: "preamble", Checks: []string{"one"}},
+},
+want: "1. **Old** — p\n" +
+"2. **New**\n" +
+"   preamble\n" +
+"   1. one\n",
+},
+}
+for _, tc := range cases {
+t.Run(tc.name, func(t *testing.T) {
+got := FormatUnifiedPromptEntries(tc.entries)
+if got != tc.want {
+t.Errorf("rendering mismatch\n got: %q\nwant: %q", got, tc.want)
+}
+})
+}
+}

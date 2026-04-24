@@ -522,3 +522,26 @@ Tank's per-grader display refactor (`4adc9288`) revealed four critical bugs now 
 
 Tank's fix for duplicate per-bucket AI grader display revealed critical pattern for multi-stage review pipelines: **ALWAYS clear merged `EvalCriteria` when setting `EvalCriteriaBuckets`** in grader input construction. The merged field (containing all criteria from prompt + attribute-matched files) acts as a fallback in PromptReviewGrader.gradePanel(). If not explicitly cleared after bucket assignment, each bucket's grader receives all criteria instead of just bucket-specific ones. This pattern applies to any code that (a) creates a master merged input, (b) partitions it into buckets, and (c) passes bucket-specific inputs to per-bucket handlers. See `.squad/decisions.md` "Per-Bucket Grader Input Isolation" for verification and rationale.
 
+
+---
+
+## 2026-04-24 — Prompt grader `checks:` field (per Morpheus scope §7)
+
+**Branch:** `ronniegeraghty/prompt-grader-checks` (off `ronniegeraghty/dev`)
+
+**Shipped:**
+- `UnifiedGraderEntry.Checks []string` + validation (one of `prompt`/`checks` for type=prompt; index-aware empty-string error; forbidden on non-prompt types).
+- `FormatUnifiedPromptEntries` renders `N. **Name**` parent + optional preamble + `   N. <check>` nested list when `Checks` set; legacy single-line shape preserved when empty.
+- Hard-migrated `criteria/language/python.yaml` (DefaultAzureCredential) and `criteria/language/test.yaml` (Markdown Structure). Other YAMLs and testdata untouched.
+- `prompt_review_grader.go`: `slog.Debug` on `expected ≠ returned` criterion count (regex-counts leaf numbered lines; prefers indented when present). Both `gradePanel` and `gradeSingle`. No structural changes.
+- Table-driven tests added to `config_test.go` (6 cases) and `buckets_test.go` (5 cases). All `go test ./...` green.
+
+**Live smoke:** `run --prompt-id key-vault-dp-python-crud --config baseline/claude-opus-4.6` produced report (run `20260424-052914`) with per-check Points populated on the migrated grader. Confirmed via `jq '.grader_results[] | select(.grader_name == ...) | .points'`.
+
+**Learnings / gotchas:**
+1. **YAML colon trap:** `prompt: Check the following criteria:` (trailing colon, unquoted) breaks YAML — it's parsed as a key. All migrated `prompt:` preambles MUST be quoted: `prompt: "Check the following criteria:"`. The `realfixtures_test.go` test caught this immediately — that's a load-bearing test, keep it.
+2. **Judge returned the parent name as an extra criterion** in the smoke run (expected=2 returned=3). The debug log Morpheus asked for was correct in §5 — this is a real flake mode and the diagnostic fires cleanly. Future work could post-filter returned criteria against sent leaf names, but defer until data justifies.
+3. **Result Points were already wired through `convertGraderResults` (engine_eval.go:1199-1204)** by Phase 2; my work just had to make sure the grader produces them. No report-side changes needed for this scope.
+4. **Bucket-name vs grader-name in reports:** `report.GraderResult` uses `grader_name` (snake_case JSON key), not `name`. Cost a couple minutes when `jq` came back empty — the per-bucket-per-entry refactor (commit `9e2d8100`) means each bucket *is* a grader entry now, so the Points show up under the entry name, not under any aggregating `name` field.
+
+**Decision file:** `.squad/decisions/inbox/neo-checks-implementation.md`

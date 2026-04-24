@@ -116,12 +116,32 @@ func HasUnifiedIsolation(matched []MatchedUnifiedEntry) bool {
 // block suitable for injection into a review prompt. Mirrors
 // criteria.FormatGraders output so combined-mode criteria text remains
 // byte-compatible with the legacy path.
+//
+// When an entry's Checks field is non-empty, the entry is rendered as a
+// parent line carrying the grader name, an optional preamble line (the
+// entry's Prompt field, treated as judge-only guidance), and a nested
+// numbered list — one line per check. Each nested check becomes its own
+// criterion the LLM judge must score, producing one GraderPoint per check.
+//
+// When Checks is empty the legacy single-criterion shape is used:
+//
+//	1. **Name** — Prompt
 func FormatUnifiedPromptEntries(entries []UnifiedGraderEntry) string {
 	if len(entries) == 0 {
 		return ""
 	}
 	var b strings.Builder
 	for i, e := range entries {
+		if len(e.Checks) > 0 {
+			fmt.Fprintf(&b, "%d. **%s**\n", i+1, e.Name)
+			if preamble := strings.TrimSpace(e.Prompt); preamble != "" {
+				fmt.Fprintf(&b, "   %s\n", preamble)
+			}
+			for j, c := range e.Checks {
+				fmt.Fprintf(&b, "   %d. %s\n", j+1, strings.TrimSpace(c))
+			}
+			continue
+		}
 		fmt.Fprintf(&b, "%d. **%s**", i+1, e.Name)
 		if e.Prompt != "" {
 			fmt.Fprintf(&b, " — %s", strings.TrimSpace(e.Prompt))

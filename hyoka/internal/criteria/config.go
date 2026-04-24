@@ -45,9 +45,18 @@ type UnifiedGraderEntry struct {
 	// type=prompt; silently ignored for typed graders.
 	Isolate bool `yaml:"isolate,omitempty" json:"isolate,omitempty"`
 
-	// Prompt is the LLM-review prompt. Required for type=prompt; must be
-	// empty for any other type.
+	// Prompt is the LLM-review prompt. For type=prompt, either Prompt or
+	// Checks must be non-empty (both may be set; when Checks is non-empty
+	// Prompt acts as preamble text shown to the judge before the numbered
+	// checks). Must be empty for any other type.
 	Prompt string `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+
+	// Checks lists the individual pass/fail items the LLM judge must
+	// evaluate. Allowed only for type=prompt. Each non-empty string becomes
+	// one line in the rendered review criteria and one Point in the
+	// resulting GraderResult. When set, Prompt is treated as optional
+	// preamble text shown to the judge before the numbered checks.
+	Checks []string `yaml:"checks,omitempty" json:"checks,omitempty"`
 
 	// Details is the typed-grader payload (e.g. min_files for output_check,
 	// path for file, command for program). Required for any type other
@@ -135,8 +144,17 @@ func validateEntry(e UnifiedGraderEntry) error {
 		return fmt.Errorf("grader %q: weight must be >= 0, got %f", tag, e.Weight)
 	}
 	if e.Type == graders.KindPrompt {
-		if strings.TrimSpace(e.Prompt) == "" {
-			return fmt.Errorf("grader %q: type=prompt requires non-empty prompt", tag)
+		hasPrompt := strings.TrimSpace(e.Prompt) != ""
+		hasChecks := len(e.Checks) > 0
+		if !hasPrompt && !hasChecks {
+			return fmt.Errorf("grader %q: type=prompt requires non-empty prompt or checks", tag)
+		}
+		if hasChecks {
+			for i, c := range e.Checks {
+				if strings.TrimSpace(c) == "" {
+					return fmt.Errorf("grader %q: checks[%d] must be a non-empty string", tag, i)
+				}
+			}
 		}
 		if hasDetails(e.Details) {
 			return fmt.Errorf("grader %q: type=prompt must not set details", tag)
@@ -146,6 +164,9 @@ func validateEntry(e UnifiedGraderEntry) error {
 	// Typed grader.
 	if e.Prompt != "" {
 		return fmt.Errorf("grader %q: type=%s must not set prompt (use details)", tag, e.Type)
+	}
+	if len(e.Checks) > 0 {
+		return fmt.Errorf("grader %q: type=%s must not set checks (only valid for type=prompt)", tag, e.Type)
 	}
 	if !hasDetails(e.Details) {
 		return fmt.Errorf("grader %q: type=%s requires non-empty details", tag, e.Type)

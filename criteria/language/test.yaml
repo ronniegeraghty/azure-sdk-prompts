@@ -4,10 +4,10 @@ graders:
   - name: Markdown Structure
     type: prompt
     weight: 1.0
-    prompt: >
-      Check the following criteria:
-      1. File hello.md exists and contains a level-1 heading (starts with single #).
-      2. File contains exactly three bullet list items.
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md exists and contains a level-1 heading (starts with single #).
+      - File contains exactly three bullet list items.
   - name: Output Files Exist
     type: output_check
     weight: 1.0

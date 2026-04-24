@@ -5,6 +5,8 @@ import (
 "fmt"
 "log/slog"
 "os"
+"regexp"
+"strings"
 
 "github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
@@ -104,6 +106,8 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 g.LastPanel = panel
 g.LastConsolidated = consolidated
 
+logCriteriaCountMismatch(g.name, input, len(consolidated.Scores.Criteria))
+
 result.Pass = consolidated.Scores.AllPassed()
 result.Score = criteriaScore(consolidated)
 result.Message = consolidated.Summary
@@ -184,6 +188,8 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 
 g.LastConsolidated = reviewResult
 
+logCriteriaCountMismatch(g.name, input, len(reviewResult.Scores.Criteria))
+
 result.Pass = reviewResult.Scores.AllPassed()
 result.Score = criteriaScore(reviewResult)
 result.Message = reviewResult.Summary
@@ -250,6 +256,54 @@ if r.MaxScore == 0 {
 	return 0
 }
 return float64(r.OverallScore) / float64(r.MaxScore)
+}
+
+// numberedItemRe matches lines of the form "<n>. " (any leading whitespace).
+// Used to estimate how many checks the LLM judge was asked to score.
+var numberedItemRe = regexp.MustCompile(`(?m)^[ \t]*\d+\.\s+\S`)
+
+// expectedCriteriaCount returns a best-effort count of the leaf criteria
+// rendered in the bucket text. It prefers indented (nested) numbered items
+// when present (the new prompt+checks rendering), and falls back to top-level
+// numbered items (the legacy single-check / prompt-file rendering).
+func expectedCriteriaCount(criteria string) int {
+	if strings.TrimSpace(criteria) == "" {
+		return 0
+	}
+	nested := 0
+	top := 0
+	for _, m := range numberedItemRe.FindAllString(criteria, -1) {
+		if len(m) > 0 && (m[0] == ' ' || m[0] == '\t') {
+			nested++
+		} else {
+			top++
+		}
+	}
+	if nested > 0 {
+		return nested
+	}
+	return top
+}
+
+// logCriteriaCountMismatch emits a debug log when the LLM judge returned a
+// different number of criteria than the bucket text asked for. This is a
+// flake-detection signal — the grader still uses whatever criteria came back.
+func logCriteriaCountMismatch(graderName string, input GraderInput, returned int) {
+	expected := 0
+	if len(input.EvalCriteriaBuckets) > 0 {
+		for _, b := range input.EvalCriteriaBuckets {
+			expected += expectedCriteriaCount(b.Criteria)
+		}
+	} else {
+		expected = expectedCriteriaCount(input.EvalCriteria)
+	}
+	if expected > 0 && expected != returned {
+		slog.Debug("Review judge returned criterion count differs from sent",
+			"grader", graderName,
+			"expected", expected,
+			"returned", returned,
+		)
+	}
 }
 
 // copyDirToTemp creates a temporary copy of the source directory.
