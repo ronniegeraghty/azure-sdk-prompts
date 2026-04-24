@@ -2,6 +2,99 @@
 
 ## Active Decisions
 
+### Decision: Per-Bucket Grader Input Isolation (Grader Display Fix V2) (2026-04-24T04:36:24Z)
+
+**Agent:** Tank 🎖️  
+**Branch:** ronniegeraghty/dev  
+**Commits:** `609ff869` (third attempt; chain: `4adc9288` → `84b1606d` → `609ff869`)
+
+## Context
+
+After commit `84b1606d` removed `KindPromptReview` from `validTypedKinds`, users were still seeing duplicate/mixed AI grader output. Both review buckets ("Criteria from prompt file" and "combined") were displaying the SAME 8 criteria, instead of being properly separated.
+
+## Investigation
+
+Live eval analysis revealed:
+- "Criteria from prompt file" bucket: 8 criteria (should be 5)
+- "combined" bucket: 8 criteria (should be 1)
+- Both buckets contained ALL criteria from both the prompt and attribute-matched files
+
+Root cause: In `engine_eval.go` (lines 632-634), the per-bucket grader input construction was:
+```go
+bucketInput := graderInput
+bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{bucket}
+```
+
+This copied the parent `graderInput`, which included the merged `EvalCriteria` field containing ALL criteria. When `PromptReviewGrader.gradePanel()` processed a single bucket, it used the merged `EvalCriteria` instead of the bucket-specific `EvalCriteriaBuckets[0].Criteria`.
+
+## Decision
+
+Clear the merged `EvalCriteria` field after setting `EvalCriteriaBuckets` to enforce bucket isolation:
+```go
+bucketInput := graderInput
+bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{bucket}
+bucketInput.EvalCriteria = ""  // Force use of bucket-specific criteria
+```
+
+## Rationale
+
+1. **Bucket Isolation:** Each bucket should see ONLY its own criteria, not the merged view
+2. **Fallback Semantics:** The `EvalCriteria` field is a fallback when `EvalCriteriaBuckets` is empty or has one bucket; clearing it forces the grader to use the bucket's criteria
+3. **Minimal Change:** One-line fix; no changes to the bucket construction logic or PromptReviewGrader
+4. **Testable:** Live eval immediately shows the correct separation of criteria
+
+## Verification
+
+BEFORE fix (run 20260424-042347):
+```
+"Criteria from prompt file" bucket:
+  - 8 criteria (all prompt + all attribute-matched)
+  
+"combined" bucket:
+  - 8 criteria (duplicate)
+```
+
+AFTER fix (run 20260424-043129):
+```
+"Criteria from prompt file" bucket:
+  - 5 criteria (prompt-only):
+    • Installing azure-keyvault-secrets...
+    • Creating a SecretClient...
+    • set_secret(), get_secret()...
+    • Handling soft-delete...
+    • Exception handling...
+
+"combined" bucket:
+  - 1 criterion (attribute-matched only):
+    • DefaultAzureCredential Authentication — Check the following criteria...
+```
+
+## Additional Changes
+
+Updated `criteria/language/python.yaml` DefaultAzureCredential grader prompt to list two distinct criteria (authentication + async/await) to make any future mis-grouping immediately visible in test runs.
+
+## Impact
+
+- ✅ Per-bucket grader display now works correctly
+- ✅ No duplication of criteria across buckets
+- ✅ Each grader shows only its intended criteria
+- ✅ Report JSON structure is correct
+- ⚠️ AI reviewer still treats multi-point prompts as single criteria (future work if needed)
+
+## Alternatives Considered
+
+1. **Modify PromptReviewGrader.gradePanel():** Check `EvalCriteriaBuckets` first, then fall back to `EvalCriteria`. Rejected: More complex, adds conditional logic to the grader.
+2. **Change bucket construction:** Separate prompt and attribute-matched into different inputs. Rejected: Bigger change, affects multiple files.
+
+## Related
+
+- Issue: User report of duplicate AI grader display
+- Previous fix: Commit `84b1606d` (removed KindPromptReview from validTypedKinds)
+- Phase 2 per-bucket work: Commit `4adc9288` (created per-bucket graders)
+- **Pattern:** ALWAYS clear merged `EvalCriteria` when setting `EvalCriteriaBuckets` in per-bucket grader input construction
+
+---
+
 ### Decision: KindPromptReview Removed from validTypedKinds (2026-04-24T03:59:28Z)
 
 **Agent:** Tank 🎖️  

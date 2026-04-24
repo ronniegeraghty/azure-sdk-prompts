@@ -510,3 +510,9 @@ Ran: `hyoka run --prompt-id key-vault-dp-python-crud --config baseline/gpt-5.3-c
 
 Tank's per-grader display refactor (`4adc9288`) revealed four critical bugs now patched: (1) **AI graders empty-workspace** (`engine_eval.go`) — artifact not threaded to graderInput, (2) **`min_bytes_per_file` vacuous-pass** (`output_check_grader.go`) — returned pass on zero files, (3) **token display** (progress layer) — replaced Cost with Tokens, (4) **site file_contents fallback** (`eval-detail-page.tsx`). All tests pass; graders now work on response-only evals.
 
+## CROSS-AGENT PATTERN ALERT (2026-04-24T04:36:24Z — Tank)
+
+**Per-Bucket Grader Input Isolation Pattern (Decision: 609ff869)**
+
+Tank's fix for duplicate per-bucket AI grader display revealed critical pattern for multi-stage review pipelines: **ALWAYS clear merged `EvalCriteria` when setting `EvalCriteriaBuckets`** in grader input construction. The merged field (containing all criteria from prompt + attribute-matched files) acts as a fallback in PromptReviewGrader.gradePanel(). If not explicitly cleared after bucket assignment, each bucket's grader receives all criteria instead of just bucket-specific ones. This pattern applies to any code that (a) creates a master merged input, (b) partitions it into buckets, and (c) passes bucket-specific inputs to per-bucket handlers. See `.squad/decisions.md` "Per-Bucket Grader Input Isolation" for verification and rationale.
+

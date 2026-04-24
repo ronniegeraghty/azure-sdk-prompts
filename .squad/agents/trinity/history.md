@@ -250,3 +250,9 @@ Aligned the React/TypeScript site with schema-v3 reports in 7 commits on `ronnie
 
 Coordinator identified and Tank fixed bug in `eval-detail-page.tsx`: file content only rendered when in reviewedFiles set, no fallback. Now uses `r.file_contents?.[filePath]` for generated-but-not-reviewed files. All generated files now visible on detail page.
 
+## CROSS-AGENT PATTERN ALERT (2026-04-24T04:36:24Z — Tank)
+
+**Per-Bucket Grader Input Isolation Pattern (Decision: 609ff869)**
+
+Tank's fix for duplicate per-bucket AI grader display revealed critical pattern for multi-stage review pipelines: **ALWAYS clear merged `EvalCriteria` when setting `EvalCriteriaBuckets`** in grader input construction. The merged field (containing all criteria from prompt + attribute-matched files) acts as a fallback in PromptReviewGrader.gradePanel(). If not explicitly cleared after bucket assignment, each bucket's grader receives all criteria instead of just bucket-specific ones. This pattern applies to any code that (a) creates a master merged input, (b) partitions it into buckets, and (c) passes bucket-specific inputs to per-bucket handlers. See `.squad/decisions.md` "Per-Bucket Grader Input Isolation" for verification and rationale.
+
