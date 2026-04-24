@@ -408,3 +408,22 @@ Extended `criteria/language/test.yaml` to demo two more grader behaviors on the 
 **Caveat:** `hyoka clean` hung this session — needed `kill -9` on orphaned subprocess. Pre-existing flake unrelated to this change. Worth flagging to whoever owns cleanup.
 
 **Decision note:** `.squad/decisions/inbox/switch-test-fixtures.md`
+
+---
+
+## 2026-04-24: Feature Shipped — Skill Usage Grader + Demo Check ✅
+
+**Session:** 2026-04-24T05:58:18Z  
+**Commit:** ff38a7ec (merged to dev)  
+**Status:** ✅ Shipped to dev
+
+Extended `criteria/language/test.yaml` with two grader improvements:
+
+1. **Skill Usage `tool_constraint`:** Uses `required: [skill]` + `min_calls: {skill: 2}` to match Copilot skill invocations (skills surface as tool name `skill`, not individual skill names)
+2. **Deliberately-failing check:** Rust code-block requirement demonstrates partial-fail rendering (2/3 pass)
+
+**Verification:** Smoke run 20260424-053907 ✅ confirmed new per-check rendering. Coordinator smoke 20260424-055601 ✅ verified end-to-end.
+
+**Display:** `[tool_constr] Skill Usage: ✅ Pass` + `[prompt] Markdown Structure: ❌ Fail (2/3)`
+
+**Decision:** Merged into `.squad/decisions.md`

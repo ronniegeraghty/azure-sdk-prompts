@@ -114,3 +114,20 @@ See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md`.
 ### 2026-04-23T19:42Z: Decision-log discipline — extend, don't SUPERSEDE, when a follow-up adds a contract rather than reversing one
 
 When commit `4a8c4a0d` landed (container plugin fan-out), the temptation was to mark the prior `repo:`-required entry as superseded. Wrong instinct. The earlier decision fixed the *locator* shape; this one fixes the *content* shape. Both contracts now hold simultaneously. Rule: only mark SUPERSEDED when the new decision *replaces* or *reverses* the earlier one. When it adds an orthogonal contract, the entry should explicitly say "extends, does not supersede" and cross-reference the prior commit. Readers a year later need to know both rules still apply.
+
+---
+
+## 2026-04-24: Session Complete — Orchestration, Decision Merge, History Updates ✅
+
+**Session:** 2026-04-24T05:58:18Z  
+**Status:** ✅ Complete
+
+Merged feature-shipped state across team:
+
+- ✅ Orchestration logs: Switch (ff38a7ec) + Coordinator merge (4 commits)
+- ✅ Session log: prompt-grader-checks feature shipped
+- ✅ Decision merge: Switch's tool-grader decision + work-on-dev directive → decisions.md (inbox deleted)
+- ✅ Cross-agent history: Feature notes appended to Switch, Tank, Neo, Morpheus + work-on-dev directive to all active agents
+- ✅ Ready for git commit of .squad/ state
+
+**Work-on-dev directive:** All active agents notified of new branch strategy (no transient feature branches for squad work — merge to dev).

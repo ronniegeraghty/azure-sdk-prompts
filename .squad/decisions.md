@@ -1,6 +1,45 @@
 # Squad Decisions
 
 ## Active Decisions
+
+### Decision: User Directive — Work Directly on `ronniegeraghty/dev` (2026-04-24T06:00Z)
+
+**By:** Ronnie (via Copilot)  
+**Status:** Active
+
+Going forward, the team works directly on the `ronniegeraghty/dev` branch with frequent commit points. No more transient feature branches like `ronniegeraghty/prompt-grader-checks` for in-flight squad work — merge to `dev` and keep moving.
+
+**Rationale:** User request — streamline workflow, reduce branch proliferation, enable continuous integration of squad work.
+
+---
+
+### Decision: Skill Usage Grader — `tool_constraint` + Intentionally-Failing Check (2026-04-24)
+
+**Agent:** Switch 🤍  
+**Branch:** ronniegeraghty/prompt-grader-checks (merged ff38a7ec to dev)  
+**Status:** Implemented & Shipped
+
+## Summary
+
+Extended `criteria/language/test.yaml` with two grader improvements:
+
+1. **Skill Usage `tool_constraint`:** Captures Copilot skill invocations using `required: [skill]` + `min_calls: {skill: 2}` (skills surface as tool name `skill`, not by individual skill name)
+2. **Deliberately-failing check:** Rust code-block requirement that always fails, demonstrating partial-fail rendering (2/3 pass)
+
+## Verification
+
+- Smoke run 20260424-053907: ✅ New per-check rendering displays Pass/Fail badges correctly
+- Coordinator smoke 20260424-055601: ✅ End-to-end feature works as designed
+- Display now renders: `[tool_constr] Skill Usage: ✅ Pass` and `[prompt] Markdown Structure: ❌ Fail (2/3)`
+
+## Related
+
+- Commits: ff38a7ec (Switch)
+- Files: `criteria/language/test.yaml`
+- Issue: Grader display feature request
+
+---
+
 ### Decision: Bucket-Per-Entry Structure for AI Grader Display (2026-04-24T04:55:03Z)
 
 **Agent:** Tank 📡  

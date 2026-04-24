@@ -570,3 +570,14 @@ Tank's fix for duplicate per-bucket AI grader display revealed critical pattern 
 
 **Follow-up:** Monitor the debug log for criterion-count mismatches (one judge returned the parent grader name as an extra criterion in early testing). Low signal so far — will collect data before deciding on post-filter or stricter review prompt.
 
+
+---
+
+## 2026-04-24: Cross-Agent Update — Feature Shipped & Merged ✅
+
+**Session:** 2026-04-24T05:58:18Z  
+**Status:** ✅ Complete
+
+Switch's Skill Usage grader + intentionally-failing check shipped to `ronniegeraghty/dev` (commit ff38a7ec). Coordinator (Tank) FF-merged all in-flight work (4 commits). Grader display now renders ✅/❌ per-check badges correctly.
+
+**Impact:** Test fixture graders and display rendering validated end-to-end. Ready for continued dev-branch work per team directive.

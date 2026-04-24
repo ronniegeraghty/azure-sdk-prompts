@@ -264,3 +264,15 @@ Coordinator identified and Tank fixed bug in `eval-detail-page.tsx`: file conten
 
 Tank's fix for duplicate per-bucket AI grader display revealed critical pattern for multi-stage review pipelines: **ALWAYS clear merged `EvalCriteria` when setting `EvalCriteriaBuckets`** in grader input construction. The merged field (containing all criteria from prompt + attribute-matched files) acts as a fallback in PromptReviewGrader.gradePanel(). If not explicitly cleared after bucket assignment, each bucket's grader receives all criteria instead of just bucket-specific ones. This pattern applies to any code that (a) creates a master merged input, (b) partitions it into buckets, and (c) passes bucket-specific inputs to per-bucket handlers. See `.squad/decisions.md` "Per-Bucket Grader Input Isolation" for verification and rationale.
 
+---
+
+## 2026-04-24T06:00Z: TEAM DIRECTIVE — Work on `ronniegeraghty/dev`
+
+**By:** Ronnie (User directive captured by Copilot)  
+**Status:** Active
+
+Going forward, the team works directly on the `ronniegeraghty/dev` branch with frequent commit points. No more transient feature branches like `ronniegeraghty/prompt-grader-checks` for in-flight squad work — merge to dev and keep moving.
+
+**Rationale:** User request — streamline workflow, reduce branch proliferation, enable continuous integration of squad work.
+
+**Action:** Update your local branch strategy. All future work targets dev with regular commits.

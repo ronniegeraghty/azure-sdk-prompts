@@ -30,3 +30,15 @@ Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026
 
 - **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
 - **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+---
+
+## 2026-04-24T06:00Z: TEAM DIRECTIVE — Work on `ronniegeraghty/dev`
+
+**By:** Ronnie (User directive captured by Copilot)  
+**Status:** Active
+
+Going forward, the team works directly on the `ronniegeraghty/dev` branch with frequent commit points. No more transient feature branches like `ronniegeraghty/prompt-grader-checks` for in-flight squad work — merge to dev and keep moving.
+
+**Rationale:** User request — streamline workflow, reduce branch proliferation, enable continuous integration of squad work.
+
+**Action:** Update your local branch strategy. All future work targets dev with regular commits.

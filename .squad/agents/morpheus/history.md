@@ -270,3 +270,14 @@ Read trinity-site-ux-review.md and my own morpheus-report-architecture-review.md
 ### Learnings
 - The prompt-grader Points pipeline is fully wired end-to-end since Phase 2; the YAML-side gap is purely a bucket-text-rendering issue, not a missing-feature issue. Future scopes touching grader output should look at the bucket text first before assuming renderer work is needed.
 - `internal/criteria/buckets.go:119` (`FormatUnifiedPromptEntries`) is the single render point for YAML prompt-grader → review-LLM input. Anything that needs to change how the LLM sees the criteria text passes through here.
+
+---
+
+## 2026-04-24: Cross-Agent Update — Feature Shipped & Merged ✅
+
+**Session:** 2026-04-24T05:58:18Z  
+**Status:** ✅ Complete
+
+Team Feature: Skill Usage grader + intentionally-failing check shipped and merged to `ronniegeraghty/dev` (commit ff38a7ec). Coordinator (Tank) consolidated 4 commits. Grader display validates ✅/❌ per-check rendering. All downstream artifacts (orchestration logs, session logs, decisions) recorded.
+
+**Directive:** Team now works directly on `ronniegeraghty/dev` with frequent commits (no transient feature branches for squad work).

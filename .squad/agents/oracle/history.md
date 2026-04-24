@@ -245,3 +245,15 @@ Status: ✅ Scribe audit complete. Ready for Ronnie's release decision.
 Neo rewrote `docs/configuration.md` plugin section. The `@skills` magic alias is gone — remote plugin entries now require an explicit `repo:` field (e.g. `repo: github.com/microsoft/skills`). Names containing `@` are rejected at validation. This BREAKING CHANGE reverses commit `769dea69`. Per Ronnie: *"I want to be explicit when configs are written."*
 
 For your work: any docs, examples, or CHANGELOG entries that reference `name@skills` shorthand need to be migrated to the explicit `repo:` form. Worth a CHANGELOG callout for downstream users. See `decisions.md` 2026-04-23T18:50Z entry for the full schema, validator messages, and migration guidance.
+---
+
+## 2026-04-24T06:00Z: TEAM DIRECTIVE — Work on `ronniegeraghty/dev`
+
+**By:** Ronnie (User directive captured by Copilot)  
+**Status:** Active
+
+Going forward, the team works directly on the `ronniegeraghty/dev` branch with frequent commit points. No more transient feature branches like `ronniegeraghty/prompt-grader-checks` for in-flight squad work — merge to dev and keep moving.
+
+**Rationale:** User request — streamline workflow, reduce branch proliferation, enable continuous integration of squad work.
+
+**Action:** Update your local branch strategy. All future work targets dev with regular commits.

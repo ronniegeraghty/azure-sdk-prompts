@@ -766,3 +766,20 @@ if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
 
 **Follow-up:** Monitor the debug log for criterion-count mismatches (one judge returned the parent grader name as an extra criterion in early testing). Low signal so far — will collect data before deciding on post-filter or stricter review prompt.
 
+
+---
+
+## 2026-04-24: Feature Shipped — Grader Check Rendering Consolidated ✅
+
+**Coordinated by:** Tank (Coordinator)  
+**Session:** 2026-04-24T05:58:18Z  
+**Commits merged:** a47cb97d (Tank), 2949f578 (Neo), 86a6574f (prior), ff38a7ec (Switch)  
+**Status:** ✅ Shipped to dev
+
+FF-merged `ronniegeraghty/prompt-grader-checks` into `ronniegeraghty/dev`. Branch consolidation complete.
+
+**Feature:** Skill Usage grader + deliberately-failing check to demonstrate per-check Pass/Fail rendering in grader display.
+
+**Verification:** Coordinator smoke 20260424-055601 ✅ confirmed all grader display changes work end-to-end.
+
+**Next:** Branch `ronniegeraghty/prompt-grader-checks` deleted (now equal to dev).
