@@ -718,3 +718,26 @@ if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
 **Future:**
 - If ANOTHER pass is needed, the next place to look is the display layer (`display_interactive.go`) or the JSON report builder
 - The bucket names visible to the user are set in `BuildUnifiedReviewBuckets` — they come from `entry.Name` for criteria-file entries
+
+---
+
+## 2026-04-24 — Grader badge format alignment + Points wire-up verification
+
+**Task:** Morpheus's prompt-grader `checks:` redesign, Tank's slice (scope §6/§7). File-disjoint with Neo on shared branch `ronniegeraghty/prompt-grader-checks`.
+
+**Changes (all in `hyoka/internal/progress/display_interactive.go`):**
+1. `renderGraderWithPoints` badge: `❌/✅ X/Y passed` → `❌ Fail (X/Y)` / `✅ Pass (X/Y)` per user spec.
+2. Soft-truncated per-Point `name` to 50 cols using existing `truncateToWidth` (ANSI-aware). Full text stays in the report.
+3. Updated 3 assertions in `display_interactive_points_test.go` for the new format.
+
+**Verifications:**
+- Tests green: `go test -race ./internal/progress/... ./internal/report/...`
+- Live smoke (`test-dp-test-hello-markdown` × `test/haiku`) confirmed end-to-end Points flow through `convertGraderResults` (`internal/eval/engine_eval.go:1199`) for BOTH the YAML `checks:` grader (Markdown Structure → 2 Points) AND the prompt-file path (Criteria from prompt file → 3 Points). Phase 2 v3 wire-up was already correct — no schema bump needed.
+
+**Learnings:**
+- `truncateToWidth` already existed in this package (built for the tail-row in-place rewrite). Reuse > rebuild.
+- The CI renderer (`display_ci.go`) deliberately doesn't render Points — only aggregate pass/total. Don't propagate badge format changes there.
+- `report.GraderResult.Points` field name in JSON is `points` (lowercase, omitempty). Verified via raw report.json inspection.
+- For fast iteration on grader-display work, the `test/haiku` config + `test-dp-test-hello-markdown` prompt round-trips in ~50s including consensus review.
+
+**Decision note:** `.squad/decisions/inbox/tank-badge-format.md`

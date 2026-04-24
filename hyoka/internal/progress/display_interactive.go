@@ -1001,10 +1001,10 @@ func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 }
 
 // renderGraderWithPoints emits a multi-line block for a grader that reported
-// multiple Points: a header line summarizing the aggregate (e.g. "❌ 2/3 passed")
-// followed by one indented row per Point. Reuses the same in-place rewrite
-// scaffolding as the single-row path so the header replaces the original
-// "Running…" row when one was previously frozen.
+// multiple Points: a header line summarizing the aggregate (e.g.
+// "❌ Fail (2/3)") followed by one indented row per Point. Reuses the same
+// in-place rewrite scaffolding as the single-row path so the header replaces
+// the original "Running…" row when one was previously frozen.
 func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 	passed := 0
 	for _, p := range evt.Points {
@@ -1014,9 +1014,9 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 	}
 	total := len(evt.Points)
 	allPassed := passed == total
-	badge := r.sty.Fail(fmt.Sprintf("❌ %d/%d passed", passed, total))
+	badge := r.sty.Fail(fmt.Sprintf("❌ Fail (%d/%d)", passed, total))
 	if allPassed {
-		badge = r.sty.OK(fmt.Sprintf("✅ %d/%d passed", passed, total))
+		badge = r.sty.OK(fmt.Sprintf("✅ Pass (%d/%d)", passed, total))
 	}
 	header := fmt.Sprintf("  - %s %s: %s",
 		evt.GraderID,
@@ -1045,7 +1045,10 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 		}
 	}
 
-	// One indented row per point under the header.
+	// One indented row per point under the header. Point names are
+	// soft-truncated for terminal output so very long check strings don't
+	// wrap awkwardly; full text remains in the report.
+	const maxPointNameWidth = 50
 	for _, p := range evt.Points {
 		var status string
 		if p.Pass {
@@ -1053,7 +1056,8 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 		} else {
 			status = r.sty.Fail("❌ Fail")
 		}
-		line := fmt.Sprintf("    - %s: %s", p.Name, status)
+		name := truncateToWidth(p.Name, maxPointNameWidth)
+		line := fmt.Sprintf("    - %s: %s", name, status)
 		if !p.Pass && p.Message != "" {
 			line += " " + r.sty.Muted("— "+p.Message)
 		}

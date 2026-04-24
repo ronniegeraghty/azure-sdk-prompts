@@ -8,7 +8,7 @@ import (
 
 // TestInteractive_GraderPointsRendersNestedBlock exercises the Phase 2 nested
 // rendering path: when len(Points) > 1, onGraderComplete writes a header line
-// summarizing the aggregate (e.g. "❌ 2/3 passed") followed by one indented
+// summarizing the aggregate (e.g. "❌ Fail (2/3)") followed by one indented
 // row per Point. Single- and zero-point graders should still use the legacy
 // flat row.
 func TestInteractive_GraderPointsRendersNestedBlock(t *testing.T) {
@@ -41,8 +41,8 @@ func TestInteractive_GraderPointsRendersNestedBlock(t *testing.T) {
 	if !strings.Contains(out, "ai_review") || !strings.Contains(out, "(prompt)") {
 		t.Errorf("missing grader header\n--- got ---\n%s", out)
 	}
-	if !strings.Contains(out, "2/3 passed") {
-		t.Errorf("missing aggregate badge \"2/3 passed\"\n--- got ---\n%s", out)
+	if !strings.Contains(out, "Fail (2/3)") {
+		t.Errorf("missing aggregate badge \"Fail (2/3)\"\n--- got ---\n%s", out)
 	}
 	// One indented row per Point.
 	for _, want := range []string{
@@ -61,7 +61,7 @@ func TestInteractive_GraderPointsRendersNestedBlock(t *testing.T) {
 }
 
 // TestInteractive_GraderPointsAllPassedBadge verifies the all-passed aggregate
-// formats as "✅ N/N passed".
+// formats as "✅ Pass (N/N)".
 func TestInteractive_GraderPointsAllPassedBadge(t *testing.T) {
 	var buf bytes.Buffer
 	d := NewDisplay(DisplayConfig{Total: 1, Workers: 1, Writer: &buf, Mode: ModeInteractive})
@@ -85,8 +85,8 @@ func TestInteractive_GraderPointsAllPassedBadge(t *testing.T) {
 	d.Finish()
 
 	out := buf.String()
-	if !strings.Contains(out, "2/2 passed") {
-		t.Errorf("missing all-passed aggregate badge \"2/2 passed\"\n--- got ---\n%s", out)
+	if !strings.Contains(out, "Pass (2/2)") {
+		t.Errorf("missing all-passed aggregate badge \"Pass (2/2)\"\n--- got ---\n%s", out)
 	}
 	if !strings.Contains(out, "    - min_files:") || !strings.Contains(out, "    - require_files:") {
 		t.Errorf("missing nested point rows\n--- got ---\n%s", out)
@@ -120,7 +120,7 @@ func TestInteractive_GraderSinglePointFlatRow(t *testing.T) {
 	// Single-Point case must NOT emit the aggregate badge inside a grader
 	// header row (the run summary line "Summary: 1/1 passed" is unrelated
 	// and exists in every transcript).
-	if strings.Contains(out, "(program): ✅ 1/1 passed") || strings.Contains(out, "(program): ❌ 1/1 passed") {
+	if strings.Contains(out, "(program): ✅ Pass (1/1)") || strings.Contains(out, "(program): ❌ Fail (1/1)") {
 		t.Errorf("single-point grader should use flat row, not aggregate badge\n--- got ---\n%s", out)
 	}
 	if strings.Contains(out, "    - exit code 0:") {
