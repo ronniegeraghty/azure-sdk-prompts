@@ -427,3 +427,92 @@ Extended `criteria/language/test.yaml` with two grader improvements:
 **Display:** `[tool_constr] Skill Usage: ✅ Pass` + `[prompt] Markdown Structure: ❌ Fail (2/3)`
 
 **Decision:** Merged into `.squad/decisions.md`
+
+---
+
+## 2026-04-24 — Empirical Verification of Issues #586 and #619
+
+**Task:** Verify that issues #586 (builtin skill leakage) and #619 (tool load guardrail) are actually fixed by running live tests, not just reading commit history.
+
+**Context:** Morpheus performed a commit-evidence pass and claimed both issues were fixed. My job was to prove it empirically.
+
+### Issue #586: Builtin Copilot CLI Skills Leak — ❌ **NOT FIXED**
+
+**Expected behavior:** Builtin skills like `customize-cloud-agent` (shipped at `~/.copilot/pkg/universal/{cli-version}/builtin-skills/`) should NOT load into eval sessions unless explicitly opted in via config.
+
+**Evidence:**
+1. Ran live eval: `hyoka run --prompt-id app-configuration-dp-python-crud --config baseline/gpt-5.3-codex --log-level debug --log-file hyoka-586-verify.log`
+2. Log output shows: `time=2026-04-24T18:20:03.928Z level=INFO msg="Skills loaded" ... skills=customize-cloud-agent`
+3. **The builtin skill IS still loading** — symptom exactly as described in issue #586.
+
+**Root cause of false positive:**
+- Morpheus cited commit `445fea76` as the fix
+- That commit message: "Fix user-level skills leaking into eval Copilot sessions"
+- That commit addresses **USER-LEVEL** skills from `~/.config/github-copilot/` (issue #21)
+- It does NOT address **BUILTIN** skills from the CLI binary install dir
+- Issue #586 explicitly states: "builtin skills are loaded by the CLI binary itself from its install dir, not via ConfigDir — so the isolation is a no-op against them"
+
+**What's needed:**
+- Set `SessionConfig.DisabledSkills` field (exposed by SDK since v0.1.22)
+- Enumerate builtin skill names from `~/.copilot/pkg/universal/{cli-version}/builtin-skills/` at session build time
+- Add all detected builtin skills to `DisabledSkills` unless config explicitly opts in
+- No code currently implements this — `git grep DisabledSkills` returns zero matches in hyoka
+
+**Verdict:** ❌ **NOT FIXED** — builtin skills still leak into eval sessions.
+
+---
+
+### Issue #619: Tool Load Failure Guardrail — ✅ **VERIFIED FIXED**
+
+**Expected behavior:** When a config declares tools (skills/MCP servers) that fail to load, eval should hard-fail with `ErrorCategory="tool_load_failure"` BEFORE running the generation session.
+
+**Evidence:**
+1. **Unit tests pass:** `go test ./hyoka/internal/config/tool/... -v -run ValidateAndExpand` — 23 tests green, covering:
+   - Missing plugins
+   - Missing skill directories
+   - Missing MCP commands
+   - Malformed YAML
+   - Remote plugin cache failures
+2. **Integration tests pass:** `go test ./hyoka/internal/eval/... -v -run "Test.*[Tt]ool"` — 47 tests green, including:
+   - `TestCopilotRunner_ToolLoadFailure_HardFail`
+   - `TestCopilotRunner_ToolLoadFailure_MissingSkill`
+   - `TestCopilotRunner_ToolLoadFailure_MCPMissingCommand`
+   - `TestToolValidationGate_*` suite (8 tests covering happy path, failures, timeouts, partial events)
+3. **Code inspection confirms:**
+   - `hyoka/internal/config/tool/validate.go` implements `ValidateAndExpand` with `ToolLoadError` return
+   - `hyoka/internal/eval/copilot.go:175` calls `ValidateAndExpand` before `CreateSession`
+   - On failure, sets `ErrorCategory: "tool_load_failure"` and aborts (lines 188-190)
+   - Tests verify no session events or generated files on `tool_load_failure`
+
+**Implementation commits found:**
+- `8c947c8a` — "feat(eval): hard-fail evals on tool_load_failure in buildSessionConfig"
+- `5c75b47c` — "feat(tool): introduce ToolLoadReport and ValidateAndExpand for strict pre-session validation"
+- `557bb83b` — "docs: tool-load hard-fail and grouped Tools output"
+- `05b4f6d8` — "test(tool): table-driven coverage for ValidateAndExpand + tool_load_failure hard-fail"
+
+**Verdict:** ✅ **VERIFIED FIXED** — guardrail is implemented, tested, and working end-to-end.
+
+---
+
+### Key Learnings
+
+1. **Commit-evidence ≠ empirical verification:** Morpheus's analysis mistakenly conflated user-level skill isolation (#21) with builtin skill isolation (#586). Reading commit messages without running tests misses these distinctions.
+
+2. **"Skills loaded" log lines are smoking guns:** The `skills=customize-cloud-agent` log entry is direct evidence that the builtin skill loaded — no SDK event inspection needed.
+
+3. **Unit + integration tests prove #619:** The `ValidateAndExpand` → hard-fail path is thoroughly tested. 47 green tests across validation and eval packages give high confidence.
+
+4. **Test discipline matters:** #619 was fixed with tests (WU-2). #586 has no tests yet because it's not fixed yet. Tests catch regressions; commit messages are just documentation.
+
+### Recommended Next Steps
+
+**For #586:**
+1. Implement `DisabledSkills` population in `buildSessionConfig` (generator + reviewer)
+2. Write detection logic to enumerate `~/.copilot/pkg/universal/{cli-version}/builtin-skills/`
+3. Add opt-in surface (either via `tools:` entries or dedicated `builtin_skills:` config field)
+4. Add tests: verify `customize-cloud-agent` appears in `DisabledSkills` by default, and can be opted in
+5. Add debug log: record disabled builtins at `--log-level debug`
+
+**For #619:**
+- Close the issue — it's done and tested.
+

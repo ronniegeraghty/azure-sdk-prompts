@@ -310,3 +310,73 @@ Team Feature: Skill Usage grader + intentionally-failing check shipped and merge
 
 **Recommendation:** Close #586 and #619 with clear commit references. Others require deeper investigation or remain open as valid future work.
 
+
+## 2026-04-23 — Grader structural audit
+
+Ronnie asked for a written audit of grader structure after noticing
+the on-site report shows graders in vastly different shapes.
+
+**Investigated:** 8 grader kinds in `hyoka/internal/criteria/graders/`,
+the shared `GraderResult` / `GraderInput` types, the report-side
+`report.GraderResult` marshalling layer, and `site/src/app/components/
+GraderResultRow.tsx`.
+
+**Key findings:**
+
+1. The grader interface is healthy (3 methods, single input struct,
+   single result struct).
+2. Common surface: `Kind, Name, Score, Weight, Pass, Gate, Message,
+   Points`. Phase 2 made `Points` the canonical sub-check channel,
+   and the React renderer treats it as such — but the per-kind
+   `*Details` structs still live alongside, half-redundant.
+3. Three real structural problems:
+   - `OutputCheckDetails` is dropped at the report-marshalling layer
+     (`report/types.go` has no field for it). The agent's produced
+     files + per-knob sub-checks die in transit.
+   - `BehaviorGraderDetails` is a 14-field union shared by behavior /
+     action_sequence / tool_constraint. Each grader sets a different
+     subset, the renderer guesses, and `action_sequence`'s expected-
+     vs-actual sequence is invisible on the site.
+   - `prompt_review` flattens `OverallScore, MaxScore, Summary, Issues,
+     Strengths, Scores, IsConsensus` to the top level of
+     `report.GraderResult`. Every other grader leaves those fields
+     zero-valued. One grader's shape is everyone else's noise.
+4. Score semantics also drift: 0.0/1.0 for some, partial credit for
+   others, "X/N points" for output_check. Renderer ad-hocs the display.
+
+**Deliverable:** `.squad/decisions/inbox/morpheus-grader-structure-
+audit.md` with full breakdown + three options:
+
+- **Option A** — plumb missing data, no structural change. ~50 LOC,
+  no migration. Doesn't fix root cause.
+- **Option B** — promote `Points` to canonical, reduce per-kind
+  `*Details` to a discriminated `Extras` union, split
+  `BehaviorGraderDetails` into three typed extras, drop the flattened
+  review fields from `report.GraderResult`. ~300–500 LOC, breaking
+  change to report JSON v4. **Recommended.**
+- **Option C** — single `SubCheck` model + free-form `Evidence map`.
+  Re-opens DM4 (no `interface{}` in results). Not recommended.
+
+Open questions for Ronnie noted in the inbox file: external report
+consumers? prompt_review score semantics alignment? FileGrader's 0.5
+partial-credit?
+
+No code changed. Implementation work, if Ronnie picks B, would go
+to Neo (engine + types) and Trinity (site renderer).
+
+---
+
+## 2026-04-24: Issue Triage False Positive — #586 Commit Analysis
+
+**FLAGGED:** Morpheus's analysis of #586 ("Fixed by commit 445fea76") was a false positive.
+
+**Evidence from Switch's empirical verification:**
+- Commit `445fea76` addresses **user-level** skills leaking from `~/.config/github-copilot/`, NOT builtin skills
+- Issue #586 explicitly names builtin skills from `~/.copilot/pkg/universal/{cli-version}/builtin-skills/`
+- Live eval run shows `skills=customize-cloud-agent` still loading into sessions
+- Builtin skill filtering requires `SessionConfig.DisabledSkills` population — not implemented
+
+**Lesson learned:** Commit-evidence triage (reading commit messages/diffs) is insufficient for semantic distinctions. Empirical verification (running tests/evals) is required for confidence on "issue closed" claims.
+
+**Action:** #586 remains open; requires session config implementation (Neo/Tank).
+
