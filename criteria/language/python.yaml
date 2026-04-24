@@ -5,9 +5,9 @@ graders:
     type: prompt
     weight: 1.0
     prompt: >
-      Uses DefaultAzureCredential (or another azure-identity credential) for
-      authentication. No hardcoded connection strings, account keys, SAS
-      tokens, or secrets embedded in source.
+      Check the following criteria:
+      1. Uses DefaultAzureCredential (or another azure-identity credential) for authentication. No hardcoded connection strings, account keys, SAS tokens, or secrets embedded in source.
+      2. Uses async/await patterns appropriately for Azure SDK operations.
   - name: Output Files Exist
     type: output_check
     weight: 1.0

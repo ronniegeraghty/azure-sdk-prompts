@@ -632,6 +632,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 					// Build a per-bucket grader input with only this bucket's criteria.
 					bucketInput := graderInput
 					bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{bucket}
+					// Clear the merged EvalCriteria so the grader uses the bucket-specific criteria.
+					bucketInput.EvalCriteria = ""
 
 					emitGraderStart(sendRawEvent, reviewGrader)
 					reviewResult, reviewErr := reviewGrader.Grade(ctx, bucketInput)
