@@ -73,6 +73,16 @@ export function evalGraderTotals(r: EvalPassInput): { passed: number; total: num
 }
 
 /**
+ * Fractional pass rate (0–100) over the eval's Points. Returns 0 when
+ * no points are available (e.g. error rows). Use this everywhere the UI
+ * wants partial-credit % rather than binary pass/fail.
+ */
+export function pointsPassRate(r: EvalPassInput): number {
+  const t = evalPointTotals(r);
+  return t.total > 0 ? (t.passed / t.total) * 100 : 0;
+}
+
+/**
  * Total Points seen and total Points passed across every grader on this
  * eval. For graders that did not emit Points we synthesize a single
  * virtual point so the count remains meaningful (`✓ N / N points across M

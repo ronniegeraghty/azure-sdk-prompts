@@ -8,6 +8,7 @@
 // the page) and produce derived data. No fetching, no React.
 
 import type { RunSummary, EvalResult } from "../data/types";
+import { pointsPassRate, evalPassFromPoints } from "./evalPass";
 
 export type FilterDimension =
   | "configs"
@@ -143,6 +144,12 @@ export function filterGroup(results: EvalResult[], group: ComparisonGroup): Eval
 // ── Metric computation ─────────────────────────────────────────────
 
 function safeScore(r: EvalResult): number {
+  // Prefer fractional grader-point pass rate when grader data exists.
+  // Fall back to legacy review.overall_score / max_score for older
+  // reports (or test mocks) that don't carry grader_results.
+  if (r.grader_results && r.grader_results.length > 0) {
+    return pointsPassRate(r) / 100;
+  }
   const m = r.review?.max_score ?? 0;
   if (!m) return 0;
   return r.review.overall_score / m;
@@ -172,7 +179,7 @@ export function computeMetrics(results: EvalResult[]): GroupMetrics {
     const score = safeScore(r);
     scoreSum += score;
     durationSum += r.duration_seconds || 0;
-    if (r.success) passCount++;
+    if (evalPassFromPoints(r)) passCount++;
 
     const svc = r.prompt_metadata?.service || "unknown";
     const lang = r.prompt_metadata?.language || "unknown";

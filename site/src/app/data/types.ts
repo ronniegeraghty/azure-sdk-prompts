@@ -324,6 +324,17 @@ export interface EvalResult {
   duration_seconds: number;
   generated_files?: string[];
   prompt_metadata: PromptMetadata;
+  // Optional schema-v3+/v4 fields. The wire (`/api/runs` summary.json)
+  // already carries the full EvalReport for every eval, so consumers can
+  // render fractional grader/point scoring without extra fetches.
+  // See `.squad/decisions/inbox/morpheus-prompt-graph-grader-scores.md`.
+  grader_results?: GraderResult[];
+  graders_passed?: number;
+  graders_total?: number;
+  environment?: Environment;
+  tool_calls?: string[];
+  schema_version?: number;
+  config_used?: { model: string; name: string };
 }
 
 // ── Pairwise impact types (matching Go pairwise package) ──────────────
