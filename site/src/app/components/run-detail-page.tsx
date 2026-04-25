@@ -4,7 +4,7 @@ import { fetchRun } from "../data/api";
 import type { RunSummary, EvalResult, EvalReport } from "../data/types";
 import { CheckCircle2, XCircle, Clock, FileCode2, ArrowLeft, Loader2, Tag, Zap } from "lucide-react";
 import { GraderResultRow } from "./GraderResultRow";
-import { evalPassFromPoints, evalGraderTotals, graderPasses } from "../lib/evalPass";
+import { evalPassFromPoints, evalPointTotals, graderPasses } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -257,7 +257,7 @@ export function RunDetailPage() {
               <tbody>
                 {filtered.map((r, i) => {
                   const evalReport = r as EvalReport;
-                  const totals = evalGraderTotals(evalReport);
+                  const totals = evalPointTotals(evalReport);
                   const gradersTotal = totals.total;
                   const gradersPassed = totals.passed;
                   const evalPassed = evalPassFromPoints(evalReport);

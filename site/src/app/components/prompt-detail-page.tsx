@@ -4,7 +4,7 @@ import { fetchPrompt, fetchRuns, type PromptInfo } from "../data/api";
 import type { RunSummary, EvalResult, Environment } from "../data/types";
 import { ArrowLeft, CheckCircle2, XCircle, Clock, BarChart3, TrendingUp, Cpu, Wrench, ArrowUpRight, ArrowDownRight, Minus, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { evalPassFromPoints } from "../lib/evalPass";
+import { evalPassFromPoints, evalPointTotals, pointsPassRate } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -14,7 +14,16 @@ interface HistoryEntry {
   success: boolean;
   duration: number;
   file_count: number;
+  // Fractional grader-point score (0–100). 100 = every Point passed.
+  // Replaces the legacy `review.overall_score` (review-grader only).
   score: number;
+  // Raw point totals for "N/M" display (e.g. "12/15 points").
+  points_passed: number;
+  points_total: number;
+  // True when the eval finished and has a detail page. Mirrors the
+  // gate used on the run-detail page; in-progress evals don't yet have
+  // their per-eval JSON written, so the detail link would 404.
+  is_complete: boolean;
 }
 
 interface ConfigStat {
@@ -22,6 +31,9 @@ interface ConfigStat {
   runs: number;
   passed: number;
   pass_rate: number;
+  points_rate: number;
+  points_passed: number;
+  points_total: number;
   avg_duration: number;
 }
 
@@ -32,6 +44,9 @@ interface CorrelationStat {
   failed: number;
   rate: number;
   avgScore: number;
+  pointsPassed: number;
+  pointsTotal: number;
+  pointsRate: number;
   avgDuration: number;
 }
 
@@ -103,7 +118,7 @@ function CorrelationTable({ title, icon: Icon, data, baseline, showDuration }: {
               <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Evals</th>
               <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Pass Rate</th>
               <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>vs Baseline</th>
-              <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Avg Score</th>
+              <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Points %</th>
               {showDuration && <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Avg Duration</th>}
             </tr>
           </thead>
@@ -127,7 +142,7 @@ function CorrelationTable({ title, icon: Icon, data, baseline, showDuration }: {
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={d.avgScore >= 80 ? "text-emerald-400/70" : d.avgScore >= 60 ? "text-amber-400/70" : "text-red-400/70"} style={{ ...mono, fontSize: 11 }}>
-                      {d.avgScore}
+                      {d.avgScore}%
                     </span>
                   </td>
                   {showDuration && <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{d.avgDuration}s</td>}
@@ -146,14 +161,17 @@ function computeGrouped(
   evals: { result: EvalResult; run: RunSummary }[],
   keyFn: (result: EvalResult, run: RunSummary) => string[]
 ): CorrelationStat[] {
-  const map: Record<string, { total: number; passed: number; scoreSum: number; durationSum: number }> = {};
+  const map: Record<string, { total: number; passed: number; scoreSum: number; pointsPassed: number; pointsTotal: number; durationSum: number }> = {};
   for (const { result, run } of evals) {
     for (const key of keyFn(result, run)) {
       if (!key) continue;
-      if (!map[key]) map[key] = { total: 0, passed: 0, scoreSum: 0, durationSum: 0 };
+      if (!map[key]) map[key] = { total: 0, passed: 0, scoreSum: 0, pointsPassed: 0, pointsTotal: 0, durationSum: 0 };
       map[key].total++;
       if (evalPassFromPoints(result)) map[key].passed++;
-      map[key].scoreSum += result.review?.overall_score || 0;
+      const pt = evalPointTotals(result);
+      map[key].pointsPassed += pt.passed;
+      map[key].pointsTotal += pt.total;
+      map[key].scoreSum += pointsPassRate(result);
       map[key].durationSum += result.duration_seconds || 0;
     }
   }
@@ -165,6 +183,9 @@ function computeGrouped(
       failed: v.total - v.passed,
       rate: parseFloat(((v.passed / v.total) * 100).toFixed(1)),
       avgScore: parseFloat((v.scoreSum / v.total).toFixed(1)),
+      pointsPassed: v.pointsPassed,
+      pointsTotal: v.pointsTotal,
+      pointsRate: v.pointsTotal > 0 ? parseFloat(((v.pointsPassed / v.pointsTotal) * 100).toFixed(1)) : 0,
       avgDuration: parseFloat((v.durationSum / v.total).toFixed(1)),
     }))
     .sort((a, b) => b.rate - a.rate);
@@ -208,13 +229,17 @@ export function PromptDetailPage() {
     for (const run of runs) {
       for (const result of run.results || []) {
         if (result.prompt_id === decodedId) {
+          const pt = evalPointTotals(result);
           entries.push({
             run_id: run.run_id,
             config_name: result.config_name,
             success: evalPassFromPoints(result),
             duration: result.duration_seconds || 0,
             file_count: result.generated_files?.length || 0,
-            score: result.review?.overall_score || 0,
+            score: parseFloat(pointsPassRate(result).toFixed(1)),
+            points_passed: pt.passed,
+            points_total: pt.total,
+            is_complete: result.duration_seconds != null && result.duration_seconds > 0,
           });
           evalsWithContext.push({ result, run });
         }
@@ -225,13 +250,18 @@ export function PromptDetailPage() {
     const totalRuns = entries.length;
     const passRate = totalRuns > 0 ? parseFloat(((passed / totalRuns) * 100).toFixed(1)) : 0;
     const avgDuration = totalRuns > 0 ? parseFloat((entries.reduce((s, e) => s + e.duration, 0) / totalRuns).toFixed(1)) : 0;
+    const totalPointsPassed = entries.reduce((s, e) => s + e.points_passed, 0);
+    const totalPointsTotal = entries.reduce((s, e) => s + e.points_total, 0);
+    const pointsPassRatePct = totalPointsTotal > 0 ? parseFloat(((totalPointsPassed / totalPointsTotal) * 100).toFixed(1)) : 0;
 
     // Config breakdown
-    const configMap: Record<string, { runs: number; passed: number; totalDuration: number }> = {};
+    const configMap: Record<string, { runs: number; passed: number; pointsPassed: number; pointsTotal: number; totalDuration: number }> = {};
     for (const e of entries) {
-      if (!configMap[e.config_name]) configMap[e.config_name] = { runs: 0, passed: 0, totalDuration: 0 };
+      if (!configMap[e.config_name]) configMap[e.config_name] = { runs: 0, passed: 0, pointsPassed: 0, pointsTotal: 0, totalDuration: 0 };
       configMap[e.config_name].runs++;
       if (e.success) configMap[e.config_name].passed++;
+      configMap[e.config_name].pointsPassed += e.points_passed;
+      configMap[e.config_name].pointsTotal += e.points_total;
       configMap[e.config_name].totalDuration += e.duration;
     }
     const configs: ConfigStat[] = Object.entries(configMap).map(([config, c]) => ({
@@ -239,6 +269,9 @@ export function PromptDetailPage() {
       runs: c.runs,
       passed: c.passed,
       pass_rate: parseFloat(((c.passed / c.runs) * 100).toFixed(1)),
+      points_rate: c.pointsTotal > 0 ? parseFloat(((c.pointsPassed / c.pointsTotal) * 100).toFixed(1)) : 0,
+      points_passed: c.pointsPassed,
+      points_total: c.pointsTotal,
       avg_duration: parseFloat((c.totalDuration / c.runs).toFixed(1)),
     }));
 
@@ -267,7 +300,18 @@ export function PromptDetailPage() {
       : 0;
 
     return {
-      history: { prompt_id: decodedId, total_runs: totalRuns, passed, pass_rate: passRate, avg_duration_seconds: avgDuration, entries, configs },
+      history: {
+        prompt_id: decodedId,
+        total_runs: totalRuns,
+        passed,
+        pass_rate: passRate,
+        points_passed: totalPointsPassed,
+        points_total: totalPointsTotal,
+        points_pass_rate: pointsPassRatePct,
+        avg_duration_seconds: avgDuration,
+        entries,
+        configs,
+      },
       correlations: { byModel, byToolAll, byToolEnv, overallRate, overallAvgScore },
     };
   }, [runs, decodedId]);
@@ -302,22 +346,25 @@ export function PromptDetailPage() {
   const configChartData = history.configs.map(c => ({
     name: c.config.replace("baseline-", "").replace("copilot-", "cp-"),
     rate: c.pass_rate,
+    pointsRate: c.points_rate,
     runs: c.runs,
     avgDuration: c.avg_duration,
   }));
 
-  // Entries over time (by run_id)
-  const timelineData = history.entries.reduce<Record<string, { run: string; passed: number; failed: number; avgScore: number; count: number }>>((acc, e) => {
-    if (!acc[e.run_id]) acc[e.run_id] = { run: e.run_id.slice(0, 8), passed: 0, failed: 0, avgScore: 0, count: 0 };
+  // Entries over time (by run_id). `pointsRate` = fractional grader-point
+  // pass rate (e.g. 5/7 → 71%). `rate` = binary pass rate (perfect-only).
+  const timelineData = history.entries.reduce<Record<string, { run: string; passed: number; failed: number; pointsPassed: number; pointsTotal: number; count: number }>>((acc, e) => {
+    if (!acc[e.run_id]) acc[e.run_id] = { run: e.run_id.slice(0, 8), passed: 0, failed: 0, pointsPassed: 0, pointsTotal: 0, count: 0 };
     acc[e.run_id].count++;
-    acc[e.run_id].avgScore += e.score;
+    acc[e.run_id].pointsPassed += e.points_passed;
+    acc[e.run_id].pointsTotal += e.points_total;
     if (e.success) acc[e.run_id].passed++;
     else acc[e.run_id].failed++;
     return acc;
   }, {});
   const timelineChartData = Object.values(timelineData).map(d => ({
     ...d,
-    avgScore: Math.round(d.avgScore / d.count),
+    pointsRate: d.pointsTotal > 0 ? Math.round((d.pointsPassed / d.pointsTotal) * 100) : 0,
     rate: Math.round((d.passed / d.count) * 100),
   }));
 
@@ -376,11 +423,12 @@ export function PromptDetailPage() {
         )}
 
         {/* Summary cards */}
-        <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-5">
           {[
             { label: "Total Runs", value: history.total_runs, icon: BarChart3, color: "text-blue-400" },
             { label: "Pass Rate", value: `${history.pass_rate}%`, icon: CheckCircle2, color: history.pass_rate >= 80 ? "text-emerald-400" : history.pass_rate >= 60 ? "text-amber-400" : "text-red-400" },
-            { label: "Passed", value: history.passed, icon: CheckCircle2, color: "text-emerald-400" },
+            { label: "Points", value: `${history.points_passed}/${history.points_total}`, icon: TrendingUp, color: history.points_pass_rate >= 80 ? "text-emerald-400" : history.points_pass_rate >= 60 ? "text-amber-400" : "text-red-400" },
+            { label: "Points %", value: `${history.points_pass_rate}%`, icon: TrendingUp, color: history.points_pass_rate >= 80 ? "text-emerald-400" : history.points_pass_rate >= 60 ? "text-amber-400" : "text-red-400" },
             { label: "Avg Duration", value: `${history.avg_duration_seconds}s`, icon: Clock, color: "text-purple-400" },
           ].map(s => (
             <div key={s.label} className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
@@ -396,30 +444,41 @@ export function PromptDetailPage() {
         {/* Charts */}
         <div className="mb-8 grid gap-6 lg:grid-cols-2">
           <div className="rounded-xl border border-white/8 bg-white/[0.03] p-6">
-            <h3 className="mb-4 text-white" style={{ fontSize: 15 }}>Pass Rate by Config</h3>
+            <h3 className="mb-1 text-white" style={{ fontSize: 15 }}>Pass Rate by Config</h3>
+            <p className="mb-4 text-white/40" style={{ fontSize: 11 }}>Binary pass rate (perfect-only) vs. fractional grader-point rate.</p>
             <ResponsiveContainer width="100%" height={230}>
               <BarChart data={configChartData}>
                 <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 12 }} />
-                <Bar dataKey="rate" fill="#10b981" radius={[4, 4, 0, 0]} name="Pass Rate %" />
+                <Bar dataKey="pointsRate" fill="#10b981" radius={[4, 4, 0, 0]} name="Points %" />
+                <Bar dataKey="rate" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Pass Rate %" />
               </BarChart>
             </ResponsiveContainer>
+            <div className="mt-3 flex justify-center gap-5">
+              {[{ label: "Points %", color: "#10b981" }, { label: "Binary Pass", color: "#8b5cf6" }].map(l => (
+                <div key={l.label} className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full" style={{ background: l.color }} />
+                  <span className="text-white/40" style={{ fontSize: 11 }}>{l.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-xl border border-white/8 bg-white/[0.03] p-6">
-            <h3 className="mb-4 text-white" style={{ fontSize: 15 }}>Score Trend Across Runs</h3>
+            <h3 className="mb-1 text-white" style={{ fontSize: 15 }}>Score Trend Across Runs</h3>
+            <p className="mb-4 text-white/40" style={{ fontSize: 11 }}>Fractional grader-point pass rate per run (e.g. 5/7 graders → 71%).</p>
             <ResponsiveContainer width="100%" height={230}>
               <LineChart data={timelineChartData}>
                 <XAxis dataKey="run" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 12 }} />
-                <Line type="monotone" dataKey="avgScore" stroke="#10b981" strokeWidth={2} dot={{ fill: "#10b981", r: 3 }} name="Avg Score" />
-                <Line type="monotone" dataKey="rate" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: "#8b5cf6", r: 3 }} name="Pass Rate %" />
+                <Line type="monotone" dataKey="pointsRate" stroke="#10b981" strokeWidth={2} dot={{ fill: "#10b981", r: 3 }} name="Points %" />
+                <Line type="monotone" dataKey="rate" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: "#8b5cf6", r: 3 }} name="Binary Pass %" />
               </LineChart>
             </ResponsiveContainer>
             <div className="mt-3 flex justify-center gap-5">
-              {[{ label: "Avg Score", color: "#10b981" }, { label: "Pass Rate", color: "#8b5cf6" }].map(l => (
+              {[{ label: "Points %", color: "#10b981" }, { label: "Binary Pass", color: "#8b5cf6" }].map(l => (
                 <div key={l.label} className="flex items-center gap-1.5">
                   <div className="h-2 w-2 rounded-full" style={{ background: l.color }} />
                   <span className="text-white/40" style={{ fontSize: 11 }}>{l.label}</span>
@@ -662,10 +721,15 @@ export function PromptDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {history.entries.map((e, i) => (
+                {history.entries.map((e, i) => {
+                  const scorePct = e.points_total > 0 ? (e.points_passed / e.points_total) * 100 : 0;
+                  const scoreTone = scorePct >= 80 ? "emerald" : scorePct >= 60 ? "amber" : "red";
+                  const barColor = scoreTone === "emerald" ? "bg-emerald-500" : scoreTone === "amber" ? "bg-amber-500" : "bg-red-500";
+                  const textColor = scoreTone === "emerald" ? "text-emerald-400" : scoreTone === "amber" ? "text-amber-400" : "text-red-400";
+                  return (
                   <tr key={`${e.run_id}-${e.config_name}-${i}`} className="border-b border-white/5 transition hover:bg-white/[0.02]">
                     <td className="px-4 py-3">
-                      {e.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}
+                      {!e.is_complete ? <Loader2 className="h-4 w-4 animate-spin text-white/40" /> : e.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}
                     </td>
                     <td className="px-4 py-3">
                       <Link to={`/runs/${e.run_id}`} className="text-blue-400/70 no-underline hover:text-blue-400" style={{ ...mono, fontSize: 11 }}>
@@ -673,24 +737,37 @@ export function PromptDetailPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-white/50" style={{ ...mono, fontSize: 12 }}>{e.config_name}</td>
-                    <td className="px-4 py-3">
-                      <span className={e.score >= 80 ? "text-emerald-400" : e.score >= 60 ? "text-amber-400" : "text-red-400"} style={{ ...mono, fontSize: 13 }}>
-                        {e.score}
-                      </span>
+                    <td className="px-4 py-3" style={{ minWidth: 140 }}>
+                      {e.points_total > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <span className={textColor} style={{ ...mono, fontSize: 12 }}>{e.points_passed}/{e.points_total}</span>
+                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${scorePct}%` }} />
+                          </div>
+                          <span className="text-white/40" style={{ ...mono, fontSize: 11 }}>{Math.round(scorePct)}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-white/30" style={{ ...mono, fontSize: 12 }}>—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-white/40" style={{ ...mono, fontSize: 12 }}>{e.duration.toFixed(1)}s</td>
                     <td className="px-4 py-3 text-white/40" style={{ fontSize: 12 }}>{e.file_count}</td>
                     <td className="px-4 py-3">
-                      <Link
-                        to={`/runs/${encodeURIComponent(e.run_id)}/eval/${encodeURIComponent(decodedId)}/${encodeURIComponent(e.config_name)}`}
-                        className="text-white/30 no-underline transition hover:text-emerald-400"
-                        style={{ fontSize: 12 }}
-                      >
-                        Detail →
-                      </Link>
+                      {e.is_complete ? (
+                        <Link
+                          to={`/runs/${encodeURIComponent(e.run_id)}/eval/${encodeURIComponent(decodedId)}/${encodeURIComponent(e.config_name)}`}
+                          className="text-white/30 no-underline transition hover:text-emerald-400"
+                          style={{ fontSize: 12 }}
+                        >
+                          Detail →
+                        </Link>
+                      ) : (
+                        <span className="text-white/20" style={{ fontSize: 12 }}>Running…</span>
+                      )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 import { CheckCircle2, XCircle, Clock, FileCode2, Cpu, TrendingUp, Loader2, Calendar } from "lucide-react";
 import { fetchRuns } from "../data/api";
 import type { RunSummary } from "../data/types";
-import { evalPassFromPoints } from "../lib/evalPass";
+import { evalPassFromPoints, pointsPassRate, evalPointTotals } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -60,6 +60,8 @@ export function DashboardPage() {
       lang: string;
       config: string;
       score: number;
+      pointsPassed: number;
+      pointsTotal: number;
       pass: boolean;
       duration: string;
       files: number;
@@ -101,13 +103,16 @@ export function DashboardPage() {
     for (const run of sortedRuns) {
       for (const result of run.results || []) {
         if (recentEvalsList.length >= 10) break;
+        const pt = evalPointTotals(result);
         recentEvalsList.push({
           id: `${run.run_id.slice(0, 8)}-${result.prompt_id.slice(0, 12)}`,
           runId: run.run_id,
           prompt: result.prompt_id,
           lang: result.prompt_metadata?.language || "unknown",
           config: result.config_name,
-          score: result.review?.overall_score || 0,
+          score: parseFloat(pointsPassRate(result).toFixed(1)),
+          pointsPassed: pt.passed,
+          pointsTotal: pt.total,
           pass: evalPassFromPoints(result),
           duration: `${(result.duration_seconds ?? 0).toFixed(1)}s`,
           files: result.generated_files?.length || 0,

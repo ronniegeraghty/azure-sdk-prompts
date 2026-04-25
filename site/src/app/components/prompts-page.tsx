@@ -4,6 +4,7 @@ import { fetchPrompts, fetchRuns, type PromptInfo } from "../data/api";
 import type { RunSummary } from "../data/types";
 import { Search, ChevronRight, Loader2, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { motion } from "motion/react";
+import { pointsPassRate, evalPassFromPoints } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -68,14 +69,12 @@ export function PromptsPage() {
               recentScores: []
             };
             stats.evals++;
-            if (result.success) stats.passed++;
+            if (evalPassFromPoints(result)) stats.passed++;
             
-            // Track recent scores (last 10) for sparkline
+            // Track recent scores (last 10) for sparkline. Use fractional
+            // grader-point pass rate, not legacy review.overall_score.
             if (stats.recentScores.length < 10) {
-              const score = result.review?.overall_score ?? 0;
-              const maxScore = result.review?.max_score ?? 100;
-              const normalizedScore = maxScore > 0 ? (score / maxScore) * 100 : 0;
-              stats.recentScores.push(normalizedScore);
+              stats.recentScores.push(pointsPassRate(result));
             }
             
             // Update last evaluated if this run is more recent
