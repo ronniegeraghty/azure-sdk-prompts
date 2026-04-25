@@ -283,11 +283,14 @@ export function RunDetailPage() {
                   const tools = evalReport.environment?.mcp_servers || [];
                   const skills = evalReport.environment?.skills_loaded || [];
 
+                  // Check if eval is complete - incomplete evals don't have a detail page yet
+                  const isComplete = r.duration_seconds != null && r.duration_seconds > 0;
+
                   return (
                     <tr 
                       key={`${r.prompt_id}-${r.config_name}-${i}`} 
-                      onClick={() => navigate(`/runs/${run.run_id}/eval/${encodeURIComponent(r.prompt_id)}/${r.config_name}`)}
-                      className="cursor-pointer border-b border-white/5 transition hover:bg-white/[0.02]"
+                      onClick={isComplete ? () => navigate(`/runs/${run.run_id}/eval/${encodeURIComponent(r.prompt_id)}/${r.config_name}`) : undefined}
+                      className={`border-b border-white/5 transition ${isComplete ? "cursor-pointer hover:bg-white/[0.02]" : "cursor-default opacity-60"}`}
                     >
                       <td className="px-4 py-3">
                         <ScoreBadge
@@ -342,7 +345,11 @@ export function RunDetailPage() {
                         {r.duration_seconds != null && !isNaN(r.duration_seconds) ? `${r.duration_seconds.toFixed(1)}s` : "N/A"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-white/30 text-xs">→</span>
+                        {isComplete ? (
+                          <span className="text-white/30 text-xs">→</span>
+                        ) : (
+                          <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                        )}
                       </td>
                     </tr>
                   );
@@ -397,18 +404,25 @@ export function RunDetailPage() {
                       const graders = evalReport.grader_results || [];
                       const model = evalReport.config_used?.model || configName;
                       const evalPassed = evalPassFromPoints(evalReport);
+                      
+                      // Check if eval is complete - incomplete evals don't have a detail page yet
+                      const isComplete = result.duration_seconds != null && result.duration_seconds > 0;
 
                       return (
-                        <div key={configName} className="rounded-lg border border-white/5 bg-white/[0.01]">
+                        <div key={configName} className={`rounded-lg border border-white/5 bg-white/[0.01] ${!isComplete ? "opacity-60" : ""}`}>
                           <div className="border-b border-white/5 p-3">
                             <div className="mb-1 flex items-center gap-2">
                               <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-blue-400/80" style={{ fontSize: 11 }}>
                                 {model}
                               </span>
-                              {evalPassed ? (
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                              {isComplete ? (
+                                evalPassed ? (
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <XCircle className="h-3 w-3 text-red-400" />
+                                )
                               ) : (
-                                <XCircle className="h-3 w-3 text-red-400" />
+                                <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
                               )}
                             </div>
                             <div className="text-white/30" style={{ fontSize: 10 }}>{configName}</div>
@@ -425,13 +439,19 @@ export function RunDetailPage() {
                           </div>
 
                           <div className="border-t border-white/5 p-3">
-                            <Link
-                              to={`/runs/${run.run_id}/eval/${encodeURIComponent(result.prompt_id)}/${result.config_name}`}
-                              className="text-emerald-400/80 no-underline transition hover:text-emerald-400"
-                              style={{ fontSize: 12 }}
-                            >
-                              View full detail →
-                            </Link>
+                            {isComplete ? (
+                              <Link
+                                to={`/runs/${run.run_id}/eval/${encodeURIComponent(result.prompt_id)}/${result.config_name}`}
+                                className="text-emerald-400/80 no-underline transition hover:text-emerald-400"
+                                style={{ fontSize: 12 }}
+                              >
+                                View full detail →
+                              </Link>
+                            ) : (
+                              <span className="text-amber-400/60" style={{ fontSize: 12 }}>
+                                Running...
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
