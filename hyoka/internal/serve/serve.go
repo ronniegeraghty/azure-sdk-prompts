@@ -374,14 +374,8 @@ func spaHandler(siteDir string) http.HandlerFunc {
 	if siteDir != "" {
 		siteFS = os.DirFS(siteDir)
 	} else {
-		sub, err := fs.Sub(embeddedSite, "site")
-		if err != nil {
-			slog.Error("failed to access embedded site", "error", err)
-			return func(w http.ResponseWriter, r *http.Request) {
-				http.Error(w, "embedded site unavailable", http.StatusInternalServerError)
-			}
-		}
-		siteFS = sub
+		// embeddedSite is already the dist/ subtree, use it directly
+		siteFS = embeddedSite
 	}
 
 	fileServer := http.FileServerFS(siteFS)
