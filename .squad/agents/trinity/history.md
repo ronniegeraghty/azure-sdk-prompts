@@ -534,3 +534,31 @@ Neo's verification recipe (worth remembering):
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
 - **2026-04-25: `tool_version_override` schema changed to repo-keyed.** Frontend has no direct involvement; noted for context if Tool-related UI changes arise. Old shape rejected with clear error. See `.squad/decisions.md` "Tool Version Override Migrated to Repo-Keyed" for decision rationale.
+
+## 2026-04-25: Prevent clickthrough on in-progress eval rows
+
+**Issue:** When an eval is currently running, the row appears with a running indicator but is clickable. Clicking leads to 404 because the eval's detail page/artifacts don't exist yet.
+
+**Root cause:** In-progress evals appear in the run summary.json results array but don't have their individual detail JSON files written yet. The site was rendering all eval rows as clickable without checking completion status.
+
+**Fix implemented:**
+- Added completion check: `r.duration_seconds != null && r.duration_seconds > 0`
+- In table view: conditionally apply onClick handler and cursor style
+- In matrix view: conditionally render Link vs plain text "Running..."
+- Visual indicators:
+  - Incomplete rows show spinner (Loader2) instead of arrow
+  - Incomplete cards show spinner instead of pass/fail icon
+  - Both have opacity-60 for dimmed appearance
+- Applies to both table and matrix view modes in run-detail-page.tsx
+
+**File changed:** `site/src/app/components/run-detail-page.tsx`
+
+**Completion gate:** `duration_seconds > 0` is a reliable indicator that the eval has finished and written its detail JSON file. In-progress evals have this field as 0, null, or undefined.
+
+**Build/test result:** All 132 tests passed. Build succeeded with no errors.
+
+**Commit:** 312c17e7
+
+**Note:** This entry was originally written under the wrong cast name ("Fenster") by a coordinator-side hallucination; folded into Trinity's history where it belongs.
+
+---
