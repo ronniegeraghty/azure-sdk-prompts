@@ -146,9 +146,9 @@ export function RunsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >
-                    <Link
-                      to={`/runs/${run.run_id}`}
-                      className="group block rounded-xl border border-white/8 bg-white/[0.03] p-5 no-underline transition hover:border-amber-500/20 hover:bg-white/[0.05]"
+                    <div
+                      className="block rounded-xl border border-white/8 bg-white/[0.03] p-5 opacity-70 cursor-default"
+                      aria-disabled="true"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex-1">
@@ -169,10 +169,10 @@ export function RunsPage() {
                         <div className="flex items-center gap-3 text-white/30" style={{ fontSize: 12 }}>
                           <Clock className="h-3.5 w-3.5" />
                           <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span>
-                          <ChevronRight className="h-4 w-4 transition group-hover:text-amber-400" />
+                          <Loader2 className="h-4 w-4 animate-spin text-amber-400/60" />
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   </motion.div>
                 );
               }
