@@ -562,3 +562,36 @@ Neo's verification recipe (worth remembering):
 **Note:** This entry was originally written under the wrong cast name ("Fenster") by a coordinator-side hallucination; folded into Trinity's history where it belongs.
 
 ---
+
+## 2025-04-25: Direct-embed refactor (eliminating the copy step)
+
+**Context:** The site embed workflow had a 3-attempt fix saga this week. Developers fixed bugs in `site/src/**`, rebuilt `site/dist/`, committed, and merged — but forgot to run `make site-embed` to refresh the mirrored copy at `hyoka/internal/serve/site/`. The binary continued shipping stale UI despite passing CI.
+
+**Decision:** Ronnie greenlit eliminating the copy step entirely. Embed `site/dist/` directly via `site/embed.go` (`//go:embed all:dist`), commit `site/dist/` to git, delete the Makefile and mirrored copy.
+
+**Implementation (4 commits):**
+1. `5690a925` — Created `site/embed.go`, updated `hyoka/internal/serve/embed.go` to import `siteembed`, updated `.gitignore` to track `site/dist/`, committed fresh bundle
+2. `7a3f421a` — Deleted `hyoka/internal/serve/site/` and `Makefile`
+3. `3b84c62e` — Replaced `site-embed-freshness.yml` CI workflow with `site-bundle-freshness.yml` (rebuilds site/dist/, fails on `git diff --exit-code`)
+4. `eebd61fc` — Updated README and embedded-asset-freshness skill
+
+**Verification:**
+- `go build ./...` succeeds (no pre-step required)
+- `go run ./hyoka serve --port 8765` serves correct bundle (curl verified index-Bj7TXL2_.js)
+- Working tree clean, all commits pushed to `origin ronniegeraghty/dev`
+
+**Lessons:**
+- **Simpler is better:** The copy step was the entire source of the footgun. One-step workflow (`cd site && npm run build`) is harder to mess up.
+- **Vite determinism:** Content-hashed filenames make `git diff --exit-code site/dist/` a reliable freshness gate.
+- **Go embed quirk:** `site/` becoming a Go package is fine — it's just one file with one var. Module path `github.com/ronniegeraghty/hyoka/site` works.
+- **Commit bundle to git:** ~1.2MB size is acceptable. Matches ecosystem norms (most Go+Vite projects do this).
+
+**What contributors need to know:**
+- Old workflow (`make site-embed`) is dead. Just `cd site && npm run build`.
+- CI enforces freshness — PRs touching `site/**` will fail if `site/dist/` is stale.
+- The embedded-asset-freshness skill and README document the new flow.
+
+**Related artifacts:**
+- Decision drop: `.squad/decisions/inbox/trinity-embed-dist-direct.md`
+- CI workflow: `.github/workflows/site-bundle-freshness.yml`
+- Skill: `.squad/skills/embedded-asset-freshness/SKILL.md` (rewritten)
