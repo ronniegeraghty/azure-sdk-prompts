@@ -895,3 +895,21 @@ The parser's `ParseEvaluationCriteria` was already producing structured `[]Crite
 - Markdown bullets now behave identically to YAML checks from the LLM's perspective
 
 **Files:** 5 files modified, +228/-7 lines (see `.squad/decisions/inbox/neo-prompt-grader-cleanup.md` for full details)
+
+---
+
+## 2026-04-25: Pending handoff — graders_passed/graders_total naming bug
+
+**From:** Morpheus (scoping pass on prompt-detail-page fractional scores)  
+**Issue:** `internal/eval/engine_eval.go:689-690` writes `evalReport.GradersTotal = countTotalPoints(...)` — field name says "graders" but value is POINTS count.
+
+**Current impact:**
+- `eval-detail-page.tsx` works around via `evalPointTotals` (correct behavior)
+- `run-detail-page.tsx:260` trusts the lie verbatim → Score column displays points count labeled as "graders"
+- JSON from `/api/runs` has ambiguous field semantics
+
+**Recommendation:** Rename fields to `points_passed` / `points_total` (or emit both honest `graders_*` + accurate `points_*`). This is schema v4.1 (additive) or v5 (breaking) decision.
+
+**Status:** Flagged, awaiting Neo assignment. Trinity's implementation uses correct `evalPointTotals` path; no site regression.
+
+**Reference:** `.squad/decisions.md` → "2026-04-25: Prompt-detail-page graphs — fractional grader-point scoring" (Engine naming bug section)

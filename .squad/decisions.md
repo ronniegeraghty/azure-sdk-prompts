@@ -1959,3 +1959,108 @@ See docs/configuration.md → "Tool Versioning" for examples.
 
 **Orchestration logs:** `.squad/orchestration-log/2026-04-25-00-24-30-{morpheus,neo,oracle}.md`  
 **Session log:** `.squad/log/2026-04-25-00-24-30-repo-keyed-version-override.md`
+
+---
+
+## 2026-04-25: Prompt-detail-page graphs — fractional grader-point scoring
+
+**By:** Morpheus 🕶️ (Scoping), Trinity 🖤 (Implementation), Neo 💊 (Naming bug noted)  
+**Date:** 2026-04-25  
+**Status:** ✅ IMPLEMENTED  
+**Branch:** `ronniegeraghty/dev`
+
+### Scoping (Morpheus)
+
+Every fact needed for "5/7 grader points passed" rendering is already in the JSON from `/api/runs` → `summary.json` carries full `EvalReport` with `grader_results` and `points` arrays. Site-only fix: type narrowing issue in `site/src/app/data/types.ts:318` hides the data from the page.
+
+**Six gaps in prompt-detail-page.tsx:**
+1. Score column (line 217) — should show fractional `N/M` instead of legacy `review.overall_score`
+2. HistoryEntry verdict (line 211–218) — should use points-aware pass function
+3. Per-key tally (line 145–171) — should count points in addition to binary pass/fail
+4. Summary cards (line 379–393) — should show "Points X / Y"
+5. Score Trend chart (line 411–428) — should plot `points_pass_rate` instead of legacy `avgScore`
+6. Pass Rate by Config chart (line 398–408) — should show average point-pass-rate
+
+### Implementation (Trinity)
+
+**Files changed:** 7
+- Type widening: `site/src/app/data/types.ts` (RunSummary.results → EvalReport[])
+- Helper: `pointsPassRate()` in `evalPass.ts`
+- Prompt detail: all 6 gaps closed in `prompt-detail-page.tsx`
+- Dashboard, prompts-page, run-detail, comparison-groups: points-aware rendering
+
+**Verification:**
+- ✅ `npm run build` succeeds
+- ✅ 132/132 Vitest tests pass
+- ✅ Playwright walkthrough confirmed fractional bars, dual charts, correlation tables
+- ✅ Commits caa52db9, bc9e36ea, 1d10c433 pushed to ronniegeraghty/dev
+
+**Post-implementation findings:**
+- Config Breakdown table still binary-only (low-priority follow-up)
+- `review.overall_score` correctly used in eval-detail for Review Score card (not a regression)
+- Legacy overall_score also used in 4 components (prompts-page, dashboard, eval-detail, prompt-detail) — good candidates for future `pointsPassRate` migration
+
+### Engine naming bug flagged (for Neo)
+
+`graders_passed`/`graders_total` JSON fields actually count POINTS, not graders. This misdiagnosis is visible in `run-detail-page.tsx:260` (Score column shows points count labeled as "graders"). `eval-detail-page.tsx` works around via `evalPointTotals`; recommend Neo rename fields to `points_passed`/`points_total` (schema v4.1 or v5 decision).
+
+---
+
+## 2026-04-25: Site embed refactor — `site/dist/` embedded directly
+
+**By:** Trinity 🖤 (Implementation)  
+**Date:** 2026-04-25  
+**Status:** ✅ IMPLEMENTED  
+**Branch:** `ronniegeraghty/dev`
+
+Eliminated the 3-step copy workflow (`site/` → `npm run build` → `make site-embed` → `hyoka/internal/serve/site/` → `go:embed`) in response to 3 consecutive PRs (#601, #604, #607) where developers fixed the UI but forgot to run `make site-embed`, leaving stale binaries in production. New model: embed `site/dist/` directly via `//go:embed`, commit `dist/` to git (1.2MB, acceptable for this project), CI enforces freshness with `git diff --exit-code`.
+
+**Changes:**
+1. Created `site/embed.go` with `//go:embed all:dist`
+2. Updated `hyoka/internal/serve/embed.go` to import siteembed and use `fs.Sub()`
+3. Deleted `hyoka/internal/serve/site/` and Makefile copy target
+4. Stopped ignoring `site/dist/` in `.gitignore`
+5. Updated CI workflow: `site-bundle-freshness.yml` replaces Makefile verify
+
+**Verification:**
+- ✅ `go build ./...` succeeds
+- ✅ `go run ./hyoka serve` serves correct bundle
+- ✅ CI correctly detects stale bundles on rebuild + `git diff`
+
+**Tradeoffs:**
+- Repo size: `site/dist/` is 1.2MB, grows with each bundle change (acceptable)
+- Breaking change for contributors: old `make site-embed` workflow no longer works (README updated)
+
+---
+
+## 2026-01-20: Prompt grader output cleanup (Neo)
+
+**By:** Neo 💊 (Engine)  
+**Date:** 2026-01-20  
+**Status:** ✅ IMPLEMENTED
+
+Cleaned up prompt-grader output rendering and made markdown-form evaluation criteria deterministic.
+
+**Changes:**
+1. Removed "criterion:" prefix from grader point labels (`prompt_review_grader.go` lines 114, 208)
+2. Made markdown criteria deterministic by formatting parsed bullets as numbered checks before passing to LLM review panel
+   - Added `FormatParsedCriteria()` to `parser.go`
+   - Updated `engine.reviewBuckets()` and `engine.mergedCriteria()` to use formatted criteria
+   - Fallback to raw `EvaluationCriteria` if `ParsedCriteria` empty (backward compatibility)
+
+**Tests:**
+- Added 8 tests for `FormatParsedCriteria`
+- Added `TestBuildUnifiedReviewBuckets_DeterministicPromptCriteria`
+- Documented edge cases (4-space indent dropped, numbered lists not recognized, blank lines ignored)
+
+**Rationale:** Parser was producing structured `[]CriterionEntry`, but review path ignored it and passed raw markdown to LLM. LLM decided how to split bullets → non-deterministic scoring. Fix: format parsed structure as numbered checks (same style as YAML `checks:`) so LLM sees deterministic numbering.
+
+**Impact:**
+- Cleaner point labels (no "criterion:" prefix)
+- Deterministic criterion counts for markdown criteria
+- Markdown bullets now behave identically to YAML checks from LLM perspective
+
+---
+
+**Orchestration logs:** `.squad/orchestration-log/2026-04-25T04-34-17Z-{morpheus-grader-score-scope,trinity-grader-score-graphs-FAILED,trinity-grader-score-retry,scribe}.md`  
+**Session log:** `.squad/log/2026-04-25T04-34-17Z-prompt-graph-fractional-scores.md`

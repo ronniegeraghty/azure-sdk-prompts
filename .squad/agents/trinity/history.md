@@ -645,3 +645,42 @@ Neo's verification recipe (worth remembering):
 - Grader-by-grader reliability table (Morpheus §3, separate session)
 
 **Commits:** `caa52db9`, `bc9e36ea`, `1d10c433` pushed to `ronniegeraghty/dev`
+
+---
+
+## 2026-04-25: Fractional grader-point scoring implementation (90m + Playwright verification)
+
+**Trigger:** Morpheus scoping drop (`morpheus-prompt-graph-grader-scores.md`) + Ronnie's ask for prompt-detail UI improvements.
+
+**Initial attempt:** API error before implementation started. Model upgraded to opus-4.6 for retry.
+
+**Successful implementation (trinity-grader-score-retry):**
+
+1. **Type widening** (`types.ts`) — `RunSummary.results: EvalReport[]` (dropped stale `as EvalReport` casts)
+2. **Helper** (`evalPass.ts`) — added `pointsPassRate()` for points/total ratio → percentage
+3. **Prompt-detail fixes** (all six Morpheus gaps):
+   - Score column: N/M fractional display + percentage
+   - HistoryEntry verdict: points-aware pass logic
+   - Per-key grouping: points tallying alongside binary pass-rate
+   - Summary cards: "Points X / Y" + "% Rate"
+   - Score Trend chart: `points_pass_rate` Y-axis (replaces legacy `avgScore`)
+   - Pass Rate by Config chart: average point-pass-rate bars
+4. **Cross-component updates:**
+   - Dashboard: Score column → `pointsPassRate`
+   - Prompts-page: Sparkline + pass-rate → points-aware functions
+   - Run-detail: `evalPointTotals` (not misnamed grader totals)
+   - Comparison-groups: `safeScore` prefers points when available
+
+**Verification:**
+- ✅ `npm run build` succeeds (1104 KB / 317 KB gzip)
+- ✅ 132/132 Vitest tests pass
+- ✅ Playwright full walkthrough: dashboard (93.3/80 fractional), run-detail (14/15), eval-detail (per-grader points), prompt-detail (all 6 gaps rendering correctly)
+
+**Commits:** caa52db9, bc9e36ea, 1d10c433 pushed to ronniegeraghty/dev
+
+**Post-implementation findings:**
+- Config Breakdown table still binary-only (low-priority, noted for follow-up)
+- `review.overall_score` use in eval-detail is correct (Review Grader's own score, not a regression)
+- Not addressed: graders_passed/graders_total naming lie (Neo's territory, schema v4.1 vs v5)
+
+**Time:** ~90m implementation + verification. Model bump resolved API error cleanly.

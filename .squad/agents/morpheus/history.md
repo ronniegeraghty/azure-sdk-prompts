@@ -450,3 +450,48 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - This affects what every future spawn looks like — expect opus-4.7 as your model.
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
+
+## Scoping: Prompt-page fractional grader scores (2026-04-25)
+
+**Ask:** Ronnie wants the prompt-detail page graphs to show "5/7 grader points passed" instead of binary pass/fail, plus a broader site review post-grader/embed work.
+
+**Outcome:** Decision drop at `.squad/decisions/inbox/morpheus-prompt-graph-grader-scores.md`. Trinity is unblocked — this is **site-only**, no engine plumbing needed. The full v4 grader_results (with Points) already ships through `/api/runs` because `summary.json` carries `[]*EvalReport`.
+
+**Where Trinity starts:**
+1. Widen `site/src/app/data/types.ts` → `RunSummary.results: EvalReport[]` (drops a stack of `as EvalReport` casts already scattered through the codebase).
+2. Add `pointsPassRate` helper in `lib/evalPass.ts` (1 line on top of existing `evalPointTotals`).
+3. Rewrite six binary spots in `prompt-detail-page.tsx` to use point totals — score column, summary cards, both charts, both correlation tables.
+4. Lift the in-progress click-gate from `run-detail-page.tsx:287` onto the prompt-page entries table.
+
+**Issues flagged:**
+- ⚠️ `graders_passed`/`graders_total` JSON fields are misnamed — engine writes POINTS counts there. `eval-detail-page` works around it, `run-detail-page` trusts the lie. Logged as Neo follow-up (schema v4.1 or v5).
+- Legacy `review.overall_score` still used in 4 components (prompt-detail, prompts-page, dashboard, eval-detail) — replace with point-rate.
+- Embed refactor (5690a925, 7a3f421a, 3b84c62e) is clean — no Makefile drift.
+- `summary.json` carrying full reports is fine today; flag for scale later.
+
+**Time spent:** ~45m. Within the 30–60m budget. No code changes by me — pure scoping pass per the ask.
+
+---
+
+## 2026-04-25: Scoping — Prompt-page fractional grader scores (45m)
+
+**Ask:** Ronnie wants prompt-detail-page graphs to show "5/7 grader points passed" instead of binary pass/fail, plus post-refactor site review.
+
+**Analysis:**
+- Data already on wire — `summary.json` carries full `EvalReport` with `grader_results` and `points`
+- Site-only fix: type narrowing in `EvalResult` hides the data
+- Six UI gaps identified in prompt-detail-page.tsx
+- Post-refactor audit: embed cleanup is clean, no Makefile drift
+- Flagged engine naming bug: `graders_passed`/`graders_total` actually count POINTS
+
+**Deliverable:** Decision drop at `.squad/decisions/inbox/morpheus-prompt-graph-grader-scores.md`. Trinity is unblocked.
+
+**Time:** 45m (within budget). Pure analysis, no code.
+
+---
+
+## 2026-04-25: Site post-refactor review conclusion
+
+All six prompt-detail gaps implemented by Trinity. Type widening complete. Dashboard, prompts-page, run-detail all updated. Post-implementation Playwright walkthrough confirmed fractional rendering across all pages. 132/132 tests pass. Ready for Ronnie's live testing.
+
+Follow-ups deferred: grader-by-grader reliability table (separate session), Neo's field rename (schema v4.1 vs v5 decision).
