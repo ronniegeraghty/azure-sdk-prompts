@@ -595,3 +595,53 @@ Neo's verification recipe (worth remembering):
 - Decision drop: `.squad/decisions/inbox/trinity-embed-dist-direct.md`
 - CI workflow: `.github/workflows/site-bundle-freshness.yml`
 - Skill: `.squad/skills/embedded-asset-freshness/SKILL.md` (rewritten)
+
+---
+
+## 2026-04-25: Grader-Point Scoring on Prompt-Detail Page + Site Walkthrough
+
+**Task:** Implement Morpheus's scoping drop for fractional grader-point scoring on the prompt-detail page. Walk the served site with Playwright post-refactor.
+
+**Changes made (3 commits on `ronniegeraghty/dev`):**
+
+1. **`site/src/app/lib/evalPass.ts`** — Added `pointsPassRate()` helper (fractional 0–100 rate across all Points). Fixed a broken JSDoc splice from a prior crashed session.
+
+2. **`site/src/app/data/types.ts`** — Widened `EvalResult` with optional `grader_results`, `graders_passed`, `graders_total`, `environment`, `tool_calls`, `schema_version`, `config_used`. The wire already carries these via `/api/runs`.
+
+3. **`site/src/app/components/prompt-detail-page.tsx`** — All six gaps from Morpheus §2:
+   - Per-eval rows show `N/M` points with fractional bar + percentage (e.g. "14/15 93%")
+   - HistoryEntry.success uses `evalPassFromPoints`
+   - computeGrouped tallies points-passed/total per group
+   - Summary cards: "Points X/Y" + "Points %" cards
+   - Score Trend chart: dual-series (Points % + Binary Pass %)
+   - Pass Rate by Config: dual bars
+   - In-progress eval click gate on All Entries table (§4f)
+   - CorrelationTable "Avg Score" → "Points %" column
+
+4. **`site/src/app/components/dashboard-page.tsx`** — Score column uses `pointsPassRate` (replaces `review.overall_score`).
+
+5. **`site/src/app/components/prompts-page.tsx`** — Sparkline uses `pointsPassRate`, pass counting uses `evalPassFromPoints`.
+
+6. **`site/src/app/components/run-detail-page.tsx`** — Switched from `evalGraderTotals` to `evalPointTotals` for consistent point counting.
+
+7. **`site/src/app/lib/comparison-groups.ts`** — `safeScore` prefers `pointsPassRate` when grader data exists, falls back to `review.overall_score` for legacy data. `passCount` uses `evalPassFromPoints`.
+
+**Verification:**
+- `npm run build` succeeds (1104 KB / 317 KB gzip)
+- 132/132 Vitest tests pass
+- Playwright walkthrough confirmed fractional bars rendering on prompt-detail, run-detail (14/15), eval-detail (POINTS 14/15 across 6 graders), dashboard (93.3), prompts sparklines
+
+**Site review findings (Playwright walkthrough):**
+- **[OK]** Dashboard: renders, no crash, scores show fractional (93.3 / 80)
+- **[OK]** Run detail: Score column shows 14/15, model + tools render
+- **[OK]** Eval detail: POINTS 14/15 card, 6 grader rows with per-grader point counts
+- **[OK]** Prompt detail: full fractional scoring, dual charts, correlation tables
+- **[LOW]** Config Breakdown table still only shows binary pass rate (no points rate column) — minor, could add in follow-up
+- **[INFO]** `review.overall_score` still used in eval-detail-page for "Review Score" card and "Consolidated Review" section — this is correct behavior since it specifically shows the review grader's own score
+- **[INFO]** `graders_passed`/`graders_total` naming lie (they count points, not graders) — Neo engine fix needed (Morpheus §4a), not blocking site work
+
+**Not done (out of scope / deferred to Neo):**
+- `graders_passed`/`graders_total` field rename → needs engine schema v5 bump (Morpheus §4a, Neo's territory)
+- Grader-by-grader reliability table (Morpheus §3, separate session)
+
+**Commits:** `caa52db9`, `bc9e36ea`, `1d10c433` pushed to `ronniegeraghty/dev`
