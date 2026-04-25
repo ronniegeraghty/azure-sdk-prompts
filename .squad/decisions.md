@@ -1848,3 +1848,114 @@ Never create files with `:` in the filename. Windows filesystems reject colons o
 **Why:** Cross-platform compatibility — the repo must clone and work cleanly on Windows.
 
 **Baseline:** Commit `8148ba13` renamed 83 pre-existing files with colons. All agents and Scribe must follow this invariant going forward. Reference: `.squad/skills/windows-compatibility/SKILL.md`.
+
+---
+
+## 2026-04-25: Tool Version Override Migrated to Repo-Keyed (Morpheus, Neo, Oracle)
+
+**Status:** MERGED & COMMITTED  
+**Session:** repo-keyed-version-override (2026-04-25T00:24:30Z)  
+**Spawned agents:** Morpheus 🕶️, Neo 💊, Oracle 🔮  
+
+### Decision: Migrate `tool_version_override` from name-keyed to repo-keyed
+
+**Author:** Morpheus 🕶️ (Lead/Architect)  
+**Date:** 2026-04-24  
+**Approved:** All four recommended defaults adopted  
+
+#### Problem
+
+`tool_version_override` was keyed by user-chosen tool entry name (`Entry.Name`), but git refs are properties of repos, not individual skills. This caused:
+1. Git ref granularity mismatch (fetcher clones `owner/repo`, not per-skill)
+2. Monorepo fan-out (`microsoft/skills` → N redundant entries)
+3. Arbitrary key coupling (entry names are locally-meaningful, not canonical)
+4. Common case verbose (pin whole repo requires N entries)
+
+**Blast radius:** Zero shipped configs use this field; only fixtures and docs needed migration.
+
+#### Proposed Schema
+
+```yaml
+tool_version_override:
+  owner/repo: git_ref  # e.g. microsoft/skills: v1.2.0
+```
+
+**Key format:** `owner/repo` (GitHub prefix optional, normalized away).
+
+#### Design Choices (All Approved)
+
+1. **Key format:** `owner/repo` with `github.com/` prefix normalization
+2. **Migration:** Hard cut — reject old-shape (keys without `/`) with migration-hint error
+3. **Unknown repo override:** Warn (allow shared override maps across configs)
+4. **Empty value:** Silent skip (preserve existing behavior)
+
+#### Resolution & Merge
+
+**Per-entry `version:` always wins** (unchanged). Precedence:
+```
+per-entry version: > tool_version_override (by repo key) > fetcher default
+```
+
+**Multi-file merge:** Maps merge across files; conflicting values for same repo = hard error (determinism guarantee); identical values merge silently.
+
+#### Migration Path
+
+Hard cut with clear error message:
+
+```
+tool_version_override now keys by repo (e.g. "microsoft/skills"), not by tool name.
+Found name-shaped key "my-skill". Migration:
+  - Replace each tool-name key with the repo it points to.
+  - If multiple tools shared the same repo, collapse to one entry.
+See docs/configuration.md → "Tool Versioning" for examples.
+```
+
+#### Edge Cases Handled
+
+| Case | Behavior |
+|---|---|
+| Two entries from same repo, both explicit `version:` | Both per-entry pins win. Override ignored. |
+| Override + per-entry both set on same repo | Per-entry wins. |
+| Override references unknown repo | Warn (shared maps may cover more repos). |
+| Key has `github.com/` prefix | Normalize away. |
+| Key malformed (`microsoft`, `a/b/c`, empty parts) | Hard error at parse time. |
+| Local skill (`source: local`, no `Repo`) | Override never applies. |
+| Plugin (`type: plugin`, `source: remote`) | Override applies via same code path. |
+| Empty value (`owner/repo: ""`) | Silent skip (no override). |
+
+#### Implementation (Neo)
+
+**File:** `hyoka/internal/config/config.go`
+- Updated `ToolVersionOverride` doc comment (key format: `owner/repo`)
+- Added `normalizeRepoKey(s string) string` (strips `github.com/` prefix)
+- Rewrote `ApplyVersionOverrides` (lookup by normalized `Entry.Repo`, skip local skills/MCPs)
+- Added `validateOverrideKeys` (rejects old-shape, validates `owner/repo` format)
+- Updated `LoadDir` error message (references repo, not tool)
+
+**File:** `hyoka/internal/config/version_override_test.go`
+- Replaced name-keyed fixtures with repo-keyed ones
+- Added 11 new test cases covering multi-entry repos, normalization, old-shape rejection, validation, merge semantics
+
+**File:** `CHANGELOG.md`
+- Added breaking-change entry (pre-1.0)
+
+**Verification:** `go build ./...` ✅, `go test -race ./hyoka/internal/config/...` ✅, `go vet ./hyoka/internal/config/...` ✅
+
+#### Documentation (Oracle)
+
+**File:** `docs/configuration.md`
+- Per-entry `version:` field documentation (branch, tag, SHA)
+- Top-level `tool_version_override` map documentation (repo-key schema, precedence, monorepo examples)
+- Resolution order: per-entry > override > fetcher default
+- Multi-file merge semantics and conflict-error behavior
+- Migration callout with before/after YAML and error message quote
+- Remote Skills cross-link to Tool Versioning section
+
+#### Impact
+
+**Breaking change (pre-1.0):** All `tool_version_override` entries must migrate from name-keyed to repo-keyed format. User benefit: monorepo pinning now requires ONE entry per repo instead of N entries per skill (e.g., `microsoft/skills` → 1 entry vs 10+ entries).
+
+---
+
+**Orchestration logs:** `.squad/orchestration-log/2026-04-25-00-24-30-{morpheus,neo,oracle}.md`  
+**Session log:** `.squad/log/2026-04-25-00-24-30-repo-keyed-version-override.md`

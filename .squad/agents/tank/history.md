@@ -797,3 +797,4 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - This affects what every future spawn looks like — expect opus-4.7 as your model.
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
+- **2026-04-25: `tool_version_override` migrated to repo-key schema.** Old name-keyed shape rejected with migration-hint error. If working with Tool configs, use `owner/repo` keys instead of tool-entry names. Migration guidance: `docs/configuration.md` "Migrating from name-keyed overrides" section. See `.squad/decisions.md` for full decision memo.

@@ -160,6 +160,7 @@ generator:
       type: skill
       source: remote
       repo: microsoft/skills
+      version: "v1.2.0"        # optional: pin to git ref (branch, tag, or SHA)
 ```
 
 | Field | Required | Description |
@@ -168,6 +169,7 @@ generator:
 | `source` | yes | Must be `"remote"` |
 | `repo` | yes | GitHub repository in `owner/repo` format |
 | `name` | no | Specific skill name within the repo |
+| `version` | no | Git ref to pin to (branch, tag, or commit SHA); empty = repo default branch. Overridable by top-level `tool_version_override` (see [Tool Versioning](#tool-versioning--custom-fetchers)) |
 
 Under the hood, hyoka runs:
 
@@ -462,14 +464,9 @@ Remote skills (and other future remote tools) are pinned and fetched through hyo
 
 ### Pinning versions
 
-Use `tool_version_override` at the top of any config file to pin tools by `name`:
+Each remote tool entry can pin a specific version via the `version:` field (accepts a git branch name, tag, or commit SHA):
 
 ```yaml
-tool_version_override:
-  azure-sdk-java: "v1.4.2"      # git tag
-  copilot-knowledge: "main"      # branch
-  azsdk-samples: "abc123def"     # commit SHA
-
 configs:
   - name: baseline/sonnet
     generator:
@@ -479,18 +476,79 @@ configs:
           type: skill
           source: remote
           repo: Azure/azure-sdk-skills
-        - name: pinned-by-entry
+          version: "v1.4.2"         # pin to git tag
+        - name: copilot-kb
+          type: skill
+          source: remote
+          repo: microsoft/skills
+          version: "main"            # pin to branch
+        - name: unpinned
           type: skill
           source: remote
           repo: x/y
-          version: "v2.0.0"      # per-entry version always wins
+          # empty or omitted → fetcher default (latest)
 ```
 
-**Resolution order:** per-entry `version:` field > `tool_version_override` map > fetcher default (latest).
+For monorepos (multiple skills from the same repo), or to apply a pin to all entries from a repo without repeating it, use `tool_version_override` at the top of the config file. Map it by repository in `owner/repo` format (the `github.com/` prefix is optional and normalized away):
+
+```yaml
+tool_version_override:
+  microsoft/skills: "v1.2.0"           # all entries using microsoft/skills
+  Azure/azure-sdk-skills: "v1.4.2"     # tag
+  someorg/plugins: "abc123def"         # commit SHA
+  # Full GitHub URL prefix is stripped: "github.com/Azure/example" → "Azure/example"
+
+configs:
+  - name: baseline/sonnet
+    generator:
+      model: claude-sonnet-4.5
+      tools:
+        - name: general-skills
+          type: skill
+          source: remote
+          repo: microsoft/skills
+          # Picks up v1.2.0 from override
+        - name: auth-skill
+          type: skill
+          source: remote
+          repo: microsoft/skills
+          # Also picks up v1.2.0 from override
+        - name: pinned-explicitly
+          type: skill
+          source: remote
+          repo: Azure/azure-sdk-skills
+          version: "v2.0.0"            # per-entry pin wins over override
+```
+
+**Resolution order:** per-entry `version:` field > `tool_version_override` (by repo key) > fetcher default (latest).
+
+When loading multiple config files from a directory, `tool_version_override` maps **merge** across files. If two files pin the same repository to different versions, hyoka returns a hard error (identical values merge silently). This prevents silent override conflicts when configs are split across files.
 
 The version is forwarded to the fetcher; the default `npx` fetcher appends it as a git ref (`repo@version`) and caches each version under a separate directory (`.skills-cache/<version>/<repo>/<name>/`) so toggling pins doesn't poison the cache.
 
-`tool_version_override` maps are scoped to the config file they live in. Conflicting values across files in a directory load are an error.
+#### Migrating from name-keyed overrides
+
+Earlier versions of hyoka keyed `tool_version_override` by tool **name** instead of repository. If you see an error like:
+
+```
+tool_version_override now keys by repo (e.g. "microsoft/skills"), not by tool name.
+Found name-shaped key "my-skill-name". Migration:
+  - Replace each tool-name key with the repo it points to.
+  - If multiple tools shared the same repo, collapse them to one entry.
+```
+
+Update your config: replace the tool name keys with their corresponding repository names. For example:
+
+```yaml
+# Old (no longer supported)
+tool_version_override:
+  azure-sdk-java: "v1.4.2"
+  azure-keyvault: "v1.4.2"
+
+# New
+tool_version_override:
+  Azure/azure-sdk-skills: "v1.4.2"  # covers both azure-sdk-java and azure-keyvault
+```
 
 ### Custom fetchers
 

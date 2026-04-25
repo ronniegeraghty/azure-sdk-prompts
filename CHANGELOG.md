@@ -31,8 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Docs: installed-binary form** — all examples in docs/ now use `hyoka <cmd>` instead of `go run . <cmd>` for consistency with end-user perspective
 - **getting-started.md** — clarified installation instructions with `go install ./...` and removed stale reference to old `hyoka/` directory structure
 
-### Breaking Changes
+### Breaking Changes (pre-1.0)
 
+- **`tool_version_override` now keys by `owner/repo` instead of tool entry name.** Configs using name-keyed entries will fail with a migration-hint error. See docs/configuration.md → "Tool Versioning".
 - **Retired top-level `plugins:` field** — Pre-1.0, no deprecation path. All plugin declarations must migrate to `generator.tools` and `reviewer.tools` with `type: plugin`. Example migration:
   ```yaml
   # OLD (no longer supported)

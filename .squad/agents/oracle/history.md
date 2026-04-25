@@ -413,3 +413,102 @@ Unimplemented examples are worse than no examples — they confuse users and pol
 
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
+
+## Session: Document Version Pinning on Remote Skills/Plugins
+
+**Date:** 2026-04-25
+**Task:** Document `version:` field on remote skills/plugins and `tool_version_override:` map (existing code, missing docs).
+
+### Learnings
+
+**Version Pinning Mechanics:**
+- **Per-entry `version:`** — defined on every tool entry (skill or plugin) via the `Version` field in `hyoka/internal/config/tool/entry.go:28-33`. Accepts branch name, tag, or commit SHA. Empty/omitted = repo default branch.
+- **Fetcher Resolution:** `hyoka/internal/config/tool/fetcher.go:275-313` handles both fresh clones (`git clone --branch <version>`) and cached updates (`git fetch --all --tags && git checkout <version>`), enabling branch/tag/SHA pinning.
+- **Top-level `tool_version_override:`** — a map[string]string keyed by tool entry name. Defined in `hyoka/internal/config/config.go:95-130`, with `ApplyVersionOverrides()` walking every Generator/Reviewer tool entry.
+- **Resolution Order:** Per-entry `version:` ALWAYS wins over override map, which wins over fetcher default.
+- **Multi-file Loading:** `tool_version_override:` maps merge across `--config-dir` files. Same tool name with conflicting versions across files = hard error (determinism guarantee).
+
+### Work Summary
+
+**Files Changed:**
+1. **docs/configuration.md:**
+   - Updated Remote Skills section (lines 151-180) to add `version:` to example YAML and field reference table
+   - Added note linking version pinning to "Tool Versioning & Custom Fetchers" section
+   - Improved "Tool Versioning & Custom Fetchers" multi-file merge explanation
+
+2. **CHANGELOG.md:**
+   - Added entry under "### Changed" documenting the docs improvements
+
+**Key Implementation Detail:**
+Version pinning works identically for remote skills, plugins, and any tool entry that uses the git fetcher — no special handling needed. The `version:` field is the ONLY way to pin; there is no separate `ref:` or `branch:` field.
+
+## Session: Redirect Documentation to Repo-Keyed Version Override
+
+**Date:** 2026-04-25
+**Requested by:** Ronnie Geraghty (autonomous mode — user is AFK)
+**Status:** ✅ COMPLETE
+**Task:** Update `docs/configuration.md` for the NEW repo-keyed `tool_version_override` shape (Morpheus' approved proposal). Previous work (`oracle-version-docs`) documented the OLD name-keyed shape and has been REVERTED; this work replaces it with repo-keyed documentation.
+
+### Context
+
+**Previous Oracle work:** `oracle-version-docs` spawned to document tool versioning using **name-keyed** `tool_version_override` (keyed by tool entry name, e.g. `azure-sdk-java: "v1.4.2"`).
+
+**Schema change (approved):** Morpheus' proposal migrates to **repo-keyed** override (keyed by repo, e.g. `Azure/azure-sdk-skills: "v1.4.2"`). Rationale: repos are the atomic pinning unit in the fetcher, not individual skill names. Monorepos with N skills from one repo no longer require N redundant override entries.
+
+**Migration strategy:** Hard cut with a clear error message (user rewrites keys from tool names to repo names). Zero shipped configs use the old shape, so blast radius is tiny.
+
+### Work Summary
+
+**Files Updated:**
+1. **docs/configuration.md**
+   - Rewrote "Tool Versioning & Custom Fetchers" section (lines 461–551)
+   - Added per-entry `version:` field documentation with examples
+   - Documented `tool_version_override:` keyed by `owner/repo` (not `name`)
+   - Included monorepo example showing multiple entries from one repo picking up single override
+   - Included per-entry vs. override precedence example
+   - Documented `github.com/` prefix normalization (bare form preferred)
+   - Documented multi-file merge semantics: maps merge; conflicting values for same repo = hard error; identical values merge silently
+   - Added "Migrating from name-keyed overrides" callout with error message pattern and before/after YAML
+
+   - Updated "Remote Skills" section (lines 151–178)
+     - Added `version:` to the field reference table
+     - Added inline comment in YAML example showing optional `version:` field
+     - Added cross-link to "Tool Versioning" section
+
+### Design Patterns Applied
+
+**Documentation Precedence:**
+- Proposal-first: Read the approved decision before writing docs (ensures no misinterpretation)
+- Hard-cut migration messaging: Explicitly quote the error users will see, then provide the fix
+- Multi-file merge semantics: Clearly explain conflict detection (determinism guarantee for splits configs)
+- Reuse, don't duplicate: Remote Skills section links to Tool Versioning; doesn't re-explain the same fields
+
+**Content Organization:**
+- Per-entry pinning first (simplest case), then override map (most powerful case), then merge rules (infrastructure detail)
+- Migration callout as a separate subsection (discoverable when users see the error)
+- YAML examples show the "happy path" (things that work), not edge cases
+
+### Learnings
+
+**Proposal-to-Docs Workflow:**
+- Always read the full proposal (including edge cases, conflict detection, and migration strategy) before writing docs
+- The proposal's concrete examples (monorepos, per-entry override, prefix normalization) directly translate to doc YAML
+- The proposal's error messages should be quoted in the docs so users recognize what they see
+- Hard-cut schema migrations need a dedicated "migration" section, not buried in a footnote
+
+**Schema Naming Stability:**
+- When a Go field changes **meaning** (keying semantics) but keeps the same **name** (ToolVersionOverride), keep the YAML field name stable (tool_version_override) — users don't need to do a global find-replace
+- The Go type stays `map[string]string`; only validation and lookup sites change
+- This reduces user friction on configs that need updating
+
+**Multi-file Merge Behavior:**
+- Conflicting values = hard error is the right choice for version pinning (silent last-wins would hide misconfigurations)
+- Identical values merge silently to allow configs to be split without duplicating pins
+- Document both cases explicitly; users often split configs and need to know what's safe
+
+### Files Staged (not committed)
+
+- `docs/configuration.md` (updated per-entry + override + migration sections, plus Remote Skills cross-link)
+
+Ready for Scribe to commit.
+

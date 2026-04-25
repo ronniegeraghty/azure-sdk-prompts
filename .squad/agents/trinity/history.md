@@ -533,3 +533,4 @@ Neo's verification recipe (worth remembering):
 `jq '[.grader_results[].points[] | select(.label=="" or .label==null)]' <report.json>` returning `[]` + zero `synthesizing fallback` log hits = engine invariant verified end-to-end.
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
+- **2026-04-25: `tool_version_override` schema changed to repo-keyed.** Frontend has no direct involvement; noted for context if Tool-related UI changes arise. Old shape rejected with clear error. See `.squad/decisions.md` "Tool Version Override Migrated to Repo-Keyed" for decision rationale.

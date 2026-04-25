@@ -788,3 +788,79 @@ Correct workflow: `make site-embed` (does Vite build + atomic wipe + copy dist �
 This ate three "shipped" site fixes in two consecutive sessions before Trinity caught it. If you're modifying `site/src/**` or auditing why the served UI doesn't match source, check embed freshness first.
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
+
+## 2026-04-24 — Repo-Keyed Version Override Migration (Morpheus Proposal Implementation)
+
+**Branch:** `ronniegeraghty/dev`  
+**Status:** ✅ COMPLETE — code + tests + CHANGELOG shipped, staged for Scribe
+
+**Context:** Morpheus proposal `.squad/decisions/inbox/morpheus-repo-keyed-version-override.md` approved with all four recommended defaults:
+1. Key format: `owner/repo` (strip optional `github.com/` prefix)
+2. Migration: HARD CUT (no soft deprecation)
+3. Override referencing unknown repo → WARN via slog (not error)
+4. Empty value → silent skip (preserve existing behavior)
+
+**Implementation scope:** Steps 1, 2, and 4 from proposal Section 6 (code + tests + CHANGELOG). Step 3 (docs/configuration.md) owned by Oracle in parallel spawn.
+
+### Changes
+
+**`hyoka/internal/config/config.go`:**
+- Updated `ToolVersionOverride` doc comment to specify `owner/repo` format
+- Added `normalizeRepoKey(s string) string` helper — trims leading `github.com/` prefix
+- Rewrote `ApplyVersionOverrides`:
+  - Now looks up by normalized `Entry.Repo` (not `Entry.Name`)
+  - Skips entries with empty `Repo` (local skills, MCPs)
+  - Tracks used keys and logs slog.Warn for unused override keys
+- Added `validateOverrideKeys(map[string]string) error`:
+  - Rejects old-shape (name-keyed) entries with migration-hint error
+  - Validates `owner/repo` format: exactly one slash, non-empty parts
+  - Called from `Parse` before `Validate`
+- Updated `LoadDir` conflict error message: "repo" not "tool"
+
+**`hyoka/internal/config/version_override_test.go`:**
+- Replaced all name-keyed fixtures with repo-keyed ones
+- New test coverage:
+  - `TestApplyVersionOverrides_PinsByRepo` — multiple entries from same repo get same version
+  - `TestApplyVersionOverrides_PerEntryWinsOverMap` — per-entry `version:` precedence
+  - `TestApplyVersionOverrides_GitHubPrefixNormalization` — `github.com/owner/repo` matches `owner/repo`
+  - `TestApplyVersionOverrides_SkipsLocalSkills` — local skills (no `Repo`) are untouched
+  - `TestApplyVersionOverrides_EmptyValueSkipped` — empty override values are silent no-ops
+  - `TestValidateOverrideKeys_OldShapeRejected` — name-keyed input → migration error with hint
+  - `TestValidateOverrideKeys_MalformedKeysRejected` — single component, three components, empty owner/repo → validation error
+  - `TestValidateOverrideKeys_ValidKeysAccepted` — all valid formats pass
+  - `TestLoadDir_IdenticalOverridesMerge` — identical values across files merge OK
+
+**`CHANGELOG.md`:**
+- Added entry under "Breaking Changes (pre-1.0)": one-line description + link to docs
+
+### Verification
+
+```bash
+cd /home/rgeraghty/projects/hyoka
+go build ./...                                  # ✅ clean
+go test -race ./hyoka/internal/config/... -timeout 2m  # ✅ all pass (1.215s)
+go vet ./hyoka/internal/config/...             # ✅ clean (other packages have pre-existing issues)
+```
+
+**Pre-existing vet issues in other packages:** report, comparison, serve, cmd — unrelated to this change.
+
+### Files staged
+
+- `hyoka/internal/config/config.go`
+- `hyoka/internal/config/version_override_test.go`
+- `CHANGELOG.md`
+
+**NOT staged:** `docs/configuration.md` (Oracle's parallel spawn), `.squad/agents/oracle/history.md` (Oracle-owned)
+
+### Decision artifacts
+
+- `.squad/decisions/inbox/neo-repo-keyed-implementation.md` — implementation summary for Scribe
+- `.squad/agents/neo/history.md` — this entry
+
+## Learnings
+
+**Hard-cut schema migration pattern works cleanly pre-1.0.** The validation + migration-hint approach (modeled after the retired `plugins:` field) provides clear user guidance without maintaining dual code paths. Key insight: detect old-shape inputs at parse time, surface explicit error with migration steps, fail fast. No ambiguity, no "did it apply?" debugging.
+
+**Repo-level override granularity eliminates monorepo fan-out.** Before: pinning all skills in `microsoft/skills` required N override entries (one per skill name). After: one entry per repo. This matches the fetcher's actual behavior (it clones `owner/repo` at `version`, not individual skills).
+
+**Unused-key warning is a UX win.** Users splitting configs across files may have override maps that cover more repos than any single config uses. Warning (not erroring) lets them maintain a shared override map without per-config duplication, while still surfacing typos.

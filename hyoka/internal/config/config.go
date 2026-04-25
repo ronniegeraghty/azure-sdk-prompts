@@ -92,30 +92,83 @@ type ConfigFile struct {
 	// config YAML loaded from disk, relative paths are resolved against the
 	// containing config file's directory by Load/LoadDir.
 	PromptDirectory string `yaml:"prompt_directory,omitempty" json:"prompt_directory,omitempty"`
-	// ToolVersionOverride pins specific tool entries (matched by Entry.Name)
-	// to a given version. The version is forwarded to the registered Fetcher
-	// (for the default npx fetcher, it becomes a git ref). Per-entry
-	// `version:` set directly on a tool entry takes precedence over this map.
-	// Empty map (or absent field) means "no overrides" — fetcher defaults
-	// are used everywhere.
+	// ToolVersionOverride pins all tool entries from a given repository
+	// (matched by Entry.Repo in owner/repo format) to a specific version.
+	// Keys should be in "owner/repo" format (e.g., "microsoft/skills").
+	// Leading "github.com/" prefixes are normalized away during lookup.
+	// The version is forwarded to the registered Fetcher (for the git fetcher,
+	// it becomes a git ref). Per-entry `version:` set directly on a tool entry
+	// takes precedence over this map. Empty map (or absent field) means "no
+	// overrides" — fetcher defaults are used everywhere.
 	ToolVersionOverride map[string]string `yaml:"tool_version_override,omitempty" json:"tool_version_override,omitempty"`
 	Configs             []ToolConfig      `yaml:"configs"`
 }
 
+// normalizeRepoKey normalizes a repository key by trimming the leading
+// "github.com/" prefix, if present. This allows users to write either
+// "microsoft/skills" or "github.com/microsoft/skills" and have them match.
+func normalizeRepoKey(s string) string {
+	return strings.TrimPrefix(s, "github.com/")
+}
+
+// validateOverrideKeys validates that all keys in tool_version_override are
+// in the new repo-keyed format (owner/repo). Returns a migration-hint error
+// if old-shape (name-keyed) entries are detected, or a validation error if
+// keys are malformed.
+func validateOverrideKeys(overrides map[string]string) error {
+	for k := range overrides {
+		normalized := normalizeRepoKey(k)
+		// Detect old-shape: keys without a slash
+		if !strings.Contains(normalized, "/") {
+			return fmt.Errorf(
+				"tool_version_override now keys by repo (e.g. \"microsoft/skills\"), not by tool name.\n"+
+					"Found name-shaped key %q. Migration:\n"+
+					"  - Replace each tool-name key with the repo it points to.\n"+
+					"  - If multiple tools shared the same repo, collapse them to one entry.\n"+
+					"See docs/configuration.md → \"Tool Versioning\" for examples.",
+				k,
+			)
+		}
+		// Validate owner/repo format: exactly one slash, non-empty parts
+		parts := strings.Split(normalized, "/")
+		if len(parts) != 2 {
+			return fmt.Errorf("tool_version_override: key %q is not in \"owner/repo\" format", k)
+		}
+		if parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("tool_version_override: key %q has empty owner or repo", k)
+		}
+	}
+	return nil
+}
+
 // ApplyVersionOverrides applies cf.ToolVersionOverride to every tool entry
 // in every config (Generator and Reviewer). Entries with a non-empty
-// Version field are left untouched (per-entry pin wins). Idempotent.
+// Version field are left untouched (per-entry pin wins). Keys are matched
+// against Entry.Repo (normalized to owner/repo format). Idempotent.
 func (cf *ConfigFile) ApplyVersionOverrides() {
 	if cf == nil || len(cf.ToolVersionOverride) == 0 {
 		return
 	}
+	// Normalize override keys once
+	normalized := make(map[string]string, len(cf.ToolVersionOverride))
+	for k, v := range cf.ToolVersionOverride {
+		normalized[normalizeRepoKey(k)] = v
+	}
+	// Track which override keys were used
+	usedKeys := make(map[string]bool)
+	
 	apply := func(entries []ToolEntry) {
 		for i := range entries {
 			if entries[i].Version != "" {
-				continue
+				continue // per-entry pin wins
 			}
-			if v, ok := cf.ToolVersionOverride[entries[i].Name]; ok && v != "" {
+			if entries[i].Repo == "" {
+				continue // skip local skills, MCPs
+			}
+			normalizedRepo := normalizeRepoKey(entries[i].Repo)
+			if v, ok := normalized[normalizedRepo]; ok && v != "" {
 				entries[i].Version = v
+				usedKeys[normalizedRepo] = true
 			}
 		}
 	}
@@ -125,6 +178,13 @@ func (cf *ConfigFile) ApplyVersionOverrides() {
 		}
 		if cf.Configs[i].Reviewer != nil {
 			apply(cf.Configs[i].Reviewer.Tools)
+		}
+	}
+	
+	// Warn about unused override keys (override references a repo not present in any tool entry)
+	for k := range normalized {
+		if !usedKeys[k] {
+			slog.Warn("tool_version_override key matches no tool entries in this config set", "repo", k)
 		}
 	}
 }
@@ -198,7 +258,7 @@ func LoadDir(dir string) (*ConfigFile, error) {
 				merged.ToolVersionOverride = make(map[string]string)
 			}
 			if existing, ok := merged.ToolVersionOverride[k]; ok && existing != v {
-				return nil, fmt.Errorf("conflicting tool_version_override for %q: %q vs %q (in %s)", k, existing, v, e.Name())
+				return nil, fmt.Errorf("conflicting tool_version_override for repo %q: %q vs %q (in %s)", k, existing, v, e.Name())
 			}
 			merged.ToolVersionOverride[k] = v
 		}
@@ -225,6 +285,10 @@ func Parse(data []byte) (*ConfigFile, error) {
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing config YAML: %w", err)
+	}
+	// Validate tool_version_override keys are in the new repo-keyed format
+	if err := validateOverrideKeys(cfg.ToolVersionOverride); err != nil {
+		return nil, err
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
