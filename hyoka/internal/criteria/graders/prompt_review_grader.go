@@ -110,8 +110,11 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 
 	// Per v4 spec: one Point per criterion, Weight = criterion max
 	var points []GraderPoint
-	for _, c := range consolidated.Scores.Criteria {
-		label := fmt.Sprintf("criterion: %s", c.Name)
+	for i, c := range consolidated.Scores.Criteria {
+		label := c.Name
+		if label == "" {
+			label = fmt.Sprintf("check %d", i+1)
+		}
 		pointMsg := ""
 		if !c.Passed {
 			pointMsg = c.Reason
@@ -204,8 +207,11 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 
 	// Per v4 spec: one Point per criterion, Weight = criterion max
 	var points []GraderPoint
-	for _, c := range reviewResult.Scores.Criteria {
-		label := fmt.Sprintf("criterion: %s", c.Name)
+	for i, c := range reviewResult.Scores.Criteria {
+		label := c.Name
+		if label == "" {
+			label = fmt.Sprintf("check %d", i+1)
+		}
 		pointMsg := ""
 		if !c.Passed {
 			pointMsg = c.Reason

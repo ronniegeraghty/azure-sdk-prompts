@@ -195,3 +195,31 @@ entries = append(entries, *current)
 
 return entries
 }
+
+// FormatParsedCriteria formats parsed criterion entries into a deterministic
+// numbered list matching the style used for YAML-defined checks. Each top-level
+// bullet becomes a numbered check; sub-points become indented hints.
+//
+// This ensures the LLM review panel sees a consistent numbered structure
+// regardless of whether criteria come from YAML checks or markdown bullets.
+func FormatParsedCriteria(entries []CriterionEntry) string {
+if len(entries) == 0 {
+return ""
+}
+var b strings.Builder
+for i, e := range entries {
+prompt := strings.TrimSpace(e.Prompt)
+if prompt == "" {
+// Skip empty entries
+continue
+}
+fmt.Fprintf(&b, "%d. %s\n", i+1, prompt)
+for _, sub := range e.SubPoints {
+sub = strings.TrimSpace(sub)
+if sub != "" {
+fmt.Fprintf(&b, "   - %s\n", sub)
+}
+}
+}
+return strings.TrimRight(b.String(), "\n")
+}

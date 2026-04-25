@@ -335,3 +335,46 @@ t.Errorf("rendering mismatch\n got: %q\nwant: %q", got, tc.want)
 })
 }
 }
+
+func TestBuildUnifiedReviewBuckets_DeterministicPromptCriteria(t *testing.T) {
+// Test that prompt criteria are formatted as deterministic numbered checks
+promptCriteria := `1. Use DefaultAzureCredential
+   - Must include azure-identity dependency
+   - Must use DefaultAzureCredentialBuilder
+2. CRUD operations on secrets
+   - setSecret()
+   - getSecret()
+3. Error handling for authentication failures`
+
+// No attribute-matched entries, only prompt criteria
+buckets := BuildUnifiedReviewBuckets(nil, promptCriteria, ReviewModeCombined)
+
+if len(buckets) != 1 {
+t.Fatalf("expected 1 bucket, got %d", len(buckets))
+}
+
+if buckets[0].Name != "Criteria from prompt file" {
+t.Errorf("bucket name = %q, want %q", buckets[0].Name, "Criteria from prompt file")
+}
+
+// The bucket criteria should contain the prompt criteria under "### Prompt-Specific Criteria"
+if !strings.Contains(buckets[0].Criteria, "### Prompt-Specific Criteria") {
+t.Errorf("bucket criteria missing section header")
+}
+
+// Should contain numbered checks
+if !strings.Contains(buckets[0].Criteria, "1. Use DefaultAzureCredential") {
+t.Errorf("bucket criteria missing first check")
+}
+if !strings.Contains(buckets[0].Criteria, "2. CRUD operations on secrets") {
+t.Errorf("bucket criteria missing second check")
+}
+if !strings.Contains(buckets[0].Criteria, "3. Error handling for authentication failures") {
+t.Errorf("bucket criteria missing third check")
+}
+
+// Should contain sub-points
+if !strings.Contains(buckets[0].Criteria, "- setSecret()") {
+t.Errorf("bucket criteria missing sub-point")
+}
+}

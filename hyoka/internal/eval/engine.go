@@ -270,7 +270,12 @@ func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string) []grad
 		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
 			"prompt_id", p.ID)
 	}
-	return criteria.BuildUnifiedReviewBuckets(promptMatched, p.EvaluationCriteria, mode)
+	// Format parsed criteria if available, otherwise use raw EvaluationCriteria
+	criteriaText := prompt.FormatParsedCriteria(p.ParsedCriteria)
+	if criteriaText == "" {
+		criteriaText = p.EvaluationCriteria
+	}
+	return criteria.BuildUnifiedReviewBuckets(promptMatched, criteriaText, mode)
 }
 
 // mergedCriteria returns the combined attribute-matched + prompt-specific
@@ -284,9 +289,14 @@ func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) strin
 	for _, m := range promptMatched {
 		entries = append(entries, m.Entry)
 	}
-	merged := criteria.MergeUnifiedCriteria(entries, p.EvaluationCriteria)
+	// Format parsed criteria if available, otherwise use raw EvaluationCriteria
+	criteriaText := prompt.FormatParsedCriteria(p.ParsedCriteria)
+	if criteriaText == "" {
+		criteriaText = p.EvaluationCriteria
+	}
+	merged := criteria.MergeUnifiedCriteria(entries, criteriaText)
 	if merged == "" {
-		return p.EvaluationCriteria
+		return criteriaText
 	}
 	return merged
 }

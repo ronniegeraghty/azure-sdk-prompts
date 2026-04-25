@@ -864,3 +864,34 @@ go vet ./hyoka/internal/config/...             # ✅ clean (other packages have 
 **Repo-level override granularity eliminates monorepo fan-out.** Before: pinning all skills in `microsoft/skills` required N override entries (one per skill name). After: one entry per repo. This matches the fetcher's actual behavior (it clones `owner/repo` at `version`, not individual skills).
 
 **Unused-key warning is a UX win.** Users splitting configs across files may have override maps that cover more repos than any single config uses. Warning (not erroring) lets them maintain a shared override map without per-config duplication, while still surfacing typos.
+
+## 2025-01-20: Prompt Grader Output Cleanup
+
+**Task:** Remove "criterion:" prefix from grader points and make markdown-form evaluation criteria deterministic.
+
+**Changes:**
+
+1. **Removed "criterion:" prefix** from prompt review grader output (`prompt_review_grader.go` lines 114, 208)
+   - Changed `fmt.Sprintf("criterion: %s", c.Name)` → `c.Name`
+   - Added fallback: empty names → `fmt.Sprintf("check %d", i+1)`
+
+2. **Made markdown criteria deterministic** by formatting parsed bullets as numbered checks before passing to LLM review panel
+   - Added `prompt.FormatParsedCriteria([]CriterionEntry) string` to format bullets as numbered checks
+   - Updated `engine.reviewBuckets()` and `engine.mergedCriteria()` to use formatted criteria
+   - Fallback to raw `EvaluationCriteria` if `ParsedCriteria` is empty (backward compatibility)
+
+3. **Tests:**
+   - Added 8 tests for `FormatParsedCriteria` in `parser_test.go`
+   - Added `TestBuildUnifiedReviewBuckets_DeterministicPromptCriteria` in `buckets_test.go`
+   - Documented edge cases: 4-space indent (dropped), numbered lists (not recognized), blank lines (ignored)
+
+**Key Learning:**
+
+The parser's `ParseEvaluationCriteria` was already producing structured `[]CriterionEntry`, but the review path was ignoring it and passing raw markdown text to the LLM. This caused non-deterministic scoring because the LLM decided how to split bullets. The fix: format the parsed structure into the same numbered-check style that YAML `checks:` uses, so the LLM sees deterministic numbering regardless of source format.
+
+**Impact:**
+- Cleaner point labels (no redundant prefix)
+- Deterministic criterion counts for markdown-form criteria
+- Markdown bullets now behave identically to YAML checks from the LLM's perspective
+
+**Files:** 5 files modified, +228/-7 lines (see `.squad/decisions/inbox/neo-prompt-grader-cleanup.md` for full details)

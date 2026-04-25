@@ -202,3 +202,137 @@ if len(p.ParsedCriteria[2].SubPoints) != 0 {
 t.Errorf("criteria[2] should have no sub-points")
 }
 }
+
+func TestFormatParsedCriteria_Empty(t *testing.T) {
+result := FormatParsedCriteria(nil)
+if result != "" {
+t.Errorf("expected empty string for nil input, got %q", result)
+}
+result = FormatParsedCriteria([]CriterionEntry{})
+if result != "" {
+t.Errorf("expected empty string for empty slice, got %q", result)
+}
+}
+
+func TestFormatParsedCriteria_SimpleBullets(t *testing.T) {
+entries := []CriterionEntry{
+{Prompt: "Use DefaultAzureCredential"},
+{Prompt: "Handle authentication errors"},
+{Prompt: "Use async methods"},
+}
+result := FormatParsedCriteria(entries)
+expected := "1. Use DefaultAzureCredential\n2. Handle authentication errors\n3. Use async methods"
+if result != expected {
+t.Errorf("FormatParsedCriteria() =\n%q\n\nwant:\n%q", result, expected)
+}
+}
+
+func TestFormatParsedCriteria_WithSubPoints(t *testing.T) {
+entries := []CriterionEntry{
+{
+Prompt: "CRUD operations",
+SubPoints: []string{
+"createItem()",
+"readItem()",
+"deleteItem()",
+},
+},
+{
+Prompt:    "Error handling",
+SubPoints: []string{"CosmosException handling"},
+},
+}
+result := FormatParsedCriteria(entries)
+expected := `1. CRUD operations
+   - createItem()
+   - readItem()
+   - deleteItem()
+2. Error handling
+   - CosmosException handling`
+if result != expected {
+t.Errorf("FormatParsedCriteria() =\n%q\n\nwant:\n%q", result, expected)
+}
+}
+
+func TestFormatParsedCriteria_SkipsEmptyEntries(t *testing.T) {
+entries := []CriterionEntry{
+{Prompt: "Use DefaultAzureCredential"},
+{Prompt: ""},
+{Prompt: "  \t  "},
+{Prompt: "Handle authentication errors"},
+}
+result := FormatParsedCriteria(entries)
+// Empty entries should be skipped but numbering should be preserved
+expected := "1. Use DefaultAzureCredential\n4. Handle authentication errors"
+if result != expected {
+t.Errorf("FormatParsedCriteria() =\n%q\n\nwant:\n%q", result, expected)
+}
+}
+
+func TestFormatParsedCriteria_MultilineWithBlankLines(t *testing.T) {
+input := `- Use of DefaultAzureCredential
+  - Must include azure-identity dependency
+  - Must use DefaultAzureCredentialBuilder
+
+- CRUD operations on secrets
+  - setSecret()
+  - getSecret()
+
+- Error handling for authentication failures`
+
+parsed := ParseEvaluationCriteria(input)
+result := FormatParsedCriteria(parsed)
+
+if len(parsed) != 3 {
+t.Fatalf("expected 3 parsed entries, got %d", len(parsed))
+}
+
+expected := `1. Use of DefaultAzureCredential
+   - Must include azure-identity dependency
+   - Must use DefaultAzureCredentialBuilder
+2. CRUD operations on secrets
+   - setSecret()
+   - getSecret()
+3. Error handling for authentication failures`
+
+if result != expected {
+t.Errorf("FormatParsedCriteria() =\n%q\n\nwant:\n%q", result, expected)
+}
+}
+
+func TestFormatParsedCriteria_NumberedListsInInput(t *testing.T) {
+// Test that numbered lists in markdown input are converted to bullet format
+input := `- Authentication
+  1. Use DefaultAzureCredential
+  2. Handle AuthenticationException
+- Storage operations
+  1. Upload blob
+  2. Download blob`
+
+parsed := ParseEvaluationCriteria(input)
+// The parser currently treats "1. Use..." as sub-points since they don't start with "- "
+// This tests current behavior - if parser changes, update this test
+if len(parsed) != 2 {
+t.Fatalf("expected 2 parsed entries, got %d", len(parsed))
+}
+}
+
+func TestFormatParsedCriteria_FourSpaceIndent(t *testing.T) {
+// Test 4-space indented sub-points (currently dropped by parser)
+input := `- Parent item
+    - Four space sub-point
+  - Two space sub-point`
+
+parsed := ParseEvaluationCriteria(input)
+_ = FormatParsedCriteria(parsed) // Just verify it does not panic
+
+// Currently parser only recognizes 2-space indent as sub-points
+// This documents current behavior - 4-space indent is silently dropped
+if len(parsed) != 1 {
+t.Fatalf("expected 1 parsed entry, got %d", len(parsed))
+}
+if len(parsed[0].SubPoints) != 1 {
+t.Errorf("expected 1 sub-point (4-space indent dropped), got %d: %v",
+len(parsed[0].SubPoints), parsed[0].SubPoints)
+}
+}
