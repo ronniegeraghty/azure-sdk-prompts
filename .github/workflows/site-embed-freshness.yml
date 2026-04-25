@@ -1,18 +1,12 @@
-name: Site Embed Freshness
+name: Site Bundle Freshness
 
-# Enforces that hyoka/internal/serve/site/ (the go:embed'd bundle) is kept
-# in sync with site/src/**. Rebuilds the site on the PR branch and fails if
-# the committed embedded tree differs from a fresh build.
+# Enforces that site/dist/ (the go:embed'd bundle) is kept in sync with
+# site/src/**. Rebuilds the site on the PR branch and fails if the committed
+# dist/ differs from a fresh build.
 #
-# See .squad/skills/embedded-asset-freshness/SKILL.md.
-#
-# Deliberate duplication note: this workflow's `npm ci && npm run build`
-# overlaps with ci.yml's `site-build-and-test` job (~1–2 min/run). The
-# duplication is intentional — keeping freshness as a discrete required
-# check gives a clear, named status on PRs ("Verify embedded site bundle is
-# fresh") that reviewers can gate on without reading into a generic site
-# CI job. Reconsider folding into ci.yml only if CI minute pressure
-# materially outweighs the signal clarity.
+# Vite hashes asset filenames deterministically by content, so rebuilding
+# identical source produces byte-identical output. The git diff --exit-code
+# gate reliably detects stale bundles.
 
 on:
   pull_request:
@@ -20,14 +14,9 @@ on:
       - '**'
     paths:
       - 'site/**'
-      - 'hyoka/internal/serve/site/**'
       - 'hyoka/internal/serve/embed.go'
-      - 'Makefile'
       - '.github/workflows/site-embed-freshness.yml'
   push:
-    # phase-6 was a temporary integration branch and was removed once it
-    # merged into ronniegeraghty/dev. Add it back only if a similar
-    # short-lived integration line is reopened.
     branches:
       - main
       - ronniegeraghty/dev
@@ -37,8 +26,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify-embedded-bundle:
-    name: Verify embedded site bundle is fresh
+  verify-bundle-freshness:
+    name: Verify site/dist/ is fresh
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -52,7 +41,20 @@ jobs:
           cache-dependency-path: site/package-lock.json
 
       - name: Install site dependencies
-        run: make site-install
+        run: cd site && npm ci
 
-      - name: Verify embedded bundle matches fresh build
-        run: make verify-embed
+      - name: Rebuild site bundle
+        run: cd site && npm run build
+
+      - name: Check if site/dist/ is up to date
+        run: |
+          if ! git diff --exit-code site/dist/; then
+            echo ""
+            echo "ERROR: site/dist/ is stale."
+            echo "  site/src/** has changes that were not reflected in the committed bundle."
+            echo "  Run 'cd site && npm run build' and commit the result."
+            echo ""
+            git --no-pager diff --stat site/dist/
+            exit 1
+          fi
+          echo "[verify] site/dist/ is up to date."
