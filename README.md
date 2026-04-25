@@ -217,10 +217,10 @@ go test -race ./...
 # Test site (frontend)
 cd site && npm test
 
-# Rebuild the site AND refresh the embedded bundle that `hyoka serve` ships.
+# Rebuild the site bundle (embedded via go:embed).
 # Required whenever you change anything under site/src/** — a CI check
-# (site-embed-freshness) will fail the PR otherwise.
-make site-embed
+# (site-bundle-freshness) will fail the PR if site/dist/ is stale.
+cd site && npm run build
 
 # Test with a live eval (fastest feedback)
 hyoka run --prompt-id key-vault-dp-python-crud \
