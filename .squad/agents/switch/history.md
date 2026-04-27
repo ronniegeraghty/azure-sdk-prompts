@@ -576,3 +576,20 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - `hyoka/internal/eval/engine_test.go` - Added test and stub runner
 
 **Commit:** 7dda6358
+
+---
+
+## 2026-04-27: Cross-Agent Note — OPTA Test Coverage Shipped
+
+**From:** Scribe (session close)
+
+Your test for real-time guardrail enforcement has shipped:
+
+- **Commits:** 7dda6358 ("Add TestRealtimeGuardrailEnforcementUsesResolvedLimits") + fe9a93c9 ("Add LimitConfigurable interface")
+- **Coverage:** 4 table-driven cases (turn limits both above/below CLI default, file limits both above/below)
+- **Infrastructure:** `LimitConfigurable` interface enables test stubs + real runner to participate
+- **Verification:** All tests pass; live smoke test confirms fix works end-to-end
+
+The test strategy (stub runner + fallback chain) is a solid pattern for future guardrail changes.
+
+---

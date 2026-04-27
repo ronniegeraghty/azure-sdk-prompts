@@ -512,3 +512,33 @@ Version pinning works identically for remote skills, plugins, and any tool entry
 
 Ready for Scribe to commit.
 
+
+## Session: Limits Documentation Update (2026-04-24)
+
+**Date:** 2026-04-24  
+**Task ID:** opta-docs  
+**Status:** ✅ COMPLETE  
+
+### Work Summary
+
+Updated `docs/configuration.md` to explicitly clarify that the limit resolution order (prompt frontmatter > config YAML > CLI flag > engine default) applies to **real-time enforcement** during code generation, not just post-hoc reporting.
+
+### Files Changed
+
+1. **docs/configuration.md** (line 418)
+   - Added one clarifying sentence: "These resolved limits are enforced in real-time during code generation, ensuring that session actions, turns, and file creation respect the merged priority order."
+   - Placement: immediately after resolution order statement in Limits section
+   - Tone: terse, Microsoft Style Guide
+   - No fearmongering or historical bug notes
+
+### Commit
+
+- **Commit:** 4a8cd9d0
+- **Branch:** ronniegeraghty/dev
+- **Message:** docs(configuration): clarify real-time enforcement of resolved limits
+
+### Related
+
+- **Decision file:** `.squad/decisions/inbox/morpheus-maxturns-enforcement-bug.md` — bug fix context (Option A implemented)
+- **Team context:** `SetLimitsForEval()` now threads resolved limits into runner for real-time enforcement
+

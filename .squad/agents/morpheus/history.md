@@ -524,3 +524,58 @@ Follow-ups deferred: grader-by-grader reliability table (separate session), Neo'
 
 **Time:** ~45m. Pure scoping — no code changes.
 
+
+## Learnings (Guardrail Enforcement Bug — 2026-04-23)
+
+**Date:** 2026-04-23
+
+**Task:** Bug investigation — guardrail real-time enforcement uses stale CLI defaults instead of resolved per-config/per-prompt limits.
+
+**Findings:**
+- **Bug confirmed:** `CopilotPromptRunner` is constructed once at CLI startup with CLI defaults (`maxTurns`, `maxFiles`, `maxSessionActions`), before any per-config limits are loaded.
+- Real-time enforcement (`copilot.go:303-308` for turns, `339-344` for files, `316-320` for actions) uses the runner's stale fields: `e.maxTurns`, `e.maxFiles`, `e.maxSessionActions`.
+- The Engine's `resolveLimits()` correctly merges `CLI → config → prompt` and writes the result to the **report**, but never passes it back to the runner for real-time enforcement.
+- **Impact:** A config with `max_turns: 100` will kill the session at 25 turns because the runner's `e.maxTurns` was `0` (CLI default), falling back to hardcoded `25` at `copilot.go:224-227`.
+
+**Bug class extension:**
+- `maxTurns`: ✅ AFFECTED — CLI default `0` falls back to `25`, ignoring config overrides
+- `maxFiles`: ✅ AFFECTED — CLI default `50`, ignores config overrides
+- `maxSessionActions`: ⚠️ PARTIALLY AFFECTED — Only if config sets a value **higher** than the CLI default (e.g., config says `250`, CLI default `50` wins)
+
+**Recommended fix (Option A):**
+- Add `SetLimitsForEval(maxTurns, maxFiles, maxSessionActions int)` method to `CopilotPromptRunner`
+- Call it from `engine_eval.go` after `resolveLimits()`, before `evaluator.Run()`
+- Real-time enforcement checks per-eval fields first, falls back to CLI defaults if unset
+- Minimal structural change, backward compatible, testable
+
+**Other options rejected:**
+- Option B (construct runner per-eval): breaks resource reuse, higher overhead
+- Option C (per-eval context): requires interface change, breaks all test stubs
+
+**Smoke test:**
+```bash
+# Create config with max_turns: 100, run a Python prompt, verify no premature cancellation at turn 25
+hyoka run --prompt-id identity-dp-python-default-credential --config test-high-turns --log-level debug
+grep "Turn limit reached" verify-turns.log  # Should be empty or show turn 100, not 25
+```
+
+**Decision file:** `.squad/decisions/inbox/morpheus-maxturns-enforcement-bug.md`
+
+**Architectural insight:** The per-eval resolution pattern (CLI → config → prompt) is correctly implemented for the **report** (post-hoc guardrail check), but not threaded through to the **runner** (real-time enforcement). This is a classic state-sync bug: two consumers of the same logical limit, one gets the fresh value, one gets the stale value. The fix threads the fresh value through by adding a per-eval state update hook on the runner.
+
+---
+
+## 2026-04-27: Cross-Agent Note — OPTA MaxTurns Fix Shipped
+
+**From:** Scribe (session close)
+
+Your guardrail enforcement bug investigation (2026-04-23) recommended Option A. The full Option A fix has shipped:
+
+- **Neo** implemented `SetLimitsForEval()` with RWMutex (commits d2f6e93b + def6b803)
+- **Switch** added comprehensive test coverage (commits 7dda6358 + fe9a93c9)  
+- **Oracle** updated documentation (commit 4a8cd9d0)
+- **Coordinator** verified via live smoke test (`python-pairwise` config, turns 1-3 without premature cancellation)
+
+All commits merged to origin/ronniegeraghty/dev. No pre-existing test failures introduced. Ready for production.
+
+---

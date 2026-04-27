@@ -1013,3 +1013,20 @@ hard-fail path still runs and now appends the fetch error inline.
 - Always check concurrency model before adding shared state — engine's goroutine-per-eval pattern required RWMutex
 - Type assertion pattern (`if copilotRunner, ok := e.evaluator.(*CopilotPromptRunner); ok`) cleanly skips stub runners in tests
 - Fallback chain (per-eval → CLI → hardcoded) maintains backward compatibility while fixing the bug
+
+---
+
+## 2026-04-27: Cross-Agent Note — OPTA Implementation Shipped
+
+**From:** Scribe (session close)
+
+Your implementation of Option A guardrail enforcement fix has shipped:
+
+- **Commits:** d2f6e93b ("Fix guardrail enforcement to use per-eval resolved limits") + def6b803 (engine integration)
+- **Tests:** All existing eval tests pass with -race flag
+- **Real-time test:** Switch added `TestRealtimeGuardrailEnforcementUsesResolvedLimits` (4 table-driven cases)
+- **Verification:** Live smoke test confirms sessions no longer cancel prematurely
+
+The SetLimitsForEval() method signature is stable; Switch and future implementers can safely depend on it.
+
+---
