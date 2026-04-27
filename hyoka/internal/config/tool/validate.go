@@ -1,8 +1,10 @@
 package tool
 
 import (
+"bufio"
 "context"
 "fmt"
+"log/slog"
 "os"
 "path/filepath"
 "strconv"
@@ -506,6 +508,19 @@ Role:   role,
 emitResultWithParent(emit, entry.Name, progress.ToolKindSkill, progress.ToolStatusFailed, reason, "", "")
 return
 }
+// Sanity check: the SDK uses the SKILL.md `name:` frontmatter when
+// loading a skill, not the config entry name. If they don't match,
+// the user will see the SKILL.md name in load events and reports —
+// not what they typed in YAML. Surface a clear warning so it doesn't
+// look like the skill failed to load when really it loaded under a
+// different label.
+if skillName, ok := readSkillFrontmatterName(dir); ok && skillName != "" && skillName != entry.Name {
+slog.Warn("Remote skill name differs from SKILL.md frontmatter — SDK will load it under the SKILL.md name",
+"entry_name", entry.Name,
+"skill_md_name", skillName,
+"path", dir,
+"hint", fmt.Sprintf("rename your config entry to `name: %s` to match", skillName))
+}
 report.Items = append(report.Items, ToolLoadItem{
 Kind:   progress.ToolKindSkill,
 Name:   entry.Name,
@@ -744,4 +759,42 @@ Reason:     reason,
 ParentName: parent,
 ParentKind: parentKind,
 })
+}
+
+// readSkillFrontmatterName reads the `name:` field from the YAML frontmatter
+// of a SKILL.md file in the given directory. Returns ("", false) if SKILL.md
+// is missing, has no frontmatter, or has no name field. Used to surface
+// mismatches between a config entry's name and the actual skill name the
+// SDK will load.
+func readSkillFrontmatterName(skillDir string) (string, bool) {
+f, err := os.Open(filepath.Join(skillDir, "SKILL.md"))
+if err != nil {
+return "", false
+}
+defer f.Close()
+scanner := bufio.NewScanner(f)
+scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+inFrontmatter := false
+for scanner.Scan() {
+line := scanner.Text()
+trimmed := strings.TrimSpace(line)
+if !inFrontmatter {
+if trimmed == "---" {
+inFrontmatter = true
+}
+continue
+}
+if trimmed == "---" {
+return "", false
+}
+if rest, ok := strings.CutPrefix(trimmed, "name:"); ok {
+name := strings.TrimSpace(rest)
+name = strings.Trim(name, `"'`)
+if name == "" {
+return "", false
+}
+return name, true
+}
+}
+return "", false
 }

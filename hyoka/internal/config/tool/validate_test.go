@@ -699,3 +699,56 @@ if !report.Failed() {
 t.Error("expected report.Failed() == true")
 }
 }
+
+func TestReadSkillFrontmatterName(t *testing.T) {
+cases := []struct {
+name     string
+content  string
+want     string
+wantOk   bool
+}{
+{
+name:    "well-formed frontmatter with name",
+content: "---\nname: python\ndescription: foo\n---\n# body\n",
+want:    "python",
+wantOk:  true,
+},
+{
+name:    "quoted name",
+content: "---\nname: \"python-best-practices\"\n---\n",
+want:    "python-best-practices",
+wantOk:  true,
+},
+{
+name:    "no frontmatter",
+content: "# Just a heading\n",
+want:    "",
+wantOk:  false,
+},
+{
+name:    "frontmatter without name",
+content: "---\ndescription: foo\n---\n",
+want:    "",
+wantOk:  false,
+},
+}
+for _, tc := range cases {
+t.Run(tc.name, func(t *testing.T) {
+dir := t.TempDir()
+if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(tc.content), 0o644); err != nil {
+t.Fatal(err)
+}
+got, ok := readSkillFrontmatterName(dir)
+if got != tc.want || ok != tc.wantOk {
+t.Errorf("got (%q, %v), want (%q, %v)", got, ok, tc.want, tc.wantOk)
+}
+})
+}
+t.Run("missing SKILL.md", func(t *testing.T) {
+dir := t.TempDir()
+got, ok := readSkillFrontmatterName(dir)
+if got != "" || ok {
+t.Errorf("got (%q, %v), want empty", got, ok)
+}
+})
+}
