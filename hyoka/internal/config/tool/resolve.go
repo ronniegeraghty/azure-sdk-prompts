@@ -60,7 +60,7 @@ func ResolveSkillsWithReporter(ctx context.Context, entries []Entry, baseDir str
 			}
 		case SourceRemote:
 			var dir string
-			dir, err = FetchRemote(ctx, entry, baseDir)
+			dir, err = FetchRemote(ctx, entry)
 			if err != nil {
 				err = fmt.Errorf("fetching remote skill %s/%s: %w", entry.Repo, entry.Name, err)
 			} else {
@@ -262,21 +262,23 @@ func resolveSkillDir(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-// FetchRemote fetches a remote skill via the registered Fetcher (default: npx).
+// FetchRemote fetches a remote skill via the registered Fetcher (default: git).
 // Returns the directory where the skill was installed. The fetcher is chosen
 // from DefaultRegistry; users can register custom fetchers via Register to
 // override or extend this behavior. Honors entry.Version (which may have been
 // set by ApplyVersionOverrides) and falls back to the fetcher's default when
 // empty. The provided context is passed to the fetcher so cancellation and
 // deadlines propagate into any HTTP/exec work it performs.
-func FetchRemote(ctx context.Context, entry Entry, baseDir string) (string, error) {
+//
+// The on-disk cache location is owned by internal/toolload — callers no
+// longer pass a base directory.
+func FetchRemote(ctx context.Context, entry Entry) (string, error) {
 	f := LookupFetcher(entry)
 	if f == nil {
 		return "", fmt.Errorf("no fetcher registered for remote skill %q (repo=%q)", entry.Name, entry.Repo)
 	}
 	res, err := f.Fetch(ctx, FetchRequest{
 		Entry:   entry,
-		BaseDir: baseDir,
 		Version: entry.Version,
 	})
 	if err != nil {

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/toolload"
 )
 
 func TestMain(m *testing.M) {
@@ -214,16 +216,18 @@ func TestPluginToToolEntries(t *testing.T) {
 // child so the SDK loads them and the verifier checks the right names.
 func TestResolveInstalled_ContainerPluginFanOut(t *testing.T) {
 home := t.TempDir()
-t.Setenv("HOME", home)
+restore := toolload.SetTestRoot(filepath.Join(home, ".hyoka", "cache"))
+defer restore()
 
-// Build a fake cache mirroring microsoft/skills' layout:
-//   ~/.hyoka/cache/default/microsoft/skills/.github/plugins/azure-sdk-python/
+// Build a fake cache mirroring microsoft/skills' layout under the new
+// canonical path:
+//   <CacheRoot>/repos/microsoft/skills/default/.github/plugins/azure-sdk-python/
 //     ├── README.md            (no SKILL.md at the root)
 //     └── skills/
 //         ├── azure-keyvault-py/SKILL.md
 //         └── azure-identity-py/SKILL.md
-pluginDir := filepath.Join(home, ".hyoka", "cache", "default",
-"microsoft", "skills", ".github", "plugins", "azure-sdk-python")
+pluginDir := filepath.Join(toolload.RepoCacheDir("microsoft", "skills", "default"),
+".github", "plugins", "azure-sdk-python")
 if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 t.Fatal(err)
 }
@@ -272,10 +276,11 @@ t.Errorf("child %q missing SKILL.md: %v", child, err)
 // validator falls back to recording one skill row named after the plugin.
 func TestResolveInstalled_SingleSkillPluginStillWorks(t *testing.T) {
 home := t.TempDir()
-t.Setenv("HOME", home)
+restore := toolload.SetTestRoot(filepath.Join(home, ".hyoka", "cache"))
+defer restore()
 
-pluginDir := filepath.Join(home, ".hyoka", "cache", "default",
-"acme", "skills", ".github", "plugins", "solo")
+pluginDir := filepath.Join(toolload.RepoCacheDir("acme", "skills", "default"),
+".github", "plugins", "solo")
 if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 t.Fatal(err)
 }

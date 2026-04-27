@@ -254,7 +254,7 @@ func TestFetchRemote_ContextPropagates(t *testing.T) {
 	t.Cleanup(func() { DefaultRegistry.Unregister(mock.name) })
 
 	ctx := context.WithValue(context.Background(), key, "hit")
-	if _, err := FetchRemote(ctx, Entry{Type: TypeSkill, Source: SourceRemote, Repo: "acme/ctx", Name: "x"}, t.TempDir()); err != nil {
+	if _, err := FetchRemote(ctx, Entry{Type: TypeSkill, Source: SourceRemote, Repo: "acme/ctx", Name: "x"}); err != nil {
 		t.Fatalf("FetchRemote: %v", err)
 	}
 	if seen == nil {
