@@ -10,17 +10,22 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/toolload"
 )
 
 // FetchRequest carries the data a Fetcher needs to materialize a remote tool
 // (typically a skill) on disk.
+//
+// Note: prior versions of this struct exposed a per-eval BaseDir field that
+// callers used to scope the on-disk cache. That field was a footgun — empty
+// strings from the reviewer factory caused ".skills-cache/" to land in the
+// process cwd, and the per-eval tmp dir caused the generator's cache to be
+// destroyed every run. Fetchers now derive their cache path from
+// toolload.CacheRoot(), which is the single source of truth.
 type FetchRequest struct {
 	// Entry is the tool entry being fetched (already version-overridden).
 	Entry Entry
-	// BaseDir is the per-eval working directory; fetchers should keep their
-	// per-tool cache scoped beneath this directory unless they have a strong
-	// reason to use a global cache.
-	BaseDir string
 	// Version is the resolved version pin. Empty string means "default" —
 	// fetchers should treat this as latest / the user's normal default.
 	Version string
@@ -146,6 +151,10 @@ func (r *Registry) Names() []string {
 // It is preloaded with the built-in git fetcher.
 var DefaultRegistry = func() *Registry {
 	r := NewRegistry()
+	// pluginFetcher must register before gitFetcher so plugin entries route
+	// to it. gitFetcher's CanFetch is skill-only, so order is safety-belt
+	// rather than load-bearing — but we keep plugins first by intent.
+	_ = r.Register(&pluginFetcher{})
 	_ = r.Register(&gitFetcher{})
 	return r
 }()
@@ -185,7 +194,7 @@ const defaultFetcherName = "git"
 // avoid stdout pollution from npm plugin auto-install. Skill specs are parsed:
 //   - "name@owner/repo" → clone owner/repo, look for skill "name"
 //   - Bare "owner/repo" → clone repo, return root if no name specified
-// Caches under <baseDir>/.skills-cache/<version>/<owner>/<repo>/.
+// Caches under <toolload.CacheRoot()>/repos/<owner>/<repo>/<version>/.
 type gitFetcher struct{}
 
 func (gitFetcher) Name() string { return defaultFetcherName }
@@ -198,16 +207,15 @@ func (gitFetcher) CanFetch(entry Entry) bool {
 
 func (gitFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, error) {
 	entry := req.Entry
-	versionSegment := req.Version
-	if versionSegment == "" {
-		versionSegment = "default"
-	}
+	versionSegment := toolload.VersionSegment(req.Version)
 
 	// Parse skill spec from explicit repo + name fields.
 	owner, repo, skillName, repoSubpath := parseSkillSpec(entry.Repo, entry.Name)
 
-	// Cache path: <baseDir>/.skills-cache/<version>/<owner>/<repo>/
-	cacheDir := filepath.Join(req.BaseDir, ".skills-cache", versionSegment, owner, repo)
+	// Cache path: <CacheRoot>/repos/<owner>/<repo>/<version>/. Owner/repo
+	// first so all versions of one repo cluster together (Item A, Morpheus
+	// 2026-04-25 plan).
+	cacheDir := toolload.RepoCacheDir(owner, repo, versionSegment)
 
 	// Clone or update the repo
 	if err := ensureRepoCloned(ctx, owner, repo, versionSegment, cacheDir); err != nil {
@@ -297,45 +305,90 @@ func parseSkillSpec(repo, name string) (owner, repoName, skillName, subpath stri
 	return parts[0], parts[1], name, ""
 }
 
-// ensureRepoCloned ensures the repo is cloned at cacheDir. If it already
-// exists, runs git fetch and checks out the specified version. All git output
-// is suppressed unless the command fails.
+// runGit is the package-level hook used by ensureRepoCloned. Tests swap it
+// out to assert call counts / arg patterns without shelling out. The default
+// is runGitQuiet which actually executes git.
+var runGit = runGitQuiet
+
+// ensureRepoCloned ensures the repo is cloned at cacheDir and checked out at
+// the requested version. Behavior branches on whether the version is pinned:
+//
+//   - Fresh (no .git): git clone + checkout. No version freshness logic.
+//   - Cached + unpinned ("default"/empty): always git fetch + checkout HEAD,
+//     so users iterating on a remote skill see updates immediately. (Ronnie
+//     directive 2026-04-27, no TTL.)
+//   - Cached + pinned (any other version): try `git rev-parse <ref>^{commit}`
+//     locally first. If it resolves, skip the network and just checkout. If
+//     it doesn't, fetch then checkout (the pin may be a tag/commit added to
+//     the remote since we cloned).
+//
+// The whole operation is serialized per <owner>/<repo> via a flock on the
+// parent dir so concurrent hyoka processes don't race on the same clone
+// across all version subdirs. See acquireRepoLock for timeout details.
+//
+// All git output is suppressed unless a command fails.
 func ensureRepoCloned(ctx context.Context, owner, repo, version, cacheDir string) error {
+	parentDir := filepath.Dir(cacheDir)
+	release, lockErr := acquireRepoLock(ctx, parentDir)
+	if lockErr != nil {
+		return fmt.Errorf("acquiring repo lock for %s/%s: %w", owner, repo, lockErr)
+	}
+	defer func() {
+		if cerr := release(); cerr != nil {
+			slog.Debug("releasing repo lock", "owner", owner, "repo", repo, "error", cerr)
+		}
+	}()
+
 	repoURL := fmt.Sprintf("https://github.com/%s/%s.git", owner, repo)
 
-	_, statErr := os.Stat(filepath.Join(cacheDir, ".git"))
-	if statErr == nil {
-		// Repo already exists — fetch and checkout
-		slog.Debug("Repo cache hit, updating", "owner", owner, "repo", repo, "version", version)
-		if err := runGitQuiet(ctx, cacheDir, "fetch", "--all", "--tags"); err != nil {
-			return fmt.Errorf("git fetch: %w", err)
+	if _, statErr := os.Stat(filepath.Join(cacheDir, ".git")); statErr != nil {
+		// Fresh clone
+		slog.Debug("Cloning repo", "owner", owner, "repo", repo, "version", version, "url", repoURL)
+		if err := os.MkdirAll(parentDir, 0o755); err != nil {
+			return fmt.Errorf("creating cache dir: %w", err)
 		}
-		// Checkout the version (default branch if version == "default")
-		ref := version
-		if version == "default" {
-			ref = "HEAD"
+		cloneArgs := []string{"clone", "--quiet"}
+		if version != "default" && version != "" {
+			cloneArgs = append(cloneArgs, "--branch", version)
 		}
-		if err := runGitQuiet(ctx, cacheDir, "checkout", ref); err != nil {
-			return fmt.Errorf("git checkout %s: %w", ref, err)
+		cloneArgs = append(cloneArgs, repoURL, cacheDir)
+		if err := runGit(ctx, "", cloneArgs...); err != nil {
+			return fmt.Errorf("git clone: %w", err)
 		}
 		return nil
 	}
 
-	// Fresh clone
-	slog.Debug("Cloning repo", "owner", owner, "repo", repo, "version", version, "url", repoURL)
-	parentDir := filepath.Dir(cacheDir)
-	if err := os.MkdirAll(parentDir, 0o755); err != nil {
-		return fmt.Errorf("creating cache dir: %w", err)
+	// Cached repo already on disk.
+	pinned := version != "" && version != "default"
+	if !pinned {
+		// Unpinned — keep current always-fetch behavior.
+		slog.Debug("Repo cache hit (unpinned), fetching", "owner", owner, "repo", repo)
+		if err := runGit(ctx, cacheDir, "fetch", "--all", "--tags"); err != nil {
+			return fmt.Errorf("git fetch: %w", err)
+		}
+		if err := runGit(ctx, cacheDir, "checkout", "HEAD"); err != nil {
+			return fmt.Errorf("git checkout HEAD: %w", err)
+		}
+		return nil
 	}
 
-	cloneArgs := []string{"clone", "--quiet"}
-	if version != "default" {
-		cloneArgs = append(cloneArgs, "--branch", version)
+	// Pinned + cached: try to resolve the ref locally first. If it resolves,
+	// skip the network entirely — pinned refs don't move.
+	if err := runGit(ctx, cacheDir, "rev-parse", "--verify", "--quiet", version+"^{commit}"); err == nil {
+		slog.Debug("Repo cache hit (pinned, ref resolves locally), skipping fetch", "owner", owner, "repo", repo, "version", version)
+		if err := runGit(ctx, cacheDir, "checkout", version); err != nil {
+			return fmt.Errorf("git checkout %s: %w", version, err)
+		}
+		return nil
 	}
-	cloneArgs = append(cloneArgs, repoURL, cacheDir)
 
-	if err := runGitQuiet(ctx, "", cloneArgs...); err != nil {
-		return fmt.Errorf("git clone: %w", err)
+	// Pinned but ref isn't in the local clone yet — fetch and try again.
+	slog.Debug("Repo cache hit (pinned, ref missing), fetching", "owner", owner, "repo", repo, "version", version)
+	if err := runGit(ctx, cacheDir, "fetch", "--all", "--tags"); err != nil {
+		return fmt.Errorf("git fetch: %w", err)
+	}
+	if err := runGit(ctx, cacheDir, "checkout", version); err != nil {
+		return fmt.Errorf("git checkout %s: %w", version, err)
 	}
 	return nil
 }
