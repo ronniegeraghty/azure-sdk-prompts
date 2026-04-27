@@ -913,3 +913,74 @@ The parser's `ParseEvaluationCriteria` was already producing structured `[]Crite
 **Status:** Flagged, awaiting Neo assignment. Trinity's implementation uses correct `evalPointTotals` path; no site regression.
 
 **Reference:** `.squad/decisions.md` → "2026-04-25: Prompt-detail-page graphs — fractional grader-point scoring" (Engine naming bug section)
+
+## Learnings — Item D (aggregate tool load failures)
+
+- **`ToolLoadError` lives in `hyoka/internal/config/tool/validate.go`** (not in a separate `errors.go` or `types.go`). Keep new error-related helpers in the same file — no separate package.
+- **`ToolLoadReport` is also in `validate.go`.** Items are flat; the "tree" view (plugin parent → children, skill_dir parent → child skills) is reconstructed by the renderer from `ParentKind`/`Parent`. Per-tool failures already emit Failed items even though the old `FirstError` short-circuited the eval-level error.
+- **Validation pipeline shape:** `ValidateAndExpand(ctx, ValidationInput) → (*ToolLoadReport, error)`. Calls `validateEntries` for generator role, then again for reviewer role (sequential — Morpheus chose ordered output over parallel). Each `validate*Entry` (skill, plugin, mcp) records its own item; the aggregate error is computed at the end. This means **every tool gets validated even when earlier ones fail** — the report was always complete; only the returned error was lossy.
+- **EvalResult error rendering path:** `internal/eval/copilot.go` builds an `EvalResult{Error, ErrorDetails, ErrorCategory}`. `Error` is what the operator sees in CLI/report headers; `ErrorDetails` is the longer block. Both came from the SAME `toolErr.Error()` string before — I kept that pattern but used `\n` separators so multi-line summaries render cleanly. Look at `hyoka/internal/report/types.go` if you ever change schema fields here — the v0→v4 migration path treats these as opaque.
+- **Type assertions vs `errors.As`:** any test that did `err.(*ToolLoadError)` now needs `errors.As(err, &target)` because the error is wrapped in `joinedToolLoadError`. There were 4 such sites in `validate_test.go` and 1 in `plugin_migration_test.go`. Future error-wrapping changes here will cascade similarly.
+- **File quirk:** `hyoka/internal/config/tool/validate.go` has zero leading whitespace on most lines (gofmt-stripped or some prior reformat). gofmt restores tabs cleanly — always run it after editing this file.
+- **Tank's parallel WIP** on `fetcher.go`/`installed.go` currently breaks `TestValidateAndExpand_RemoteContainerPlugin_FansOutChildren` and `TestResolveInstalled_*`. Not my regression — confirmed by selective `git stash`.
+
+## 2026-04-27 — Item B: Plugin Remote Fetcher (tool-load consolidation)
+
+Built `pluginFetcher` in `hyoka/internal/config/tool/plugin_fetcher.go` so
+`type: plugin, source: remote` entries clone into the canonical
+`toolload.RepoCacheDir(...)` tree on cache miss instead of hard-failing.
+Wired into `validatePluginEntry` between the cache lookup and the
+enumerated-paths failure message; on fetch failure the original
+hard-fail path still runs and now appends the fetch error inline.
+
+### Learnings
+
+- **Plugin lookup precedence is NOT the same as skill lookup precedence.**
+  `plugin.ResolveInstalled` checks `.github/plugins/` first, then
+  `.github/skills/`, then `skills/`. `findSkillInRepo` (in `fetcher.go`)
+  checks `.github/skills/` first, then `.github/plugins/`. Both are
+  intentional — skills are usually published under `.github/skills/` while
+  Copilot plugins live at `.github/plugins/<name>/`. Don't accidentally
+  unify them when refactoring; the fetcher must mirror `ResolveInstalled`
+  exactly so cached writes land where the post-fetch lookup expects.
+
+- **Registry tail-pin keys off the literal name `"git"`.** `Registry.Register`
+  inserts new fetchers before any existing fetcher named `"git"` (the
+  `defaultFetcherName` constant). `pluginFetcher.Name()` is `"plugin-git"`,
+  which does NOT match the constant, so it's treated as a "regular" fetcher
+  and ends up wherever the loop puts it. Registering it before `gitFetcher`
+  in `DefaultRegistry`'s init lambda guarantees lookup order regardless of
+  the tail-pin behavior. If a future fetcher name happens to equal `"git"`,
+  the tail-pin could clobber registration order — guard with a test.
+
+- **Import cycle gotcha:** `internal/config/tool` imports `internal/plugin`
+  (for `ResolveInstalled`, `EnumerateChildSkills`, `SplitOwnerRepo`,
+  `Registry`). Pulling additional helpers like `plugin.isPluginDir` into the
+  fetcher would require exporting them. I duplicated 8 lines locally instead
+  — small enough that the duplication isn't a maintenance burden, and Item F
+  is the natural moment to consolidate.
+
+- **Stub the clone helper, not the fetcher.** Making `pluginCloneFn` a
+  package-level var swappable in tests gave clean, fast, deterministic
+  coverage of the fetcher's own logic (precedence, error wrapping, version
+  segment) without leaking the clone implementation into the test API.
+  The pattern is reusable for Tank's Item C tests too.
+
+- **Threading `ctx` through validators is cheap.** `validatePluginEntry` was
+  the only validator without a `context.Context` parameter (skill validation
+  already had it for `FetchRemote`). Plumbing it through the call site in
+  `validateEntries` was a one-line change. The fetcher honors cancellation
+  via the standard exec.CommandContext path in `ensureRepoCloned`.
+
+
+## Learnings — Item E (post-session tool verification gate)
+
+**SDK event ordering is the entire bug.** `SessionSkillsLoaded` and `SessionMcpServersLoaded` fire only AFTER `session.SendAndWait` completes its first round-trip. The original gate sat between `CreateSession` and `SendAndWait` — it had no chance of seeing the events it was waiting for. The fix is purely placement: move the call to *after* `SendAndWait` returns.
+
+**Latent bug in `verifier.readyChan` lifecycle.** In `copilot.go`'s OnEvent handler, `verifier.emitIfReady()` is only called inside `if e.progressFn != nil { … }`. That means evals running without a progress display (`--progress off`, tests, headless CI) would never close `readyChan` even when both SDK events fired. `waitForToolVerification` would time out 100% of the time for those callers. Workaround: have `postSessionToolVerification` call `emitIfReady` itself before falling through to wait. This makes the gate independent of the progress-callback wiring. Future cleanup: lift the `emitIfReady` call out of the `progressFn != nil` guard in `copilot.go` so the channel always closes deterministically.
+
+**Timeout = hard-fail, never partial-success.** The whole point of Item E is "no false-positive evals." On timeout, every configured tool is marked Failed (not just the ones we hadn't heard from). The reason string distinguishes timeout failures from per-tool failures, so operators reading the summary can tell which timing edge case fired. Partial success would re-introduce the exact bug we're closing.
+
+**Plugins ≠ Extensions in the SDK.** SDK v0.2.0 exposes `SessionExtensionsLoaded` with an `Extension.Status` field (incl. `failed`), but there's no `SessionPluginsLoaded` event. "Extensions" are SDK-side and don't map cleanly onto hyoka's plugin entries today. Skipped plugin verification for Item E — Item B's pre-session `pluginFetcher` already catches remote-fetch failures, so the post-session gap is narrow. Wiring SDK Extensions → `ToolKindPlugin` is a separate ticket.
+
+**Item D's `tool.SummarizeToolLoadErrors` was perfect for re-use.** Building `[]*tool.ToolLoadError` from the verifier's `[]progress.ToolStatus` and passing it through gives operators identical wording from both pre- and post-session paths. The format contract ("N tool(s) failed to load:" + bulleted `kind "name": reason`) is now the single source of truth for tool-load failure surface across the engine.

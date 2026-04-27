@@ -164,3 +164,33 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 **Rationale:** Documentation debt — unimplemented features belong in issues, not in shipped examples. Examples now match parser reality.
 
 **Decision archive:** `.squad/decisions/archive/oracle-unimplemented-examples-to-issues.md`
+
+---
+
+## 2026-04-28: Tool-Load Consolidation — Decision Merge + Commit Hygiene ✅
+
+**Session:** scribe finalize Wave 1-3 (Items A/B/C/D/E + Switch tests + Item F already at `c72ac831`)
+**Status:** ✅ Complete
+
+Took ~16 uncommitted files spanning 6 logical work items + 9 inbox decisions and produced 7 commits on `ronniegeraghty/dev`:
+
+- `7d750d4f` (tank, Item A — `internal/toolload` package)
+- `54fedbab` (neo, Item D — pre-session aggregation)
+- `a65ac8e5` (neo, Item B — plugin remote fetcher tests)
+- `2cec4f85` (tank, Item C — freshness + flock + cache-root threading in `fetcher.go`)
+- `55d25601` (neo, Item E — post-session gate, closes #347)
+- `20c9e502` (switch, Item G — cacheroot warning tests)
+- `<hash>` (scribe, decision merge — single dated section in `decisions.md`)
+
+All 9 inbox decision files archived under `.squad/decisions/archive/`. Orchestration entry written. Histories preserved.
+
+**Pushed to `origin/ronniegeraghty/dev`.**
+
+## Learnings
+
+- **Scribe must reconstruct authorship from agent decision files, not just `git blame`.** When agents ship without committing, the decision file is the only ground truth for who wrote which lines. Tank's Item F commit (`c72ac831`) bundled Neo's `validate.go` + Tank's `installed.go` Item A bits because the working tree was sprawling. Authorship was reconstructed from `tank-item-f-*.md` + `neo-item-d-*.md` + `tank-item-a-*.md` cross-referenced against the diff hunks.
+- **Build-green-per-commit is achievable even when files mix Items.** Group the file with the most-impacted Item, mention the other Items' contributions in the commit body, run `go build ./...` after every commit. Took 6 build checks for 6 commits — zero red builds.
+- **`fetcher.go` and `copilot.go` were the worst offenders for Item-mixing.** `fetcher.go`: A (cache root) + B (plugin reg) + C (ensureRepoCloned). `copilot.go`: D (`\n` separator) + E (gate). Splitting via `git add -p` would have given cleaner per-Item commits but cost ~30min and three merge errors. Pragmatic group-with-most-impacted got the same end-state diff with 6 commits in ~10min.
+- **Stripping a test file via `cp` + `sed` then restoring is safer than `git add -p` for splitting tests.** Did this for `cacheroot_test.go` to land Tank's tests in commit 1 and Switch's tests in commit 6. Backup file lived in repo root with `.scribe-` prefix (NOT in `/tmp` — environment forbids `/tmp`).
+- **One section in `decisions.md`, not eight.** Charter is explicit: Scribe consolidates fan-out work into a single dated entry with sub-sections (cache layout / no-TTL / freshness / flock / fetcher / format contract / post-session gate / dedup / legacy fallback / open follow-ups). Eight separate entries for one logical refactor would be a charter violation.
+- **Open Ronnie-action items belong in the decisions section under "Open follow-ups", not in the orchestration log.** The legacy `~/.copilot/installed-plugins/` drop window is the only Ronnie-pending item from this session — surfaced in `decisions.md` so future contributors see it during normal decision review, not buried in a session-specific log.

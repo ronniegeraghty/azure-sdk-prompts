@@ -531,3 +531,23 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
 - **2026-04-25: `tool_version_override` schema migrated to repo-keyed.** Hard-cut breaking change (pre-1.0). Old name-keyed shape now rejected. Key format: `owner/repo` (e.g. `microsoft/skills: v1.2.0`). User benefit: monorepo pinning 1 entry per repo vs N entries per skill. Migration: docs `Tool Versioning` section or via error message. Full decision: `.squad/decisions.md`.
+
+---
+
+## 2026-04-28: Tool-load consolidation integration coverage (Wave 1-3 Item G)
+
+**Task:** cross-cutting integration tests for the new 5-step tool-load pipeline (Tank A/C/F + Neo B/D/E).
+
+### Learnings
+
+1. **Audit before authoring.** Every spec step except two (post-session format-equivalence + `.skills-cache/` warning fires-once) was already covered by per-item unit tests. Time spent reading existing tests > time spent writing new ones. Net result: +3 tests, not +15.
+
+2. **Byte-level format equivalence is the right pin for cross-path contracts.** Neo's `TestPostSessionVerification_MixedFailures` asserts header + names — necessary but not sufficient. Comparing the post-session summary `==` to `tool.SummarizeToolLoadErrors(...)` output catches every drift mode (bullet glyph, sort order, quoting). One extra assertion, makes the Item D ↔ Item E contract testable.
+
+3. **Don't add live-git tests when the codebase already injects clone hooks.** Tank's `runGit` package var and Neo's `pluginCloneFn` give offline determinism. Spec called this out explicitly; sticking to it kept the test suite fast and CI-safe.
+
+4. **`sync.Once`-gated warnings need fires-once tests.** `warnIfLegacySkillsCache` lives inside `cacheRootOnce.Do`; if anyone refactors that out the warning would spam per-call. The new `TestCacheRoot_LegacySkillsCacheWarningFiresOnce` calls `CacheRoot()` three times and asserts `strings.Count(out, "...") == 1` to lock the contract.
+
+5. **Pre-existing failures stay pre-existing.** Confirmed `cmd`, `comparison`, `report`, `serve`, `rerender` failed identically before Wave 1-3 (matches Tank's Item A baseline doc). Did NOT fix — out of scope per task brief and per `test-discipline` SKILL ("update tests when changing APIs — Tank/Neo's API changes don't touch these packages").
+
+6. **Test placement matters.** `.skills-cache/` warning test belongs in `internal/toolload` (real package, real call path) — not in `eval` (would need either a real Copilot session or a `CacheRoot` stub that skips the production path).

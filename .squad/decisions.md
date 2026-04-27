@@ -2064,3 +2064,138 @@ Cleaned up prompt-grader output rendering and made markdown-form evaluation crit
 
 **Orchestration logs:** `.squad/orchestration-log/2026-04-25T04-34-17Z-{morpheus-grader-score-scope,trinity-grader-score-graphs-FAILED,trinity-grader-score-retry,scribe}.md`  
 **Session log:** `.squad/log/2026-04-25T04-34-17Z-prompt-graph-fractional-scores.md`
+
+---
+
+## 2026-04-28: Tool-Load Consolidation — cache, freshness, aggregation, post-session gate ✅
+
+**By:** Morpheus 🕶️ (audit + plan), Tank 📡 (Items A, C, F), Neo 💊 (Items B, D, E), Switch 🔀 (Item G integration tests)  
+**Scope:** `hyoka/internal/toolload/` (new), `hyoka/internal/config/tool/`, `hyoka/internal/eval/`, `hyoka/internal/plugin/`, `hyoka/cmd/run.go`  
+**Commits:** `c72ac831` (Item F + carried Items A/B/D bits in `validate.go`/`installed.go`/`plugin_fetcher.go`) · `7d750d4f` (Item A) · `54fedbab` (Item D) · `a65ac8e5` (Item B) · `2cec4f85` (Item C) · `55d25601` (Item E, closes #347) · `20c9e502` (Switch integration tests)  
+**Closes:** #347
+
+The pre-this remote tool-loading flow was a four-way split (skill-fetch / plugin-lookup / cache-root / verification) with two cache trees that didn't know about each other and a post-session gate that was disabled because of an SDK timing bug. This consolidation collapses it into one canonical path and re-enables the gate. Fan-out work landed in three waves (A+D parallel → B+C parallel → E+F+integration tests).
+
+### Cache layout (Item A — Tank)
+
+Single canonical tree under `<CacheRoot>/repos/<owner>/<repo>/<version>/`. Owner/repo first, version last — all versions of one repo cluster together.
+
+`internal/toolload.CacheRoot()` resolution order (first non-empty wins, computed once per process via `sync.Once`):
+
+1. `$HYOKA_CACHE_DIR`
+2. `$XDG_CACHE_HOME/hyoka`
+3. `~/.hyoka/cache`
+4. `os.TempDir()/hyoka/cache` (with `slog.Warn` fallback if home is unreadable)
+
+`FetchRequest.BaseDir` is **deleted** (not kept-and-ignored — footgun removed). `FetchRemote(ctx, entry)` no longer takes a `baseDir` parameter. **Breaking change** for any third-party `Fetcher` implementations outside this repo; none known.
+
+A first-run migration `slog.Warn` fires once if `<cwd>/.skills-cache/` exists. Directory is never auto-deleted.
+
+`SetTestRoot(path) (restore func())` is exported test-only — packages whose tests need to override `CacheRoot` despite `sync.Once` use it.
+
+### No TTL for unpinned versions (Ronnie directive 2026-04-27T20:10Z)
+
+For unpinned (`default` version) remote skills/plugins, **do NOT use TTL-based freshness** — keep `git fetch` every run. Reason: people testing skills under active development need updates to land immediately, not after a TTL window.
+
+### Version freshness (Item C — Tank)
+
+`ensureRepoCloned` branches on pinned vs unpinned:
+
+- **Fresh (no `.git`):** `git clone` (+ `--branch <version>` if pinned).
+- **Cached + unpinned (`""`/`default`):** always `git fetch --all --tags` + `git checkout HEAD`. Honors the no-TTL directive above.
+- **Cached + pinned:** try `git rev-parse --verify --quiet <ref>^{commit}` first. If it resolves locally → checkout, **zero network**. If it doesn't → fetch then checkout (the pin may be a tag/commit added since last clone).
+
+A package-level `var runGit = runGitQuiet` lets tests stub git without shelling out. Treat any non-default/non-empty version as pinned (branches included — the escape hatch is `default`).
+
+**Deferred:** `<CacheRoot>/meta/<owner>/<repo>.json` (last-fetch UTC + resolved SHA). Out of scope; will land when a consumer (e.g., site "last fetched at" column) needs it. Not creating a stub note.
+
+### Per-repo flock with 30s timeout (Item C — Tank)
+
+Two parallel `hyoka run` invocations against the same repo would otherwise race on `git fetch`. `acquireRepoLock(ctx, parentDir)` opens `<parentDir>/.hyoka-lock` with `LOCK_EX | LOCK_NB`, polls every 500ms, gives up after 30s with a wrapped `"another hyoka process is fetching this repo (lock at <path> held >30s)"` error.
+
+Locked at the **parent of the version dir** = `<CacheRoot>/repos/<owner>/<repo>/`, so all version subdirs of the same repo serialize against each other. Acquired before stat/clone/fetch/checkout, released via deferred close. Honors `ctx.Done()`.
+
+- Linux/macOS: `golang.org/x/sys/unix.Flock` (no new module surface).
+- Windows: no-op stub (`flock_windows.go`, build-tagged). A real `LockFileEx` impl can land later if Windows usage warrants it.
+
+### Plugin remote fetcher (Item B — Neo)
+
+`pluginFetcher` (`Name() = "plugin-git"`) registered in `DefaultRegistry` ahead of `gitFetcher`. `CanFetch` matches `entry.ResolvedType() == TypePlugin && (entry.Source == SourceRemote || (entry.Source == "" && entry.Repo != ""))` — the inferred-remote case mirrors `validatePluginEntry`'s defaulting rule.
+
+`Fetch` parses owner/repo, resolves `versionSegment` via `toolload.VersionSegment`, computes the cache dir via `toolload.RepoCacheDir(owner, repo, version)`, then delegates the clone to a package var `pluginCloneFn` (defaults to `ensureRepoCloned` — inherits Item C's freshness branching and flock for free).
+
+Plugin lookup precedence (preserved exactly from `plugin.ResolveInstalled`, **not** the same as `findSkillInRepo` skill precedence):
+
+1. `<repo>/.github/plugins/<name>`
+2. `<repo>/.github/skills/<name>`
+3. `<repo>/skills/<name>`
+
+`validatePluginEntry` calls the fetcher when the cache lookup misses, instead of immediately hard-failing. On fetch failure, falls through to the enumerated-paths hard-fail and appends `"Fetch attempt failed: <err>"` so operators see *why*.
+
+### Pre-session error format contract (Item D — Neo)
+
+`(*ToolLoadReport).AllErrors() []*ToolLoadError` walks `Items` and collects every Failed row in report order. `(*ToolLoadReport).JoinedError() error` returns a `*joinedToolLoadError` wrapping every per-tool failure; implements `Unwrap() []error` so `errors.As(err, &target)` traverses to any `*ToolLoadError` leaf. `FirstError` is **deleted**.
+
+`ValidateAndExpand` returns `report.JoinedError()` (signature unchanged). `validateEntries` stays sequential — ordered output beats parallel speedup.
+
+**Format string** (Item E reuses verbatim via `tool.SummarizeToolLoadErrors`):
+
+```
+N tool(s) failed to load:
+  • {kind} "{name}": {reason}
+  • {kind} "{name}": {reason}
+```
+
+- Header `%d tool(s) failed to load:` always plural (even N=1) — keeps the parser simple.
+- Bullets are `\n  • ` (two spaces, U+2022 bullet, one space).
+- Per-line content via `%s %q: %s` — Go-idiomatic double quotes around the name.
+- Empty/nil slice → empty string (NOT a header with zero bullets).
+
+`copilot.go:187` and `cmd/run.go:407` consume the joined error; both render the multi-line summary verbatim with a `\n` separator after the `tool_load_failure:` / per-config prefix. Type assertions in tests migrated from `err.(*ToolLoadError)` → `errors.As(err, &target)` (5 sites).
+
+### Post-session verification gate (Item E — Neo, closes #347)
+
+The 12-line `// NOTE: Tool validation gate is DISABLED` block is gone. `postSessionToolVerification(ctx, *toolVerifier, 30*time.Second)` runs **after** `session.SendAndWait` returns and **after** the captured-events copy under `mu.Lock`, but **before** `listFiles(workDir)` (no wasted I/O on the failure branch).
+
+On any Failed status OR 30s timeout → return an `EvalResult` with `error_category = "tool_load_failure"`, `Error = "tool_load_failure:\n" + summary` (same format as Item D), and abort before grading. Diagnostics survive the abort: `SessionEvents`, `ActionTimeline`, `ToolCalls`, `FinalResponse`, `ToolReport`, `CleanupFn` are all populated.
+
+**No partial-success path.** On timeout, every configured tool is marked Failed with reason `"SDK did not confirm tool load within 30s"` — the whole point of Item E is no false positives.
+
+Latent bug fixed: `verifier.emitIfReady()` was only invoked from inside `if e.progressFn != nil { … }` in the OnEvent handler, so any non-interactive eval (`--progress off`, unit tests) had `readyChan` never close even after both SDK events fired. `postSessionToolVerification` now calls `v.emitIfReady()` once at the top.
+
+**Plugins are NOT verified post-session.** SDK exposes `SessionExtensionsLoaded` but no `SessionPluginsLoaded`, and Extensions don't currently map onto our plugin model — wiring that is scope-creep. Acceptable because Item B catches plugin remote-fetch failures pre-session via Item D's aggregation.
+
+### Plugin path enumeration dedup (Item F — Tank, committed `c72ac831`)
+
+`PluginCacheCandidates(repoDir, name)`, `FindPluginInRepo`, `IsPluginDir` lifted into `internal/plugin/paths.go` as the single source of truth. Three historical call sites (`ResolveInstalled`, `pluginCheckedPaths`, `plugin_fetcher`'s `findPluginInRepo`) now share one helper. The `isPluginDir`/`isSkillDir`/`hasChildSkills` mirrors that lived in `plugin_fetcher.go` are gone.
+
+### Legacy fallback warning (Item F — Tank)
+
+`~/.copilot/installed-plugins/<name>/` and `~/.copilot/installed-plugins/<owner>-<repo>/<name>/` resolution paths are **kept for one release** with a `slog.Warn`:
+
+```
+Resolved plugin via deprecated legacy path; will be removed in a future release
+  path=… plugin=… repo=…
+  hint=move plugin into the canonical hyoka cache layout
+```
+
+**Open follow-up:** Ronnie to confirm the drop window — next release vs. longer deprecation period (Morpheus open question 5.4). Item F documented the default of "drop in next release" but explicitly waits for Ronnie's call before any agent removes the fallback branches.
+
+### Open follow-ups (none blocking)
+
+- **Plugin SDK verification gap.** Post-session gate covers skills + MCP only. Wire `SessionExtensionsLoaded` → `progress.ToolKindPlugin` (third channel in `toolVerifier.expectedPlugins`) once we move to SDK v0.3+ or a real false-positive shows up. New ticket recommended.
+- **Meta file deferred from Item C.** `<CacheRoot>/meta/<owner>/<repo>.json` (last-fetch timestamp + resolved SHA). Pick up when a consumer needs it.
+- **Live integration test.** No build-tagged `//go:build integration` end-to-end test against a real public repo. Mocked + table-driven coverage gives high confidence; add a wet-finger CI signal if Ronnie wants it.
+- **`--tool-verify-timeout` CLI flag.** Item E hardcodes the 30s constant at the call site. If cold-start MCP servers prove flaky, add a flag.
+- **Ronnie answer pending: legacy `~/.copilot/installed-plugins/` drop window.**
+
+### Verification
+
+- `go build ./...` ✅
+- `go test -race ./hyoka/internal/{toolload,plugin,config/tool,eval}/... -timeout 120s` ✅
+- Pre-existing failures untouched and out of scope: `cmd`, `comparison`, `report`, `serve`, `rerender` (`boolPtr`/`Model`/schema-v0 issues — all predate Wave 1-3).
+
+---
+
+**Orchestration log:** `.squad/orchestration-log/2026-04-28T-scribe-tool-load-consolidation.md`  
+**Decisions archived:** `.squad/decisions/archive/{morpheus-tool-load-consolidation,copilot-directive-2026-04-27T20-10Z-no-ttl,tank-item-{a-cache-root,c-freshness-flock,f-dedup-plugin-paths},neo-item-{b-plugin-remote-fetcher,d-aggregate-tool-load-errors,e-post-session-verification-gate},switch-toolload-integration-tests}.md`

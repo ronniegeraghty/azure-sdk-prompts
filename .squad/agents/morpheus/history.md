@@ -495,3 +495,32 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 All six prompt-detail gaps implemented by Trinity. Type widening complete. Dashboard, prompts-page, run-detail all updated. Post-implementation Playwright walkthrough confirmed fractional rendering across all pages. 132/132 tests pass. Ready for Ronnie's live testing.
 
 Follow-ups deferred: grader-by-grader reliability table (separate session), Neo's field rename (schema v4.1 vs v5 decision).
+
+---
+
+## 2026-04-25: Audit — tool-load consolidation (45m)
+
+**Ask:** Map the current remote tool loading flow against Ronnie's target spec, identify gaps, propose a unified module shape, and break the work into items for Neo + Tank.
+
+**Deliverable:** `.squad/decisions/inbox/morpheus-tool-load-consolidation.md`.
+
+### Learnings — current tool-load architecture
+
+- **Cache split-brain.** Skills cache at `<BaseDir>/.skills-cache/<v>/<owner>/<repo>/` (`fetcher.go:209`); plugins look at `~/.hyoka/cache/default/<owner>/<repo>/` (`installed.go:45`) plus `~/.copilot/installed-plugins/...`. Two trees, neither aware of the other. Same git repo cloned twice if you use both a skill and a plugin from microsoft/skills.
+- **Root cause of `.skills-cache/` in cwd:** `cmd/run.go:403` passes `ConfigDir: ""` to `ValidateAndExpand` for the reviewer factory. Empty string flows to `FetchRequest.BaseDir = ""`. `filepath.Join("", ".skills-cache", ...)` returns a relative path, resolved against `os.Getwd()`. Generator path uses the isolated tmp config dir (which gets `RemoveAll`'d after each eval) — also wrong, but invisible because it's tmp. The cache is effectively destroyed every run.
+- **Plugins cannot fetch.** `ResolveInstalled` is stat-only. There is no `pluginFetcher`. Users get a "checked: <paths>" error and instructions to run `/plugin install`. This is the asymmetry to fix — skills got `gitFetcher` in the npx-removal refactor, plugins didn't.
+- **Version freshness is unimplemented.** `ensureRepoCloned` runs `git fetch --all --tags` on every call regardless of whether the version is pinned. Pinned-vs-latest distinction exists in YAML (`entry.go:33`) but not in the resolver. Default ("unpinned") fetches HEAD with no audit of what SHA was actually used.
+- **Post-session verification gate is INTENTIONALLY disabled.** `copilot.go:643-655` has a TODO block citing #347 — the SDK only emits `SessionSkillsLoaded`/`SessionMcpServersLoaded` after the first message round-trip, so the original gate (placed before SendAndWait) deadlocked. The fix is obvious in hindsight: move the gate to AFTER SendAndWait. Today the verifier accumulates statuses and the renderer flips Loaded→Failed, but the engine ignores it — evals run graders against code generated without the tools the prompt required. False-positive evals.
+- **Verifier semantics are correct.** `tool_verification.go` already waits for ALL configured kinds (`emitIfReady` lines 94-108) before producing a verdict. The "wait for all tools, then fail" requirement Ronnie stated is satisfied by the existing data — we just have to consume it.
+- **Pre-session validation IS sequential** (`validate.go:282`) but doesn't short-circuit per-entry — every entry validates, only `FirstError()` returns early at the report level. So pre-session, the report is complete; the gap is that the user only sees one error in the EvalResult. Fix is `AllErrors()`.
+- **`configDir` is overloaded** as both the isolated Copilot config root AND the cache base. Decoupling these (fetcher gets `CacheRoot()`, configDir stays the throwaway) is the cleanup.
+
+### Decisions baked into the proposal
+
+- New `internal/toolload` package owns cache root + Resolve.
+- Cache layout: `${CacheRoot}/repos/<owner>/<repo>/<v>/` shared between skills and plugins; `meta/<owner>/<repo>.json` records SHA + last-fetch.
+- Fan-out: A (cache root) + D (collect-all-errors) parallel first wave; B (plugin fetch) + C (freshness) after A; E (re-enable post-session gate) after D; F (path dedup) last.
+- Six open questions flagged for Ronnie. Defaults proposed for each so he can rubber-stamp or pick.
+
+**Time:** ~45m. Pure scoping — no code changes.
+
