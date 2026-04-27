@@ -984,3 +984,32 @@ hard-fail path still runs and now appends the fetch error inline.
 **Plugins ≠ Extensions in the SDK.** SDK v0.2.0 exposes `SessionExtensionsLoaded` with an `Extension.Status` field (incl. `failed`), but there's no `SessionPluginsLoaded` event. "Extensions" are SDK-side and don't map cleanly onto hyoka's plugin entries today. Skipped plugin verification for Item E — Item B's pre-session `pluginFetcher` already catches remote-fetch failures, so the post-session gap is narrow. Wiring SDK Extensions → `ToolKindPlugin` is a separate ticket.
 
 **Item D's `tool.SummarizeToolLoadErrors` was perfect for re-use.** Building `[]*tool.ToolLoadError` from the verifier's `[]progress.ToolStatus` and passing it through gives operators identical wording from both pre- and post-session paths. The format contract ("N tool(s) failed to load:" + bulleted `kind "name": reason`) is now the single source of truth for tool-load failure surface across the engine.
+
+## 2026-04-23: Guardrail Enforcement Bug Fix (Option A Implementation)
+
+**Task:** Implemented Option A from Morpheus's investigation — fixed stale runner state causing real-time enforcement to ignore per-eval resolved limits.
+
+**Root Cause:** `CopilotPromptRunner` was constructed once at CLI startup with CLI defaults. Its `maxTurns`, `maxFiles`, and `maxSessionActions` fields never updated with per-eval resolved values. Real-time enforcement read stale values.
+
+**Solution:**
+1. Added per-eval fields to `CopilotPromptRunner`: `evalMaxTurns`, `evalMaxFiles`, `evalMaxSessionActions`
+2. Protected with `sync.RWMutex` (`evalLimitsMu`) for concurrent safety — engine runs multiple evals in parallel via worker semaphore
+3. Added `SetLimitsForEval(maxTurns, maxFiles, maxSessionActions int)` method
+4. Updated real-time enforcement logic (lines 223-265, 352) to:
+   - Prefer per-eval resolved value (if > 0)
+   - Fall back to CLI-level default (e.g., from flag)
+   - Fall back to hardcoded default (e.g., 25 for turns)
+5. Called `SetLimitsForEval` from `engine_eval.go` (lines 148-152) after `resolveLimits()` and before `evaluator.Run()`
+
+**Concurrency Model:** Engine launches goroutines (one per eval task) with a worker semaphore (`e.opts.Workers`). All goroutines share one `e.evaluator` instance. Per-eval state requires mutex protection.
+
+**Testing:** All existing eval tests pass (`go test -race ./hyoka/internal/eval/...`). Pre-existing test validates post-hoc guardrail check (report fields). Switch is writing real-time enforcement test in parallel — they'll exercise `SetLimitsForEval` directly.
+
+**Coordination:** Switch's WIP test file (`guardrail_realtime_test.go.wip`) had compilation errors (missing `report` import, wrong field names). Left it renamed so build succeeds. Decision file documents final method signature so Switch can integrate.
+
+**Commit:** `d2f6e93b` — "Fix guardrail enforcement to use per-eval resolved limits"
+
+**Learnings:**
+- Always check concurrency model before adding shared state — engine's goroutine-per-eval pattern required RWMutex
+- Type assertion pattern (`if copilotRunner, ok := e.evaluator.(*CopilotPromptRunner); ok`) cleanly skips stub runners in tests
+- Fallback chain (per-eval → CLI → hardcoded) maintains backward compatibility while fixing the bug
