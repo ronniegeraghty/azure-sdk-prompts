@@ -551,3 +551,28 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 5. **Pre-existing failures stay pre-existing.** Confirmed `cmd`, `comparison`, `report`, `serve`, `rerender` failed identically before Wave 1-3 (matches Tank's Item A baseline doc). Did NOT fix — out of scope per task brief and per `test-discipline` SKILL ("update tests when changing APIs — Tank/Neo's API changes don't touch these packages").
 
 6. **Test placement matters.** `.skills-cache/` warning test belongs in `internal/toolload` (real package, real call path) — not in `eval` (would need either a real Copilot session or a `CacheRoot` stub that skips the production path).
+
+## Learnings
+
+### Real-Time Guardrail Enforcement Test (2026-04-27)
+
+**Task:** Add test for real-time guardrail enforcement using resolved limits.
+
+**Implementation:**
+- Added `TestRealtimeGuardrailEnforcementUsesResolvedLimits` to `engine_test.go`
+- Created `stubRealtimeEnforcementRunner` that simulates OnEvent callback behavior
+- Test verifies config limits (e.g., max_turns: 100) override CLI defaults (25)
+- 4 test cases cover turns and files, both higher and lower than CLI defaults
+
+**Key insight:** The type assertion to `*CopilotPromptRunner` in `engine_eval.go` prevented test stubs from participating in limit injection. Solution: Added `LimitConfigurable` interface so any runner can opt-in to receiving per-eval limits.
+
+**Test behavior:**
+- **Before fix:** Would fail with config max_turns: 100, CLI default 25 → cancels at turn 25
+- **After fix:** Passes - uses config's 100, allows 26+ turns
+
+**Files changed:**
+- `hyoka/internal/eval/engine.go` - Added `LimitConfigurable` interface
+- `hyoka/internal/eval/engine_eval.go` - Changed type assertion to interface check
+- `hyoka/internal/eval/engine_test.go` - Added test and stub runner
+
+**Commit:** 7dda6358
