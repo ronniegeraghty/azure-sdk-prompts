@@ -798,3 +798,62 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
 - **2026-04-25: `tool_version_override` migrated to repo-key schema.** Old name-keyed shape rejected with migration-hint error. If working with Tool configs, use `owner/repo` keys instead of tool-entry names. Migration guidance: `docs/configuration.md` "Migrating from name-keyed overrides" section. See `.squad/decisions.md` for full decision memo.
+
+
+## 2026-04-27: Item A — Centralized cache root → `~/.hyoka/cache` ✅
+
+**Spec:** Morpheus's tool-load consolidation plan, Item A.
+**Branch:** `ronniegeraghty/dev` (uncommitted at time of writing — Tank works on dev directly).
+**Decision note:** `.squad/decisions/inbox/tank-item-a-cache-root.md`
+
+Created `internal/toolload` package with `CacheRoot()`, `RepoCacheDir()`, `VersionSegment()`, and a test-only `SetTestRoot()`. Replaced the `<BaseDir>/.skills-cache/<version>/<owner>/<repo>` layout (which was polluting cwd with a 4.7M tree) with `<CacheRoot>/repos/<owner>/<repo>/<version>` — owner/repo first so versions cluster.
+
+Dropped `BaseDir` from `FetchRequest` and the `baseDir` param from `FetchRemote(ctx, entry)`. Updated `validate.go:pluginCheckedPaths` and `internal/plugin/installed.go:ResolveInstalled` to read from `toolload.RepoCacheDir(...)`. Tests in `plugin/` and `config/tool/` updated to use `toolload.SetTestRoot(...)` instead of `t.Setenv("HOME", ...)`.
+
+Deferred flock-for-concurrent-fetch to Item C (it's already going to touch `ensureRepoCloned`).
+
+### Learnings
+
+- **The bug was as advertised.** `.skills-cache/` was sitting in `/home/rgeraghty/projects/hyoka/.skills-cache/default/...` (4.7M) — exactly the cwd-pollution Ronnie kept hitting. Original cause: `cmd/run.go:403` passed `ConfigDir: ""` to `ValidateAndExpand` for the reviewer pass; that empty string flowed all the way to `filepath.Join("", ".skills-cache", ...)`.
+- **`sync.Once` + tests don't mix without a helper.** Three packages have tests that previously did `t.Setenv("HOME", t.TempDir())` to redirect cache lookups. After moving to `CacheRoot()` (computed once), `Setenv` is too late on the second test. Solution: `toolload.SetTestRoot(path)` returns a `restore` closure and resets the Once. Exported test-only helper, clearly documented.
+- **`FetchRemote(ctx, entry, baseDir)` had two real callers** (`resolve.go` and `validate.go`) plus tests. Dropping the param entirely was cleaner than keeping a deprecated arg — caught one straggling test, fixed in one line.
+- **`pluginCheckedPaths` is the source of the path-list shown in error messages.** The validate.go enumerated paths (3 cache + 1 legacy `installed-plugins` per-repo + 1 legacy repo-less) get rendered when a plugin lookup misses. Easy to forget that this list and `ResolveInstalled` had to stay in sync — Item F's job to dedup.
+- **`gofmt` reformatted half of validate.go** because the pre-existing file had inconsistent tab/space indentation. The diff looks huge but the semantic change is ~30 lines. Let it stand.
+- **Pre-existing test failures persist** (`cmd`, `comparison`, `report`, `serve`, `rerender`) — Neo's Item D WIP and unrelated `Model`/`boolPtr` issues. Verified `tool` and `plugin` baseline was green before my edits and is green again after.
+
+## Item C — Version freshness + flock (2026-04-27)
+
+**Status:** COMPLETE — see `.squad/decisions/inbox/tank-item-c-freshness-flock.md`.
+
+### Learnings
+
+**Freshness branching: "pinned" includes branch names.** Per Ronnie's spec, anything not `""`/`"default"` skips fetch when the local ref resolves. That intentionally means `version: main` won't auto-update — users who want freshness drop the pin entirely. The escape hatch (`default`) keeps the always-fetch behavior intact.
+
+**`git rev-parse --verify --quiet <ref>^{commit}` is the right local-resolution check** — `^{commit}` forces tag dereferencing so annotated tags resolve to their commit. `--verify --quiet` makes it exit non-zero with no stderr if the ref is missing, which is exactly the signal we want; no need to parse output. Pair it with the existing `runGitQuiet` hook so failure noise stays at Debug.
+
+**Flock pattern: lock the parent dir, not the version dir.** Cache layout is `<CacheRoot>/repos/<owner>/<repo>/<version>/`. Locking the version subdir would let two processes race on owner/repo@v1 vs owner/repo@v2 — different dirs but they share zero git state since they're sibling clones, so this might seem fine. But the pattern in Item A's note (Ronnie's plan) was explicit: lock at the repo level so the cache layout has one serialization point per repo, future-proofing for shared object stores or `git worktree`-style layouts. Doing this also matches user mental model — "hyoka is fetching microsoft/skills" doesn't mention a version.
+
+**`unix.Flock` released by kernel on process exit.** A crashed hyoka cannot leave a permanent lock turd; the lock file persists as bytes on disk but the advisory lock is gone. Big improvement over a homegrown PID-file scheme.
+
+**Polling vs blocking flock:** `LOCK_EX` alone blocks indefinitely. `LOCK_EX | LOCK_NB` returns `EWOULDBLOCK` immediately if busy, lets us implement a deadline + honor `ctx.Done()`. 500ms poll feels right — fast handoff without burning cycles. Caught a subtle bug in the first draft: `errors.Is(err, unix.EWOULDBLOCK)` is the right check, not `==` — `unix.Errno` is a typed errno but `errors.Is` is friendlier for future-proofing.
+
+**Testability hook: package-level function var is fine for one call site.** I considered an interface or a struct field, but `var runGit = runGitQuiet` + `t.Cleanup` is one line and tests stay legible. The cost is "future readers might abuse it from elsewhere in the package" — accepted because it's lowercase and sealed. If `runGit` ever picks up a second consumer, refactor to an interface.
+
+**Windows stub via build tag instead of runtime check.** `//go:build !windows` and `//go:build windows` on two files keeps `unix.Flock` from compiling on Windows (it's not in `x/sys/unix`'s Windows variant). Cleaner than `runtime.GOOS == "windows"` branching inside one file. The stub returns success — concurrent Windows runs may race on git; the existing tool-load error path will surface failures, and users retry. Acceptable until someone runs hyoka on Windows for real.
+
+**Meta file punted.** Morpheus suggested `<CacheRoot>/meta/<owner>/<repo>.json` for audit. Decision in the inbox note: defer until there's a consumer (e.g., `hyoka serve` "last fetched" column). No need to ship JSON marshaling + atomic-rename complexity for a write-only audit log no one reads.
+
+**Pre-existing failures persist.** `cmd`, `comparison`, `report`, `serve`, `rerender` still fail to build/run for reasons documented in Item A. My changes don't touch those packages. Confirmed by checking each failure mode is the same as Item A's baseline.
+
+## Item F — Dedup plugin path enumeration (2026-04-27)
+
+**Status:** COMPLETE — see `.squad/decisions/inbox/tank-item-f-dedup-plugin-paths.md`.
+
+### Learnings
+
+- **Three call sites, three copies, zero drift — until now.** `pluginCheckedPaths` (validate.go), `ResolveInstalled` (installed.go), and `findPluginInRepo` (plugin_fetcher.go) all hand-rolled the same `[".github/plugins", ".github/skills", "skills"]` list. Lifting it into `plugin.PluginCacheCandidates` and having all three callers `append(..., plugin.PluginCacheCandidates(repoCache, name)...)` collapses three definitions into one. Acceptance: adding a candidate now requires editing exactly one function.
+- **Predicate mirroring was a real cost, not theoretical.** Neo's Item B note documented duplicating `isPluginDir`/`isSkillDir`/`hasChildSkills` in `plugin_fetcher.go` to avoid an import cycle. The cycle was imaginary — `internal/config/tool` already imports `internal/plugin` for `SplitOwnerRepo`/`ResolveInstalled`/`Registry`/`EnumerateChildSkills`. The "cycle" was actually just "needs an exported name." Adding `plugin.IsPluginDir` (one-line wrapper over the unexported `isPluginDir`) deleted three predicate functions from `plugin_fetcher.go` with no API surface bloat — `IsPluginDir` is the natural sibling of `FindPluginInRepo` anyway.
+- **Skill-side dedup wasn't applicable.** `findSkillInRepo` in `fetcher.go` has 5 candidates + manifest fallback + single-skill fallback, but **only one copy in the codebase**. No duplication to dedup. Worth checking before assuming symmetry — plugins and skills evolved on different precedence rules (Neo flagged this in Item B D2) and have different lookup helpers.
+- **Lock file (`.hyoka-lock`) sits one level above the enumeration zone.** `acquireRepoLock` writes to `<CacheRoot>/repos/<owner>/<repo>/.hyoka-lock` (parent of version dir). `PluginCacheCandidates` produces paths under `<repoDir>` where `repoDir = RepoCacheDir(owner, repo, "default")` — i.e., one dir level deeper. So the lock can never be mistaken for a plugin/skill candidate dir. Documented this in `paths.go`'s comment so future maintainers don't trip over it.
+- **Legacy fallback decision: kept with `slog.Warn`, not dropped.** Could not interactively ask Ronnie (no `ask_user` tool in non-interactive mode). Defaulted to the recommended option from both Morpheus's spec and the task brief. The deprecation warning gives one release for users to migrate before the next release drops the two `~/.copilot/installed-plugins/...` branches in `ResolveInstalled`. Surfaced this in the decision note for Ronnie to override.
+- **`parsePluginRepo` and `findPluginInRepo` kept as in-package shims.** Tests in `plugin_fetcher_test.go` reference these by their unexported names. Replacing the call sites and keeping one-line shims (`return plugin.SplitOwnerRepo(repo)` / `return plugin.FindPluginInRepo(...)`) is cheaper than touching every test. Future deletion is a one-liner once tests get refactored to call the exported names directly.

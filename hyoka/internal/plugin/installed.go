@@ -1,10 +1,13 @@
 package plugin
 
 import (
-"os"
-"path/filepath"
-"sort"
-"strings"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/toolload"
 )
 
 // ResolveInstalled resolves an installed plugin to a local plugin directory
@@ -12,17 +15,20 @@ import (
 // shorthand aliases — callers must always pass the repo string from the
 // user's config (e.g. "github.com/microsoft/skills" or "microsoft/skills").
 //
-// It looks for the plugin under the hyoka git-clone cache:
+// It looks for the plugin under the canonical hyoka cache (toolload.CacheRoot)
+// at the "default" version segment — matching where gitFetcher writes:
 //
-//~/.hyoka/cache/default/<owner>/<repo>/.github/plugins/<name>
-//~/.hyoka/cache/default/<owner>/<repo>/.github/skills/<name>
-//~/.hyoka/cache/default/<owner>/<repo>/skills/<name>
+//<CacheRoot>/repos/<owner>/<repo>/default/.github/plugins/<name>
+//<CacheRoot>/repos/<owner>/<repo>/default/.github/skills/<name>
+//<CacheRoot>/repos/<owner>/<repo>/default/skills/<name>
 //
 // As a transitional fallback for plugins installed via the Copilot CLI
 // before hyoka existed, it also checks:
 //
 //~/.copilot/installed-plugins/<owner>-<repo>/<name>/skills
 //~/.copilot/installed-plugins/<name>/skills (legacy, repo-less)
+//
+// (Item F of the tool-load consolidation plan retires those legacy paths.)
 //
 // A directory qualifies as a plugin if it is either:
 //
@@ -35,37 +41,42 @@ import (
 // plugin cannot be located. To enumerate the children of a container
 // plugin, pass the returned dir to EnumerateChildSkills.
 func ResolveInstalled(repo, name string) string {
-home, err := os.UserHomeDir()
-if err != nil {
-return ""
-}
+	owner, repoName := SplitOwnerRepo(repo)
+	if owner != "" && repoName != "" {
+		// Canonical cache: <CacheRoot>/repos/<owner>/<repo>/default
+		hyokaCache := toolload.RepoCacheDir(owner, repoName, "default")
+		for _, dir := range PluginCacheCandidates(hyokaCache, name) {
+			if isPluginDir(dir) {
+				return dir
+			}
+		}
 
-owner, repoName := SplitOwnerRepo(repo)
-if owner != "" && repoName != "" {
-hyokaCache := filepath.Join(home, ".hyoka", "cache", "default", owner, repoName)
-for _, dir := range []string{
-filepath.Join(hyokaCache, ".github", "plugins", name),
-filepath.Join(hyokaCache, ".github", "skills", name),
-filepath.Join(hyokaCache, "skills", name),
-} {
-if isPluginDir(dir) {
-return dir
-}
-}
+		// Copilot CLI legacy install layout, keyed by "<owner>-<repo>".
+		// Deprecated — slated for removal one release after Item F lands;
+		// see .squad/decisions/inbox/tank-item-f-dedup-plugin-paths.md.
+		if home, err := os.UserHomeDir(); err == nil {
+			legacy := filepath.Join(home, ".copilot", "installed-plugins", owner+"-"+repoName, name, "skills")
+			if isDir(legacy) {
+				slog.Warn("Resolved plugin via deprecated legacy path; will be removed in a future release",
+					"path", legacy, "plugin", name, "repo", repo,
+					"hint", "move plugin into the canonical hyoka cache layout (see docs/configuration.md)")
+				return legacy
+			}
+		}
+	}
 
-// Copilot CLI legacy install layout, keyed by "<owner>-<repo>".
-legacy := filepath.Join(home, ".copilot", "installed-plugins", owner+"-"+repoName, name, "skills")
-if isDir(legacy) {
-return legacy
-}
-}
-
-// Legacy ~/.copilot/installed-plugins/<name>/skills (repo-less). Kept
-// as a final fallback for users who installed before repo: was required.
-if dir := filepath.Join(home, ".copilot", "installed-plugins", name, "skills"); isDir(dir) {
-return dir
-}
-return ""
+	// Legacy ~/.copilot/installed-plugins/<name>/skills (repo-less). Kept
+	// as a final fallback for users who installed before repo: was required.
+	// Deprecated — see note above.
+	if home, err := os.UserHomeDir(); err == nil {
+		if dir := filepath.Join(home, ".copilot", "installed-plugins", name, "skills"); isDir(dir) {
+			slog.Warn("Resolved plugin via deprecated legacy repo-less path; will be removed in a future release",
+				"path", dir, "plugin", name,
+				"hint", "set repo: in the plugin entry and move into the canonical hyoka cache layout")
+			return dir
+		}
+	}
+	return ""
 }
 
 // EnumerateChildSkills returns the absolute paths of every SKILL.md-bearing
