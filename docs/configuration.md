@@ -415,7 +415,7 @@ Guardrail limits can be set at multiple levels with the following resolution ord
 
 **prompt frontmatter > config YAML > CLI flag > engine default**
 
-This allows fine-grained control at the prompt level while maintaining sensible defaults.
+This allows fine-grained control at the prompt level while maintaining sensible defaults. These resolved limits are enforced in real-time during code generation, ensuring that session actions, turns, and file creation respect the merged priority order.
 
 | Field | Type | Default | CLI Flag | Description |
 |-------|------|---------|----------|-------------|
