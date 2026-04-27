@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 )
 
@@ -175,4 +176,83 @@ func waitForToolVerification(ctx context.Context, v *toolVerifier, timeout time.
 	case <-timeoutCtx.Done():
 		return nil, fmt.Errorf("tool verification timeout: SDK did not confirm tool load within %v", timeout)
 	}
+}
+
+// postSessionToolVerification waits for the SDK to confirm every configured
+// skill / MCP server actually loaded after `session.SendAndWait` returned.
+// Returns a tool.SummarizeToolLoadErrors-formatted summary of any failures
+// (matching the pre-session validation format from Item D), or "" when
+// every configured tool loaded cleanly OR when nothing was configured to
+// verify.
+//
+// Timeout semantics: if the verifier hasn't completed within the supplied
+// timeout, every configured-but-unconfirmed tool is treated as Failed with
+// reason "SDK did not confirm tool load within <timeout>". The point of
+// this gate is to eliminate false-positive evals; we'd rather hard-fail on
+// a slow MCP than silently grade code that never had its tools.
+func postSessionToolVerification(ctx context.Context, v *toolVerifier, timeout time.Duration) string {
+	if v == nil {
+		return ""
+	}
+	if len(v.expectedSkills) == 0 && len(v.expectedMCP) == 0 {
+		return ""
+	}
+	// Opportunistic flush: in production the OnEvent handler only calls
+	// emitIfReady when a progressFn is registered, so an eval running
+	// without a progress display would otherwise time out here even when
+	// every SDK event already fired. Calling emitIfReady ourselves closes
+	// readyChan if both kinds have reported.
+	tools := v.emitIfReady()
+	if tools == nil {
+		var err error
+		tools, err = waitForToolVerification(ctx, v, timeout)
+		if err != nil {
+			// Timeout — synthesize a Failed entry per configured tool so the
+			// summary names every tool we expected to see and didn't.
+			tools = expectedAsTimeoutFailures(v, timeout)
+		}
+	}
+	var failed []*tool.ToolLoadError
+	for _, t := range tools {
+		if t.Status == progress.ToolStatusFailed {
+			failed = append(failed, &tool.ToolLoadError{
+				Kind:   t.ToolKind,
+				Name:   t.ToolName,
+				Reason: t.Reason,
+			})
+		}
+	}
+	return tool.SummarizeToolLoadErrors(failed)
+}
+
+// expectedAsTimeoutFailures builds the synthetic Failed list used when
+// waitForToolVerification times out. Sort order matches emitIfReady so
+// renderers and snapshot tests see identical ordering across the
+// happy/timeout paths.
+func expectedAsTimeoutFailures(v *toolVerifier, timeout time.Duration) []progress.ToolStatus {
+	reason := fmt.Sprintf("SDK did not confirm tool load within %s", timeout)
+	tools := make([]progress.ToolStatus, 0, len(v.expectedSkills)+len(v.expectedMCP))
+	for name := range v.expectedSkills {
+		tools = append(tools, progress.ToolStatus{
+			ToolName: name,
+			ToolKind: progress.ToolKindSkill,
+			Status:   progress.ToolStatusFailed,
+			Reason:   reason,
+		})
+	}
+	for name := range v.expectedMCP {
+		tools = append(tools, progress.ToolStatus{
+			ToolName: name,
+			ToolKind: progress.ToolKindMCP,
+			Status:   progress.ToolStatusFailed,
+			Reason:   reason,
+		})
+	}
+	sort.Slice(tools, func(i, j int) bool {
+		if tools[i].ToolKind != tools[j].ToolKind {
+			return tools[i].ToolKind < tools[j].ToolKind
+		}
+		return tools[i].ToolName < tools[j].ToolName
+	})
+	return tools
 }

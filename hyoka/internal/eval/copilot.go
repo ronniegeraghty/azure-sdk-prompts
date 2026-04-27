@@ -184,8 +184,12 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	})
 	if toolErr != nil {
 		return &EvalResult{
-			Success:       false,
-			Error:         "tool_load_failure: " + toolErr.Error(),
+			Success: false,
+			// toolErr.Error() is the multi-line summary produced by
+			// tool.SummarizeToolLoadErrors — every failed tool, not just
+			// the first. Surface it verbatim so operators can fix all
+			// broken tools in one pass.
+			Error:         "tool_load_failure:\n" + toolErr.Error(),
 			ErrorDetails:  toolErr.Error(),
 			ErrorCategory: "tool_load_failure",
 		}, fmt.Errorf("tool load failure: %w", toolErr)
@@ -640,20 +644,6 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	}
 	sessionID = session.SessionID
 
-	// NOTE: Tool validation gate is DISABLED pending SDK event timing investigation.
-	// The gate was blocking before SendAndWait, but the SDK only emits SessionSkillsLoaded
-	// and SessionMcpServersLoaded events AFTER the first message round-trip. This created
-	// a deadlock where every eval timed out waiting for events that would never fire.
-	//
-	// TODO(#347): Re-enable after confirming SDK event ordering. Options:
-	//   1. Move gate AFTER first SendAndWait (verify tools loaded post-generation)
-	//   2. Check SDK internals to see if there's a different event that fires earlier
-	//   3. Make timeout much longer (30s+) to handle cold-start MCP servers
-	//
-	// For now, tool load failures are logged (see SessionSkillsLoaded/SessionMcpServersLoaded
-	// event handlers above) but don't block eval execution. This is better than zero evals
-	// running at all.
-
 	// Send the prompt
 	if e.progressFn != nil {
 		e.progressFn(progress.ProgressEvent{
@@ -732,6 +722,44 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	capturedRecords := make([]report.SessionEventRecord, len(sessionRecords))
 	copy(capturedRecords, sessionRecords)
 	mu.Unlock()
+
+	// Post-session tool verification gate (#347 / Item E). The SDK emits
+	// SessionSkillsLoaded / SessionMcpServersLoaded only after the first
+	// message round-trip, so this gate runs AFTER SendAndWait returned —
+	// by which point the verifier's readyChan has typically already closed
+	// from inside the OnEvent callback. waitForToolVerification resolves
+	// immediately when there's nothing configured to verify; it only
+	// imposes the 30s deadline when SDK events haven't arrived yet.
+	//
+	// Failure here is fatal to the eval: grading code that ran without the
+	// configured tools produces false-positive scores. Match the
+	// pre-session error format (Item D) by using
+	// tool.SummarizeToolLoadErrors so operators see consistent messaging
+	// regardless of which validation layer caught the breakage.
+	if summary := postSessionToolVerification(ctx, verifier, 30*time.Second); summary != "" {
+		lg.Warn("Post-session tool verification failed; aborting before grading",
+			"summary", summary)
+		generatedFiles, listErr := listFiles(workDir)
+		if listErr != nil {
+			lg.Warn("Failed to list generated files after tool verification failure",
+				"dir", workDir, "error", listErr)
+		}
+		cleanupCalled = true
+		return &EvalResult{
+			GeneratedFiles: generatedFiles,
+			EventCount:     len(capturedEvents),
+			ToolCalls:      extractToolCalls(capturedEvents),
+			SessionEvents:  capturedRecords,
+			ActionTimeline: BuildActionTimeline(capturedRecords),
+			Success:        false,
+			Error:          "tool_load_failure:\n" + summary,
+			ErrorDetails:   summary,
+			ErrorCategory:  "tool_load_failure",
+			FinalResponse:  extractLastAssistantMessage(capturedRecords),
+			ToolReport:     toolReport,
+			CleanupFn:      buildCleanupFn(),
+		}, fmt.Errorf("post-session tool verification: %s", summary)
+	}
 
 	generatedFiles, listErr := listFiles(workDir)
 	if listErr != nil {

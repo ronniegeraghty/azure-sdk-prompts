@@ -1,8 +1,12 @@
 package eval
 
 import (
+	"context"
+	"strings"
 	"testing"
+	"time"
 
+	tool "github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 )
 
@@ -470,3 +474,179 @@ func TestToolValidationGate_AllFailures(t *testing.T) {
 	}
 }
 
+
+// --- postSessionToolVerification (Item E) ----------------------------------
+
+// TestPostSessionVerification_NothingConfigured asserts the gate is a no-op
+// when no remote tools are declared — evals without skills/MCP must not
+// stall for the timeout.
+func TestPostSessionVerification_NothingConfigured(t *testing.T) {
+v := newToolVerifier(nil, nil)
+start := time.Now()
+got := postSessionToolVerification(context.Background(), v, 5*time.Second)
+elapsed := time.Since(start)
+if got != "" {
+t.Errorf("expected empty summary when nothing configured, got %q", got)
+}
+if elapsed > 100*time.Millisecond {
+t.Errorf("gate should resolve immediately when nothing to verify, took %v", elapsed)
+}
+}
+
+// TestPostSessionVerification_AllLoaded asserts a clean evaluation returns
+// no failure summary — eval should proceed to grading.
+func TestPostSessionVerification_AllLoaded(t *testing.T) {
+v := newToolVerifier(
+[]string{"/skills/alpha"},
+map[string]bool{"azure-mcp": true},
+)
+v.onSkillsLoaded([]string{"alpha"})
+v.onMCPLoaded([]string{"azure-mcp"})
+
+got := postSessionToolVerification(context.Background(), v, 5*time.Second)
+if got != "" {
+t.Errorf("expected empty summary when all tools loaded, got %q", got)
+}
+}
+
+// TestPostSessionVerification_FailedSkill asserts a missing skill produces
+// a tool.SummarizeToolLoadErrors-formatted summary so the eval engine can
+// short-circuit to tool_load_failure with the same wording as pre-session.
+func TestPostSessionVerification_FailedSkill(t *testing.T) {
+v := newToolVerifier(
+[]string{"/skills/alpha", "/skills/beta"},
+nil,
+)
+v.onSkillsLoaded([]string{"alpha"}) // beta missing
+
+got := postSessionToolVerification(context.Background(), v, 5*time.Second)
+if got == "" {
+t.Fatal("expected non-empty summary for failed skill")
+}
+wantHeader := "1 tool(s) failed to load:"
+if !strings.HasPrefix(got, wantHeader) {
+t.Errorf("summary should start with %q, got: %s", wantHeader, got)
+}
+if !strings.Contains(got, `skill "beta"`) {
+t.Errorf("summary should name the failed skill, got: %s", got)
+}
+}
+
+// TestPostSessionVerification_FailedMCP asserts a missing MCP server produces
+// the same shape of summary, with kind="mcp".
+func TestPostSessionVerification_FailedMCP(t *testing.T) {
+v := newToolVerifier(
+nil,
+map[string]bool{"azure-mcp": true, "playwright-mcp": true},
+)
+v.onMCPLoaded([]string{"azure-mcp"}) // playwright missing
+
+got := postSessionToolVerification(context.Background(), v, 5*time.Second)
+if !strings.Contains(got, `mcp "playwright-mcp"`) {
+t.Errorf("summary should name failed mcp, got: %s", got)
+}
+if !strings.HasPrefix(got, "1 tool(s) failed to load:") {
+t.Errorf("unexpected header in summary: %s", got)
+}
+}
+
+// TestPostSessionVerification_MixedFailures asserts every failed tool —
+// both skills and MCPs — is listed in the aggregated summary, in
+// (kind, name) sort order matching emitIfReady.
+func TestPostSessionVerification_MixedFailures(t *testing.T) {
+v := newToolVerifier(
+[]string{"/skills/alpha", "/skills/beta"},
+map[string]bool{"mcp1": true, "mcp2": true},
+)
+v.onSkillsLoaded([]string{"alpha"}) // beta failed
+v.onMCPLoaded([]string{"mcp2"})     // mcp1 failed
+
+got := postSessionToolVerification(context.Background(), v, 5*time.Second)
+if !strings.HasPrefix(got, "2 tool(s) failed to load:") {
+t.Errorf("expected 2-failure header, got: %s", got)
+}
+for _, want := range []string{`skill "beta"`, `mcp "mcp1"`} {
+if !strings.Contains(got, want) {
+t.Errorf("summary missing %q\nfull summary:\n%s", want, got)
+}
+}
+}
+
+// TestPostSessionVerification_TimeoutMarksAllFailed asserts the timeout
+// path treats every configured tool as Failed (no false positives) and
+// the reason is the timeout string. Uses a short timeout to keep the test
+// fast.
+func TestPostSessionVerification_TimeoutMarksAllFailed(t *testing.T) {
+v := newToolVerifier(
+[]string{"/skills/alpha"},
+map[string]bool{"mcp1": true},
+)
+// No SDK events ever fire.
+
+timeout := 50 * time.Millisecond
+start := time.Now()
+got := postSessionToolVerification(context.Background(), v, timeout)
+elapsed := time.Since(start)
+
+if got == "" {
+t.Fatal("expected timeout to produce a failure summary")
+}
+if !strings.HasPrefix(got, "2 tool(s) failed to load:") {
+t.Errorf("timeout should mark every configured tool as failed, got: %s", got)
+}
+for _, want := range []string{`skill "alpha"`, `mcp "mcp1"`, "did not confirm tool load"} {
+if !strings.Contains(got, want) {
+t.Errorf("timeout summary missing %q\nfull summary:\n%s", want, got)
+}
+}
+if elapsed < timeout {
+t.Errorf("gate returned before timeout elapsed: %v < %v", elapsed, timeout)
+}
+if elapsed > timeout+500*time.Millisecond {
+t.Errorf("gate returned far after timeout: %v >> %v", elapsed, timeout)
+}
+}
+
+// TestPostSessionVerification_FormatMatchesPreSession asserts byte-for-byte
+// equivalence between the post-session summary (Item E) and the pre-session
+// SummarizeToolLoadErrors output (Item D). Operators must see the same
+// "N tool(s) failed to load:" header, same bullet glyph, same quoting, and
+// same kind/name ordering regardless of which gate produced the failure.
+// Drift between the two paths would defeat the whole point of routing both
+// through tool.SummarizeToolLoadErrors.
+func TestPostSessionVerification_FormatMatchesPreSession(t *testing.T) {
+	v := newToolVerifier(
+		[]string{"/skills/alpha", "/skills/beta"},
+		map[string]bool{"mcp1": true, "mcp2": true},
+	)
+	v.onSkillsLoaded([]string{"alpha"}) // beta failed
+	v.onMCPLoaded([]string{"mcp2"})     // mcp1 failed
+
+	postSummary := postSessionToolVerification(context.Background(), v, 5*time.Second)
+	if postSummary == "" {
+		t.Fatal("expected non-empty post-session summary")
+	}
+
+	// Build the equivalent pre-session error list using the same kind names
+	// and the empty Reason that the post-session path emits when the SDK
+	// did not provide a reason. emitIfReady returns entries sorted by
+	// (kind, name): mcp before skill, alpha before beta.
+	preErrs := []*tool.ToolLoadError{
+		{Kind: "mcp", Name: "mcp1", Reason: "SDK did not report MCP server as loaded"},
+		{Kind: "skill", Name: "beta", Reason: "SDK did not report skill as loaded"},
+	}
+	preSummary := tool.SummarizeToolLoadErrors(preErrs)
+
+	if postSummary != preSummary {
+		t.Errorf("post-session summary diverges from pre-session format\nPOST:\n%s\nPRE:\n%s",
+			postSummary, preSummary)
+	}
+}
+
+// TestPostSessionVerification_NilVerifier asserts the helper is safe to call
+// with a nil verifier — defensive coverage for future call sites.
+func TestPostSessionVerification_NilVerifier(t *testing.T) {
+if got := postSessionToolVerification(context.Background(), nil, time.Second); got != "" {
+t.Errorf("nil verifier should return empty summary, got %q", got)
+}
+}
