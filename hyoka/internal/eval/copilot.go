@@ -32,6 +32,13 @@ type CopilotPromptRunner struct {
 	maxFiles          int
 	sessionTimeout    time.Duration
 	progressFn        progress.ProgressFunc
+
+	// Per-eval resolved limits (set by SetLimitsForEval before each Run call).
+	// Protected by evalLimitsMu for concurrent eval safety (#bugfix-maxturns).
+	evalLimitsMu          sync.RWMutex
+	evalMaxTurns          int
+	evalMaxFiles          int
+	evalMaxSessionActions int
 }
 
 // SetProgressFunc registers a callback for live progress updates.
@@ -44,6 +51,18 @@ func (e *CopilotPromptRunner) SetProgressFunc(fn progress.ProgressFunc) {
 // Timeout frontmatter still overrides this value.
 func (e *CopilotPromptRunner) SetSessionTimeout(d time.Duration) {
 	e.sessionTimeout = d
+}
+
+// SetLimitsForEval updates the per-eval resolved limits before each Run call.
+// These values override the CLI-level defaults during real-time enforcement.
+// Safe for concurrent calls — the engine may run multiple evals in parallel
+// against the same runner instance (#bugfix-maxturns).
+func (e *CopilotPromptRunner) SetLimitsForEval(maxTurns, maxFiles, maxSessionActions int) {
+	e.evalLimitsMu.Lock()
+	e.evalMaxTurns = maxTurns
+	e.evalMaxFiles = maxFiles
+	e.evalMaxSessionActions = maxSessionActions
+	e.evalLimitsMu.Unlock()
 }
 
 // PromptRunnerOptions configures the CopilotPromptRunner.
@@ -220,15 +239,31 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	var turnLimitHit bool
 	var fileLimitHit bool
 
-	// Use runner-level limits for real-time enforcement
-	maxTurnsLimit := e.maxTurns
+	// Resolve effective limits for real-time enforcement.
+	// Prefer per-eval resolved values (set by engine via SetLimitsForEval),
+	// fall back to CLI defaults from runner construction, then hardcoded defaults.
+	e.evalLimitsMu.RLock()
+	maxTurnsLimit := e.evalMaxTurns
+	if maxTurnsLimit <= 0 {
+		maxTurnsLimit = e.maxTurns
+	}
 	if maxTurnsLimit <= 0 {
 		maxTurnsLimit = 25
 	}
-	maxFilesLimit := e.maxFiles
+
+	maxFilesLimit := e.evalMaxFiles
+	if maxFilesLimit <= 0 {
+		maxFilesLimit = e.maxFiles
+	}
 	if maxFilesLimit <= 0 {
 		maxFilesLimit = 50
 	}
+
+	maxSessionActionsLimit := e.evalMaxSessionActions
+	if maxSessionActionsLimit <= 0 {
+		maxSessionActionsLimit = e.maxSessionActions
+	}
+	e.evalLimitsMu.RUnlock()
 
 	// Build expected tool sets for verification after session creation (#347)
 	expectedMCPServers := make(map[string]bool)
@@ -313,9 +348,9 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			}
 		case copilot.SessionEventTypeAssistantReasoning:
 			actionCounter++
-			if e.maxSessionActions > 0 && actionCounter > e.maxSessionActions && !actionLimitHit {
+			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
 				actionLimitHit = true
-				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", e.maxSessionActions)
+				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", maxSessionActionsLimit)
 				genCancel()
 			}
 			// Content already captured above
