@@ -404,7 +404,9 @@ func runCmd() *cobra.Command {
 							PluginsDir:    config.ResolvePluginsDir(),
 						})
 						if err != nil {
-							return nil, nil, fmt.Errorf("reviewer tool load failure for config %q: %w", cfg.Name, err)
+							// err is a *joinedToolLoadError from tool.SummarizeToolLoadErrors
+							// — surfaces every broken reviewer tool, not just the first.
+							return nil, nil, fmt.Errorf("reviewer tool load failure for config %q:\n%w", cfg.Name, err)
 						}
 						reviewerSkillsDirs = report.ReviewerSkillDirs()
 					}
