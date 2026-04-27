@@ -29,6 +29,15 @@ configs:
           type: plugin
           source: remote
           repo: microsoft/skills
+        # Idiomatic Python 3.11+ best practices: type hints, Pydantic v2,
+        # EAFP error handling, comprehensions, modern tooling (uv, ruff, mypy).
+        # Source: https://github.com/mauromedda/agent-toolkit/tree/main/skills/python
+        # When the skill lives at a non-standard path inside the repo, append
+        # the path directly to the repo string: <owner>/<repo>/<path-in-repo>.
+        - name: python-best-practices
+          type: skill
+          source: remote
+          repo: mauromedda/agent-toolkit/skills/python
     reviewer:
       models:
         - "claude-opus-4.6"

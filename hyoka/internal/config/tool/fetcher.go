@@ -204,7 +204,7 @@ func (gitFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, err
 	}
 
 	// Parse skill spec from explicit repo + name fields.
-	owner, repo, skillName := parseSkillSpec(entry.Repo, entry.Name)
+	owner, repo, skillName, repoSubpath := parseSkillSpec(entry.Repo, entry.Name)
 
 	// Cache path: <baseDir>/.skills-cache/<version>/<owner>/<repo>/
 	cacheDir := filepath.Join(req.BaseDir, ".skills-cache", versionSegment, owner, repo)
@@ -212,6 +212,29 @@ func (gitFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, err
 	// Clone or update the repo
 	if err := ensureRepoCloned(ctx, owner, repo, versionSegment, cacheDir); err != nil {
 		return FetchResult{}, fmt.Errorf("cloning %s/%s: %w", owner, repo, err)
+	}
+
+	// Explicit path: when set on a remote skill entry (either via `path:` or
+	// embedded in the repo string as `<owner>/<repo>/<subpath>`), point
+	// directly at the skill directory inside the repo. Skips the name-based
+	// search across well-known locations (.github/skills, skills/, etc.).
+	// An explicit `path:` field wins over a path embedded in `repo:`.
+	subpath := entry.Path
+	if subpath == "" {
+		subpath = repoSubpath
+	}
+	if subpath != "" {
+		skillDir := filepath.Join(cacheDir, filepath.FromSlash(subpath))
+		if !isValidSkillDir(skillDir) {
+			return FetchResult{}, fmt.Errorf("skill path %q in %s/%s does not contain SKILL.md or plugin.yaml", subpath, owner, repo)
+		}
+		abs, absErr := filepath.Abs(skillDir)
+		if absErr != nil {
+			slog.Warn("Failed to resolve absolute skill path", "path", skillDir, "error", absErr)
+			abs = skillDir
+		}
+		slog.Info("Resolved skill via explicit path", "skill", entry.Name, "repo", entry.Repo, "subpath", subpath, "version", versionSegment, "path", abs)
+		return FetchResult{Dir: abs, Version: versionSegment}, nil
 	}
 
 	// If no specific skill name, return the repo root
@@ -243,30 +266,35 @@ func (gitFetcher) Fetch(ctx context.Context, req FetchRequest) (FetchResult, err
 // parseSkillSpec parses skill specifications:
 //   - If name contains "@", split at last @ to get skillname and owner/repo
 //   - Otherwise, repo is "owner/repo" (or "github.com/owner/repo") and name is the skill name
+//   - When repo has more than two path segments (e.g. "owner/repo/skills/python"),
+//     the first two are owner/repo and the remainder is returned as subpath.
 //
 // The legacy "name@skills" shorthand for microsoft/skills has been removed.
 // Callers must declare the source repo explicitly via the entry's repo: field.
-func parseSkillSpec(repo, name string) (owner, repoName, skillName string) {
+func parseSkillSpec(repo, name string) (owner, repoName, skillName, subpath string) {
 	// Handle "name@owner/repo" format
 	if idx := strings.LastIndex(name, "@"); idx > 0 {
 		skillName = name[:idx]
 		ownerRepo := name[idx+1:]
 		parts := strings.SplitN(ownerRepo, "/", 2)
 		if len(parts) == 2 {
-			return parts[0], parts[1], skillName
+			return parts[0], parts[1], skillName, ""
 		}
 		// Malformed — return owner empty so it fails downstream with a clear path.
-		return ownerRepo, "", skillName
+		return ownerRepo, "", skillName, ""
 	}
 
-	// Standard "owner/repo" with separate name. Strip optional github.com/ prefix.
+	// Standard "owner/repo[/subpath...]" with separate name. Strip optional github.com/ prefix.
 	r := strings.TrimPrefix(repo, "github.com/")
-	parts := strings.SplitN(r, "/", 2)
-	if len(parts) != 2 {
+	parts := strings.SplitN(r, "/", 3)
+	if len(parts) < 2 {
 		// Malformed repo — return as-is, will fail downstream
-		return r, "", name
+		return r, "", name, ""
 	}
-	return parts[0], parts[1], name
+	if len(parts) == 3 {
+		return parts[0], parts[1], name, parts[2]
+	}
+	return parts[0], parts[1], name, ""
 }
 
 // ensureRepoCloned ensures the repo is cloned at cacheDir. If it already

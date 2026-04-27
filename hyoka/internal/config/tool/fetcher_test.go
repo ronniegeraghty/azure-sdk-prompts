@@ -294,6 +294,7 @@ skillName      string
 wantOwner      string
 wantRepo       string
 wantSkillName  string
+wantSubpath    string
 }{
 {
 name:          "name@owner/repo format",
@@ -335,14 +336,32 @@ wantOwner:     "microsoft",
 wantRepo:      "skills",
 wantSkillName: "azure-sdk-python",
 },
+{
+name:          "owner/repo/subpath embeds the in-repo path",
+repo:          "mauromedda/agent-toolkit/skills/python",
+skillName:     "python-best-practices",
+wantOwner:     "mauromedda",
+wantRepo:      "agent-toolkit",
+wantSkillName: "python-best-practices",
+wantSubpath:   "skills/python",
+},
+{
+name:          "github.com prefix with subpath",
+repo:          "github.com/mauromedda/agent-toolkit/skills/python",
+skillName:     "py",
+wantOwner:     "mauromedda",
+wantRepo:      "agent-toolkit",
+wantSkillName: "py",
+wantSubpath:   "skills/python",
+},
 }
 for _, tc := range cases {
 t.Run(tc.name, func(t *testing.T) {
-owner, repo, skillName := parseSkillSpec(tc.repo, tc.skillName)
-if owner != tc.wantOwner || repo != tc.wantRepo || skillName != tc.wantSkillName {
-t.Errorf("got (%q, %q, %q), want (%q, %q, %q)",
-owner, repo, skillName,
-tc.wantOwner, tc.wantRepo, tc.wantSkillName)
+owner, repo, skillName, subpath := parseSkillSpec(tc.repo, tc.skillName)
+if owner != tc.wantOwner || repo != tc.wantRepo || skillName != tc.wantSkillName || subpath != tc.wantSubpath {
+t.Errorf("got (%q, %q, %q, %q), want (%q, %q, %q, %q)",
+owner, repo, skillName, subpath,
+tc.wantOwner, tc.wantRepo, tc.wantSkillName, tc.wantSubpath)
 }
 })
 }

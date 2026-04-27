@@ -50,3 +50,6 @@ node_modules/
 .morpheus-screenshots/
 .playwright-cli/
 .trinity-screenshots/
+
+# Skill fetch cache
+.skills-cache/
