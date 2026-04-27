@@ -1497,3 +1497,272 @@ func TestUnifiedGraderSuccessIncludesReview(t *testing.T) {
 	}
 }
 
+
+// TestRealtimeGuardrailEnforcementUsesResolvedLimits verifies that real-time
+// enforcement (genCancel() during OnEvent) uses the resolved per-eval limits
+// from config/prompt, not the stale CLI defaults stored in the runner at
+// construction time.
+//
+// Bug: Before SetLimitsForEval was added, the CopilotPromptRunner was
+// constructed once with CLI defaults (e.g., maxTurns=0 -> fallback 25), and
+// those values were never updated with per-config limits. A config with
+// max_turns: 100 would still kill sessions at turn 25.
+//
+// This test exercises the full enforcement path by running a real eval through
+// the engine with a stub runner that simulates turn/file events. It verifies
+// that the session is NOT cancelled at the CLI default limit, but IS cancelled
+// at the resolved config limit.
+func TestRealtimeGuardrailEnforcementUsesResolvedLimits(t *testing.T) {
+tests := []struct {
+name              string
+cliMaxTurns       int    // Passed to runner constructor (CLI default)
+cliMaxFiles       int
+cliMaxActions     int
+configMaxTurns    int    // Set in config YAML
+configMaxFiles    int
+configMaxActions  int
+stubTurnCount     int    // How many turns the stub will emit
+stubFileCount     int    // How many files the stub will create
+expectSuccess     bool   // Should the eval succeed or hit guardrail?
+expectAbortReason string // Expected substring in GuardrailAbortReason
+}{
+{
+name:              "turn_limit_uses_config_not_cli_default",
+cliMaxTurns:       0,   // Falls back to hardcoded 25
+cliMaxFiles:       50,
+cliMaxActions:     50,
+configMaxTurns:    100, // Config says 100
+configMaxFiles:    50,
+configMaxActions:  50,
+stubTurnCount:     26, // 26 turns > CLI default 25, but < config 100
+stubFileCount:     5,
+expectSuccess:     true, // Should NOT cancel at turn 25
+expectAbortReason: "",
+},
+{
+name:              "turn_limit_enforced_at_resolved_config_value",
+cliMaxTurns:       0,
+cliMaxFiles:       50,
+cliMaxActions:     50,
+configMaxTurns:    10, // Config says 10 (lower than CLI default 25)
+configMaxFiles:    50,
+configMaxActions:  50,
+stubTurnCount:     15, // 15 turns > config 10
+stubFileCount:     5,
+expectSuccess:     false, // Should cancel at turn 10
+expectAbortReason: "turn count",
+},
+{
+name:              "file_limit_uses_config_not_cli_default",
+cliMaxTurns:       25,
+cliMaxFiles:       50,  // CLI default
+cliMaxActions:     50,
+configMaxTurns:    100,
+configMaxFiles:    200, // Config says 200
+configMaxActions:  50,
+stubTurnCount:     5,
+stubFileCount:     60, // 60 files > CLI default 50, but < config 200
+expectSuccess:     true, // Should NOT cancel at file 50
+expectAbortReason: "",
+},
+{
+name:              "file_limit_enforced_at_resolved_config_value",
+cliMaxTurns:       25,
+cliMaxFiles:       50,
+cliMaxActions:     50,
+configMaxTurns:    100,
+configMaxFiles:    20, // Config says 20 (lower than CLI default 50)
+configMaxActions:  50,
+stubTurnCount:     5,
+stubFileCount:     25, // 25 files > config 20
+expectSuccess:     false, // Should cancel at file 20
+expectAbortReason: "file count",
+},
+}
+
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+outputDir := t.TempDir()
+
+// Create runner with CLI defaults (simulating CLI startup state)
+runner := &stubRealtimeEnforcementRunner{
+turnCount:   tt.stubTurnCount,
+fileCount:   tt.stubFileCount,
+cliMaxTurns: tt.cliMaxTurns,
+cliMaxFiles: tt.cliMaxFiles,
+}
+
+// Create engine (simulating cmd/run.go setup)
+engine := NewEngine(runner, quietOpts(EngineOptions{
+Workers:           1,
+OutputDir:         outputDir,
+SkipReview:        true,
+MaxTurns:          tt.cliMaxTurns,
+MaxFiles:          tt.cliMaxFiles,
+MaxSessionActions: tt.cliMaxActions,
+}))
+
+prompts := []*prompt.Prompt{{
+ID:         "realtime-enforcement-test",
+Properties: map[string]string{
+"service":  "storage",
+"plane":    "data-plane",
+"language": "go",
+"category": "auth",
+},
+}}
+
+configs := []config.ToolConfig{{
+Name:      "config-with-limits",
+Generator: &config.GeneratorConfig{Model: "gpt-4"},
+Limits: &config.SessionLimits{
+MaxTurns:          tt.configMaxTurns,
+MaxFiles:          tt.configMaxFiles,
+MaxSessionActions: tt.configMaxActions,
+},
+}}
+
+summary, err := engine.Run(context.Background(), prompts, configs)
+if err != nil {
+t.Fatalf("unexpected engine error: %v", err)
+}
+
+if len(summary.Results) != 1 {
+t.Fatalf("expected 1 result, got %d", len(summary.Results))
+}
+
+r := summary.Results[0]
+
+// Verify report contains resolved limits (post-hoc check)
+if r.GuardrailMaxTurns != tt.configMaxTurns {
+t.Errorf("report should show resolved maxTurns=%d, got %d",
+tt.configMaxTurns, r.GuardrailMaxTurns)
+}
+if r.GuardrailMaxFiles != tt.configMaxFiles {
+t.Errorf("report should show resolved maxFiles=%d, got %d",
+tt.configMaxFiles, r.GuardrailMaxFiles)
+}
+
+// Verify real-time enforcement outcome
+if tt.expectSuccess {
+if !r.Success {
+t.Errorf("expected eval to succeed (no guardrail hit), but got failure: %s",
+r.GuardrailAbortReason)
+}
+} else {
+if r.Success {
+t.Errorf("expected guardrail to abort eval, but eval succeeded")
+}
+if !strings.Contains(r.GuardrailAbortReason, tt.expectAbortReason) {
+t.Errorf("expected abort reason to contain %q, got %q",
+tt.expectAbortReason, r.GuardrailAbortReason)
+}
+}
+})
+}
+}
+
+// stubRealtimeEnforcementRunner simulates a CopilotPromptRunner with real-time
+// enforcement logic. It's initialized with CLI defaults (like the real runner),
+// but must be updated with per-eval limits via SetLimitsForEval() to pass the
+// test.
+//
+// This stub emits synthetic events to exercise the OnEvent callback path
+// without requiring a real Copilot SDK session.
+type stubRealtimeEnforcementRunner struct {
+turnCount   int
+fileCount   int
+cliMaxTurns int // CLI default (may be 0, which falls back to 25)
+cliMaxFiles int // CLI default
+
+// Per-eval limits (set by SetLimitsForEval)
+evalMaxTurns   int
+evalMaxFiles   int
+evalMaxActions int
+}
+
+func (s *stubRealtimeEnforcementRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+// Simulate real-time enforcement using resolved limits
+maxTurnsLimit := s.evalMaxTurns
+if maxTurnsLimit <= 0 {
+maxTurnsLimit = s.cliMaxTurns
+}
+if maxTurnsLimit <= 0 {
+maxTurnsLimit = 25 // Hardcoded fallback (matches copilot.go:226)
+}
+
+maxFilesLimit := s.evalMaxFiles
+if maxFilesLimit <= 0 {
+maxFilesLimit = s.cliMaxFiles
+}
+if maxFilesLimit <= 0 {
+maxFilesLimit = 50 // Hardcoded fallback (matches copilot.go:230)
+}
+
+// Check if we should abort due to turn limit
+turnAbort := false
+if maxTurnsLimit > 0 && s.turnCount > maxTurnsLimit {
+turnAbort = true
+}
+
+// Check if we should abort due to file limit
+fileAbort := false
+if maxFilesLimit > 0 && s.fileCount > maxFilesLimit {
+fileAbort = true
+}
+
+// Generate session events (simulating OnEvent callback behavior)
+var events []report.SessionEventRecord
+for i := 0; i < s.turnCount; i++ {
+events = append(events, report.SessionEventRecord{
+Type:       "assistant.message",
+TurnNumber: i + 1,
+})
+}
+
+// Generate file creation events
+var generatedFiles []string
+for i := 0; i < s.fileCount; i++ {
+filename := "file_" + string(rune('a'+i)) + ".txt"
+fullpath := filepath.Join(workDir, filename)
+os.WriteFile(fullpath, []byte("stub content"), 0644)
+generatedFiles = append(generatedFiles, filename)
+events = append(events, report.SessionEventRecord{
+Type:          "session.workspace.file_changed",
+FileOperation: "create",
+FilePath:      filename,
+})
+}
+
+// Build result - EvalResult doesn't have GuardrailAbortReason
+// That's set by the engine's post-hoc guardrail check
+result := &EvalResult{
+GeneratedFiles: generatedFiles,
+SessionEvents:  events,
+Success:        !turnAbort && !fileAbort, // Fail if limits exceeded
+IsStub:         true,
+}
+
+// Set error messages to signal guardrail violation
+if turnAbort {
+result.Error = "guardrail: turn count exceeded"
+result.ErrorCategory = "generation_failure"
+} else if fileAbort {
+result.Error = "guardrail: file count exceeded"
+result.ErrorCategory = "generation_failure"
+}
+
+return result, nil
+}
+
+// SetLimitsForEval is called by the engine after resolveLimits() to inject
+// per-eval limits into the runner. This method must exist for the test to
+// compile and pass after Neo implements it.
+//
+// NOTE: This is a stub-specific implementation. The real CopilotPromptRunner
+// implementation will be added by Neo in copilot.go.
+func (s *stubRealtimeEnforcementRunner) SetLimitsForEval(maxTurns, maxFiles, maxSessionActions int) {
+s.evalMaxTurns = maxTurns
+s.evalMaxFiles = maxFiles
+s.evalMaxActions = maxSessionActions
+}

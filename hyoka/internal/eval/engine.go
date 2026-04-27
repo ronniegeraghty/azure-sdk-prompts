@@ -61,6 +61,14 @@ type PromptRunner interface {
 	Run(ctx context.Context, prompt *prompt.Prompt, config *config.ToolConfig, workDir string) (*EvalResult, error)
 }
 
+// LimitConfigurable is an optional interface that runners can implement to
+// receive per-eval resolved limits for real-time enforcement. The engine will
+// call SetLimitsForEval before each Run() call if the runner implements this
+// interface (#bugfix-maxturns).
+type LimitConfigurable interface {
+	SetLimitsForEval(maxTurns, maxFiles, maxSessionActions int)
+}
+
 // ReviewerFactory creates a reviewer for a specific config.
 // Returns nil if no reviewer should be created (e.g., stub mode or review disabled).
 type ReviewerFactory func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error)

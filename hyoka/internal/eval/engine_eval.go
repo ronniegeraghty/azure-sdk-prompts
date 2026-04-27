@@ -146,9 +146,9 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		"starter_files", len(starterFiles))
 
 	// Thread resolved limits to the runner for real-time enforcement (#bugfix-maxturns).
-	// Type-assert to skip stub runners used in tests.
-	if copilotRunner, ok := e.evaluator.(*CopilotPromptRunner); ok {
-		copilotRunner.SetLimitsForEval(lim.maxTurns, lim.maxFiles, lim.maxSessionActions)
+	// Call SetLimitsForEval if the runner implements LimitConfigurable.
+	if limitConfig, ok := e.evaluator.(LimitConfigurable); ok {
+		limitConfig.SetLimitsForEval(lim.maxTurns, lim.maxFiles, lim.maxSessionActions)
 	}
 
 	// Run evaluation (generation phase — uses its own timeout)
