@@ -2,12 +2,14 @@ package tool
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/toolload"
 )
 
 // TestValidateAndExpand_MissingPlugin_ErrorEnumeratesEveryCheckedPath
@@ -89,6 +91,8 @@ func TestValidateAndExpand_MissingPlugin_ErrorEnumeratesEveryCheckedPath(t *test
 // TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo
 // verifies that a remote plugin with an explicit repo: that fails to
 // resolve enumerates the per-repo cache paths in the error reason.
+// We stub the plugin clone helper so this test stays offline; the fetch
+// failure path still produces the enumerated-paths hard-fail message.
 func TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo(t *testing.T) {
 	dir := t.TempDir()
 	prevHome := os.Getenv("HOME")
@@ -99,6 +103,10 @@ func TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo(t *te
 	})
 	cleanHome := t.TempDir()
 	_ = os.Setenv("HOME", cleanHome)
+	restore := toolload.SetTestRoot(filepath.Join(cleanHome, ".hyoka", "cache"))
+	defer restore()
+	restoreClone := stubPluginCloneFailing(t)
+	defer restoreClone()
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -128,9 +136,9 @@ func TestValidateAndExpand_MissingRemotePlugin_EnumeratesCachePathsForRepo(t *te
 	}
 
 	wantPaths := []string{
-		filepath.Join(cleanHome, ".hyoka", "cache", "default", "microsoft", "skills", ".github", "plugins", "ghost-plugin"),
-		filepath.Join(cleanHome, ".hyoka", "cache", "default", "microsoft", "skills", ".github", "skills", "ghost-plugin"),
-		filepath.Join(cleanHome, ".hyoka", "cache", "default", "microsoft", "skills", "skills", "ghost-plugin"),
+		filepath.Join(toolload.RepoCacheDir("microsoft", "skills", "default"), ".github", "plugins", "ghost-plugin"),
+		filepath.Join(toolload.RepoCacheDir("microsoft", "skills", "default"), ".github", "skills", "ghost-plugin"),
+		filepath.Join(toolload.RepoCacheDir("microsoft", "skills", "default"), "skills", "ghost-plugin"),
 		filepath.Join(cleanHome, ".copilot", "installed-plugins", "microsoft-skills", "ghost-plugin", "skills"),
 	}
 	for _, p := range wantPaths {
@@ -498,10 +506,11 @@ skills:
 }
 
 // TestValidateAndExpand_RemotePlugin_MissingCache_HardFails pins the
-// contract that a `source: remote` plugin without a cache entry
-// surfaces as a *ToolLoadError before any session work happens. We
-// don't mock the fetcher here — we assert that remote resolution is
-// pure-local (cache lookup) and correctly fails when the cache is empty.
+// contract that a `source: remote` plugin which neither resolves from
+// cache nor successfully fetches surfaces as a *ToolLoadError before
+// any session work happens. The plugin clone is stubbed to fail so the
+// test stays offline; the failure still surfaces via the aggregated
+// hard-fail path.
 func TestValidateAndExpand_RemotePlugin_MissingCache_HardFails(t *testing.T) {
 	dir := t.TempDir()
 	prevHome := os.Getenv("HOME")
@@ -513,6 +522,10 @@ func TestValidateAndExpand_RemotePlugin_MissingCache_HardFails(t *testing.T) {
 	// Redirect HOME to a clean temp dir so the cache lookup cleanly misses.
 	cleanHome := t.TempDir()
 	_ = os.Setenv("HOME", cleanHome)
+	restore := toolload.SetTestRoot(filepath.Join(cleanHome, ".hyoka", "cache"))
+	defer restore()
+	restoreClone := stubPluginCloneFailing(t)
+	defer restoreClone()
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -526,9 +539,9 @@ func TestValidateAndExpand_RemotePlugin_MissingCache_HardFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected hard-fail error for uncached remote plugin")
 	}
-	toolErr, ok := err.(*ToolLoadError)
-	if !ok {
-		t.Fatalf("expected *ToolLoadError, got %T (%v)", err, err)
+	toolErr := new(ToolLoadError)
+	if !errors.As(err, &toolErr) {
+		t.Fatalf("expected wrapped *ToolLoadError, got %T (%v)", err, err)
 	}
 	if toolErr.Kind != progress.ToolKindPlugin {
 		t.Errorf("expected Kind=plugin, got %q", toolErr.Kind)
@@ -568,6 +581,8 @@ _ = os.Chdir(prevWD)
 
 cleanHome := t.TempDir()
 _ = os.Setenv("HOME", cleanHome)
+restore := toolload.SetTestRoot(filepath.Join(cleanHome, ".hyoka", "cache"))
+defer restore()
 wd := t.TempDir()
 if err := os.Chdir(wd); err != nil {
 t.Fatal(err)
@@ -575,8 +590,8 @@ t.Fatal(err)
 
 // Mirror microsoft/skills' layout for azure-sdk-python (truncated to
 // 3 children for the test).
-pluginDir := filepath.Join(cleanHome, ".hyoka", "cache", "default",
-"microsoft", "skills", ".github", "plugins", "azure-sdk-python")
+pluginDir := filepath.Join(toolload.RepoCacheDir("microsoft", "skills", "default"),
+".github", "plugins", "azure-sdk-python")
 if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 t.Fatal(err)
 }
