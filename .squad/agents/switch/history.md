@@ -757,3 +757,24 @@ No regressions introduced. Test suite is ready for Trinity's implementation.
 3. **Auto-expand logic:** Uses `useState(hasDisagreement)` to initialize expansion state — only evaluated on mount, so works for initial render but won't update if props change later (not a bug in current usage).
 4. **Test strategy:** Separate unit tests (ExpandablePoint) from integration tests (GraderResultRow) to verify both component behavior AND data flow.
 
+
+## CROSS-AGENT UPDATE (2026-04-28T18-23-00Z — Scribe: Per-Reviewer Vote Display Feature Shipped)
+
+**Decision tested:** Morpheus's scope (morpheus-grader-vote-display.md) + Trinity's design/impl. Full test coverage delivered.
+
+**Test suite delivered:** 31/31 tests pass
+- Initial spawn: 18 tests in ReviewExtras.test.tsx (5a165d63)
+- Reconciliation spawn: Reorganized into ExpandablePoint.test.tsx (14 unit) + extended GraderResultRow.test.tsx (17 integration total)
+
+**Reconciliation cycle:**
+- Discovered initial test structure didn't match Trinity's final component architecture
+- Trinity split rendering: ExpandablePoint (component) + GraderResultRow (integration)
+- Re-parameterized tests, re-ran full suite: 31/31 pass ✅
+- No regressions (pre-existing tests unaffected)
+
+**Commit e347e4d6:**
+- site/src/app/components/grader-extras/ExpandablePoint.test.tsx (new, 14 tests)
+- site/src/app/components/grader-extras/GraderResultRow.test.tsx (extended, +17 tests for integration)
+
+**Status:** Feature complete and fully tested. Pushed to ronniegeraghty/dev. Ready for merge.
+

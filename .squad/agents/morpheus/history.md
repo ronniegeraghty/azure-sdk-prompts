@@ -644,3 +644,16 @@ All commits merged to origin/ronniegeraghty/dev. No pre-existing test failures i
 **Impact:** Eliminates false positives when 45+ skills take >30s to load. Primary gate is now `AssistantTurnStart`, fallback ceiling is 5 minutes (not primary).
 
 ---
+
+## CROSS-AGENT UPDATE (2026-04-28T18-23-00Z — Scribe: Per-Reviewer Vote Display Feature Shipped)
+
+**Decision shipped:** Morpheus's data audit (morpheus-grader-vote-display.md) confirmed: per-reviewer votes already in JSON, rendering gap in frontend. No engine work needed.
+
+**Implementation by Trinity:** Component refactor (ExpandablePoint.tsx) + type extension + integration into GraderResultRow. Auto-expand + amber badge on split votes.
+
+**Validation by Switch:** Test suite (31/31 pass). Reconciliation cycle completed. No regressions.
+
+**Contribution:** Investigation + scoped decision document. Identified frontend-only scope, enabled Trinity to ship quickly. Data audit saved engineering time.
+
+**Status:** Feature complete. Commits c155340f (impl), 5a165d63 (tests v1), e347e4d6 (reconcile). Pushed to ronniegeraghty/dev.
+

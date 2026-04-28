@@ -356,3 +356,80 @@ Added "Post-Session Tool Verification" subsection to `docs/configuration.md`:
 
 **Last updated:** 2026-04-28T00-54-38Z  
 **Scribe:** Orchestration complete
+
+---
+
+## 2026-04-28: Per-Reviewer Vote Display — Feature Shipped
+
+**Authors:** Morpheus 🕶️ (audit), Trinity 🖤 (design + impl), Switch 🤍 (tests + reconcile)  
+**Date:** 2026-04-28  
+**Status:** ✅ SHIPPED — Feature complete and tested  
+**Commits:** `c155340f` (Trinity impl), `5a165d63` (Switch tests v1), `e347e4d6` (Switch reconcile)
+
+### Problem
+
+The site's grader result cards did not show **per-reviewer model votes** on individual criteria. When expanding a prompt grader card, users saw only:
+- Consolidated summary (panel consensus)
+- Panel member list with overall scores
+- **Missing:** Which checks each reviewer passed/failed + rationale per reviewer
+
+This was a **rendering-only gap** — the data already exists in the JSON at `grader_results[].extras.review.panel_results[].criteria[]`.
+
+### Investigation (Morpheus)
+
+Audited the data flow:
+- ✅ **Go Engine:** Correctly writes `ReviewPanelResult.Criteria[]` per reviewer per criterion
+- ❌ **TypeScript Types:** `ReviewPanelEntry` interface missing `criteria` field
+- ❌ **React Component:** `ReviewExtras.tsx` never renders `panel.criteria[]` array
+
+**Verdict:** No engine changes needed. Frontend-only fix.
+
+### Solution (Trinity)
+
+1. **Type Extension:** Added `criteria?: ReviewCriterionResult[]` to `ReviewPanelEntry` (optional for backward compat)
+2. **New Component:** `ExpandablePoint.tsx` — reusable expandable criteria display
+3. **Integration:** Updated `GraderResultRow.tsx` to call `ExpandablePoint.tsx` for split-vote scenarios
+4. **UX Features:**
+   - Per-reviewer model votes visible on expand
+   - Criterion-level pass/fail with reasons
+   - Auto-expand + amber badge for split votes (disagreement)
+   - Consistent icons (CheckCircle2 green, XCircle red, amber for splits)
+
+### Validation (Switch)
+
+Wrote comprehensive test suite:
+- 31 tests (all pass): backward compat, split votes, edge cases, accessibility
+- Tests split across:
+  - `ExpandablePoint.test.tsx` (component unit tests)
+  - `GraderResultRow.test.tsx` (integration tests)
+- Reconciliation: Initial test structure didn't match Trinity's final architecture; reorganized and re-ran. No regressions.
+
+### Feature Highlights
+
+✅ Per-reviewer model votes visible on expand  
+✅ Criterion-level pass/fail + reason per reviewer  
+✅ Auto-expand + visual indicator on disagreement  
+✅ Backward compatible (optional criteria field for legacy reports)  
+✅ Full test coverage (31/31 pass)  
+✅ Consistent styling (emerald pass, red fail, amber split)  
+
+### Files Changed
+
+**Commit c155340f (Trinity):**
+- `site/src/app/data/types.ts` — Type extension
+- `site/src/app/components/grader-extras/ExpandablePoint.tsx` — New component
+- `site/src/app/components/grader-extras/GraderResultRow.tsx` — Integration
+
+**Commit 5a165d63 (Switch):**
+- `site/src/app/components/grader-extras/ReviewExtras.test.tsx` — Initial test suite (692 lines)
+
+**Commit e347e4d6 (Switch):**
+- `site/src/app/components/grader-extras/ExpandablePoint.test.tsx` — Component tests (reconcile)
+- `site/src/app/components/grader-extras/GraderResultRow.test.tsx` — Extended integration tests (reconcile)
+
+### Branch
+
+`ronniegeraghty/dev` — ready for merge to main after review and smoke test.
+
+---
+

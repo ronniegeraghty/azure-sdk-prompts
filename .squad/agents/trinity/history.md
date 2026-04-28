@@ -804,3 +804,23 @@ Neo's verification recipe (worth remembering):
 - Switch (or another agent) will write tests for the new ExpandablePoint component
 - Verify with a fresh eval run once a config with multi-reviewer panel is available
 
+
+## CROSS-AGENT UPDATE (2026-04-28T18-23-00Z — Scribe: Per-Reviewer Vote Display Feature Complete)
+
+**Decision implemented:** Morpheus's scope (morpheus-grader-vote-display.md) + your design (trinity-grader-vote-ux.md). All tasks shipped.
+
+**Components delivered:**
+- ExpandablePoint.tsx — expandable criteria with pass/fail + reason per reviewer
+- GraderResultRow.tsx — integration (collects reviewer votes, passes to ExpandablePoint)
+- ReviewPanelEntry type — added optional `criteria[]` field
+- UX features: auto-expand + amber badge on split votes
+
+**Validation by Switch:** Test suite (31/31 pass). Initial test file reconciled to align with final architecture. All pre-existing tests still pass. No regressions.
+
+**Commits:**
+- c155340f — Types + ExpandablePoint + GraderResultRow integration
+- 5a165d63 — Switch: Initial tests
+- e347e4d6 — Switch: Reconciled tests (ExpandablePoint.test.tsx + extended GraderResultRow.test.tsx)
+
+**Status:** Feature shipped to ronniegeraghty/dev. Ready for merge to main.
+
