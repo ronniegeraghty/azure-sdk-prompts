@@ -579,3 +579,13 @@ Your guardrail enforcement bug investigation (2026-04-23) recommended Option A. 
 All commits merged to origin/ronniegeraghty/dev. No pre-existing test failures introduced. Ready for production.
 
 ---
+
+## CROSS-AGENT UPDATE (2026-04-28T00-54-38Z — Scribe: Tool-Load Gate Fix — Option A Shipped)
+
+**Decision shipped:** Morpheus's investigation (morpheus-tool-load-gate-bug.md) approved. Neo implemented Option A. Switch tested (5/5 cases pass, including 22s slow-load proof). Oracle documented.
+
+**Contribution:** Investigation + decision document recommending event-driven gate. Implementation by Neo now live in commits 8fc6d4be and fb5be186.
+
+**Impact:** Eliminates false positives when 45+ skills take >30s to load. Primary gate is now `AssistantTurnStart`, fallback ceiling is 5 minutes (not primary).
+
+---

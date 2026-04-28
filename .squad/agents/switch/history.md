@@ -593,3 +593,15 @@ Your test for real-time guardrail enforcement has shipped:
 The test strategy (stub runner + fallback chain) is a solid pattern for future guardrail changes.
 
 ---
+
+## CROSS-AGENT UPDATE (2026-04-28T00-54-38Z — Scribe: Tool-Load Gate Fix — Option A Shipped)
+
+**Decision shipped:** Morpheus investigated. Neo implemented. Switch tested (5 table-driven cases, all pass, no races). Oracle documented.
+
+**Test coverage:** `TestAssistantTurnStartToolLoadGate` in tool_verification_gate_test.go. Case #3 proves fix: 22s slow-load with no false positive (old code would timeout at 30s).
+
+**Commits:** 8fc6d4be (paired with Neo). Full eval suite passes with -race flag.
+
+**Result:** Comprehensive test coverage proves Option A works correctly for all scenarios.
+
+---

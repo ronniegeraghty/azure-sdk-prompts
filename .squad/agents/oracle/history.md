@@ -542,3 +542,15 @@ Updated `docs/configuration.md` to explicitly clarify that the limit resolution 
 - **Decision file:** `.squad/decisions/inbox/morpheus-maxturns-enforcement-bug.md` — bug fix context (Option A implemented)
 - **Team context:** `SetLimitsForEval()` now threads resolved limits into runner for real-time enforcement
 
+
+## CROSS-AGENT UPDATE (2026-04-28T00-54-38Z — Scribe: Tool-Load Gate Fix — Option A Shipped)
+
+**Decision shipped:** Morpheus investigated. Neo implemented. Switch tested. Oracle documented.
+
+**Documentation:** Added "Post-Session Tool Verification" section to docs/configuration.md. Explains AssistantTurnStart as primary gate, per-kind failure reasons, 5-minute ceiling semantics.
+
+**Commit:** f53eb3b1. User-facing guide updated.
+
+**Result:** Full feature ship complete: Investigation → Implementation → Testing → Documentation.
+
+---

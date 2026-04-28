@@ -1030,3 +1030,15 @@ Your implementation of Option A guardrail enforcement fix has shipped:
 The SetLimitsForEval() method signature is stable; Switch and future implementers can safely depend on it.
 
 ---
+
+## CROSS-AGENT UPDATE (2026-04-28T00-54-38Z — Scribe: Tool-Load Gate Fix — Option A Shipped)
+
+**Decision shipped:** Morpheus investigated. Neo implemented Option A (AssistantTurnStart listener). Switch tested (5/5 cases pass). Oracle documented.
+
+**Implementation:** Added `onSessionReady()` method, wired into copilot.go at AssistantTurnStart, replaced 30s timeout with 5min ceiling. Per-kind tracking for failure reasons.
+
+**Commits:** 8fc6d4be, fb5be186. All tests pass with -race flag.
+
+**Result:** False positives eliminated. Slow tool loads (>30s) no longer trigger premature failures.
+
+---
