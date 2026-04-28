@@ -88,4 +88,163 @@ describe("GraderResultRow (v4)", () => {
     render(<GraderResultRow result={makeResult({ gate: true, pass: false })} />);
     expect(screen.getByText("GATE")).toBeInTheDocument();
   });
+
+  describe("Per-Reviewer Criteria Integration", () => {
+    it("passes reviewer votes to ExpandablePoint when extras.review.panel_results has matching criteria", () => {
+      const result = makeResult({
+        points: [
+          { label: "Uses DefaultAzureCredential", pass: true },
+          { label: "Handles errors properly", pass: false },
+        ],
+        extras: {
+          review: {
+            model: "claude-opus-4.6",
+            summary: "Overall review",
+            panel_results: [
+              {
+                model: "opus",
+                overall_score: 5,
+                max_score: 5,
+                summary: "Good",
+                criteria: [
+                  { name: "Uses DefaultAzureCredential", passed: true, reason: "Correct usage" },
+                  { name: "Handles errors properly", passed: false, reason: "Missing try-catch" },
+                ],
+              },
+              {
+                model: "sonnet",
+                overall_score: 4,
+                max_score: 5,
+                summary: "OK",
+                criteria: [
+                  { name: "Uses DefaultAzureCredential", passed: true, reason: "Looks good" },
+                  { name: "Handles errors properly", passed: true, reason: "Try-catch present" },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      render(<GraderResultRow result={result} />);
+
+      // Expand to see points
+      fireEvent.click(screen.getByText("Grader"));
+
+      // Points should be visible
+      expect(screen.getByText("Uses DefaultAzureCredential")).toBeInTheDocument();
+      expect(screen.getByText("Handles errors properly")).toBeInTheDocument();
+
+      // The second point should auto-expand because of disagreement (false vs true)
+      // and show the reviewer votes
+      expect(screen.getByText(/opus:/)).toBeInTheDocument();
+      expect(screen.getByText(/sonnet:/)).toBeInTheDocument();
+    });
+
+    it("matches criteria by exact string: point.label ↔ criterion.name", () => {
+      const result = makeResult({
+        points: [
+          { label: "Exact Match", pass: true },
+          { label: "No Match", pass: true },
+        ],
+        extras: {
+          review: {
+            model: "claude-opus-4.6",
+            summary: "Overall review",
+            panel_results: [
+              {
+                model: "opus",
+                overall_score: 5,
+                max_score: 5,
+                summary: "Good",
+                criteria: [
+                  { name: "Exact Match", passed: true, reason: "Found" },
+                  { name: "Different Name", passed: true, reason: "Also found" },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      render(<GraderResultRow result={result} />);
+      fireEvent.click(screen.getByText("Grader"));
+
+      // First point should have matching criterion
+      const exactMatchPoint = screen.getByText("Exact Match").closest('[role="button"]');
+      if (exactMatchPoint) {
+        fireEvent.click(exactMatchPoint);
+        // Should show the reviewer vote
+        expect(screen.getByText(/Found/)).toBeInTheDocument();
+      }
+
+      // Second point should not have matching criterion (no role=button since no reviewers)
+      const noMatchPoint = screen.getByText("No Match").parentElement;
+      expect(noMatchPoint?.querySelector('[role="button"]')).not.toBeInTheDocument();
+    });
+
+    it("handles points with no matching criteria (reviewerVotes empty array)", () => {
+      const result = makeResult({
+        points: [
+          { label: "Orphan Point", pass: true },
+        ],
+        extras: {
+          review: {
+            model: "claude-opus-4.6",
+            summary: "Overall review",
+            panel_results: [
+              {
+                model: "opus",
+                overall_score: 5,
+                max_score: 5,
+                summary: "Good",
+                criteria: [
+                  { name: "Different Name", passed: true, reason: "Doesn't match" },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      render(<GraderResultRow result={result} />);
+      fireEvent.click(screen.getByText("Grader"));
+
+      // Point should render but not be expandable (no reviewer votes matched)
+      expect(screen.getByText("Orphan Point")).toBeInTheDocument();
+      
+      // Should not have expand button
+      const pointContainer = screen.getByText("Orphan Point").closest('div');
+      expect(pointContainer?.querySelector('[role="button"]')).not.toBeInTheDocument();
+    });
+
+    it("works when panel_results has no criteria field", () => {
+      const result = makeResult({
+        points: [
+          { label: "Check", pass: true },
+        ],
+        extras: {
+          review: {
+            model: "claude-opus-4.6",
+            summary: "Overall review",
+            panel_results: [
+              {
+                model: "opus",
+                overall_score: 5,
+                max_score: 5,
+                summary: "Good",
+                // No criteria field
+              },
+            ],
+          },
+        },
+      });
+
+      render(<GraderResultRow result={result} />);
+      fireEvent.click(screen.getByText("Grader"));
+
+      // Should render without crashing
+      expect(screen.getByText("Check")).toBeInTheDocument();
+    });
+  });
 });

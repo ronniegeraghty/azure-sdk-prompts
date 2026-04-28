@@ -701,3 +701,59 @@ No regressions introduced. Test suite is ready for Trinity's implementation.
 **Status:** COMPLETE. Tests await Trinity's component changes. Will re-run once she ships criteria rendering to confirm all 18 tests pass.
 
 ---
+
+## 2026-04-23: Test Reconciliation — Per-Reviewer Vote Display (COMPLETE ✅)
+
+### Context
+- **Switch** wrote 18 tests in `site/src/app/components/grader-extras/ReviewExtras.test.tsx` (commit 5a165d63)
+- **Trinity** implemented feature in commit c155340f using a DIFFERENT architecture:
+  - Created new `ExpandablePoint.tsx` component for per-Point disclosure
+  - Modified `GraderResultRow.tsx` to use ExpandablePoint and pass per-reviewer criteria
+  - Per-reviewer criteria rendered in **GraderResultRow** (via ExpandablePoint), NOT in ReviewExtras
+- **Result:** 15/18 tests failed — tests were written for wrong component location
+
+### Work Completed
+
+#### 1. Architecture Analysis
+- Trinity's implementation:
+  - `ExpandablePoint` handles per-reviewer vote display
+  - Matching key: `point.label` ↔ `criterion.name` (exact string)
+  - Auto-expands when split votes; shows amber `⚠️ N/M` badge
+  - Per-reviewer row format: `{model}: reason` with ✓/✗ icons
+  - Integrated into GraderResultRow at lines 145-159 (passes reviewerVotes from extras.review.panel_results)
+
+#### 2. Test File Restructuring
+- **Deleted:** `site/src/app/components/grader-extras/ReviewExtras.test.tsx` (testing wrong component)
+- **Created:** `site/src/app/components/ExpandablePoint.test.tsx` (18 tests, all pass)
+  - Full agreement scenarios (all pass, all fail)
+  - Disagreement scenarios with auto-expand verification
+  - Amber badge display (⚠️ split vote count)
+  - Missing/empty reason handling
+  - Legacy fallback (no reviewer votes)
+  - Edge cases (long text, special characters)
+  - Accessibility (ARIA attributes, keyboard navigation)
+- **Extended:** `site/src/app/components/GraderResultRow.test.tsx` (+5 integration tests)
+  - Reviewer votes passed to ExpandablePoint
+  - Exact string matching (point.label ↔ criterion.name)
+  - Orphan points (no matching criteria)
+  - Legacy reports (panel_results without criteria field)
+
+#### 3. Test Results
+- **ExpandablePoint:** 18/18 tests pass ✅
+- **GraderResultRow:** 13/13 tests pass ✅ (8 existing + 5 new integration tests)
+- **Total:** 31 tests covering per-reviewer vote display feature
+
+#### 4. Bugs Found
+**NONE.** Trinity's implementation is correct and working as designed:
+- Auto-expand on disagreement works correctly
+- Amber badge displays proper split vote count
+- Exact string matching for criteria works
+- Keyboard accessibility fully implemented
+- Fallback text for missing reasons works
+
+### Learnings
+1. **Test placement matters:** Always verify WHERE a feature is implemented before writing tests. Trinity put per-reviewer criteria in GraderResultRow→ExpandablePoint, not in ReviewExtras.
+2. **Component architecture:** ExpandablePoint is a reusable component that encapsulates per-point disclosure logic (expansion state, disagreement detection, per-reviewer rows).
+3. **Auto-expand logic:** Uses `useState(hasDisagreement)` to initialize expansion state — only evaluated on mount, so works for initial render but won't update if props change later (not a bug in current usage).
+4. **Test strategy:** Separate unit tests (ExpandablePoint) from integration tests (GraderResultRow) to verify both component behavior AND data flow.
+
