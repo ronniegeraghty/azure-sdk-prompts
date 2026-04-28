@@ -99,6 +99,61 @@ Full history archived. Recent entries below.
 
 **Process takeaway:** When a locked directive arrives mid-rollout and some phases have already shipped, the replan commit for Phase N+1 should explicitly map each shipped commit to "still correct" vs "needs rewrite" — saves the next implementer from guessing which earlier work is safe to build on.
 
+---
+
+## Learnings (Per-Reviewer Vote Display Investigation — 2026-04-28)
+
+**Date:** 2026-04-28  
+**Task:** Investigate "missing per-reviewer votes" regression in grader card UI; produce scoped plan for restoration
+
+**Key Findings:**
+
+1. **Data is already present in JSON ✅** — No engine changes needed
+   - Path: `grader_results[i].extras.review.panel_results[j].criteria[k]`
+   - Go type: `hyoka/internal/criteria/graders/grader.go:216-232` (`ReviewPanelResult.Criteria`)
+   - Each panel member writes full per-check data: `{name, passed, reason, weight}`
+   - Verified in live report: `reports/20260428-175710/.../claude-opus-4.6/report.json`
+
+2. **TypeScript type mismatch** — Frontend is missing the `criteria` field
+   - File: `site/src/app/data/types.ts:27-34` (`ReviewPanelEntry`)
+   - Type has `overall_score`, `max_score`, `summary` but **no `criteria` field**
+   - JSON has `criteria: [{name, passed, reason}, ...]` but TS interface doesn't declare it
+   - Root cause: `ReviewPanelEntry` predates v4 grader unification (commit `1200140b`)
+
+3. **Rendering is incomplete** — ReviewExtras component doesn't loop over criteria
+   - File: `site/src/app/components/grader-extras/ReviewExtras.tsx:68-96`
+   - Current: shows `panel.model` + `panel.overall_score` + `panel.summary`
+   - Missing: no rendering of `panel.criteria[]` array (per-check pass/fail + rationale)
+
+4. **Historical note** — This is a **new feature**, not a regression restoration
+   - No HTML templates ever existed with this feature (checked git history: `0ff7b486`)
+   - The only old template was `templates/prompt-template.prompt.md` (a prompt file skeleton)
+   - User's memory of "old reports showing per-reviewer votes" may be from manual JSON inspection
+
+**Scoped Plan Deliverable:**
+
+- Written to `.squad/decisions/inbox/morpheus-grader-vote-display.md`
+- Three changes needed (all frontend):
+  1. Add `criteria?: ReviewCriterionResult[]` to `ReviewPanelEntry` type
+  2. Add per-check rendering loop in `ReviewExtras.tsx` (icons + name + reason)
+  3. Add test coverage for criteria rendering
+- Owner: **Trinity** (all site changes)
+- Estimate: ~1 hour (types + render + test)
+- No Go changes — engine already writes correct data
+
+**Process Insight:**
+
+When investigating a "missing feature" report:
+1. **Verify data presence first** — check JSON before assuming engine bug
+2. **Compare Go vs TypeScript types** — schema drift happens when one side evolves faster
+3. **Check git history for "old way"** — user memory isn't always reliable; validate with commits
+4. **Distinguish regression vs new feature** — affects priority and messaging
+
+This pattern (data exists in JSON, frontend type/render missing) is a type-safety gap — TypeScript doesn't enforce that frontend types match backend JSON shapes. Consider:
+- Generating TS types from Go structs (via tool)
+- Schema validation tests (read JSON, assert against TS interface)
+- Documenting type sync checkpoints in rollout plans
+
 **Plan:** `.squad/decisions/inbox/morpheus-option-a-replan.md`. Awaiting Ronnie approval before restart.
 
 ---

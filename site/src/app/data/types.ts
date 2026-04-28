@@ -24,11 +24,19 @@ export interface ReviewedFile {
   content: string;
 }
 
+export interface ReviewCriterionResult {
+  name: string;
+  passed: boolean;
+  reason?: string;
+  weight?: number;
+}
+
 export interface ReviewPanelEntry {
   model: string;
   overall_score: number;
   max_score: number;
   summary: string;
+  criteria?: ReviewCriterionResult[];
   scores?: ReviewScores;
   events?: unknown[];
 }

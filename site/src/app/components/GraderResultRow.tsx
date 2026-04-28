@@ -12,6 +12,7 @@ import {
   OutputCheckExtras,
   ReviewExtras,
 } from "./grader-extras";
+import { ExpandablePoint } from "./ExpandablePoint";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -138,46 +139,33 @@ export function GraderResultRow({ result, defaultExpanded = false }: GraderResul
                     (p.pass ? "Check passed" : "Check failed");
                   // Show message as secondary line only when distinct from label.
                   const secondary = p.message && p.message !== labelText ? p.message : null;
+                  
+                  // Collect per-reviewer votes for this Point (if review grader).
+                  // Match by exact string: point.label ↔ criterion.name
+                  const reviewerVotes: Array<{ model: string; passed: boolean; reason?: string }> = [];
+                  if (result.extras?.review?.panel_results) {
+                    for (const panel of result.extras.review.panel_results) {
+                      if (panel.criteria) {
+                        const criterion = panel.criteria.find(c => c.name === labelText);
+                        if (criterion) {
+                          reviewerVotes.push({
+                            model: panel.model,
+                            passed: criterion.passed,
+                            reason: criterion.reason,
+                          });
+                        }
+                      }
+                    }
+                  }
+                  
                   return (
-                    <div
+                    <ExpandablePoint
                       key={i}
-                      className="flex items-start gap-2 py-1"
-                    >
-                      {p.pass ? (
-                        <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/80" />
-                      ) : (
-                        <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/80" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={p.pass ? "text-white/70" : "text-red-400/80"}
-                          style={{ fontSize: 12 }}
-                        >
-                          {labelText}
-                        </div>
-                        {secondary && (
-                          <div
-                            className="text-white/40"
-                            style={{ fontSize: 11, lineHeight: 1.5 }}
-                          >
-                            {secondary}
-                          </div>
-                        )}
-                        {p.evidence && Object.keys(p.evidence).length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {Object.entries(p.evidence).map(([k, v]) => (
-                              <span
-                                key={k}
-                                className="rounded bg-white/5 px-1.5 py-0.5 text-white/30"
-                                style={{ fontSize: 9 }}
-                              >
-                                {k}: {v}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      point={p}
+                      labelText={labelText}
+                      secondary={secondary}
+                      reviewerVotes={reviewerVotes}
+                    />
                   );
                 })}
               </div>

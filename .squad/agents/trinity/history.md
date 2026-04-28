@@ -684,3 +684,123 @@ Neo's verification recipe (worth remembering):
 - Not addressed: graders_passed/graders_total naming lie (Neo's territory, schema v4.1 vs v5)
 
 **Time:** ~90m implementation + verification. Model bump resolved API error cleanly.
+
+---
+
+## 2026-04-29: Per-Reviewer Vote UX Design (Regression Investigation)
+
+**Context:** Ronnie reported that the OLD HTML reports used to show **per-reviewer votes** on prompt graders (which model said what about each criterion). The NEW site UI dropped this — users only see consolidated panel results, not the breakdown.
+
+**Investigation findings:**
+
+1. **Backend data is complete:** `report.json` already contains all per-reviewer votes:
+   - `GraderResult.extras.review.panel_results[]` — array of `ReviewPanelResult`
+   - Each `ReviewPanelResult` has `criteria[]` — array of `ReviewCriterionResult` with `name`, `passed`, `reason`
+   - **No backend work needed** to restore this feature
+
+2. **Current site rendering:**
+   - `site/src/app/components/grader-extras/ReviewExtras.tsx` (lines 68–96) renders panel members with overall scores + summaries
+   - It **does NOT** render the nested `criteria[]` array inside each panel member
+   - `GraderResultRow.tsx` shows top-level Points (consolidated) but not per-reviewer breakdown
+
+3. **What was lost in v4 migration:**
+   - Phase 3/4/5 rewrote grader rendering for v4 schema (Points-first)
+   - Old HTML reports (pre-site) had per-reviewer criterion votes inline
+   - Commit 992ed39e ("drop expandReviewGraderResult") removed panel-member-per-row expansion; consolidated into single `ai_review` entry
+   - Commit 1200140b ("Site: Implement v4 grader unification") built new `ReviewExtras` component but **did NOT map Points → per-reviewer criteria**
+
+4. **Data mapping challenge:**
+   - Frontend has: `GraderPoint[]` (consolidated, one per criterion)
+   - Frontend has: `ReviewPanelResult[].criteria[]` (per-reviewer, nested)
+   - **Need:** Map each `GraderPoint.label` to matching `criteria[].name` across all panel members to build per-reviewer vote arrays
+
+**Design proposal:** `.squad/decisions/inbox/trinity-grader-vote-ux.md`
+
+**Recommendation:** **Option A — Per-Point Inline Expansion**
+
+- Make each Point in the Points list expandable (chevron icon on right)
+- When expanded, show per-reviewer votes below the Point:
+  ```
+  ✓ Uses context managers [˅]
+      ↳ claude-opus-4.6:    ✓ Pass — "with statement on line 12"
+      ↳ claude-sonnet-4.5:  ✓ Pass — "Proper context manager usage"
+      ↳ gpt-5.3-codex:      ✓ Pass — "Context manager present"
+  ```
+- **Disagreement highlighting:** If votes are split (e.g., 2/3 passed), show amber badge `⚠️ 2/3` next to Point label
+- **Auto-expand:** Points with disagreement expand by default
+- **Scope:** Only `grader_type: "prompt"` — file/program/behavior graders don't have panel votes
+
+**Visual details:**
+- Indent reviewer votes with `↳` prefix, left-align model name (mono), pass/fail icon, reason (italic)
+- Badge for split votes: `⚠️ 2/3 reviewers` (amber, 9px)
+- Collapse by default on mobile (<768px) to reduce scroll height
+
+**Implementation (NOT done in this session — proposal only):**
+1. Extract vote mapping helper: `getReviewerVotesForPoint(point, panelResults)`
+2. Update `GraderResultRow.tsx` to add per-Point expand/collapse state
+3. Render `↳ model: ✓/✗ reason` rows when Point is expanded
+4. Add unit tests + Playwright test for interaction
+
+**Next:** Get Morpheus/Neo approval, then build it.
+
+**Key files examined:**
+- `site/src/app/components/GraderResultRow.tsx` — current grader card rendering
+- `site/src/app/components/grader-extras/ReviewExtras.tsx` — panel member list (no criteria breakdown)
+- `site/src/app/data/types.ts` — `ReviewExtras`, `ReviewPanelResult`, `ReviewCriterionResult`
+- `hyoka/internal/report/types.go` — backend data shape (lines 148–175)
+- `hyoka/internal/criteria/graders/prompt_review_grader.go` — where `PanelResults` is populated
+
+**Git archaeology:**
+- Commit 992ed39e (Phase 5) — dropped panel-member expansion, single `ai_review` row
+- Commit 1200140b (v4 unification) — built `ReviewExtras` component, kept panel list but dropped per-criterion mapping
+- Commit fcb8d1d6 (polish) — collapsed graders by default, defensive fallback for missing Points
+
+**Time:** ~2 hours investigation + design doc authoring.
+
+
+---
+
+## 2026-04-29: Per-Reviewer Vote Display Implementation
+
+**Task:** Implement expandable per-reviewer vote breakdown for prompt_review graders.
+
+**Context:** The data has always existed in `report.json` at `grader_results[].extras.review.panel_results[].criteria[]`, but the site UI never displayed it. Users could see the panel members and their overall scores, but not which specific checks each reviewer passed/failed or their rationale.
+
+**Changes made:**
+
+1. **TypeScript types** (`site/src/app/data/types.ts`):
+   - Added `ReviewCriterionResult` interface with `name`, `passed`, `reason?`, `weight?`
+   - Extended `ReviewPanelEntry` to include `criteria?: ReviewCriterionResult[]`
+
+2. **New component** (`site/src/app/components/ExpandablePoint.tsx`):
+   - Created reusable expandable Point component with per-reviewer vote display
+   - Auto-expands Points with disagreement (split votes)
+   - Shows amber `⚠️ N/M` badge on Points with split votes
+   - Keyboard accessible (Enter/Space to toggle, proper aria-expanded)
+   - Matches existing site styling (same icons, color tokens, size hierarchy)
+
+3. **Updated GraderResultRow** (`site/src/app/components/GraderResultRow.tsx`):
+   - Modified Points rendering loop to collect per-reviewer votes
+   - Matches Points to criteria by exact string match: `point.label` ↔ `criterion.name` (documented in code comment)
+   - Passes reviewer votes to `ExpandablePoint` for rendering
+   - Zero changes to non-review graders — existing Points render unchanged
+
+**Visual treatment:**
+- Collapsed by default (unanimous Points)
+- Auto-expanded with amber badge (split votes: `⚠️ 2/3`)
+- Per-reviewer rows indented with left border, showing: `↳ {model}: ✓/✗ — {reason}`
+- Icon + color convey pass/fail (green checkmark, red X) — color-blind safe
+
+**Build verification:**
+- ✅ Site builds successfully (`npm run build` in `site/`)
+- ✅ Go binary builds successfully (`go build -o hyoka-bin ./hyoka`)
+- ⚠️ Unable to verify with live reports (existing reports appear incomplete/empty)
+
+**Pattern learned:**
+- React hooks (useState) can't be called conditionally inside `.map()` — need to extract to a separate component when per-item state is required
+- TypeScript's optional chaining (`?.`) is critical when accessing nested data that may not exist in older reports
+
+**Next steps:**
+- Switch (or another agent) will write tests for the new ExpandablePoint component
+- Verify with a fresh eval run once a config with multi-reviewer panel is available
+
