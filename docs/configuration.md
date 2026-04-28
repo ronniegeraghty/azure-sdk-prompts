@@ -405,6 +405,10 @@ cat reports/<eval-id>/report.json | jq '.error, .error_category'
 grep -i "tool\|skill\|mcp" hyoka-debug.log
 ```
 
+#### Post-Session Tool Verification
+
+After the generator session completes code generation, hyoka performs a **post-session verification** to confirm that all configured tools successfully loaded. Rather than using a fixed timeout, hyoka waits for the SDK's `AssistantTurnStart` event — the model's first turn — as the definitive signal that tool registration is complete. This approach avoids false failures when loading many tools (e.g., 45+ skills or MCP servers) where the SDK may take longer than a typical fixed timeout to confirm all registrations. A 5-minute absolute ceiling remains as a fail-safe for sessions that never reach their first turn due to authentication or network issues. If the ceiling is reached, the evaluation terminates with a "session never reached first turn" error.
+
 #### Future: Optional Tools
 
 In a future release, you may be able to mark specific tools as optional using `optional: true`. For now, all configured tools are required.
