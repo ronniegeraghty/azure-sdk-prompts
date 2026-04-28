@@ -594,7 +594,7 @@ t.Fatal("expected timeout to produce a failure summary")
 if !strings.HasPrefix(got, "2 tool(s) failed to load:") {
 t.Errorf("timeout should mark every configured tool as failed, got: %s", got)
 }
-for _, want := range []string{`skill "alpha"`, `mcp "mcp1"`, "did not confirm tool load"} {
+for _, want := range []string{`skill "alpha"`, `mcp "mcp1"`, "Session did not reach first turn within"} {
 if !strings.Contains(got, want) {
 t.Errorf("timeout summary missing %q\nfull summary:\n%s", want, got)
 }

@@ -46,9 +46,10 @@ type ReviewerConfig struct {
 // SessionLimits configures per-config guardrail limits for evaluation sessions.
 // Zero values are ignored and fall back to engine-level defaults.
 type SessionLimits struct {
-	MaxTurns          int `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
-	MaxFiles          int `yaml:"max_files,omitempty" json:"max_files,omitempty"`
-	MaxSessionActions int `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
+	MaxTurns          int    `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
+	MaxFiles          int    `yaml:"max_files,omitempty" json:"max_files,omitempty"`
+	MaxSessionActions int    `yaml:"max_session_actions,omitempty" json:"max_session_actions,omitempty"`
+	ToolLoadCeiling   string `yaml:"tool_load_ceiling,omitempty" json:"tool_load_ceiling,omitempty"`
 }
 
 // ToolConfig represents a single evaluation configuration.

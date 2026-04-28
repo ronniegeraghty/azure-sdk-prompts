@@ -334,6 +334,16 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			turnCounter++
 			rec.TurnNumber = turnCounter
 			lg.Info("Turn started", "turn", turnCounter)
+			// Tool loading MUST be complete by first turn start — the SDK won't
+			// begin generation until tools are loaded or definitively failed.
+			// Signal the verifier so postSessionToolVerification doesn't wait
+			// forever for events that will never arrive (#347 / Option A).
+			verifier.onSessionReady()
+			if e.progressFn != nil {
+				if t := verifier.emitIfReady(); t != nil {
+					verifiedTools = t
+				}
+			}
 			// Real-time turn limit enforcement (#347)
 			if maxTurnsLimit > 0 && turnCounter > maxTurnsLimit && !turnLimitHit {
 				turnLimitHit = true
@@ -758,20 +768,25 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	copy(capturedRecords, sessionRecords)
 	mu.Unlock()
 
-	// Post-session tool verification gate (#347 / Item E). The SDK emits
-	// SessionSkillsLoaded / SessionMcpServersLoaded only after the first
-	// message round-trip, so this gate runs AFTER SendAndWait returned —
-	// by which point the verifier's readyChan has typically already closed
-	// from inside the OnEvent callback. waitForToolVerification resolves
-	// immediately when there's nothing configured to verify; it only
-	// imposes the 30s deadline when SDK events haven't arrived yet.
+	// Post-session tool verification gate (#347 / Item E / Option A).
+	// The SDK emits SessionSkillsLoaded / SessionMcpServersLoaded only after
+	// the first message round-trip, so this gate runs AFTER SendAndWait
+	// returned — by which point the verifier's readyChan has typically already
+	// closed from inside the OnEvent callback (either from normal tool events
+	// OR from onSessionReady when AssistantTurnStart fired).
+	//
+	// waitForToolVerification now uses a 5-minute absolute ceiling as a
+	// fail-safe in case the session never reached first turn (auth hang,
+	// network failure, SDK bug). This is NOT the primary gate — the real
+	// signal is AssistantTurnStart, which marks tool registration as
+	// definitively complete. The ceiling is ONLY for broken sessions.
 	//
 	// Failure here is fatal to the eval: grading code that ran without the
 	// configured tools produces false-positive scores. Match the
 	// pre-session error format (Item D) by using
 	// tool.SummarizeToolLoadErrors so operators see consistent messaging
 	// regardless of which validation layer caught the breakage.
-	if summary := postSessionToolVerification(ctx, verifier, 30*time.Second); summary != "" {
+	if summary := postSessionToolVerification(ctx, verifier, 5*time.Minute); summary != "" {
 		lg.Warn("Post-session tool verification failed; aborting before grading",
 			"summary", summary)
 		generatedFiles, listErr := listFiles(workDir)
