@@ -605,3 +605,99 @@ The test strategy (stub runner + fallback chain) is a solid pattern for future g
 **Result:** Comprehensive test coverage proves Option A works correctly for all scenarios.
 
 ---
+
+## 2026-04-28: Per-Reviewer Vote Display Tests (ReviewExtras Component)
+
+### Context
+
+Trinity implementing per-reviewer vote rendering in site UI. Design documented in:
+- `.squad/decisions/inbox/trinity-grader-vote-ux.md` (Trinity's UX design)
+- `.squad/decisions/inbox/morpheus-grader-vote-display.md` (Morpheus's data audit + scope)
+
+**Data:** Already in JSON at `grader_results[].extras.review.panel_results[].criteria[]`. No Go changes needed.
+
+**UI change:** ReviewExtras component will render per-reviewer, per-criterion pass/fail with reasons. Each panel member card shows their individual votes on each check.
+
+### Work Completed
+
+**File:** `site/src/app/components/grader-extras/ReviewExtras.test.tsx`
+
+Created comprehensive test suite with 18 test cases across 8 describe blocks:
+
+1. **Full Agreement (All Reviewers Pass)** — 2 tests
+   - Renders all reviewer criteria when all pass same check (3 reviewers, all pass, verify all names + reasons visible)
+   - Displays CheckCircle2 icons for all passing criteria
+
+2. **Disagreement (Mixed Pass/Fail)** — 2 tests
+   - Renders both passing and failing reviewers for same criterion (2/3 pass, 1/3 fail scenario)
+   - Displays different icons for passing vs failing criteria (CheckCircle2 vs XCircle)
+
+3. **All Fail Scenario** — 1 test
+   - Renders all failing reviewers with fail icons and reasons (0/3 pass security check)
+
+4. **Missing or Empty Reasons** — 2 tests
+   - Renders criteria without reasons gracefully (no empty quote/dash artifacts)
+   - Handles criteria with missing reason field (undefined) without displaying "undefined" text
+
+5. **Legacy Reports (Backward Compatibility)** — 2 tests
+   - ✅ Renders panel_results without criteria field (pre-v4 reports) — PASSES NOW
+   - ✅ Renders panel_results with empty criteria array — PASSES NOW
+
+6. **Complex Multi-Criteria Scenarios** — 2 tests
+   - Renders multiple criteria per reviewer correctly (5 checks, 4 pass, 1 fail)
+   - Handles mixed criteria counts across reviewers (reviewer-1 has 2 checks, reviewer-2 has 1, reviewer-3 has 3)
+
+7. **Edge Cases** — 4 tests
+   - ✅ Renders when panel_results is undefined (no panel at all) — PASSES NOW
+   - ✅ Renders when panel_results is empty array — PASSES NOW
+   - Handles very long criterion names and reasons without breaking layout
+   - Handles special characters in criterion names and reasons (HTML entities, quotes, angle brackets)
+
+8. **Accessibility** — 2 tests
+   - Renders semantic HTML structure for screen readers
+   - Ensures criterion text has sufficient color contrast (via className inspection)
+
+9. **Real-World Data Scenarios** — 1 test
+   - Renders actual Azure SDK review criteria from production reports (`azure-keyvault-secrets` + `azure-identity` patterns)
+
+### Test Infrastructure
+
+- **Framework:** Vitest 4.1.4 + @testing-library/react 16.3.2
+- **Setup:** Existing `site/src/__tests__/setup.ts` (jsdom environment + browser API stubs)
+- **Pattern:** Table-driven helpers (`makeExtras()`) + comprehensive coverage matrix
+- **Fixture data:** Real production JSON structure from `reports/20260427-232343/.../report.json`
+
+### Test Results
+
+**First run:** 3/18 tests PASS, 15/18 tests FAIL (expected — Trinity hasn't implemented feature yet)
+
+**Passing tests (backward compatibility):**
+- ✅ Renders when panel_results is undefined (no panel at all)
+- ✅ Renders when panel_results is empty array
+- ✅ Renders panel_results with empty criteria array
+
+**Failing tests:** All 15 tests expecting per-reviewer criteria rendering fail with:
+```
+TestingLibraryElementError: Unable to find an element with text matching: /Uses DefaultAzureCredential/
+```
+
+This is **correct behavior** — the component currently doesn't render `panel.criteria[]` at all. Tests will pass once Trinity implements the feature per Morpheus's scoped plan.
+
+### Verification
+
+Existing GraderResultRow tests unaffected:
+```bash
+npm test GraderResultRow.test.tsx
+# Test Files  1 passed (1)
+# Tests  9 passed (9)
+```
+
+No regressions introduced. Test suite is ready for Trinity's implementation.
+
+### Commits
+
+- ✅ `site/src/app/components/grader-extras/ReviewExtras.test.tsx` — 700+ lines, 18 test cases
+
+**Status:** COMPLETE. Tests await Trinity's component changes. Will re-run once she ships criteria rendering to confirm all 18 tests pass.
+
+---
