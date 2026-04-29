@@ -56,3 +56,18 @@ Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing poli
 - This affects what every future spawn looks like — expect opus-4.7 as your model.
 
 - **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
+
+## 2026-04-29: Site PR review directive — Flag missing `site/dist/` rebuilds
+
+**From .squad/decisions.md (2026-04-29)**
+
+When reviewing PRs that touch `site/`, check:
+1. **Is `site/dist/` rebuilt?** Run `cd site && npm run build` and verify dist changes are committed
+2. **Does PR include both source and dist?** Incomplete site PRs lack rebuilt dist
+
+Flag as incomplete if:
+- PR touches `site/` but dist is unchanged or missing
+- `npm run build` would fail (type errors, broken imports)
+
+**Rationale:** Multiple PRs shipped stale dist, causing "I don't see my change" issues. Now a gating check.
+

@@ -876,3 +876,16 @@ Added "Reproduce this eval" panel to eval detail page:
 
 **Note:** The rerunCommand was already being displayed in error banners only (lines 513-518). New implementation shows it on ALL eval pages as a dedicated panel, making it easier to copy commands for successful evals too.
 
+
+## 2026-04-29: Site build directive — `npm run build` gating requirement
+
+**From .squad/decisions.md (2026-04-29)**
+
+After any update to `site/` (source, styles, components, tests), **ALWAYS** run `cd site && npm run build` before work is complete. This:
+- Catches type errors and broken imports at build time
+- Refreshes `site/dist/` so `hyoka serve` bundles reflect latest code
+
+**Commit the rebuilt `dist/` alongside source changes.**
+
+**Why:** Several sessions shipped site updates without rebuilding dist, leading to confusion when the embedded bundle was stale. This is now a gating check.
+

@@ -433,3 +433,24 @@ Wrote comprehensive test suite:
 
 ---
 
+
+## 2026-04-29: User directive — Rebuild `site/dist/` after any `site/` changes
+
+**By:** Ronnie (via Copilot directive 2026-04-29T19:03:44Z)  
+**Status:** ACTIVE  
+**Scope:** All agents touching `site/`
+
+After ANY update to the site (anything under `site/`), always run `cd site && npm run build` before considering work done. Serves two purposes:
+
+1. **Build-time test** — catches type errors and broken imports
+2. **Binary freshness** — refreshes `site/dist/` so the embedded `hyoka serve` binary reflects latest code when user inspects it
+
+**Rule:** Commit rebuilt `site/dist/` alongside source changes.
+
+**Rationale:** Multiple recent sessions shipped site source without rebuilding `dist/`, causing "I don't see my change" confusion — the embedded bundle was stale.
+
+**Action:**
+- Trinity: Ensure every site PR includes rebuilt dist
+- Ralph: Flag site PRs that skip the build as incomplete
+- Team: Make `npm run build` a gating check before pushing site changes
+
