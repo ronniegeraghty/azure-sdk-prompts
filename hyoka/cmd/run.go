@@ -38,7 +38,7 @@ type runFlags struct {
 	output       string
 	progressMode string
 	skipReview   bool
-	skipTrends   bool
+	withTrends   bool
 	dryRun       bool
 	// Fan-out visibility (#34)
 	autoConfirm bool
@@ -93,7 +93,7 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
 	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, interactive, ci, live, log, off")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
-	cmd.Flags().BoolVar(&f.skipTrends, "skip-trends", false, "Skip automatic trend analysis after run")
+	cmd.Flags().BoolVar(&f.withTrends, "with-trends", false, "Generate trend analysis after run (opt-in; default: trends are skipped)")
 	// Fan-out visibility (#34)
 	cmd.Flags().BoolVarP(&f.autoConfirm, "yes", "y", false, "Skip confirmation prompt for large runs (>10 evaluations)")
 	cmd.Flags().BoolVar(&f.allConfigs, "all-configs", false, "Run all configs when no --config filter is specified (required for multi-config runs)")
@@ -533,8 +533,8 @@ func runCmd() *cobra.Command {
 			fmt.Printf("  Errors:      %d\n", summary.Errors)
 			fmt.Printf("  Duration:    %.2fs\n", summary.Duration)
 
-			// Auto-run trend analysis unless opted out
-			if !f.skipTrends && !f.dryRun {
+			// Run trend analysis only when explicitly opted in via --with-trends
+			if f.withTrends && !f.dryRun {
 				fmt.Printf("\n%s\n", strings.Repeat("\u2500", 60))
 				fmt.Println("\U0001f4ca Generating trend analysis...")
 

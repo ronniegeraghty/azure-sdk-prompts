@@ -857,3 +857,12 @@ Deferred flock-for-concurrent-fetch to Item C (it's already going to touch `ensu
 - **Lock file (`.hyoka-lock`) sits one level above the enumeration zone.** `acquireRepoLock` writes to `<CacheRoot>/repos/<owner>/<repo>/.hyoka-lock` (parent of version dir). `PluginCacheCandidates` produces paths under `<repoDir>` where `repoDir = RepoCacheDir(owner, repo, "default")` — i.e., one dir level deeper. So the lock can never be mistaken for a plugin/skill candidate dir. Documented this in `paths.go`'s comment so future maintainers don't trip over it.
 - **Legacy fallback decision: kept with `slog.Warn`, not dropped.** Could not interactively ask Ronnie (no `ask_user` tool in non-interactive mode). Defaulted to the recommended option from both Morpheus's spec and the task brief. The deprecation warning gives one release for users to migrate before the next release drops the two `~/.copilot/installed-plugins/...` branches in `ResolveInstalled`. Surfaced this in the decision note for Ronnie to override.
 - **`parsePluginRepo` and `findPluginInRepo` kept as in-package shims.** Tests in `plugin_fetcher_test.go` reference these by their unexported names. Replacing the call sites and keeping one-line shims (`return plugin.SplitOwnerRepo(repo)` / `return plugin.FindPluginInRepo(...)`) is cheaper than touching every test. Future deletion is a one-liner once tests get refactored to call the exported names directly.
+
+## Learnings
+
+### 2026-04-29 — Trends flag flip (#638)
+- **Where trends gating lives:** `hyoka/cmd/run.go` ~line 537. Look for `if f.withTrends && !f.dryRun` block (was `!f.skipTrends`).
+- **New flag:** `--with-trends` (opt-in, default `false`). Replaces removed `--skip-trends`.
+- **Other touch points to remember:** `hyoka/cmd/cmd_test.go` (TestRunCmdBoolFlagDefaults asserts default false), `docs/cli-reference.md` flag table, `docs/getting-started.md` examples.
+- **Standalone `hyoka trends` subcommand unaffected** — still works for manual generation.
+- **Pre-existing test failures noted (not mine):** `hyoka/cmd/compare_test.go`, `hyoka/internal/comparison`, `hyoka/internal/serve`, `hyoka/internal/report` all have stale struct field references (`*bool` vs `bool`, missing `Model` field). Worth flagging to Switch.

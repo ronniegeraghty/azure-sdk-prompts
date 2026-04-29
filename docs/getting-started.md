@@ -300,10 +300,12 @@ hyoka run --service storage --dry-run
 hyoka report --all
 ```
 
-### Skip AI analysis for faster iteration
+### Generate AI trend analysis (opt-in)
+
+Trend analysis is skipped by default for fast iteration. Opt in when you want it:
 
 ```bash
-hyoka run --skip-trends
+hyoka run --with-trends
 hyoka trends --no-analyze
 ```
 

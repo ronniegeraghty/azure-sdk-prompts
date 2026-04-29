@@ -73,7 +73,7 @@ hyoka run --config baseline --dry-run
 | `--pairwise` / `-P` | false | Expand each config into N+1 pairwise tool-ablation variants for regression testing |
 | `--skip-tests` | false | Skip test generation |
 | `--skip-review` | false | Skip code review phase |
-| `--skip-trends` | false | Skip trend analysis after run |
+| `--with-trends` | false | Generate trend analysis after run (opt-in) |
 | `--dry-run` | false | List matches without running |
 | `--monitor-resources` | false | Track CPU/memory of Copilot sessions |
 | `--strict-cleanup` | false | Fail if orphaned processes remain after cleanup |

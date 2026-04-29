@@ -61,7 +61,7 @@ _ = cmd.Execute()
 
 falseFlags := []string{
 "skip-review",
-"skip-trends",
+"with-trends",
 "dry-run",
 "yes",
 "all-configs",
