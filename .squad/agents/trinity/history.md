@@ -824,3 +824,55 @@ Neo's verification recipe (worth remembering):
 
 **Status:** Feature shipped to ronniegeraghty/dev. Ready for merge to main.
 
+
+---
+
+## Session 2026-04-29: Verify Per-Reviewer Votes + Add Rerun Command Panel
+
+**User Request:** 
+1. Verify the per-reviewer vote display works (feature was implemented in previous session)
+2. Add the "rerun command" panel back to eval detail pages
+
+**Task 1: Per-Reviewer Vote Verification** ✅
+
+Verified that the per-reviewer vote display implemented in commits c155340f and e347e4d6 is working correctly:
+
+- **Component:** `ExpandablePoint.tsx` renders individual reviewer votes for prompt graders
+- **Data path:** `grader_results[].extras.review.panel_results[].criteria[]`
+- **Test coverage:** 18 tests in `ExpandablePoint.test.tsx` + 5 integration tests in `GraderResultRow.test.tsx`
+- **Features:**
+  - Each prompt grader check is expandable to show per-reviewer votes
+  - Split votes auto-expand with amber `⚠️ N/M` badge
+  - Each vote shows model name + ✓/✗ + reason
+  - All 160 tests pass (17 test files)
+
+**Task 2: Rerun Command Panel** ✅
+
+Added "Reproduce this eval" panel to eval detail page:
+
+- **Backend:** `rerunCommand` field already exists in:
+  - Go: `hyoka/internal/report/types.go:469`
+  - TypeScript: `site/src/app/data/types.ts:474`
+  - Populated by: `hyoka/internal/eval/engine_eval.go:747`
+- **UI Component:** Added inline panel in `eval-detail-page.tsx` after error banner
+  - Clean monospace command display with copy button
+  - Copy-to-clipboard with visual feedback (checkmark → Copy)
+  - Positioned between error banner and stat cards
+  - Conditional render when `rerunCommand` is present
+- **Test Coverage:** New `RerunCommand.test.tsx` with 6 tests:
+  - Renders command text correctly
+  - Shows proper label
+  - Clipboard integration works
+  - Checkmark feedback after copy
+  - Handles special characters
+  - Proper styling and layout
+
+**Deliverables:**
+- Modified: `site/src/app/components/eval-detail-page.tsx` (+17 lines)
+- Created: `site/src/app/components/RerunCommand.test.tsx` (+84 lines)
+- Tests: 160 passed (17 files)
+- Builds: Go ✅ | Site ✅
+- Commit: `009a91b2` on `ronniegeraghty/dev`
+
+**Note:** The rerunCommand was already being displayed in error banners only (lines 513-518). New implementation shows it on ALL eval pages as a dedicated panel, making it easier to copy commands for successful evals too.
+
