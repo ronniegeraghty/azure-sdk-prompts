@@ -467,6 +467,8 @@ type EvalReport struct {
 	FailureReason      string                `json:"failure_reason,omitempty"` // human-readable explanation of failure
 	IsStub             bool                  `json:"is_stub,omitempty"`
 	RerunCommand       string                `json:"rerunCommand,omitempty"`
+	BaseConfigName     string                `json:"baseConfigName,omitempty"`  // Config name before fan-out (e.g., "python-pairwise")
+	GeneratorModel     string                `json:"generatorModel,omitempty"`  // Specific model used (e.g., "claude-opus-4.6")
 	// Generator guardrails (#35) — Phase 3.5 (#566) dropped the byte-size
 	// cap entirely; MaxFiles, MaxTurns, and MaxSessionActions remain as hard
 	// fails that set GuardrailAbortReason.

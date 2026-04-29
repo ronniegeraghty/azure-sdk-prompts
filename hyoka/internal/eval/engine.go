@@ -311,8 +311,9 @@ func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) strin
 
 // EvalTask represents a single prompt+config evaluation to run.
 type EvalTask struct {
-	Prompt *prompt.Prompt
-	Config config.ToolConfig
+	Prompt         *prompt.Prompt
+	Config         config.ToolConfig
+	BaseConfigName string // Original config name before model fan-out (empty for single-model configs)
 }
 
 // resolvedLimits holds the effective guardrail limits for a single eval,
@@ -323,8 +324,14 @@ type resolvedLimits struct {
 	maxSessionActions int
 }
 
-func expandGeneratorModels(configs []config.ToolConfig) ([]config.ToolConfig, error) {
-	var expanded []config.ToolConfig
+// expandedConfig wraps a ToolConfig with metadata about the expansion.
+type expandedConfig struct {
+	Config         config.ToolConfig
+	BaseConfigName string // Original config name before fan-out (empty for single-model)
+}
+
+func expandGeneratorModels(configs []config.ToolConfig) ([]expandedConfig, error) {
+	var expanded []expandedConfig
 	for _, cfg := range configs {
 		if cfg.Generator == nil {
 			return nil, fmt.Errorf("config %q: generator.model or generator.models is required", cfg.Name)
@@ -333,12 +340,19 @@ func expandGeneratorModels(configs []config.ToolConfig) ([]config.ToolConfig, er
 		if len(models) == 0 {
 			return nil, fmt.Errorf("config %q: generator.model or generator.models is required", cfg.Name)
 		}
+		baseConfigName := ""
+		if len(models) > 1 {
+			baseConfigName = cfg.Name
+		}
 		for _, model := range models {
 			clone := cloneToolConfigForModel(cfg, model)
 			if len(models) > 1 {
 				clone.Name = fmt.Sprintf("%s/%s", cfg.Name, model)
 			}
-			expanded = append(expanded, clone)
+			expanded = append(expanded, expandedConfig{
+				Config:         clone,
+				BaseConfigName: baseConfigName,
+			})
 		}
 	}
 	return expanded, nil
@@ -437,13 +451,16 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	if err != nil {
 		return nil, err
 	}
-	configs = expandedConfigs
 
 	// Build task list (cross product: prompts × configs)
 	var tasks []EvalTask
 	for _, p := range prompts {
-		for _, c := range configs {
-			tasks = append(tasks, EvalTask{Prompt: p, Config: c})
+		for _, ec := range expandedConfigs {
+			tasks = append(tasks, EvalTask{
+				Prompt:         p,
+				Config:         ec.Config,
+				BaseConfigName: ec.BaseConfigName,
+			})
 		}
 	}
 

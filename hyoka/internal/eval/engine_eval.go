@@ -50,10 +50,12 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 
 	evalReport := &report.EvalReport{
-		SchemaVersion: report.CurrentSchemaVersion,
-		PromptID:      task.Prompt.ID,
-		ConfigName:    task.Config.Name,
-		Timestamp:     time.Now().UTC().Format(time.RFC3339),
+		SchemaVersion:  report.CurrentSchemaVersion,
+		PromptID:       task.Prompt.ID,
+		ConfigName:     task.Config.Name,
+		BaseConfigName: task.BaseConfigName, // Original config name before fan-out
+		GeneratorModel: task.Config.Generator.Model,
+		Timestamp:      time.Now().UTC().Format(time.RFC3339),
 		PromptMeta: map[string]any{
 			"service":     props["service"],
 			"plane":       props["plane"],
@@ -743,8 +745,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	// Build re-run command so users can reproduce this evaluation
-	evalReport.RerunCommand = buildRerunCommand(task.Prompt.ID, task.Config.Name, e.opts)
+	// Build re-run command so users can reproduce this evaluation.
+	// For multi-model configs, use base config name + --model override (C1 pattern).
+	evalReport.RerunCommand = buildRerunCommand(
+		task.Prompt.ID,
+		task.Config.Name,
+		task.BaseConfigName,
+		task.Config.Generator.Model,
+		e.opts,
+	)
 
 	// Capture overall duration after all phases (generation, build, review) complete.
 	evalReport.Duration = time.Since(start).Seconds()
@@ -787,10 +796,19 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 }
 
 // buildRerunCommand constructs the CLI command to reproduce a single evaluation.
-func buildRerunCommand(promptID, configName string, opts EngineOptions) string {
+// For multi-model configs (baseConfigName is non-empty), includes --model flag.
+// For single-model configs, baseConfigName is empty and we use the full configName.
+func buildRerunCommand(promptID, configName, baseConfigName, generatorModel string, opts EngineOptions) string {
 	parts := []string{"hyoka run"}
 	parts = append(parts, "--prompt-id", promptID)
-	parts = append(parts, "--config", configName)
+	
+	// Use base config name for multi-model, otherwise use the full config name
+	if baseConfigName != "" {
+		parts = append(parts, "--config", baseConfigName)
+		parts = append(parts, "--model", generatorModel)
+	} else {
+		parts = append(parts, "--config", configName)
+	}
 
 	if opts.SkipReview {
 		parts = append(parts, "--skip-review")
