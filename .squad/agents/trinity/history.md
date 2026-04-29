@@ -917,3 +917,7 @@ GeneratorModel  string  // Actual generator model used for this eval
 
 **Backward Compat:** Legacy reports without these fields gracefully fall back to using the full `configName` in rerun commands.
 
+
+---
+
+**2026-04-29:** EvalReport now carries `PairwiseVariant` field; `buildRerunCommand()` emits `--pairwise-variant` flag. Trinity may want to verify site-side rerun-command builder uses this field rather than parsing config name string.

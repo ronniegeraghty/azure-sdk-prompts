@@ -1070,3 +1070,62 @@ The SetLimitsForEval() method signature is stable; Switch and future implementer
 **Result:** False positives eliminated. Slow tool loads (>30s) no longer trigger premature failures.
 
 ---
+
+## 2026-04-29: Option F — `--pairwise-variant` Flag (Pairwise Rerun Fidelity)
+
+**Context:** C1 (shipped earlier) solved multi-model rerun commands but explicitly left pairwise tool-ablation state as lossy. Morpheus investigated and spec'd four options for tool-ablation fidelity. Ronnie picked Option F.
+
+**What shipped:**
+1. **CLI flag:** `--pairwise-variant <name>` on `hyoka run` (cmd/run.go)
+   - Single string value (e.g., `baseline`, `without-azure`, `without-azure/storage_blob_list`)
+   - Mutually exclusive with `-P`/`--pairwise` (sweep flag)
+   - Expands base config via `pairwise.ExpandPairwise()` and selects matching variant
+   - Helpful error message if variant not found
+2. **Schema extension:** Added `PairwiseVariant string` field to `EvalReport` (internal/report/types.go)
+   - Stores variant suffix at eval time (replaces brittle string parsing)
+   - Backward-compatible (optional field)
+3. **Engine plumbing:**
+   - Added `PairwiseVariant` field to `EvalTask`
+   - Created `extractPairwiseVariant()` helper to extract variant suffix from config names
+   - Populates `evalReport.PairwiseVariant` in `runSingleEval()`
+   - Updated `buildRerunCommand()` signature to accept `pairwiseVariant` parameter
+   - Emits `--pairwise-variant <name>` in rerun command when field is non-empty
+   - Q1 default: baseline gets explicit `--pairwise-variant baseline`
+   - Q4 default: quotes variant names with slashes (e.g., `"without-azure/storage_blob_list"`)
+4. **Tests:** Updated existing + added new:
+   - `TestBuildRerunCommand`: Added 6 pairwise variant test cases
+   - Created `TestExtractPairwiseVariant`: 8 cases for variant name extraction
+   - All tests pass with `-race`
+
+**Architecture:**
+Three orthogonal flags now compose cleanly:
+- `--config <base>` → which YAML file
+- `--model <model>` → which model from multi-model fan-out (C1)
+- `--pairwise-variant <variant>` → which tool-ablation variant (Option F)
+
+Each flag handles one fan-out dimension. Engine applies them in sequence: load → model override → variant selection → model expansion → task creation.
+
+**Key design decision:** Move pairwise variant identity from "parse the config name string downstream" to "store it at eval time." The `extractPairwiseVariant()` helper is used once at task creation; downstream code reads `PairwiseVariant` field. Legacy `parsePairwiseConfigName()` kept for backward-compat impact aggregation on older reports.
+
+**Example rerun command:**
+```
+hyoka run --prompt-id key-vault-dp-python-crud \
+  --config python-pairwise \
+  --model claude-opus-4.6 \
+  --pairwise-variant without-azure
+```
+
+**Commits:** (pending — all work done in this session)
+
+**Tests:** All eval tests pass (41s with `-race`). Build clean.
+
+**Follow-up notes:**
+- Trinity (site) may need to update client-side rerun command builder to consume new `pairwiseVariant` field (if site builds commands, not just renders them)
+- Option D (`--without-tool` repeatable flag) is a future flexibility move if users want hand-crafted ablations outside `-P`
+
+**Learnings:**
+1. Structured fields beat string parsing every time. Moving variant identity from "regex on a string" to "store at eval time" eliminates an entire class of bugs.
+2. Model suffix stripping is surprisingly tricky. Heuristics (look for `.` or `--` count) required to distinguish `claude-opus-4.6` (model) from `storage_blob_list` (MCP tool). Test coverage critical.
+3. Three orthogonal flags compose beautifully when each has a single responsibility.
+
+---

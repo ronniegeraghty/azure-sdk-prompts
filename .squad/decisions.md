@@ -547,3 +547,178 @@ Legacy reports (missing these fields) gracefully fall back to using the full `co
 - **Trinity (Site):** No React changes required. Site already renders whatever `rerunCommand` string it receives. New fields available in v4 schema if site wants to display them separately (e.g., "Config: python-pairwise | Model: claude-opus-4.6").
 - **Morpheus (Docs):** Can note C1 as shipped. If exact pairwise rerun becomes critical, spec out Option C2.
 
+
+---
+
+## 2026-04-29: Rerun Commands v2 — Tool-Ablation Fidelity (Options Analysis)
+
+**Author:** Morpheus 🕶️  
+**Date:** 2026-04-29  
+**Status:** OPTIONS — awaiting selection  
+**Supersedes:** Scope of `morpheus-rerun-command-pairwise-options.md` (multi-model portion still valid)
+
+### Problem
+
+C1 (shipped multi-model fix) does not preserve pairwise tool-ablation variants on rerun. Clicking "rerun" on `python-pairwise/without-azure/claude-opus-4.6` actually runs the baseline, losing the ablation. **Tool-ablation fidelity is a hard requirement.**
+
+### Options Analyzed
+
+Four options to close the fidelity gap:
+
+1. **Option D — `--without-tool` repeatable flag:** User hand-crafts ablations (most flexible, ~120 LOC)
+2. **Option E — `--exclude-tool` repeatable flag:** Extends existing `excluded_tools` config field (~150 LOC, maintenance risk)
+3. **Option F — `--pairwise-variant <name>` flag:** Replay exact variant by name (smallest, ~80 LOC) **← Recommended**
+4. **Option G — Inline/snapshot config blob:** Self-contained replay via base64 or sidecar YAML (~250-350 LOC, unreadable)
+
+### Recommendation: Option F
+
+**Why F:**
+- Reuses exact `ExpandPairwise` machinery that created the variant
+- Smallest surface area: one flag, one schema field
+- Composes cleanly with C1: `--config` (base) + `--model` (generator) + `--pairwise-variant` (ablation)
+- Cost: ~80 LOC
+
+**Doesn't deprecate C1.** F extends it. C1 remains correct for non-pairwise multi-model configs.
+
+### Open Questions for Ronnie
+
+1. **Q1:** Baseline as first-class variant? Emit explicit `--pairwise-variant baseline` or implicit?
+2. **Q2:** Single-variant rerun or full sweep replay?
+3. **Q3:** Human-readable vs. opaque blob? (Confirmed: human-readable)
+4. **Q4:** Slash quoting in variant names (`without-azure/storage_blob_list`)?
+5. **Q5:** Variant folder structure? (Confirmed: each variant is own EvalReport)
+6. **Q6:** Rerun needs `-P` opt-in? (No under F; unclear under D)
+
+---
+
+## 2026-04-29: `--pairwise-variant` Flag Implementation (Option F)
+
+**Authors:** Neo 💊 (implementation), based on Morpheus 🕶️ (spec)  
+**Date:** 2026-04-29  
+**Status:** ✅ SHIPPED  
+**Layered on:** C1 (BaseConfigName + GeneratorModel)
+
+### Summary
+
+Implemented `--pairwise-variant <name>` flag to restore tool-ablation fidelity in rerun commands. Users can now reproduce exact pairwise variants instead of just baselines.
+
+### Changes
+
+#### 1. CLI (cmd/run.go)
+- Added `--pairwise-variant <name>` string flag
+- Mutually exclusive with `-P`/`--pairwise` (errors if both set)
+- Accepts variant suffixes: `baseline`, `without-{toolName}`, `without-{mcpName}/{mcpToolName}`
+- Expands base config and selects matching variant
+
+#### 2. Schema (internal/report/types.go)
+- Added `PairwiseVariant string` field to `EvalReport`
+- Stores variant suffix (e.g., `"baseline"`, `"without-azure"`, `"without-azure/storage_blob_list"`)
+- Populated at eval creation time (not string parsing downstream)
+- Backward-compatible (optional, omitempty)
+
+#### 3. Engine (internal/eval/)
+- **`EvalTask`:** Added `PairwiseVariant string` field
+- **`extractPairwiseVariant()`:** Extracts variant suffix from config name
+  - Handles baseline, simple ablations, deep MCP variants
+  - Strips model suffix correctly (e.g., `/claude-opus-4.6`)
+- **`runSingleEval()`:** Populates `evalReport.PairwiseVariant` from task
+- **`buildRerunCommand()`:** Emits `--pairwise-variant <name>` when field non-empty
+  - Q1 default: baseline variants emit explicit `--pairwise-variant baseline`
+  - Q4 default: quotes variant names with slashes (e.g., `"without-azure/storage_blob_list"`)
+
+#### 4. Test Coverage (internal/eval/*_test.go)
+- **`TestBuildRerunCommand`:** 6 new test cases (baseline, simple ablation, deep MCP + composition)
+- **`TestExtractPairwiseVariant`:** 8 test cases (all variant patterns)
+- All tests pass with `-race`
+
+### Architecture
+
+Three orthogonal fan-out dimensions now compose cleanly:
+
+```
+User invokes:  hyoka run --config python-pairwise --model claude-opus-4.6 --pairwise-variant without-azure
+                          └─ base ──────────┘  └─ C1: model ────────────┘  └─ F: variant ──────────┘
+
+Engine flow:
+1. Load base config (python-pairwise.yaml)
+2. Override model if --model set → single-model config
+3. If --pairwise-variant set:
+   - Expand base config via pairwise.ExpandPairwise()
+   - Look up variant by suffix (e.g., "without-azure")
+   - Replace configs list with single matching variant
+4. expandGeneratorModels() fans out (if any)
+5. Build task list; populate task.PairwiseVariant from config name
+6. Populate evalReport.PairwiseVariant at eval creation
+7. buildRerunCommand() emits --pairwise-variant when field set
+
+Result: hyoka run --prompt-id X --config python-pairwise --model claude-opus-4.6 --pairwise-variant without-azure
+```
+
+### Why Not Reuse parsePairwiseConfigName()?
+
+The existing parser (engine.go:962-981) is kept for backward-compat reading of older reports. New runs populate `PairwiseVariant` directly at eval time via `extractPairwiseVariant()`, eliminating brittle string parsing downstream.
+
+### Verification
+
+✅ **Build:** `go build ./...`  
+✅ **Tests:** `go test -race ./hyoka/internal/eval/... -timeout 3m` (41s, all pass)  
+✅ **Manual:** Single-variant runs produce correct rerun commands
+
+### Files Modified
+
+- hyoka/cmd/run.go
+- hyoka/internal/eval/engine.go
+- hyoka/internal/eval/engine_eval.go
+- hyoka/internal/eval/engine_eval_rerun_test.go
+- hyoka/internal/eval/engine_pairwise_test.go (new)
+- hyoka/internal/report/types.go
+
+### Resolved Open Questions (from Morpheus's spec)
+
+- **Q1:** YES. Baseline gets explicit `--pairwise-variant baseline` for round-trip clarity
+- **Q2:** Single variant (flag selects one, not full sweep)
+- **Q3:** YES. Paste-safe, human-readable
+- **Q4:** YES. Deep MCP variants like `without-azure/storage_blob_list` are quoted in emitted command
+- **Q6:** NO. Single-variant rerun uses `--pairwise-variant`, not `-P`
+
+### Schema Impact
+
+New optional field on `EvalReport` (v4):
+```json
+{
+  "pairwiseVariant": "without-azure"
+}
+```
+
+Legacy reports (missing this field) gracefully fall back to C1 behavior.
+
+### Example Rerun Commands
+
+| Scenario | Input | Output |
+|----------|-------|--------|
+| Baseline | `--config python-pairwise --pairwise-variant baseline` | `hyoka run --prompt-id X --config python-pairwise --pairwise-variant baseline` |
+| Simple ablation | `--config python-pairwise --pairwise-variant without-azure` | `hyoka run --prompt-id X --config python-pairwise --pairwise-variant without-azure` |
+| Deep MCP | `--config python-pairwise --pairwise-variant without-azure/storage_blob_list` | `hyoka run --prompt-id X --config python-pairwise --pairwise-variant "without-azure/storage_blob_list"` |
+| + Model | `--config python-pairwise --model opus --pairwise-variant without-azure` | `hyoka run --prompt-id X --config python-pairwise --model opus --pairwise-variant without-azure` |
+
+### Follow-Ups
+
+**Trinity (Site Team):** The site may build rerun commands client-side. If so:
+1. Read `report.pairwiseVariant` from v4 schema
+2. Emit `--pairwise-variant <value>` when field non-empty
+3. Quote values containing slashes
+
+No React changes required if site only renders `rerunCommand` string as-is.
+
+**Future (Option D):** If users want hand-crafted ablations outside `-P`, Option D's `--without-tool` flag can be added later without removing Option F. The two flags coexist.
+
+### Related Decisions
+
+- **C1:** `.squad/decisions.md` (earlier) — Multi-model rerun fix (BaseConfigName + GeneratorModel)
+- **Morpheus v2 spec:** Rerun Commands v2 (above) — Option F rationale
+
+### Learnings
+
+1. **Structured fields > string parsing.** Moving pairwise variant identity from "parse the config name string" to "store at eval time" eliminates fragility.
+2. **Three orthogonal flags compose cleanly.** `--config`, `--model`, `--pairwise-variant` each handle one fan-out dimension.
+3. **Model suffix stripping is tricky.** Config names like `python-pairwise/without-azure/storage_blob_list/claude-opus-4.6` require heuristics. Test coverage critical.

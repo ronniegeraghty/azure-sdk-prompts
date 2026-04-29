@@ -59,7 +59,8 @@ type runFlags struct {
 	// Session timeout
 	sessionTimeout string
 	// Pairwise tool-ablation (#121)
-	pairwiseMode bool
+	pairwiseMode    bool
+	pairwiseVariant string
 	// Max turns per generation session
 	maxTurns int
 	// Pre-flight model check (#264)
@@ -114,6 +115,7 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.sessionTimeout, "session-timeout", "10m", "Maximum duration for a single generation or review session (e.g., 10m, 30m, 1h)")
 	// Pairwise tool-ablation (#121)
 	cmd.Flags().BoolVarP(&f.pairwiseMode, "pairwise", "P", false, "Expand each config into N+1 pairwise tool-ablation variants")
+	cmd.Flags().StringVar(&f.pairwiseVariant, "pairwise-variant", "", "Run a specific pairwise variant (e.g., 'baseline', 'without-azure', 'without-azure/storage_blob_list'). Mutually exclusive with -P/--pairwise.")
 
 	cmd.Flags().BoolVar(&f.checkModels, "check-models", false, "Pre-flight check that all configured models (generator + reviewer) are available before starting evaluations")
 	// Review session splitting (#580)
@@ -272,6 +274,11 @@ func runCmd() *cobra.Command {
 			}
 
 			// ── Config transformations ────────────────────────────
+			// Mutual exclusion: --pairwise and --pairwise-variant cannot both be set
+			if f.pairwiseMode && f.pairwiseVariant != "" {
+				return fmt.Errorf("--pairwise (-P) and --pairwise-variant are mutually exclusive")
+			}
+
 			// Override model if specified via CLI flag
 			if f.model != "" {
 				for i := range configs {
@@ -293,6 +300,39 @@ func runCmd() *cobra.Command {
 					expanded = append(expanded, variants...)
 				}
 				configs = expanded
+			}
+
+			// Pairwise variant selection (Option F)
+			if f.pairwiseVariant != "" {
+				var selected []config.ToolConfig
+				for _, c := range configs {
+					variants := pairwise.ExpandPairwise(c)
+					// Look for the variant whose name ends with "/{pairwiseVariant}"
+					targetSuffix := "/" + f.pairwiseVariant
+					var found *config.ToolConfig
+					for _, v := range variants {
+						if strings.HasSuffix(v.Name, targetSuffix) {
+							found = &v
+							break
+						}
+					}
+					if found == nil {
+						// Collect available variant names for helpful error message
+						var available []string
+						for _, v := range variants {
+							// Extract the variant suffix (everything after the base name)
+							if idx := strings.LastIndex(v.Name, "/"); idx != -1 {
+								available = append(available, v.Name[idx+1:])
+							}
+						}
+						return fmt.Errorf("pairwise variant %q not found for config %q. Available variants: %s",
+							f.pairwiseVariant, c.Name, strings.Join(available, ", "))
+					}
+					selected = append(selected, *found)
+					slog.Info("Selected pairwise variant", "config", c.Name, "variant", f.pairwiseVariant)
+					fmt.Printf("Selected pairwise variant %q for config %q\n", f.pairwiseVariant, c.Name)
+				}
+				configs = selected
 			}
 
 			// Resolve relative skill_directories in configs to absolute paths

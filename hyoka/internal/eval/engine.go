@@ -311,9 +311,10 @@ func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string) strin
 
 // EvalTask represents a single prompt+config evaluation to run.
 type EvalTask struct {
-	Prompt         *prompt.Prompt
-	Config         config.ToolConfig
-	BaseConfigName string // Original config name before model fan-out (empty for single-model configs)
+	Prompt          *prompt.Prompt
+	Config          config.ToolConfig
+	BaseConfigName  string // Original config name before model fan-out (empty for single-model configs)
+	PairwiseVariant string // Pairwise variant suffix (e.g., "baseline", "without-azure", "without-azure/storage_blob_list")
 }
 
 // resolvedLimits holds the effective guardrail limits for a single eval,
@@ -328,6 +329,59 @@ type resolvedLimits struct {
 type expandedConfig struct {
 	Config         config.ToolConfig
 	BaseConfigName string // Original config name before fan-out (empty for single-model)
+}
+
+// extractPairwiseVariant extracts the pairwise variant suffix from a config name.
+// Returns empty string if the config name doesn't follow pairwise naming convention.
+// Examples:
+//   - "python-pairwise/baseline/claude-opus-4.6" -> "baseline"
+//   - "python-pairwise/without-azure/claude-opus-4.6" -> "without-azure"
+//   - "python-pairwise/without-azure/storage_blob_list/claude-opus-4.6" -> "without-azure/storage_blob_list"
+//   - "baseline" -> "" (not a pairwise config)
+func extractPairwiseVariant(configName string) string {
+	// First, we need to identify if this follows pairwise naming.
+	// Pairwise names are: {base}/baseline[/{model}] or {base}/without-{tool}[/{model}]
+	// The challenge is the model suffix can contain slashes too (e.g., "claude-opus-4.6").
+	
+	// Check for baseline variant
+	if idx := strings.LastIndex(configName, "/baseline"); idx != -1 {
+		// Verify this is actually /baseline and not just a substring
+		rest := configName[idx+len("/baseline"):]
+		if rest == "" || rest[0] == '/' {
+			return "baseline"
+		}
+	}
+	
+	// Check for without- variant
+	if idx := strings.Index(configName, "/without-"); idx != -1 {
+		// Extract everything after the leading slash, including "without-"
+		variant := configName[idx+1:]
+		// The variant continues until we hit a model-like suffix
+		// Models typically look like "claude-opus-4.6" or "gpt-5.3-codex"
+		// Deep MCP variants look like "without-azure/storage_blob_list/claude-opus-4.6"
+		
+		// Strategy: look for the last slash-delimited segment that looks like a model name
+		// (contains hyphens and dots or numbers)
+		parts := strings.Split(variant, "/")
+		if len(parts) == 0 {
+			return ""
+		}
+		
+		// Check if the last part looks like a model name (has . or multiple -)
+		lastPart := parts[len(parts)-1]
+		if strings.Contains(lastPart, ".") || strings.Count(lastPart, "-") >= 2 {
+			// Last part is likely a model, strip it
+			if len(parts) == 1 {
+				// No variant, just model (shouldn't happen in valid pairwise names)
+				return ""
+			}
+			variant = strings.Join(parts[:len(parts)-1], "/")
+		}
+		
+		return variant
+	}
+	
+	return ""
 }
 
 func expandGeneratorModels(configs []config.ToolConfig) ([]expandedConfig, error) {
@@ -457,9 +511,10 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	for _, p := range prompts {
 		for _, ec := range expandedConfigs {
 			tasks = append(tasks, EvalTask{
-				Prompt:         p,
-				Config:         ec.Config,
-				BaseConfigName: ec.BaseConfigName,
+				Prompt:          p,
+				Config:          ec.Config,
+				BaseConfigName:  ec.BaseConfigName,
+				PairwiseVariant: extractPairwiseVariant(ec.Config.Name),
 			})
 		}
 	}

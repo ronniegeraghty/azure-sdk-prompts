@@ -469,6 +469,7 @@ type EvalReport struct {
 	RerunCommand       string                `json:"rerunCommand,omitempty"`
 	BaseConfigName     string                `json:"baseConfigName,omitempty"`  // Config name before fan-out (e.g., "python-pairwise")
 	GeneratorModel     string                `json:"generatorModel,omitempty"`  // Specific model used (e.g., "claude-opus-4.6")
+	PairwiseVariant    string                `json:"pairwiseVariant,omitempty"` // Pairwise variant suffix (e.g., "baseline", "without-azure", "without-azure/storage_blob_list")
 	// Generator guardrails (#35) — Phase 3.5 (#566) dropped the byte-size
 	// cap entirely; MaxFiles, MaxTurns, and MaxSessionActions remain as hard
 	// fails that set GuardrailAbortReason.

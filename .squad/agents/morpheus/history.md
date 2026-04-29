@@ -711,3 +711,33 @@ Three options drafted as requested:
   - Store pre-transformation state (original user command or base config name) for rerun commands.
   - Add a reverse-transformation layer (parse synthetic names back to user-facing flags).
 
+
+---
+
+## Learnings (Rerun v2 — Tool-Ablation Fidelity Miss)
+
+**Date:** 2026-04-29 (revision)
+**Task:** Redraft rerun-command options after Ronnie rejected v1's coverage of pairwise variants.
+
+**What v1 missed:**
+v1's three options (A reconstruct CLI, B `--model` flag, C1 base+model — shipped) all addressed multi-model fan-out but **none preserved tool-ablation state**. C1 explicitly accepted that pairwise variants like `/without-azure` get stripped on rerun, treating that as acceptable lossiness. Ronnie's correction: a "rerun" button that silently runs the *baseline* when the user clicked a *variant* is a lying button. Tool-ablation fidelity is a hard requirement, not a nice-to-have.
+
+**Why I missed it:** I framed the problem as "make the synthetic config name resolvable" rather than "make the rerun command reproduce the exact eval the user is staring at." First framing → drop variant suffix is fine. Second framing → variant suffix is the whole point. **Lesson: when a button says "rerun X," the contract is X-identical reproduction, not X-similar.** Ask "what does the user expect this button to do?" before "what's the smallest schema change?"
+
+**v2 deliverable:** `.squad/decisions/inbox/morpheus-rerun-options-v2-tool-ablation.md`
+
+Four options, all with full tool-ablation fidelity:
+- **D** — `--without-tool <name>` repeatable flag (replays the same `pairwise.removeTool()` transform)
+- **E** — `--exclude-tool <name>` reusing existing `excluded_tools` config field
+- **F** — `--pairwise-variant <name>` flag (selects the named variant via `ExpandPairwise`) — **recommended**
+- **G** — Inline/sidecar config snapshot (max fidelity, opaque command)
+
+**Recommendation:** F, layered on C1 (not deprecating it). Three orthogonal flags handle the three fan-out dimensions: `--config` (YAML), `--model` (multi-model), `--pairwise-variant` (tool ablation). Smallest surface (~80 LOC), reuses the same `ExpandPairwise` machinery that produced the variant — drift-proof by construction.
+
+**Investigation findings worth keeping:**
+- Pairwise variants are synthesized in `cmd/run.go:287-296` via `pairwise.ExpandPairwise` *before* the engine sees them.
+- Naming: `{base}/baseline`, `{base}/without-{tool}`, `{base}/without-{mcp}/{tool}` (deep MCP).
+- Variant identity is **not** stored as a structured field on `EvalReport` today — only embedded in the synthetic `ConfigName` string and recovered via `parsePairwiseConfigName` (`engine.go:962-981`) for impact computation.
+- Promoting variant identity to a real schema field (`PairwiseVariant`, `RemovedTool`) is a small win regardless of which rerun option ships — eliminates string-suffix parsing.
+
+**Process note:** Held the line on "options doc only, no implementation." Ronnie wants a checkbox to land on before any code moves.

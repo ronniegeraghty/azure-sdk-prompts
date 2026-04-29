@@ -50,12 +50,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 
 	evalReport := &report.EvalReport{
-		SchemaVersion:  report.CurrentSchemaVersion,
-		PromptID:       task.Prompt.ID,
-		ConfigName:     task.Config.Name,
-		BaseConfigName: task.BaseConfigName, // Original config name before fan-out
-		GeneratorModel: task.Config.Generator.Model,
-		Timestamp:      time.Now().UTC().Format(time.RFC3339),
+		SchemaVersion:   report.CurrentSchemaVersion,
+		PromptID:        task.Prompt.ID,
+		ConfigName:      task.Config.Name,
+		BaseConfigName:  task.BaseConfigName, // Original config name before fan-out
+		GeneratorModel:  task.Config.Generator.Model,
+		PairwiseVariant: task.PairwiseVariant, // Pairwise variant suffix (e.g., "baseline", "without-azure")
+		Timestamp:       time.Now().UTC().Format(time.RFC3339),
 		PromptMeta: map[string]any{
 			"service":     props["service"],
 			"plane":       props["plane"],
@@ -747,11 +748,13 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Build re-run command so users can reproduce this evaluation.
 	// For multi-model configs, use base config name + --model override (C1 pattern).
+	// For pairwise variants, include --pairwise-variant flag (Option F).
 	evalReport.RerunCommand = buildRerunCommand(
 		task.Prompt.ID,
 		task.Config.Name,
 		task.BaseConfigName,
 		task.Config.Generator.Model,
+		task.PairwiseVariant,
 		e.opts,
 	)
 
@@ -798,7 +801,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 // buildRerunCommand constructs the CLI command to reproduce a single evaluation.
 // For multi-model configs (baseConfigName is non-empty), includes --model flag.
 // For single-model configs, baseConfigName is empty and we use the full configName.
-func buildRerunCommand(promptID, configName, baseConfigName, generatorModel string, opts EngineOptions) string {
+// For pairwise variants (pairwiseVariant is non-empty), includes --pairwise-variant flag.
+func buildRerunCommand(promptID, configName, baseConfigName, generatorModel, pairwiseVariant string, opts EngineOptions) string {
 	parts := []string{"hyoka run"}
 	parts = append(parts, "--prompt-id", promptID)
 	
@@ -808,6 +812,17 @@ func buildRerunCommand(promptID, configName, baseConfigName, generatorModel stri
 		parts = append(parts, "--model", generatorModel)
 	} else {
 		parts = append(parts, "--config", configName)
+	}
+
+	// Add pairwise variant flag if this is a pairwise variant run.
+	// Q1 default: baseline variants explicitly emit --pairwise-variant baseline.
+	// Q4 default: quote variant names containing slashes (e.g., "without-azure/storage_blob_list").
+	if pairwiseVariant != "" {
+		if strings.Contains(pairwiseVariant, "/") {
+			parts = append(parts, "--pairwise-variant", fmt.Sprintf("%q", pairwiseVariant))
+		} else {
+			parts = append(parts, "--pairwise-variant", pairwiseVariant)
+		}
 	}
 
 	if opts.SkipReview {
