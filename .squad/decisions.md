@@ -454,3 +454,96 @@ After ANY update to the site (anything under `site/`), always run `cd site && np
 - Ralph: Flag site PRs that skip the build as incomplete
 - Team: Make `npm run build` a gating check before pushing site changes
 
+---
+
+## 2026-04-29: Rerun Command Fix for Multi-Model and Pairwise Configs (Option C1) — SHIPPED
+
+**Authors:** Morpheus 🕶️ (investigation), Neo 💊 (implementation)  
+**Date:** 2026-04-29  
+**Status:** ✅ SHIPPED — Commit 5dda7811 on `ronniegeraghty/dev`
+
+### Problem
+
+Rerun commands in the web UI (and `report.json`) fail for evaluations using multi-model configs or pairwise-expanded configs. The engine synthesizes virtual config names that don't exist in YAML files:
+- Multi-model: `hyoka run --config python-pairwise/claude-opus-4.6` ❌
+- Pairwise: `hyoka run --config python-pairwise/baseline/claude-opus-4.6` ❌
+
+### Investigation (Morpheus)
+
+**Confirmed bug.** Root cause: engine fan-out creates synthetic config names during multi-model expansion; `buildRerunCommand()` uses these synthetic names, but YAML files contain only base configs.
+
+Drafted three remediation options:
+- **Option A:** Reconstruct original command (store original CLI invocation) — most complete but invasive
+- **Option B:** Add `--model` flag to run.go — requires multi-config awareness
+- **Option C1:** Add `BaseConfigName` + `GeneratorModel` fields to `EvalReport` — **pragmatic, recommended**
+
+### Solution (Neo) — Option C1
+
+1. **Schema (types.go):** Added two optional fields to `EvalReport`:
+   ```go
+   BaseConfigName  string  // e.g., "python-pairwise" before fan-out
+   GeneratorModel  string  // e.g., "claude-opus-4.6" the actual model used
+   ```
+
+2. **Engine (engine.go):** Modified `expandGeneratorModels()` to return expanded configs with base config name metadata.
+
+3. **Eval Runner (engine_eval.go):** 
+   - Threaded `BaseConfigName` through `EvalTask`
+   - Populated both new fields at eval creation time
+   - Updated `buildRerunCommand()` logic:
+     - Multi-model: `hyoka run --config <base> --model <specific>`
+     - Single-model: `hyoka run --config <name>` (no --model)
+
+4. **Tests (engine_eval_rerun_test.go):** 9 new table-driven tests covering single/multi-model, pairwise variants, flag combinations, special characters. All pass.
+
+### Verification
+
+- ✅ Unit tests: All 9 pass
+- ✅ Build: Clean
+- ✅ Full suite: Eval tests pass (pre-existing serve/validate failures unrelated)
+- ✅ Code inspection: `--model` flag logic in run.go verified
+
+### Result
+
+**Before:**
+```bash
+User runs:    hyoka run --prompt-id X --config python-pairwise
+Report generated with:
+  rerunCommand = "hyoka run --prompt-id X --config python-pairwise/claude-opus-4.6"
+User retries: ERROR — config not found
+```
+
+**After:**
+```bash
+User runs:    hyoka run --prompt-id X --config python-pairwise
+Report generated with:
+  baseConfigName = "python-pairwise", generatorModel = "claude-opus-4.6"
+  rerunCommand = "hyoka run --prompt-id X --config python-pairwise --model claude-opus-4.6"
+User retries: ✅ Works
+```
+
+### Pairwise Behavior (By Design)
+
+Pairwise variants expand configs into tool-ablation variants (e.g., `/without-azure`). The C1 rerun command **does not preserve tool ablations** — this is intentional:
+- Pairwise is for comparative analysis, not one-off reruns
+- Users wanting exact pairwise reproduction can manually use `-P` and find results
+- If exact pairwise rerun becomes critical, Option C2 (`--pairwise-variant` flag) is a future follow-up
+
+### Schema Impact
+
+Two new optional fields on v4 report schema (backward compatible):
+```json
+{
+  "baseConfigName": "python-pairwise",
+  "generatorModel": "claude-opus-4.6"
+}
+```
+
+Legacy reports (missing these fields) gracefully fall back to using the full `configName` in rerun commands.
+
+### Follow-Ups
+
+- **Tank (CLI):** The `--model` flag is hidden (`cmd.Flags().MarkHidden("model")`). If users discover it, Tank should unhide and improve help text.
+- **Trinity (Site):** No React changes required. Site already renders whatever `rerunCommand` string it receives. New fields available in v4 schema if site wants to display them separately (e.g., "Config: python-pairwise | Model: claude-opus-4.6").
+- **Morpheus (Docs):** Can note C1 as shipped. If exact pairwise rerun becomes critical, spec out Option C2.
+

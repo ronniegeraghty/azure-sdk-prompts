@@ -167,6 +167,34 @@ Full history archived. Recent entries below.
 
 ## Learnings
 
+### Config Fan-Out Architecture (2026-04-29)
+
+**Context:** Implemented Option C1 for rerun command fix (Morpheus's spec).
+
+**Key insights:**
+- Multi-model configs expand at engine time via `expandGeneratorModels()` — each model becomes a separate `EvalTask` with a synthetic config name (e.g., `python-pairwise/claude-opus-4.6`).
+- The synthetic name is used for report directories and `ConfigName` field, but users can't pass it to `--config` because it doesn't exist in YAML files.
+- `--model` flag already works correctly: it sets `Generator.Model` and clears `Generator.Models` BEFORE fan-out, so the expansion produces a single eval with the original config name.
+
+**Solution (C1):**
+- Added `BaseConfigName` and `GeneratorModel` fields to `EvalReport` (types.go).
+- Modified `expandGeneratorModels()` to return `expandedConfig` structs that carry both the cloned config AND the base name.
+- Threaded `BaseConfigName` through `EvalTask` so `runSingleEval()` can populate both fields on the report.
+- Updated `buildRerunCommand()` to use base config + `--model` flag for multi-model evals, fall back to full config name for single-model.
+
+**For Tank (CLI):**
+- The `--model` flag (run.go line 89) is marked hidden but works correctly for multi-model override.
+- If users report confusion about why `--model` exists, Tank should unhide it and add better help text.
+
+**For Trinity (Site):**
+- No React changes needed — the site just renders whatever string is in `rerunCommand`.
+- New `baseConfigName` and `generatorModel` fields are available in v4 schema if the site wants to display them separately.
+
+**Test coverage:**
+- `engine_eval_rerun_test.go` covers all C1 scenarios (single-model, multi-model, pairwise lossy, flags).
+- Tests pass; pre-existing failures in serve/validate packages remain (unrelated).
+
+
 - **Gotcha (resolved):** `validate.go` in this repo has no indentation on function bodies (it still compiles because Go doesn't require it). Edits must preserve the flat style or `edit` tool `old_str` lookups fail. Do not reformat.
 - **Gotcha (resolved):** `configDir` passed into `ValidateAndExpand` from `copilot.go` is an **isolated per-eval temp dir** (`/tmp/hyoka-config-...`), not the project root. Resolving `./.hyoka/plugins/` against it surfaced `/tmp/...` paths in error messages. Fixed `hyokaPluginsBase` to always use CWD.
 - **Design note:** Kept `ResolvePluginsDir` (legacy `./plugins/`) around. Eliminating it would mean moving the Azure-Python plugin YAML into `./.hyoka/plugins/`, which is a broader migration than this wave owns.

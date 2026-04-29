@@ -889,3 +889,31 @@ After any update to `site/` (source, styles, components, tests), **ALWAYS** run 
 
 **Why:** Several sessions shipped site updates without rebuilding dist, leading to confusion when the embedded bundle was stale. This is now a gating check.
 
+---
+
+## 2026-04-29: Cross-Agent Learning — New EvalReport Fields for Rerun Commands
+
+**From Morpheus/Neo rerun command fix (Commit 5dda7811)**
+
+Two new **optional fields** added to `EvalReport` JSON schema (v4, backward compatible):
+
+```go
+BaseConfigName  string  // Original config name before multi-model fan-out
+GeneratorModel  string  // Actual generator model used for this eval
+```
+
+**Why:** Multi-model configs generate synthetic virtual config names during fan-out. The new fields let the site display rerun commands correctly. Without them, rerun commands fail for multi-model and pairwise configs.
+
+**Example (v4 report JSON):**
+```json
+{
+  "baseConfigName": "python-pairwise",
+  "generatorModel": "claude-opus-4.6",
+  "rerunCommand": "hyoka run --prompt-id X --config python-pairwise --model claude-opus-4.6"
+}
+```
+
+**Site Impact:** These fields are **available for optional display** — e.g., a detailed rerun info panel could show "Config: python-pairwise | Model: claude-opus-4.6" alongside the command. Current site just renders `rerunCommand` string as-is. No changes required unless you want richer rerun UI.
+
+**Backward Compat:** Legacy reports without these fields gracefully fall back to using the full `configName` in rerun commands.
+

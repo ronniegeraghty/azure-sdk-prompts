@@ -657,3 +657,57 @@ All commits merged to origin/ronniegeraghty/dev. No pre-existing test failures i
 
 **Status:** Feature complete. Commits c155340f (impl), 5a165d63 (tests v1), e347e4d6 (reconcile). Pushed to ronniegeraghty/dev.
 
+
+---
+
+## Learnings (Rerun Command Bug — Multi-Model + Pairwise Configs)
+
+**Date:** 2026-04-29  
+**Task:** Investigate broken rerun commands for multi-model and pairwise-expanded configs; provide options document
+
+**Bug Confirmed:**
+
+Rerun commands displayed in the web UI and written to `report.json` fail for evaluations using:
+1. **Multi-model configs** (e.g., `python-pairwise` with `models: [opus, sonnet, codex]`)
+2. **Pairwise-expanded configs** (e.g., `--pairwise` flag creating `baseline`, `without-azure`, etc.)
+
+**Root Cause:**
+
+When configs fan out (multi-model or pairwise), the engine synthesizes **virtual config names** that don't exist in YAML files:
+- Multi-model: `python-pairwise/claude-opus-4.6` (from base `python-pairwise`)
+- Pairwise: `python-pairwise/baseline/gpt-5.3-codex`, `python-pairwise/without-azure/claude-opus-4.6`
+
+These synthetic names are written to `report.config_name` and used in `buildRerunCommand()` (engine_eval.go:790), but `hyoka run --config <synthetic-name>` fails because config resolution happens in `cmd/run.go` by looking up YAML entries.
+
+**Code Locations:**
+- Synthetic name generation: `hyoka/internal/eval/engine.go:339` (multi-model), `hyoka/internal/pairwise/pairwise.go:29,35` (pairwise)
+- Rerun command builder: `hyoka/internal/eval/engine_eval.go:790`
+- Config lookup: `hyoka/cmd/run.go:244` (splits comma-separated names, calls `cfgFile.GetConfigs()`)
+
+**Live Evidence:**
+- Tested `python-pairwise/claude-opus-4.6` → **Error: configs not found**
+- Tested `python-pairwise/baseline/gpt-5.3-codex` → **Error: configs not found**
+- Tested `baseline/claude-opus-4.6` (single-model, non-pairwise) → **✅ Works**
+
+**Options Delivered:**
+
+File: `.squad/decisions/inbox/morpheus-rerun-command-pairwise-options.md`
+
+Three options drafted as requested:
+1. **Option A (Most Complete):** Store original CLI invocation, rerun commands replay the exact user command (re-runs all models if multi-model was used).
+2. **Option B (Fastest):** Add `--raw-config` escape hatch flag to accept synthetic names.
+3. **Option C (User-Expected):** Store base config name + model, rerun commands use `--config <base> --model <specific>`.
+   - **C1 (simplified):** Pairwise variants rerun base config + model (no tool ablation preserved).
+   - **C2 (extended):** Add `--pairwise-variant` flag to preserve pairwise variant suffixes.
+
+**Recommendation:** **Option C1** — matches user mental model, reuses existing flags, ships fast (~1 hour), pairwise lossy but acceptable for comparative analysis.
+
+**Process Notes:**
+- When a "rerun command doesn't work" bug is reported, check:
+  1. Does the config name in the report exist in YAML files?
+  2. Are there fan-out transformations (multi-model, pairwise, future dimensions)?
+  3. Is the rerun command using a synthetic name from post-transformation state?
+- Fan-out is conceptually "compile-time" (happens in cmd/run.go before evals start), but synthetic names leak into "runtime" artifacts (reports). The fix is either:
+  - Store pre-transformation state (original user command or base config name) for rerun commands.
+  - Add a reverse-transformation layer (parse synthetic names back to user-facing flags).
+
