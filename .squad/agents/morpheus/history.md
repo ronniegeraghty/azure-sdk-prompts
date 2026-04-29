@@ -741,3 +741,67 @@ Four options, all with full tool-ablation fidelity:
 - Promoting variant identity to a real schema field (`PairwiseVariant`, `RemovedTool`) is a small win regardless of which rerun option ships — eliminates string-suffix parsing.
 
 **Process note:** Held the line on "options doc only, no implementation." Ronnie wants a checkbox to land on before any code moves.
+
+---
+
+## Learnings (Trends Opt-In Redesign)
+
+**Date:** 2026-04-29
+**Task:** Investigate the trends process in hyoka, determine how it's invoked and how long it takes, then file a GitHub issue to gate it behind an opt-in flag.
+
+**What trends does:**
+- Historical cross-run aggregation: scans past reports in `reports/` directory
+- Computes time-series performance metrics (pass rates, duration trends, config comparisons)
+- Calls `trends.Generate()` (report scanning) and `trends.AnalyzeTrends()` (AI-powered analysis)
+- AI analysis spawns a **Copilot SDK session** — expensive LLM call for regression detection and insights
+- Writes markdown report to `reports/trends/`
+
+**When/where triggered:**
+- Automatically at the end of **every `hyoka run`** invocation (cmd/run.go:537-573)
+- Also available as standalone `hyoka trends` subcommand (cmd/trends.go)
+- Dashboard has on-demand `/api/trends` endpoint that calls `trends.Generate()` (internal/serve/dashboard.go:170-176)
+
+**Current control mechanism (opt-out):**
+- Flag: `--skip-trends` (boolean, default: false)
+- Logic: `if !f.skipTrends && !f.dryRun` → run trends
+- Users must explicitly pass `--skip-trends` to opt out
+
+**Cost & Impact:**
+- `trends.AnalyzeTrends()` spawns a Copilot SDK session with isolated config (analysis.go:43-50)
+- Adds measurable time overhead to every eval run
+- Most CI/CD workflows and quick iteration cycles don't need trend data
+
+**Dependencies & Degradation:**
+- Dashboard (`hyoka serve`) already calls `trends.Generate()` on-demand via `/api/trends` API
+- Dashboard gracefully degrades if pre-computed trends are missing (no hard requirement for pre-computed state)
+- No other subsystems depend on auto-generated trends data
+
+**Why current design is problematic:**
+- Trends process is **opt-out**, not opt-in → most users pay the cost unnecessarily
+- Every single eval run (including fast iteration loops) spawns a Copilot session
+- Users must remember the `--skip-trends` flag to avoid overhead
+
+**Proposed redesign (issue #638):**
+- **Invert default:** trends skip by default (opt-in model)
+- **New flag:** `--with-trends` (boolean, default: false)
+- **New logic:** `if f.withTrends` → generate trends
+- **User workflow:** `hyoka run --with-trends` to get trend analysis
+- **Migration:** No breaking change if we keep `--skip-trends` as deprecated alias, but preferred path is `--with-trends` for positive intent
+
+**Architecture rationale:**
+- CLI flags should default to opt-out only for essential features (generator, reviewer, guardrails)
+- Optional post-analysis (trends, dashboard enhancements) should default to opt-in
+- This aligns with "fast iteration loop" use case (most common) vs. "end-of-day summary" use case (trends user)
+
+**Key files involved:**
+- `hyoka/cmd/run.go`: lines 21, 41, 96, 537 (flag definition + invocation logic)
+- `hyoka/internal/trends/trends.go`: 573 lines (main aggregation logic)
+- `hyoka/internal/trends/analysis.go`: AI session spawning
+- `hyoka/cmd/trends.go`: standalone trends subcommand (unaffected by this change)
+- `hyoka/internal/serve/dashboard.go`: on-demand API endpoint (unaffected)
+
+**Investigation outcome:**
+- Filed GitHub issue #638 (squad label for triage)
+- Recommended flag: `--with-trends` (positive intent, matches typical opt-in UX)
+- No blockers identified; architecture supports graceful degradation
+- Recommendation: invert default in `runFlags` struct, flip condition logic, update help text, deprecate `--skip-trends` or keep as alias

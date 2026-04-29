@@ -722,3 +722,108 @@ No React changes required if site only renders `rerunCommand` string as-is.
 1. **Structured fields > string parsing.** Moving pairwise variant identity from "parse the config name string" to "store at eval time" eliminates fragility.
 2. **Three orthogonal flags compose cleanly.** `--config`, `--model`, `--pairwise-variant` each handle one fan-out dimension.
 3. **Model suffix stripping is tricky.** Config names like `python-pairwise/without-azure/storage_blob_list/claude-opus-4.6` require heuristics. Test coverage critical.
+# Decision: Trends Process — Opt-Out → Opt-In (Issue #638)
+
+**Status:** FILED (GitHub issue #638, squad label)  
+**Date:** 2026-04-29  
+**Owner:** Morpheus 🕶️ (Lead)  
+**Stakeholders:** Neo (engine), Tank (performance), Trinity (UI)  
+
+---
+
+## Problem Statement
+
+The `hyoka run` command automatically invokes trend analysis at the end of every evaluation run. This process:
+
+1. Scans past reports in `reports/` directory
+2. Computes historical metrics and time-series trends
+3. **Spawns a Copilot SDK session** for AI-powered analysis (regression detection, insights)
+4. Writes results to `reports/trends/`
+
+**Impact:** Every single eval run (including fast iteration loops) pays the cost of trend generation + LLM analysis, even when users don't need the output. Users must remember to pass `--skip-trends` to opt out.
+
+## Current Design (Opt-Out)
+
+```
+hyoka run <filters>               # trends run automatically
+hyoka run <filters> --skip-trends # skip trends (opt-out)
+```
+
+- **Flag:** `--skip-trends` (boolean, default: false)
+- **Logic:** `if !f.skipTrends && !f.dryRun` → generate trends
+- **UX problem:** Negative flag (skip) as default behavior; counterintuitive for optional feature
+
+## Proposed Design (Opt-In)
+
+```
+hyoka run <filters>              # trends skip by default (fast)
+hyoka run <filters> --with-trends # generate trends (opt-in)
+```
+
+| Aspect | Current | Proposed |
+|--------|---------|----------|
+| Default behavior | Trends run automatically | Trends skipped |
+| Control flag | `--skip-trends` (boolean, false) | `--with-trends` (boolean, false) |
+| CLI UX | `hyoka run ... --skip-trends` | `hyoka run ... --with-trends` |
+| Logic | `if !skipTrends` → run | `if withTrends` → run |
+| Backward compat | N/A | Keep `--skip-trends` as deprecated alias (optional) |
+
+## Rationale
+
+1. **Aligns with typical opt-in UX** — optional post-analysis features default to off
+2. **Improves iteration speed** — most use cases (CI/CD, quick loops) don't need trends; opt-in users get full analysis on demand
+3. **Reduces surprise costs** — no hidden Copilot session spawned without explicit request
+4. **Dashboard survives gracefully** — `/api/trends` endpoint generates data on-demand if not pre-computed (no hard dependency)
+
+## Architecture Notes
+
+- **No hard blockers** — Dashboard already calls `trends.Generate()` on-demand
+- **Graceful degradation** — Missing pre-computed trends data causes no system failure
+- **Isolated concern** — Affects only `hyoka run` command; standalone `hyoka trends` subcommand unaffected
+
+## Implementation Scope
+
+- **Files:** `hyoka/cmd/run.go` (flag definition, invocation logic)
+- **Changes:** 
+  - Replace `skipTrends bool` with `withTrends bool` in `runFlags` struct
+  - Update flag definition: `BoolVar(&f.withTrends, "with-trends", false, "Generate trend analysis...")`
+  - Flip condition: `if f.withTrends && !f.dryRun` → generate trends
+  - Update help text on `run` command
+- **Tests:** Verify dashboard still works without pre-computed trends
+
+## Acceptance Criteria
+
+- [x] Issue filed (#638, squad label)
+- [ ] Team aligns on flag name (`--with-trends` vs. alternatives)
+- [ ] Implementation plan: migrate `skipTrends` → `withTrends`, flip logic
+- [ ] Deprecation path for `--skip-trends` (keep as alias or remove cleanly)
+- [ ] Dashboard tests pass with missing pre-computed trends
+- [ ] Help text updated to clarify new default
+
+## Alternative Considered
+
+**Keep `--skip-trends`, invert its default to true:**
+- Simpler (no new flag name)
+- Less clear intent (users see `--skip-trends` and assume trends run by default, but they don't)
+- **Rejected:** Negative flag should not represent the default behavior; leads to confusion
+
+**Use `--trends` instead of `--with-trends`:**
+- Shorter
+- Less explicit about intent (is it on or off?)
+- **Decided:** `--with-trends` is clearer ("include trend analysis in this run")
+
+## Cross-Team Dependencies
+
+- **Neo (engine):** No impact on eval engine or grading
+- **Tank (perf):** Iteration time improves for common case (trends skipped by default)
+- **Trinity (UI):** Dashboard must handle missing trends gracefully (already does via on-demand API)
+- **Scribe (logging):** Trend analysis logging continues if `--with-trends` is used
+
+---
+
+## Next Steps
+
+1. **Triage (squad):** Validate problem statement, confirm flag name
+2. **Implementation (Neo or Tank):** Migrate flag logic, update tests
+3. **Review (Trinity, Scribe):** Verify dashboard degradation, logging behavior
+4. **Release notes:** Document new opt-in behavior, deprecation timeline for `--skip-trends` (if kept)
