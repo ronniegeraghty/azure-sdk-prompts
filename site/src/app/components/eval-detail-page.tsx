@@ -519,6 +519,22 @@ export function EvalDetailPage() {
           </div>
         )}
 
+        {/* Rerun command panel */}
+        {rerunCommand && (
+          <div className="mb-6 rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <div className="mb-2 flex items-center gap-2 text-white/50" style={{ fontSize: 12 }}>
+              <Terminal className="h-3.5 w-3.5" />
+              <span>Reproduce this eval</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 overflow-auto rounded bg-black/40 px-3 py-2 text-white/70" style={{ ...mono, fontSize: 11 }}>
+                {rerunCommand}
+              </code>
+              <CopyButton text={rerunCommand} />
+            </div>
+          </div>
+        )}
+
         {/* Stat cards */}
         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
           {[
