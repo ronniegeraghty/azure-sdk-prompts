@@ -778,3 +778,7 @@ No regressions introduced. Test suite is ready for Trinity's implementation.
 
 **Status:** Feature complete and fully tested. Pushed to ronniegeraghty/dev. Ready for merge.
 
+## Build Status Flagged (2026-04-29)
+
+**Flagged by Tank:** Pre-existing build failure in `hyoka/cmd/compare_test.go` — `*bool` vs `bool` type mismatch. Needs investigation and fix. Not part of Tank's trends flag work; flagged during verification pass.
+
