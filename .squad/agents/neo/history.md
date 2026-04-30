@@ -1246,3 +1246,83 @@ Morpheus diagnosed that parent grader lines are numbered when checks: exist, cau
 ### Status
 
 ✅ CI unblocked. All vet errors resolved. Phantom grader fix ready to pick up next session.
+
+---
+
+## Session — Grader Redesign Implementation (2026-04-30)
+
+**Tasked by:** Morpheus scope  
+**Deliverable:** Engine implementation of all 4 grader redesign parts  
+**Status:** ✓ Complete  
+**Branch:** `neo/issue-grader-redesign`
+
+### Work
+
+Implemented comprehensive grader redesign across engine, graders, and data model:
+
+#### Part 1: Prompt Grader Semantics
+- Modified `FormatUnifiedPromptEntries()` in buckets.go to render `prompt:` as context preamble only
+- Numbered criteria lines come from `checks:` entries only
+- Grader `name:` renders as section header (not scored item)
+- Updated parser to separate lead text from bullet items in prompt files
+
+#### Part 2: Execution Order
+- Reordered grader execution in engine_eval.go: prompt-file first, then criteria-file graders
+- Prompt eval criteria runs before all criteria-file graders (typed or AI)
+- YAML graders execute in file declaration order (no typed/AI partition)
+- Ensured stable file-walk ordering when re-interleaving partitions
+
+#### Part 3-data: Data Model
+- Added `SourceFile` and `SourceType` fields to `graders.GraderResult`
+- Added `SourceFile` (JSON: `source_file`) and `SourceType` (JSON: `source_type`) to `report.GraderResult`
+- Engine populates for every grader result:
+  - `SourceType = "prompt_file"` for prompt file criteria
+  - `SourceType = "criteria_file"` for YAML criteria files
+  - `SourceFile = absolute path` to originating file
+
+#### Part 4: Tool Usage Grader
+- Implemented new `tool_usage` grader type in graders package
+- Config shape: `type: tool_usage` with `details.rules` array
+- Each rule specifies: `type` (mcp_server, skill_plugin, skill_repo), `name`, `expect` (at_least_one_tool_call, any_skill_invoked, skill_invoked)
+- Detection logic: checks `MCPToolCalls`, `SkillsInvoked`, `ToolCalls` from GraderInput.GeneratorArtifact
+- One point per rule with meaningful label (e.g., "azure-mcp tool called", "azure-sdk-python skill invoked")
+- Rules where env item isn't in config → **skipped silently** (not emitted as point)
+- Edge case: if all rules skipped → emit trivial "no_applicable_rules" point
+- Added `EnvironmentTools []EnvironmentTool` to GraderInput for env detection
+
+#### Handoff to Tank (2026-04-26)
+- Data model ready for render-side integration
+- Provided exact field names, struct locations, code patterns, and wiring instructions
+
+#### Tank Integration (2026-04-30)
+- Merged Tank's render changes into neo/issue-grader-redesign
+- Tank implemented 3-level grouping in markdown, CLI, and site
+- All rendering degrades gracefully when SourceFile/SourceType empty
+
+#### Follow-up Fixes
+- Fixed tool_usage env detection: `azure-mcp` → `azure` name mismatch (config uses short name, detection uses full name)
+- Added threshold values to output_check labels: `min_files (1)`, `min_bytes_per_file (1)` (were missing before)
+
+### Live Verification
+
+- Tested twice on: `key-vault-dp-python-crud × azure-mcp/claude-opus-4.6`
+- All grader types operational: prompt, prompt_review, output_check, file, tool_usage
+- Test suite: 3 pre-existing failures confirmed unrelated (TestReviewerFactory_MissingSkillFailsFast, TestWriteReport_LargeReportWrittenCorrectly, TestRerenderRun)
+
+### Commits
+
+- 4 commits implementing Parts 1-4
+- 1 follow-up fix commit (env detection + labels)
+- Total: 5 commits with Tank's render changes merged in
+
+### Deliverables
+
+- Branch: `neo/issue-grader-redesign`
+- PR ready: https://github.com/ronniegeraghty/hyoka/pull/new/neo/issue-grader-redesign
+- All grader types functional with new data model
+
+### Output
+
+- Orchestration log: `.squad/orchestration-log/2026-04-30T18-29-54Z-neo.md`
+- Session log: `.squad/log/2026-04-30T18-29-54Z-grader-redesign.md`
+- Decisions merged into `.squad/decisions.md`

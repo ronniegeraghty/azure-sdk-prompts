@@ -1,0 +1,251 @@
+# Grader Redesign — Scope Doc
+
+**Status:** READY FOR IMPLEMENTATION  
+**By:** Morpheus 🕶️  
+**Date:** 2026-04-26  
+**Requested by:** Ronnie  
+**Assignees:** Neo (engine/graders), Tank (CLI output/report/site)
+
+---
+
+## Part 1 — Prompt Grader Semantics (BREAKING CHANGE)
+
+**Rule:** For `type: prompt` graders, ONLY `checks:` entries are scorable points. `name` and `prompt` are LLM judge context — never counted in the X/X tally, never reported as scored items.
+
+### Current Behavior (to remove)
+
+- `FormatUnifiedPromptEntries()` in `internal/criteria/buckets.go:129–152` renders the grader Name and Prompt as numbered criteria items that the LLM judges against. When `checks:` is empty, it emits `N. **Name** — Prompt` as a scorable line.
+- `ParseEvaluationCriteria()` in `internal/prompt/parser.go:160–197` splits the `## Evaluation Criteria` markdown section into top-level bullets as `CriterionEntry.Prompt` — each becomes a review criterion. No concept of `prompt` vs `checks` separation exists for frontmatter criteria.
+- The review grader (`prompt_review_grader.go:112–129`) creates one `GraderPoint` per criterion returned by the LLM. The criteria fed to the LLM include the grader name/prompt text (from `FormatUnifiedPromptEntries`), so those become scored items.
+
+### Changes Required
+
+| File | Change |
+|------|--------|
+| `internal/criteria/buckets.go` | `FormatUnifiedPromptEntries()` — render `prompt:` as preamble context only (not numbered). Only `checks:` items become numbered criteria lines the LLM scores. Grader `name:` becomes a section heading, not a scored item. |
+| `internal/criteria/config.go` | `validateEntry()` — YAML graders with `type: prompt` but no `checks:` should warn (soft deprecation log) or require `checks:`. Decide with Ronnie. |
+| `internal/prompt/parser.go` | `ParseEvaluationCriteria()` — rewrite to: put the leading (non-bullet) text into a `Prompt` field and put bullet items into a `Checks` slice. Return a shape convertible to `UnifiedGraderEntry{Type:"prompt", Prompt:<lead-text>, Checks:<bullets>}`. |
+| `internal/prompt/types.go` | `CriterionEntry` struct — add `Checks []string` alongside existing `SubPoints` (or rename `SubPoints→Checks` and `Prompt→Context`). Make naming match the YAML grader shape. |
+| `internal/criteria/buckets.go` | `BuildUnifiedReviewBuckets()` — "Criteria from prompt file" bucket must render only checks as numbered criteria, using the lead text as preamble. |
+
+### Migration Impact
+
+- **YAML criteria files already using `checks:`** — no change. They're already correct per the new semantics.
+- **YAML criteria files using only `prompt:` (no `checks:`)** — these become zero-scorable graders. They'll still run (prompt is context) but produce no points. **Decision needed:** should we treat this as a validation error, or synthesize a single pass/fail point labeled "LLM judge: {name}"?
+- **Prompt files' `## Evaluation Criteria`** — the parser rewrite normalizes these into the same `{prompt, checks}` shape. Existing prompt files with only bullets (no lead text) will have `prompt=""` and all bullets as checks. Backward-compatible.
+
+---
+
+## Part 2 — Grader Execution Order
+
+**Rule:** Prompt-file eval criteria runs FIRST, then criteria-file graders in YAML file order.
+
+### Current Behavior
+
+- `engine_eval.go:587–603` runs typed graders first (Phase 1), then AI review graders (Phase 2 at line 606+).
+- Within AI review, `reviewBuckets()` produces "Criteria from prompt file" as the first bucket, then per-criteria-file-entry buckets — so prompt-file criteria already runs first among review graders.
+- Typed graders (output_check, file, etc.) run before any prompt-type review graders.
+
+### Changes Required
+
+| File | Change |
+|------|--------|
+| `internal/eval/engine_eval.go` | Reorder so: (1) prompt-file eval criteria grader, (2) criteria-file graders (prompt-type and typed interleaved) in YAML file order. Remove the prompt/typed partition for ordering purposes — they should run in declaration order. |
+| `internal/criteria/buckets.go` | `MatchingUnifiedEntries()` already returns stable file-walk order. Ensure the partition into `promptMatched` and `typedMatched` doesn't break this ordering when re-interleaved. Consider a single ordered execution list instead of two partitions. |
+
+### Key Constraint
+
+- The prompt-file grader is synthetic (not from a YAML file). It must be injected at position 0 in the execution list before any criteria-file graders.
+
+---
+
+## Part 3 — Output Format Redesign
+
+**Rule:** Reports group graders by source file at three indentation levels.
+
+### Target Format
+
+```
+Graders:
+- crud-secrets.prompt.md (prompt file):
+  - Eval Criteria (prompt): Pass/Fail (x/x)
+      - check 1: Pass/Fail
+      - check 2: Pass/Fail
+- python.yaml (criteria file):
+  - DefaultAzureCredential Authentication (prompt): Pass/Fail (x/x)
+      - Uses DefaultAzureCredential ...: Pass/Fail
+      - Uses async/await patterns ...: Pass/Fail
+  - Output Files Exist (output_check): Pass/Fail (x/x)
+      - min_files (1): Pass/Fail
+      - min_bytes_per_file (1): Pass/Fail
+```
+
+### Data Model Changes
+
+| Struct | Field to Add | Purpose |
+|--------|-------------|---------|
+| `graders.GraderResult` | `SourceFile string` | Absolute path to originating file (criteria YAML or .prompt.md) |
+| `graders.GraderResult` | `SourceType string` | `"prompt_file"` or `"criteria_file"` |
+| `report.GraderResult` | `SourceFile string \`json:"source_file"\`` | Same — persisted in report JSON |
+| `report.GraderResult` | `SourceType string \`json:"source_type"\`` | Same |
+| `graders.GraderPoint` | (no change) | Points already have `Label` — per-point formatting is type-dependent |
+
+### Point Label Formatting Interface
+
+Each grader type formats its own point labels via the existing `Label` field on `GraderPoint`:
+- `output_check` → `"min_files (1)"`, `"min_bytes_per_file (1)"` (includes threshold)
+- `prompt` / `prompt_review` → the criterion text itself
+- `file` → `"file present: path/to/file"`
+- No new interface needed — each grader's `Grade()` already controls `Label`. Just ensure each type puts meaningful info in the label.
+
+### Files to Change
+
+| File | Change |
+|------|--------|
+| `internal/criteria/graders/grader.go` | Add `SourceFile`, `SourceType` fields to `GraderResult` |
+| `internal/report/types.go` | Add `SourceFile`, `SourceType` to `report.GraderResult` |
+| `internal/eval/engine_eval.go` | `convertGraderResults()` — copy SourceFile/SourceType. When building graderInput, thread source file from `MatchedUnifiedEntry.Source`. For prompt-file grader, use `task.Prompt.FilePath`. |
+| `internal/report/markdown.go` | Rewrite grader section to group by SourceFile, render 3-level indentation |
+| `internal/progress/display_interactive.go` | Update grader display to group by source file (or keep flat with source prefix) |
+| `site/src/app/components/GraderResultRow.tsx` | Group graders by `source_file` at the outer level |
+| `site/src/app/components/eval-detail-page.tsx` | Add file-level grouping wrapper around GraderResultRow list |
+| `site/src/app/data/types.ts` | Add `source_file?: string; source_type?: string` to `GraderResult` interface |
+| `site/src/app/lib/graderScore.ts` | No change (operates per-grader) |
+
+---
+
+## Part 4 — Tool/Env Usage Grader
+
+**Rule:** Verify declared tools/skills were actually used during the session.
+
+### Design Decision: New `tool_usage` grader type
+
+Rationale: This is semantically distinct from `output_check` (which examines workspace files) and `tool_constraint` (which checks tool call counts). A new type keeps the concern clean.
+
+### Config Shape (YAML)
+
+```yaml
+- name: Tool Usage Verification
+  type: tool_usage
+  weight: 1.0
+  details:
+    rules:
+      - type: mcp_server
+        name: azure-mcp
+        expect: at_least_one_tool_call
+      - type: skill_plugin
+        name: azure-sdk-python
+        expect: any_skill_invoked
+      - type: skill_repo
+        repo: mauromedda/agent-toolkit
+        skill: python
+        expect: skill_invoked
+```
+
+### Detection Logic
+
+Input data available on `GraderInput`:
+- `GeneratorArtifact.MCPToolCalls` — MCP tool calls from session events
+- `GeneratorArtifact.SkillsInvoked` — skills actually invoked
+- `GeneratorArtifact.ToolCalls` — all tool calls
+
+Detection of what's "in the env":
+- Read from `GraderInput.Config` (the grader's own YAML details) — each rule declares what it expects
+- Skip rules where the env item isn't present in the eval config. To know this, thread `report.EnvironmentInfo` or the raw `config.ToolConfig.Generator.Tools` list into `GraderInput`.
+
+**New field on `GraderInput`:**
+
+```go
+// EnvironmentTools lists the configured MCP servers + skills for this eval.
+// Used by the tool_usage grader to skip rules for tools not in the env.
+EnvironmentTools []EnvironmentTool
+```
+
+```go
+type EnvironmentTool struct {
+    Name string // MCP server name or skill name
+    Kind string // "mcp", "skill"
+    Repo string // for repo-sourced skills
+}
+```
+
+### Per-Point Output
+
+Each rule → one `GraderPoint`:
+- Label: `"azure-mcp tool used"`, `"azure-sdk-python skill invoked"`, `"mauromedda/agent-toolkit:python skill invoked"`
+- Pass: whether condition met
+- Evidence: `{"tool_calls": "3", "expected": "≥1"}` (example)
+- Rules whose env item isn't present → **skipped silently** (not emitted as a point)
+
+### Edge Case: Zero Applicable Rules
+
+If all rules are skipped (env doesn't contain any of the declared items), emit one trivially-passing point `"no_applicable_rules"` to satisfy the ≥1 Point invariant.
+
+### Files to Change
+
+| File | Change |
+|------|--------|
+| `internal/criteria/graders/types.go` | Add `KindToolUsage = "tool_usage"` constant, `ToolUsageConfig` struct, register in `validKinds` and `DecodeConfig` |
+| `internal/criteria/graders/tool_usage_grader.go` | **New file** — implements `Grader` interface |
+| `internal/criteria/graders/tool_usage_grader_test.go` | **New file** — table-driven tests |
+| `internal/criteria/graders/registry.go` | Register `tool_usage` in `NewGrader` factory |
+| `internal/criteria/graders/grader.go` | Add `EnvironmentTools []EnvironmentTool` to `GraderInput` |
+| `internal/criteria/config.go` | Add `tool_usage` to `validTypedKinds` |
+| `internal/eval/engine_eval.go` | Populate `graderInput.EnvironmentTools` from `task.Config.Generator.Tools` |
+| `criteria/language/python.yaml` | Add the tool_usage grader entry |
+| `report/types.go` | Add `ToolUsageExtras` to `GraderExtras` union (optional — can reuse nil Extras) |
+
+---
+
+## Test Impact
+
+| Test File | Why It Needs Update |
+|-----------|---------------------|
+| `internal/prompt/parser_test.go` | `ParseEvaluationCriteria` return shape changes. All fixtures asserting `CriterionEntry.Prompt` as the scored text need rework. |
+| `internal/criteria/buckets_test.go` | `FormatUnifiedPromptEntries` output format changes. `BuildUnifiedReviewBuckets` bucket content changes. `MergeUnifiedCriteria` output changes. |
+| `internal/criteria/config_test.go` | Validation rules for `type: prompt` without `checks:` change behavior. |
+| `internal/criteria/graders/prompt_review_grader_test.go` | Review grader now receives differently-shaped criteria text from the engine. |
+| `internal/criteria/graders/prompt_review_grader_buckets_test.go` | Same — bucket content shapes change. |
+| `internal/criteria/graders/types_test.go` | New `tool_usage` kind needs validation coverage. |
+| `internal/criteria/graders/points_test.go` | Add tool_usage to the per-kind invariant tests. |
+| `internal/eval/engine_eval.go` (engine tests) | `engine_test.go`, `engine_reviewbuckets_test.go` — execution order assertions, new SourceFile field propagation. |
+| `internal/report/markdown_test.go` | Markdown output format completely changes for the grader section. |
+| `site/src/app/components/GraderResultRow.test.tsx` | UI grouping logic tests needed. |
+| `site/src/__tests__/eval-detail-page.test.tsx` | Source-file grouping rendering. |
+| Prompt fixtures (any `.prompt.md` test files) | Existing fixtures should still parse; verify checks vs prompt split is correct. |
+
+---
+
+## Open Questions for Ronnie
+
+1. **Zero-checks prompt graders:** If a criteria YAML entry has `type: prompt` + `prompt:` but no `checks:`, what should happen? Options: (a) validation error, (b) single pass/fail "LLM judge" point, (c) grader runs but emits no points (violates ≥1 invariant). Recommend (b) with deprecation warning.
+
+2. **Prompt-file eval criteria without bullets:** If `## Evaluation Criteria` has only plain text (no `- ` bullets), should the whole text become one check, or is this an error? Current behavior: parser returns no entries. Recommend: treat as one check.
+
+3. **Output format — CLI interactive display:** Should the interactive progress display (`display_interactive.go`) also group by source file? Or keep the flat per-grader lines? The 3-level nesting may be too verbose for a terminal spinner.
+
+4. **Tool usage grader scope:** You said "Skills in the generator dir are out of scope — DO NOT check those." Does this mean: skip skills whose source is `path:` pointing to the `skills/generator/` directory? Or skip ALL local-path skills and only check repo-sourced and MCP?
+
+5. **Schema version bump:** Adding `source_file`/`source_type` to reports is additive (old reports just won't have them). Do we stay at schema v4, or bump to v5? Recommend: stay v4, new fields optional.
+
+---
+
+## Suggested Split
+
+| Part | Neo 💊 (Engine) | Tank 🎖️ (CLI/Reports/Site) |
+|------|-----------------|------------------------------|
+| **1** | Rewrite `FormatUnifiedPromptEntries`, update `GraderInput` threading, modify prompt_review_grader criteria handling | — |
+| **1** (parser) | Rewrite `ParseEvaluationCriteria` in `internal/prompt/parser.go` | — |
+| **2** | Reorder execution in `engine_eval.go`, unify prompt/typed into single ordered list | — |
+| **3** (data) | Add `SourceFile`/`SourceType` to `GraderResult`, propagate through `convertGraderResults` | — |
+| **3** (output) | — | Rewrite markdown report grader section, update interactive display, update site components |
+| **4** | Implement `tool_usage` grader type, wire into registry and engine, add to `python.yaml` | — |
+| **4** (site) | — | Add ToolUsageExtras component if needed |
+
+Neo owns all engine + grader logic. Tank owns all rendering (CLI, markdown, site).
+
+---
+
+## Executive Summary
+
+This redesign separates prompt-grader *context* (name, prompt text) from *scorable items* (checks), enforces deterministic execution order (prompt-file first), introduces source-file grouping across all output surfaces, and adds a new `tool_usage` grader verifying environment tools were exercised. The breaking change is confined to how `FormatUnifiedPromptEntries` renders criteria for the LLM and how `ParseEvaluationCriteria` structures prompt-file bullets — the wire format (schema v4) gains two optional fields but doesn't require a version bump. Estimated scope: ~15 files changed, ~2 new files created, concentrated in `internal/criteria/`, `internal/eval/`, `internal/report/`, and `site/src/`.

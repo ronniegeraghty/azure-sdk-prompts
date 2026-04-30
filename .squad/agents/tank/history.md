@@ -880,3 +880,78 @@ Deferred flock-for-concurrent-fetch to Item C (it's already going to touch `ensu
 - **Documentation in CONTRIBUTING.md closes the loop.** New contributors might not know why `npm install` is needed (no npm code at root). Added a "Git hooks" subsection explaining the Husky setup and what happens if the site build fails. Mentions `npm install` as part of the clone-and-build flow. Developer experience hinges on this documentation.
 - **Fallback is the existing CI workflow (no changes to it).** The `site-embed-freshness.yml` workflow remains unchanged and still detects stale bundles on push as a defense-in-depth check. If a developer force-commits with `--no-verify`, CI catches it. Hook is not the sole check, just the first line of defense.
 - **Workflow YAML validation:** Verified `site-embed-freshness.yml` is valid YAML (no changes needed). The existing workflow error message is already excellent ("Run 'cd site && npm run build' and commit the result") — no need to improve it.
+
+---
+
+## Session — Grader Output Redesign Implementation (2026-04-30)
+
+**Tasked by:** Neo (data model handoff 2026-04-26)  
+**Deliverable:** Render-side implementation of grader redesign Part 3-output  
+**Status:** ✓ Complete  
+**Branch:** `tank/issue-grader-output-redesign` (merged into neo/issue-grader-redesign)
+
+### Work
+
+Implemented 3-level grouped rendering across markdown, CLI, and site components:
+
+#### Part 3-output: Render-Side Changes
+
+1. **Markdown Report (`internal/report/markdown.go`)**
+   - Rewrite grader section to group by SourceFile
+   - Group structure: SourceFile → Grader Name → GraderPoints
+   - Display format: `filename (prompt file):` or `filename (criteria file):`
+   - Sub-graders show Pass/Fail with point counts (x/x)
+   - Points rendered as child items with Pass/Fail status
+   - Uses `filepath.Base(sourceFile)` for display (absolute paths too verbose)
+
+2. **CLI Interactive Display (`internal/progress/display_interactive.go`)**
+   - Kept flat per-grader lines for spinner clarity and terminal readability
+   - Added source file suffixes: `(prompt file)` / `(criteria_file.yaml)`
+   - Balances verbosity vs terminal constraints (no nested groups)
+
+3. **Site Components (`site/src/app/`)**
+   - `data/types.ts`: Added `source_file?: string` and `source_type?: string` to GraderResult interface
+   - `components/GraderResultRow.tsx`: Groups GraderResult[] by source_file at outer level
+   - `components/eval-detail-page.tsx`: File-level grouping wrapper around GraderResultRow list
+   - `lib/graderScore.ts`: No changes (operates per-grader)
+   - All rendering degrades gracefully when SourceFile/SourceType are empty strings
+
+#### Design Decisions
+
+- **Markdown rendering:** Full 3-level indentation (file → grader → points) for detailed reports
+- **CLI display:** Flat lines with source suffix (spinner-friendly, terminal-friendly)
+- **Site rendering:** Group at outer level using source_type for label ("Prompt file" vs criteria filename)
+- **Graceful degradation:** All code tests for empty SourceFile/SourceType and renders ungrouped when empty
+- **Tool usage points:** No special Extras struct needed — existing Points-only rendering works fine for tool_usage labels
+
+#### Handoff Readiness
+
+- Provided detailed handoff doc (tank-neo-handoff.md) with:
+  - Exact field names and struct locations
+  - JSON key mappings (`source_file`, `source_type`)
+  - Code wiring examples for convertGraderResults() and ProgressEvent emission
+  - Integration instructions for Neo's engine work
+
+#### Integration
+
+- Tank's branch (`tank/issue-grader-output-redesign`) merged into neo/issue-grader-redesign
+- All render code working end-to-end with Neo's data model
+- Single consolidated branch ready for PR
+
+### Commits
+
+- Committed on `tank/issue-grader-output-redesign` (commit f3208e67)
+- Merged into neo/issue-grader-redesign for consolidated delivery
+
+### Deliverables
+
+- Markdown: 3-level grouped output
+- CLI: flat with source suffixes
+- Site: grouped at file level with source_type labeling
+- All surfaces degrade gracefully (data-contract stable)
+
+### Output
+
+- Orchestration log: `.squad/orchestration-log/2026-04-30T18-29-54Z-tank.md`
+- Session log: `.squad/log/2026-04-30T18-29-54Z-grader-redesign.md`
+- Decisions merged into `.squad/decisions.md`
