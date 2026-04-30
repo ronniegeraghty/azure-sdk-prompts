@@ -189,6 +189,7 @@ type interactiveEval struct {
 
 	// Graders section.
 	gradersHeaderPrinted bool
+	lastGraderSourceFile string // source file of the last grader file-header printed
 
 	// Terminal state for this eval — set when EventPassed/Failed/Error fires.
 	terminalStatus evalStatus
@@ -918,6 +919,55 @@ func displayKind(kind string) string {
 	}
 }
 
+// graderIndent returns the indentation prefix for grader header lines.
+// When a file grouping header has been printed, graders are indented one
+// extra level (4 spaces). Otherwise they use the legacy 2-space prefix.
+func graderIndent(hasFileGroup bool) string {
+	if hasFileGroup {
+		return "    "
+	}
+	return "  "
+}
+
+// pointIndent returns the indentation prefix for point lines.
+func pointIndent(hasFileGroup bool) string {
+	if hasFileGroup {
+		return "        "
+	}
+	return "    "
+}
+
+// ensureGraderFileHeader prints a file-level grouping header when the
+// GraderSourceFile on the incoming event differs from the last one printed.
+// It is a no-op when sourceFile is empty (graceful degradation for pre-Neo data).
+func (r *interactiveRenderer) ensureGraderFileHeader(sourceFile, sourceType string) {
+	if sourceFile == "" || sourceFile == r.cur.lastGraderSourceFile {
+		return
+	}
+	r.cur.lastGraderSourceFile = sourceFile
+
+	base := sourceFile
+	// Use just the filename component for display.
+	if idx := len(sourceFile) - 1; idx >= 0 {
+		for i := len(sourceFile) - 1; i >= 0; i-- {
+			if sourceFile[i] == '/' || sourceFile[i] == '\\' {
+				base = sourceFile[i+1:]
+				break
+			}
+		}
+	}
+
+	typeLabel := ""
+	switch sourceType {
+	case "prompt_file":
+		typeLabel = " (prompt file)"
+	case "criteria_file":
+		typeLabel = " (criteria file)"
+	}
+
+	r.writeLine(fmt.Sprintf("  - %s%s:", base, typeLabel))
+}
+
 func (r *interactiveRenderer) ensureGradersHeader() {
 	if r.cur.gradersHeaderPrinted {
 		return
@@ -932,7 +982,10 @@ func (r *interactiveRenderer) onGraderStart(evt ProgressEvent) {
 	// Serialized: previous grader's line (if any) is already frozen via its
 	// own GraderComplete. The Running line becomes the new tail.
 	r.freezeTail()
-	line := fmt.Sprintf("  - %s %s: 🔄 %s",
+	r.ensureGraderFileHeader(evt.GraderSourceFile, evt.GraderSourceType)
+	indent := graderIndent(evt.GraderSourceFile != "")
+	line := fmt.Sprintf("%s- %s %s: 🔄 %s",
+		indent,
 		evt.GraderID,
 		r.sty.Muted("("+displayKind(evt.GraderKind)+")"),
 		r.sty.Muted("Running…"))
@@ -967,7 +1020,9 @@ func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 	default:
 		outcome = evt.Result + score
 	}
-	line := fmt.Sprintf("  - %s %s: %s",
+	indent := graderIndent(evt.GraderSourceFile != "")
+	line := fmt.Sprintf("%s- %s %s: %s",
+		indent,
 		evt.GraderID,
 		r.sty.Muted("("+displayKind(evt.GraderKind)+")"),
 		outcome)
@@ -1018,7 +1073,10 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 	if allPassed {
 		badge = r.sty.OK(fmt.Sprintf("✅ Pass (%d/%d)", passed, total))
 	}
-	header := fmt.Sprintf("  - %s %s: %s",
+	hasFile := evt.GraderSourceFile != ""
+	indent := graderIndent(hasFile)
+	header := fmt.Sprintf("%s- %s %s: %s",
+		indent,
 		evt.GraderID,
 		r.sty.Muted("("+displayKind(evt.GraderKind)+")"),
 		badge)
@@ -1049,6 +1107,7 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 	// soft-truncated for terminal output so very long check strings don't
 	// wrap awkwardly; full text remains in the report.
 	const maxPointNameWidth = 50
+	pIndent := pointIndent(hasFile)
 	for _, p := range evt.Points {
 		var status string
 		if p.Pass {
@@ -1057,7 +1116,7 @@ func (r *interactiveRenderer) renderGraderWithPoints(evt ProgressEvent) {
 			status = r.sty.Fail("❌ Fail")
 		}
 		name := truncateToWidth(p.Label, maxPointNameWidth)
-		line := fmt.Sprintf("    - %s: %s", name, status)
+		line := fmt.Sprintf("%s- %s: %s", pIndent, name, status)
 		if !p.Pass && p.Message != "" {
 			line += " " + r.sty.Muted("— "+p.Message)
 		}

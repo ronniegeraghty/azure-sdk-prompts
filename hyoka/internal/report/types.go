@@ -43,13 +43,14 @@ type GraderResult struct {
 	Weight     float64 `json:"weight"`      // Weight for aggregation
 	Pass       bool    `json:"pass"`        // AND of all Points[i].Pass
 	Gate       bool    `json:"gate,omitempty"`
-	Message    string  `json:"message"`     // Human-readable summary
+	Message    string  `json:"message"` // Human-readable summary
 
-	Points []GraderPoint  `json:"points"`           // REQUIRED, len ≥ 1
-	Extras *GraderExtras  `json:"extras,omitempty"` // kind-specific render-only data
+	Points []GraderPoint `json:"points"`           // REQUIRED, len ≥ 1
+	Extras *GraderExtras `json:"extras,omitempty"` // kind-specific render-only data
 
-	// Provenance: where the grader entry was declared.
-	SourceFile string `json:"source_file,omitempty"`
+	// Source provenance: where the grader entry was declared.
+	// Empty strings mean "unknown origin"; render falls back to ungrouped flat list.
+	SourceFile string `json:"source_file,omitempty"` // Absolute path to originating file
 	SourceType string `json:"source_type,omitempty"` // "prompt_file" or "criteria_file"
 }
 

@@ -117,10 +117,12 @@ type ProgressEvent struct {
 	ParentKind string // One of ToolParentKindPlugin, ToolParentKindSkillDir, or empty
 
 	// Grader lifecycle fields (EventGraderStart, EventGraderComplete).
-	GraderID   string   // Grader identifier (e.g. "prompt_review", "no_secrets")
-	GraderKind string   // Grader kind / model label (e.g. "claude-opus-4.6", "output_check")
-	Result     string   // One of GraderResultPass, GraderResultFail (EventGraderComplete)
-	Score      *float64 // Optional grader score; nil means "not reported"
+	GraderID         string   // Grader identifier (e.g. "prompt_review", "no_secrets")
+	GraderKind       string   // Grader kind / model label (e.g. "claude-opus-4.6", "output_check")
+	GraderSourceFile string   // Source file path for grouping (populated by engine when SourceFile known)
+	GraderSourceType string   // "prompt_file" or "criteria_file"; empty = unknown
+	Result           string   // One of GraderResultPass, GraderResultFail (EventGraderComplete)
+	Score            *float64 // Optional grader score; nil means "not reported"
 
 	// Points carries per-sub-check outcomes for EventGraderComplete (Phase 2
 	// generalization). Empty / single-element slices preserve the original
