@@ -14,7 +14,7 @@ graders:
     details:
       min_files: 1
       min_bytes_per_file: 1
-  - name: Tool Usage
+  - name: Tool Usage Verification
     type: tool_usage
     weight: 1.0
     details:
@@ -27,4 +27,5 @@ graders:
           expect: any_skill_invoked
         - type: skill_repo
           repo: mauromedda/agent-toolkit
-          expect: any_skill_invoked
+          skill: python
+          expect: skill_invoked
