@@ -1129,3 +1129,46 @@ hyoka run --prompt-id key-vault-dp-python-crud \
 3. Three orthogonal flags compose beautifully when each has a single responsibility.
 
 ---
+
+---
+
+## 2026-04-30: CI Failures — Go Vet Fixes (GraderResult Schema Sync)
+
+**Status:** ✅ RESOLVED. Commit 99a185ba.
+
+**Problem:** CI blocked by 5 go vet errors from incomplete refactoring. GraderResult v4 schema removed fields (Model, OverallScore, MaxScore, IsConsensus) and changed Pass from *bool to bool, but test files weren't updated.
+
+**Root causes:**
+1. **Struct field mismatch:** Tests referenced removed/renamed fields
+2. **Type mismatch:** Pass field changed from pointer to value (schema v4)
+3. **sync.Once copy violation:** `cacheroot.go` assigned sync.Once to local variable (violates Go's no-copy semantics)
+
+**Fixes applied:**
+- **cacheroot.go:** Replaced copy-based Once preservation with field-based state tracking (added `cacheRootInitialized` flag)
+- **All test files:** Updated GraderResult literals to v4 schema:
+  - Removed: Model, OverallScore, MaxScore, IsConsensus
+  - Changed: Pass from *bool to bool
+  - Added: Points field (required, []GraderPoint with len ≥ 1)
+- **8 test files updated:** generator_test.go, dashboard_test.go, comparison_test.go, inmem_test.go, compare_test.go, equivalence_test.go, markdown_test.go
+
+**Verification:**
+- `go vet ./...` — ✅ clean (was 5 errors)
+- `go build ./...` — ✅ success
+- All affected package tests pass (toolload, comparison, serve)
+
+**Learnings:**
+- When refactoring core structs, grep for test usage across all packages (not just the changed package)
+- sync.Once cannot be copied by assignment (use pointers or state flags)
+- The Points field is now REQUIRED in GraderResult — empty graders need at least one dummy point
+
+**Files touched:**
+- hyoka/internal/toolload/cacheroot.go
+- hyoka/internal/report/generator_test.go
+- hyoka/internal/serve/dashboard_test.go
+- hyoka/internal/comparison/comparison_test.go
+- hyoka/internal/comparison/inmem_test.go
+- hyoka/cmd/compare_test.go
+- hyoka/internal/serve/equivalence_test.go
+- hyoka/internal/report/markdown_test.go
+
+**Branch:** ronniegeraghty/dev
