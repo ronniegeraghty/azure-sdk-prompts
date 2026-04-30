@@ -192,6 +192,10 @@ export interface GraderResult {
   message: string;
   points: GraderPoint[];
   extras?: GraderExtras;
+  // Source provenance — populated once Neo's engine work lands (Part 3 data model).
+  // Empty strings mean "unknown origin"; UI falls back to ungrouped flat list.
+  source_file?: string; // Absolute path to the originating file
+  source_type?: string; // "prompt_file" or "criteria_file"
 }
 
 // ── Workspace Delta types (#566) ──────────────────────────────────

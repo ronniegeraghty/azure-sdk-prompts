@@ -59,6 +59,101 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: () =
   );
 }
 
+// ── Grader grouping by source file ─────────────────────────────────────────
+
+interface GraderFileGroup {
+  sourceFile: string; // "" means ungrouped
+  sourceType: string;
+  label: string;      // basename of sourceFile, or "" for ungrouped
+  results: GraderResult[];
+}
+
+function groupGradersBySource(results: GraderResult[]): GraderFileGroup[] {
+  const groups: GraderFileGroup[] = [];
+  const index = new Map<string, number>();
+
+  for (const g of results) {
+    const key = g.source_file || "__ungrouped__";
+    const existing = index.get(key);
+    if (existing !== undefined) {
+      groups[existing].results.push(g);
+    } else {
+      index.set(key, groups.length);
+      const base = g.source_file ? g.source_file.split(/[/\\]/).pop() ?? g.source_file : "";
+      groups.push({
+        sourceFile: g.source_file ?? "",
+        sourceType: g.source_type ?? "",
+        label: base,
+        results: [g],
+      });
+    }
+  }
+  return groups;
+}
+
+function sourceTypeLabel(sourceType: string): string {
+  switch (sourceType) {
+    case "prompt_file":   return "prompt file";
+    case "criteria_file": return "criteria file";
+    default: return sourceType;
+  }
+}
+
+function GraderResultsGrouped({ results }: { results: GraderResult[] }) {
+  const groups = groupGradersBySource(results);
+
+  // Single ungrouped bucket → flat list (no file header).
+  const flatFallback = groups.length === 1 && groups[0].label === "";
+  if (flatFallback) {
+    return (
+      <div className="space-y-2">
+        {groups[0].results.map((gr, i) => (
+          <GraderResultRow key={i} result={gr} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map((grp, gi) => {
+        if (grp.label === "") {
+          // Ungrouped results at the end — no header.
+          return (
+            <div key={gi} className="space-y-2">
+              {grp.results.map((gr, i) => (
+                <GraderResultRow key={i} result={gr} />
+              ))}
+            </div>
+          );
+        }
+        const typeLabel = sourceTypeLabel(grp.sourceType);
+        return (
+          <div key={gi}>
+            {/* Level-1: source file header */}
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <span className="text-white/70 font-medium" style={{ fontSize: 12 }}>
+                {grp.label}
+              </span>
+              {typeLabel && (
+                <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/30" style={{ fontSize: 10 }}>
+                  {typeLabel}
+                </span>
+              )}
+            </div>
+            {/* Level-2: graders under this file */}
+            <div className="ml-3 space-y-2 border-l border-white/8 pl-3">
+              {grp.results.map((gr, i) => (
+                <GraderResultRow key={i} result={gr} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Timeline types & helpers ────────────────────────────────────
 
 interface TimelineStep {
@@ -898,11 +993,7 @@ export function EvalDetailPage() {
             <h3 className="mb-4 flex items-center gap-2 text-white" style={{ fontSize: 14 }}>
               <Wrench className="h-4 w-4 text-white/40" /> Grader Results ({graderResults.length})
             </h3>
-            <div className="space-y-2">
-              {graderResults.map((gr, i) => (
-                <GraderResultRow key={i} result={gr} />
-              ))}
-            </div>
+            <GraderResultsGrouped results={graderResults} />
           </div>
         )}
 
