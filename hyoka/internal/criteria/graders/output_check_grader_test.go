@@ -283,8 +283,8 @@ func TestOutputCheckGrader_AllChecksReported_NoEarlyExit(t *testing.T) {
 	}
 	// min_files, forbid_files, max_bytes_per_file should fail;
 	// require_files and min_bytes_per_file should pass.
-	wantFail := map[string]bool{"min_files": true, "forbid_files": true, "max_bytes_per_file": true}
-	wantPass := map[string]bool{"require_files": true, "min_bytes_per_file": true}
+	wantFail := map[string]bool{"min_files (10)": true, "forbid_files": true, "max_bytes_per_file (20)": true}
+	wantPass := map[string]bool{"require_files": true, "min_bytes_per_file (5)": true}
 	seen := map[string]bool{}
 	for _, sc := range res.Points {
 		seen[sc.Label] = true

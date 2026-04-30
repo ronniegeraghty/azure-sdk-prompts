@@ -20,7 +20,7 @@ graders:
     details:
       rules:
         - type: mcp_server
-          name: azure-mcp
+          name: azure
           expect: at_least_one_tool_call
         - type: skill_plugin
           name: azure-sdk-python

@@ -59,7 +59,7 @@ func TestToolUsageGrader_NewValidation(t *testing.T) {
 		{
 			name: "valid mcp_server",
 			cfg: &ToolUsageConfig{Rules: []ToolUsageRule{
-				{Type: "mcp_server", Name: "azure-mcp", Expect: "at_least_one_tool_call"},
+				{Type: "mcp_server", Name: "azure", Expect: "at_least_one_tool_call"},
 			}},
 			wantErr: false,
 		},
@@ -96,11 +96,11 @@ func TestToolUsageGrader_Grade(t *testing.T) {
 		{
 			name: "mcp_server used → pass",
 			cfg: ToolUsageConfig{Rules: []ToolUsageRule{
-				{Type: "mcp_server", Name: "azure-mcp", Expect: "at_least_one_tool_call"},
+				{Type: "mcp_server", Name: "azure", Expect: "at_least_one_tool_call"},
 			}},
 			input: GraderInput{
-				EnvironmentTools: []EnvironmentTool{{Kind: "mcp", Name: "azure-mcp"}},
-				MCPServersUsed:   []string{"azure-mcp"},
+				EnvironmentTools: []EnvironmentTool{{Kind: "mcp", Name: "azure"}},
+				MCPServersUsed:   []string{"azure"},
 			},
 			wantPoints:  1,
 			wantPassing: 1,
@@ -108,10 +108,10 @@ func TestToolUsageGrader_Grade(t *testing.T) {
 		{
 			name: "mcp_server not used → fail",
 			cfg: ToolUsageConfig{Rules: []ToolUsageRule{
-				{Type: "mcp_server", Name: "azure-mcp", Expect: "at_least_one_tool_call"},
+				{Type: "mcp_server", Name: "azure", Expect: "at_least_one_tool_call"},
 			}},
 			input: GraderInput{
-				EnvironmentTools: []EnvironmentTool{{Kind: "mcp", Name: "azure-mcp"}},
+				EnvironmentTools: []EnvironmentTool{{Kind: "mcp", Name: "azure"}},
 			},
 			wantPoints:  1,
 			wantPassing: 0,
@@ -156,15 +156,15 @@ func TestToolUsageGrader_Grade(t *testing.T) {
 		{
 			name: "mixed pass/fail",
 			cfg: ToolUsageConfig{Rules: []ToolUsageRule{
-				{Type: "mcp_server", Name: "azure-mcp", Expect: "at_least_one_tool_call"},
+				{Type: "mcp_server", Name: "azure", Expect: "at_least_one_tool_call"},
 				{Type: "skill_plugin", Name: "azure-sdk-python", Expect: "any_skill_invoked"},
 			}},
 			input: GraderInput{
 				EnvironmentTools: []EnvironmentTool{
-					{Kind: "mcp", Name: "azure-mcp"},
+					{Kind: "mcp", Name: "azure"},
 					{Kind: "skill", Name: "azure-sdk-python", Path: "skills/reviewer/azure-sdk-python"},
 				},
-				MCPServersUsed: []string{"azure-mcp"},
+				MCPServersUsed: []string{"azure"},
 			},
 			wantPoints:  2,
 			wantPassing: 1,
