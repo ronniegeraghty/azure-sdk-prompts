@@ -12,6 +12,23 @@
 
 ---
 
+## 2026-04-26 — Grader Redesign Parts 1-4 (Neo)
+
+**Branch:** `neo/issue-grader-redesign` (2 commits: cc6931c5, 6932d653)
+
+**What shipped:**
+- **Bug fix (intermittent extra point):** `FormatUnifiedPromptEntries` no longer wraps the entry name in a top-level numbered item (`1. **Name**`). It now renders as `**Name**\npreamble\n1. check\n2. check`. The LLM judge sees only the check-level numbered items → returns exactly `len(Checks)` criteria → no more phantom 3rd point when a grader has 2 checks.
+- **Part 1 — Prompt semantics:** `ParseEvaluationCriteria` rewritten to return ONE `CriterionEntry` with lead text as `Prompt` and all bullets as `Checks []string`. `CriterionEntry.Checks` added to `types.go`. `FormatParsedCriteria` updated to render lead text as preamble + numbered checks.
+- **Part 2 — Execution order:** Replaced Phase 1/Phase 2 split in `engine_eval.go` with a unified ordered execution list: prompt-file criteria first (position 0), then criteria-file graders in YAML declaration order (typed and prompt interleaved). Each result tagged `SourceFile`/`SourceType`.
+- **Part 3 — Data model:** `SourceFile string` and `SourceType string` added to `graders.GraderResult` and `report.GraderResult`. `EnvironmentTools []EnvironmentTool`, `SkillsInvoked []string`, `MCPServersUsed []string` added to `GraderInput`. Populated from `task.Config.Generator.Tools` and session events in engine.
+- **Part 4 — tool_usage grader:** New `tool_usage` kind with `mcp_server` / `skill_plugin` / `skill_repo` rules. Generator-dir skills (`skills/generator/`) excluded from scoring. Zero-applicable-rules emits trivially-passing `no_applicable_rules` point. Added to `criteria/language/python.yaml`. Full table-driven test.
+- **Tests:** All 3 pre-existing failures remain unchanged; all affected packages pass with `-race` (`criteria`, `criteria/graders`, `prompt`, `eval`).
+- **Handoff:** `.squad/decisions/inbox/neo-tank-handoff.md` written for Tank (rendering Part 3-output).
+
+**Intermittent bug (python key vault crud on pairwise config):** Root cause was `FormatUnifiedPromptEntries` emitting `1. **Name**` as outer numbered item. Fixed. Could not reproduce live due to lack of live eval environment; documented fix logic.
+
+---
+
 ## CROSS-AGENT UPDATE (2026-04-24T04:55:03Z — Tank: Bucket-Per-Entry Structure Fix)
 
 **Grader Bucket Structure:** Tank modified `BuildUnifiedReviewBuckets` to emit ONE bucket per criteria-file entry instead of bundling all entries into a single "combined" bucket. Each grader entry now renders as a top-level bucket with individual sub-criteria. **Impact on display:** The number of top-level graders will increase (one per criteria entry). Test updates: 6 files modified. Commit: 9e2d8100. If you touch the display/site layer (`site/src/`), be aware of this structural change in `internal/criteria/buckets.go`.
