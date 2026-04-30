@@ -59,9 +59,11 @@ func TestToolVerifier_EmitsOnceAfterBothKindsConfigured(t *testing.T) {
 	if len(first) != 2 {
 		t.Fatalf("want 2 tools, got %d: %+v", len(first), first)
 	}
-	// Second call must be a no-op (at-most-once).
-	if got := v.emitIfReady(); got != nil {
-		t.Errorf("verifier emitted twice; want at-most-once: %+v", got)
+	// Second call must return the same cached result so post-session callers
+	// can still retrieve the verified tool list after an in-line emit.
+	second := v.emitIfReady()
+	if len(second) != len(first) {
+		t.Errorf("verifier did not return cached result on second emit: got %d want %d", len(second), len(first))
 	}
 }
 

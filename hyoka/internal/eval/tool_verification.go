@@ -41,7 +41,8 @@ type toolVerifier struct {
 	skillsEvtSeen     bool
 	mcpEvtSeen        bool
 	emitted           bool
-	readyChan         chan struct{} // Signals when verification is complete
+	emittedTools      []progress.ToolStatus // Cached result of first successful emit
+	readyChan         chan struct{}         // Signals when verification is complete
 	turnBeforeSkills  bool          // True if turn started before skills event
 	turnBeforeMCP     bool          // True if turn started before MCP event
 }
@@ -115,7 +116,9 @@ func (v *toolVerifier) onSessionReady() {
 //   - a previous call already emitted
 func (v *toolVerifier) emitIfReady() []progress.ToolStatus {
 	if v.emitted {
-		return nil
+		// Return the cached result so callers (e.g., postSessionToolVerification)
+		// after an in-line emit still see the verified tool list instead of nil.
+		return v.emittedTools
 	}
 	needSkills := len(v.expectedSkills) > 0
 	needMCP := len(v.expectedMCP) > 0
@@ -175,6 +178,7 @@ func (v *toolVerifier) emitIfReady() []progress.ToolStatus {
 		return tools[i].ToolName < tools[j].ToolName
 	})
 	v.emitted = true
+	v.emittedTools = tools
 	close(v.readyChan) // Signal that verification is complete
 	return tools
 }
