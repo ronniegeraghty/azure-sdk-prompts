@@ -866,3 +866,17 @@ Deferred flock-for-concurrent-fetch to Item C (it's already going to touch `ensu
 - **Other touch points to remember:** `hyoka/cmd/cmd_test.go` (TestRunCmdBoolFlagDefaults asserts default false), `docs/cli-reference.md` flag table, `docs/getting-started.md` examples.
 - **Standalone `hyoka trends` subcommand unaffected** — still works for manual generation.
 - **Pre-existing test failures noted (not mine):** `hyoka/cmd/compare_test.go`, `hyoka/internal/comparison`, `hyoka/internal/serve`, `hyoka/internal/report` all have stale struct field references (`*bool` vs `bool`, missing `Model` field). Worth flagging to Switch.
+
+## Item G — Site Bundle Freshness Pre-Commit Hook (2026-04-30)
+
+**Status:** COMPLETE — see `.squad/decisions/inbox/tank-site-bundle-guardrail.md`.
+
+### Learnings
+
+- **Pre-commit hooks (via Husky) are the right tool for "rebuild when source changes" guardrails.** Option 1 (CI auto-rebuild) would delay feedback 5-10 minutes and require branching strategy for auto-commits. Option 2 (pre-commit) gives instant local feedback and prevents bad commits from ever being pushed. Option 3 (docs only) doesn't prevent mistakes. Chose Option 2 for developer experience.
+- **Minimal root package.json + prepare script is the cleanest hook setup.** Husky's CLI tools are deprecated (`husky install`, `husky add`), but the setup pattern still works: minimal `package.json` + `prepare` script that runs `git config core.hooksPath .husky`. New contributors get hooks automatically on `npm install`. The `.husky/` directory is committed (not `.gitignore`'d) so it travels with the repo.
+- **Guard the hook with source path detection.** The pre-commit hook detects `^site/src/` in staged files before running the build. Prevents hook overhead when committing Go code or other non-site changes. Simple `git diff --cached --name-only | grep -q '^site/src/'` is fast and bulletproof.
+- **Auto-stage the rebuilt bundle in the hook itself.** When the hook rebuilds `site/dist/`, it runs `git add site/dist/` before returning. Developer sees the bundle added to the commit automatically. No extra step needed. If the build fails, the commit is blocked with a clear error.
+- **Documentation in CONTRIBUTING.md closes the loop.** New contributors might not know why `npm install` is needed (no npm code at root). Added a "Git hooks" subsection explaining the Husky setup and what happens if the site build fails. Mentions `npm install` as part of the clone-and-build flow. Developer experience hinges on this documentation.
+- **Fallback is the existing CI workflow (no changes to it).** The `site-embed-freshness.yml` workflow remains unchanged and still detects stale bundles on push as a defense-in-depth check. If a developer force-commits with `--no-verify`, CI catches it. Hook is not the sole check, just the first line of defense.
+- **Workflow YAML validation:** Verified `site-embed-freshness.yml` is valid YAML (no changes needed). The existing workflow error message is already excellent ("Run 'cd site && npm run build' and commit the result") — no need to improve it.

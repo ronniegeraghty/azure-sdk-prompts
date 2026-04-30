@@ -45,7 +45,7 @@ func TestCLISiteEquivalence_AutoGenComparisons(t *testing.T) {
 			Timestamp:     "2026-04-18T00:00:00Z",
 			Success:       true,
 			GraderResults: []report.GraderResult{
-				{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: &pass},
+				{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Points: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
 			},
 		}
 		r.ScoreBreakdown = report.BuildScoreBreakdown(r.GraderResults)
@@ -143,7 +143,7 @@ func TestCLISiteEquivalence_LoadedComparisonsFile(t *testing.T) {
 			SchemaVersion: 2, PromptID: promptID, ConfigName: config,
 			Timestamp: "2026-04-18T00:00:00Z", Success: true,
 			GraderResults: []report.GraderResult{
-				{GraderName: "g", GraderType: "prompt", Score: score, Weight: 1.0, Pass: &pass},
+				{GraderName: "g", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Points: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
 			},
 		}
 		r.ScoreBreakdown = report.BuildScoreBreakdown(r.GraderResults)

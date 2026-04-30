@@ -805,3 +805,81 @@ Four options, all with full tool-ablation fidelity:
 - Recommended flag: `--with-trends` (positive intent, matches typical opt-in UX)
 - No blockers identified; architecture supports graceful degradation
 - Recommendation: invert default in `runFlags` struct, flip condition logic, update help text, deprecate `--skip-trends` or keep as alias
+
+---
+
+## Learnings (CI Failure Diagnosis — 2026-04-30)
+
+**Date:** 2026-04-30
+**Task:** Diagnose reported periodic GitHub Actions failures; Ronnie receiving notifications.
+
+**Investigation Finding:**
+- **Scheduled workflows:** 100% healthy. `Squad Heartbeat (Ralph)` runs every 30 minutes with 60+ consecutive successes, 0 failures.
+- **Non-periodic failures:** 21 total failures across 2 workflows, all on **push events** (not scheduled):
+  - **CI**: 18 failures (go vet errors in tests)
+  - **Site Bundle Freshness**: 3 failures (stale site/dist/ bundle)
+
+**Root Causes Identified:**
+
+1. **CI (go vet failures):**
+   - Lock copy violation: `hyoka/internal/toolload/cacheroot.go:110,117` — sync.Once copied to local variables (no-copy violation)
+   - Unknown field `Model` in 3 test files (GraderResult struct field removed; tests not updated)
+   - Pointer/value type mismatch in 2 test files (passing `&pass` where `pass` expected)
+   - **Likely cause:** Recent refactoring removed/renamed struct fields; tests not synced
+
+2. **Site Bundle Freshness:**
+   - Developers pushing `site/src/**` changes without rebuilding/committing `site/dist/`
+   - Workflow gate detects stale bundle via `git diff --exit-code site/dist/`
+   - **Pattern:** 3 failures in recent week, all push-triggered, reproducible by running `cd site && npm run build`
+
+**Key Insight:**
+These are **not** periodic/scheduled failures. They are **frequent push-event failures** (dev branch activity) caused by:
+- Unfinished refactoring (struct field changes without test updates)
+- Developer workflow misalignment (site bundle rebuild not part of commit process)
+
+**Process Note:**
+Ronnie may have conflated "notifications arriving frequently due to dev activity" with "periodic scheduled job failures." The scheduled workflows are solid; the issue is **test-code sync and build artifact management** on push events.
+
+**Recommended Handoff:**
+- **Neo (engine):** Fix struct field sync in tests + lock handling in cacheroot.go (blocking all CI runs)
+- **Tank (build):** Add site bundle rebuild enforcement (pre-commit hook or CI gate with auto-commit)
+
+**Files Requiring Fixes (proposed):**
+- `hyoka/internal/toolload/cacheroot.go` (lines 110, 117)
+- `hyoka/internal/report/generator_test.go:140`
+- `hyoka/internal/serve/dashboard_test.go:46`
+- `hyoka/internal/comparison/comparison_test.go:59`
+- `hyoka/cmd/compare_test.go:129`
+
+## Learnings
+
+### 2026-04-30: Phantom Grader Point Investigation — Checks-based Graders
+
+**Issue:** When a YAML grader has `checks:`, the parent grader line is numbered like a criterion (e.g., `1. **DefaultAzureCredential Authentication**`), causing LLMs to treat it as a scoreable criterion in addition to the actual checks.
+
+**Root Cause:** `hyoka/internal/criteria/buckets.go:136` formats the parent line as:
+```go
+fmt.Fprintf(&b, "%d. **%s**\n", i+1, e.Name)
+```
+
+This numbered format makes LLMs interpret three items:
+1. The parent line (grader name)
+2. Check 1
+3. Check 2
+
+But only checks 1 and 2 should be scored.
+
+**Evidence:**
+- Report: `/home/rgeraghty/projects/hyoka/reports/20260430-041731/.../report.json`
+- Grader: `criteria/language/python.yaml` — "DefaultAzureCredential Authentication" with 2 checks
+- Output: 3 points (2 correct checks + 1 phantom parent line)
+- Phantom label: `"DefaultAzureCredential Authentication\n   Check the following criteria:\n   1. Uses...\n   2. Uses..."`
+
+**Proposed Fix:** Stop numbering the parent line when checks exist. Use a section header format instead (e.g., `### Name` or `**Name:**`) so LLMs don't treat it as a criterion.
+
+**Affected Code:**
+- `hyoka/internal/criteria/buckets.go:136` (FormatUnifiedPromptEntries)
+- Test: `hyoka/internal/criteria/buckets_test.go` (TestFormatUnifiedPromptEntries_Shapes)
+
+**Recommended Owner:** Neo (criteria/graders pipeline expert).
+

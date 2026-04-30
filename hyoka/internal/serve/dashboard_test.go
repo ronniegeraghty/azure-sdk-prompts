@@ -41,23 +41,25 @@ Duration:      42.5,
 Success:       true,
 GraderResults: []report.GraderResult{
 {
-GraderName:   "llm-review",
-GraderType:   "review",
-Model:        "claude-opus-4.6",
-OverallScore: 85,
-MaxScore:     100,
-Summary:      "Good implementation",
-Score:        0.85,
-Weight:       2.0,
-Pass:         &pass,
+GraderName: "llm-review",
+GraderType: "review",
+Score:      0.85,
+Weight:     2.0,
+Pass:       pass,
+Points: []report.GraderPoint{
+{Label: "correctness", Pass: pass, Weight: 1.0},
+},
 },
 {
 GraderName: "file-check",
 GraderType: "file",
 Score:      1.0,
 Weight:     1.0,
-Pass:       &pass,
+Pass:       pass,
 Gate:       true,
+Points: []report.GraderPoint{
+{Label: "file-exists", Pass: pass, Weight: 1.0},
+},
 },
 },
 ActionTimeline: &report.ActionTimelineReport{
@@ -106,7 +108,7 @@ ConfigName:    config,
 Timestamp:     timestamp,
 Success:       true,
 GraderResults: []report.GraderResult{
-{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: &pass},
+{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Points: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
 },
 }
 r.ScoreBreakdown = report.BuildScoreBreakdown(r.GraderResults)

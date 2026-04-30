@@ -29,6 +29,8 @@ const (
 var (
 	cacheRootOnce sync.Once
 	cacheRootVal  string
+	// For testing: track whether Once has been called
+	cacheRootInitialized bool
 )
 
 // CacheRoot returns the canonical cache directory for hyoka. Resolution
@@ -47,6 +49,7 @@ var (
 func CacheRoot() string {
 	cacheRootOnce.Do(func() {
 		cacheRootVal = resolveCacheRoot()
+		cacheRootInitialized = true
 		warnIfLegacySkillsCache(cacheRootVal)
 	})
 	return cacheRootVal
@@ -107,14 +110,26 @@ func RepoCacheDir(owner, repo, version string) string {
 // inside the cleanup.
 func SetTestRoot(path string) (restore func()) {
 	prevVal := cacheRootVal
-	prevOnce := cacheRootOnce
+	prevInitialized := cacheRootInitialized
+	// Reset the Once by replacing it with a fresh instance
 	cacheRootOnce = sync.Once{}
 	cacheRootVal = path
+	cacheRootInitialized = false
 	// Ensure the once is "done" so CacheRoot returns path verbatim.
-	cacheRootOnce.Do(func() {})
+	cacheRootOnce.Do(func() {
+		// Already set, just mark initialized
+		cacheRootInitialized = true
+	})
 	return func() {
+		// Restore the previous value and state
 		cacheRootVal = prevVal
-		cacheRootOnce = prevOnce
+		cacheRootInitialized = prevInitialized
+		// Reset the Once again so the old state is restored
+		cacheRootOnce = sync.Once{}
+		if prevInitialized {
+			// Re-arm the Once as "done" with the previous value
+			cacheRootOnce.Do(func() {})
+		}
 	}
 }
 

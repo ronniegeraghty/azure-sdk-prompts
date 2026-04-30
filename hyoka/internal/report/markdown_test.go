@@ -40,8 +40,8 @@ func TestWriteMarkdownReport(t *testing.T) {
 			Strengths:    []string{"Clean code structure"},
 		},
 		GraderResults: []GraderResult{
-			{GraderName: "md-grader", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "Grader output for MD"},
-			{GraderName: "consensus", GraderType: "review", OverallScore: 4, MaxScore: 5, Summary: "MD consensus", IsConsensus: true},
+			{GraderName: "md-grader", GraderType: "review", Score: 0.8, Weight: 1.0, Pass: true, Message: "Grader output for MD", Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+			{GraderName: "consensus", GraderType: "review", Score: 0.8, Weight: 1.0, Pass: true, Message: "MD consensus", Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 		},
 		SessionEvents: []SessionEventRecord{
 			{Type: "user.message", Content: "Write a dotnet storage auth sample"},

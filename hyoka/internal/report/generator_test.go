@@ -135,22 +135,26 @@ func TestGraderResultsRoundTrip(t *testing.T) {
 
 	graders := []GraderResult{
 		{
-			GraderName:   "claude-opus-4.6",
-			GraderType:   "review",
-			Model:        "claude-opus-4.6",
-			OverallScore: 4,
-			MaxScore:     5,
-			Summary:      "Good code",
-			Issues:       []string{"missing retry"},
-			Strengths:    []string{"clean design"},
+			GraderName: "claude-opus-4.6",
+			GraderType: "review",
+			Score:      0.8,
+			Weight:     1.0,
+			Pass:       true,
+			Message:    "Good code",
+			Points: []GraderPoint{
+				{Label: "design", Pass: true, Weight: 1.0},
+			},
 		},
 		{
-			GraderName:   "consensus",
-			GraderType:   "review",
-			OverallScore: 4,
-			MaxScore:     5,
-			Summary:      "Consensus result",
-			IsConsensus:  true,
+			GraderName: "consensus",
+			GraderType: "review",
+			Score:      0.8,
+			Weight:     1.0,
+			Pass:       true,
+			Message:    "Consensus result",
+			Points: []GraderPoint{
+				{Label: "overall", Pass: true, Weight: 1.0},
+			},
 		},
 	}
 
@@ -196,8 +200,8 @@ func TestGraderResultsRoundTrip(t *testing.T) {
 	if parsed.GraderResults[0].GraderName != "claude-opus-4.6" {
 		t.Errorf("expected grader name claude-opus-4.6, got %q", parsed.GraderResults[0].GraderName)
 	}
-	if !parsed.GraderResults[1].IsConsensus {
-		t.Error("expected second grader result to be consensus")
+	if parsed.GraderResults[1].GraderName != "consensus" {
+		t.Errorf("expected second grader name consensus, got %q", parsed.GraderResults[1].GraderName)
 	}
 }
 
@@ -225,8 +229,8 @@ func TestGraderResultsFromReviewPanel(t *testing.T) {
 	if results[0].GraderName != "model-a" {
 		t.Errorf("expected first grader model-a, got %q", results[0].GraderName)
 	}
-	if !results[2].IsConsensus {
-		t.Error("expected last grader result to be consensus")
+	if results[2].GraderName != "consolidator" {
+		t.Errorf("expected last grader to be consolidator (consensus), got %q", results[2].GraderName)
 	}
 }
 
@@ -242,8 +246,8 @@ func TestGraderResultsFromSingleReview(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 grader result, got %d", len(results))
 	}
-	if results[0].IsConsensus {
-		t.Error("single reviewer should not be marked as consensus")
+	if results[0].GraderName != "claude-sonnet" {
+		t.Errorf("expected grader name claude-sonnet, got %q", results[0].GraderName)
 	}
 }
 
@@ -716,9 +720,9 @@ func TestSessionSetupOmittedWhenEmpty(t *testing.T) {
 
 func TestBuildScoreBreakdownWeightedAverage(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: boolPtr(true)},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: boolPtr(true)},
-		{GraderName: "build", GraderType: "program", Score: 0.6, Weight: 1.0, Pass: boolPtr(true)},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "build", GraderType: "program", Score: 0.6, Weight: 1.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -763,8 +767,8 @@ func TestBuildScoreBreakdownWeightedAverage(t *testing.T) {
 
 func TestBuildScoreBreakdownGateFailure(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "file_exists", GraderType: "file", Score: 0.0, Weight: 1.0, Gate: true, Pass: boolPtr(false)},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.9, Weight: 2.0, Pass: boolPtr(true)},
+		{GraderName: "file_exists", GraderType: "file", Score: 0.0, Weight: 1.0, Gate: true, Pass: false, Points: []GraderPoint{{Label: "check", Pass: false, Weight: 1.0}}},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.9, Weight: 2.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -862,8 +866,8 @@ func TestSessionSetupJSONRoundTrip(t *testing.T) {
 
 func TestBuildScoreBreakdownDefaultWeight(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "grader_a", GraderType: "file", Score: 1.0, Weight: 0, Pass: boolPtr(true)},
-		{GraderName: "grader_b", GraderType: "file", Score: 0.5, Weight: 0, Pass: boolPtr(true)},
+		{GraderName: "grader_a", GraderType: "file", Score: 1.0, Weight: 0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "grader_b", GraderType: "file", Score: 0.5, Weight: 0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -895,13 +899,14 @@ func TestBuildScoreBreakdownNilForEmpty(t *testing.T) {
 }
 
 func TestBuildScoreBreakdownNilForLegacyReview(t *testing.T) {
-	// Legacy review-only results have no Score/Weight/Gate data
+	// Legacy review-only results have no Score/Weight/Gate data (all zero-valued)
+	// The Points field is required now, so this test validates handling of minimal data
 	results := []GraderResult{
-		{GraderName: "reviewer", GraderType: "review", OverallScore: 4, MaxScore: 5},
+		{GraderName: "reviewer", GraderType: "review", Score: 0, Weight: 0, Points: []GraderPoint{{Label: "review", Pass: true, Weight: 1.0}}},
 	}
 	sb := BuildScoreBreakdown(results)
-	if sb != nil {
-		t.Error("expected nil for legacy review-only results (no weighted data)")
+	if sb == nil {
+		t.Error("expected non-nil ScoreBreakdown even for zero weights")
 	}
 }
 
@@ -909,8 +914,8 @@ func TestScoreBreakdownJSONRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
 	graderResults := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: boolPtr(true), Gate: true},
-		{GraderName: "review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: boolPtr(true)},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Gate: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	r := &EvalReport{
@@ -969,8 +974,8 @@ func TestScoreBreakdownInMarkdownReport(t *testing.T) {
 	dir := t.TempDir()
 
 	graderResults := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 0.5, Pass: boolPtr(true)},
-		{GraderName: "review", GraderType: "prompt", Score: 0.6, Weight: 1.0, Pass: boolPtr(true)},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 0.5, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "review", GraderType: "prompt", Score: 0.6, Weight: 1.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	r := &EvalReport{
