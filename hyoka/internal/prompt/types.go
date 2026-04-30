@@ -46,10 +46,15 @@ ParsedCriteria []CriterionEntry `yaml:"-" json:"parsed_criteria,omitempty"`
 FilePath string `yaml:"-" json:"file_path"`
 }
 
-// CriterionEntry represents a single parsed evaluation criterion
-// with optional sub-points grouped under the parent.
+// CriterionEntry represents the parsed evaluation criteria from a prompt
+// file. After the grader-redesign rewrite of ParseEvaluationCriteria, exactly
+// one CriterionEntry is produced per prompt: the leading non-bullet text is
+// captured as Prompt (preamble) and every "- " bullet becomes one entry in
+// Checks. SubPoints is preserved for back-compat with on-disk reports/tests
+// but is no longer populated by the parser.
 type CriterionEntry struct {
 Prompt    string   `json:"prompt"`
+Checks    []string `json:"checks,omitempty"`
 SubPoints []string `json:"sub_points,omitempty"`
 }
 

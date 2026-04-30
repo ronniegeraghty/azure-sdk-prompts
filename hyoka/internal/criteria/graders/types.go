@@ -29,6 +29,7 @@ const (
 	KindToolConstraint = "tool_constraint"
 	KindPromptReview   = "prompt_review"
 	KindOutputCheck    = "output_check"
+	KindToolUsage      = "tool_usage"
 )
 
 // validKinds is the set of recognized grader kind values.
@@ -41,6 +42,7 @@ var validKinds = map[string]bool{
 	KindToolConstraint: true,
 	KindPromptReview:   true,
 	KindOutputCheck:    true,
+	KindToolUsage:      true,
 }
 
 // GraderConfigFile is the top-level YAML structure containing a list of graders.
@@ -151,6 +153,35 @@ type ToolConstraintConfig struct {
 	MaxCalls  map[string]int `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
 }
 
+// ToolUsageConfig holds configuration for the "tool_usage" grader kind.
+//
+// tool_usage is environment-aware: each rule is silently skipped when its
+// referenced tool/skill is not present in the eval's environment. This makes
+// it safe to declare the same rule across attribute-matched criteria files
+// (e.g. a python-language criteria file) regardless of which configs include
+// the relevant tool.
+type ToolUsageConfig struct {
+	Rules []ToolUsageRule `yaml:"rules" json:"rules"`
+}
+
+// ToolUsageRule is one rule within a ToolUsageConfig. Type selects how the
+// rule is matched against the environment and the usage signals.
+type ToolUsageRule struct {
+	// Type is one of "mcp_server", "skill_plugin", "skill_repo".
+	Type string `yaml:"type" json:"type"`
+	// Name matches an MCP server (Type=mcp_server) or skill (Type=skill_plugin).
+	Name string `yaml:"name,omitempty" json:"name,omitempty"`
+	// Repo matches a remote-skill repository (Type=skill_repo).
+	Repo string `yaml:"repo,omitempty" json:"repo,omitempty"`
+	// Skill optionally narrows a Repo match to a specific skill within it.
+	Skill string `yaml:"skill,omitempty" json:"skill,omitempty"`
+	// Expect describes the success condition. One of:
+	//   "at_least_one_tool_call" — server appears in MCPServersUsed
+	//   "any_skill_invoked"      — skill appears in SkillsInvoked
+	//   "skill_invoked"          — same as any_skill_invoked
+	Expect string `yaml:"expect" json:"expect"`
+}
+
 // EffectiveWeight returns the grader's weight, defaulting to 1.0 if unset.
 func (g *GraderConfig) EffectiveWeight() float64 {
 	if g.Weight == 0 {
@@ -204,6 +235,12 @@ func (g *GraderConfig) DecodeConfig() (any, error) {
 		var c OutputCheckConfig
 		if err := g.Config.Decode(&c); err != nil {
 			return nil, fmt.Errorf("decoding output_check config for %q: %w", g.Name, err)
+		}
+		return &c, nil
+	case KindToolUsage:
+		var c ToolUsageConfig
+		if err := g.Config.Decode(&c); err != nil {
+			return nil, fmt.Errorf("decoding tool_usage config for %q: %w", g.Name, err)
 		}
 		return &c, nil
 	default:

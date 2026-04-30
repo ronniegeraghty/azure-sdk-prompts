@@ -24,6 +24,16 @@ Name() string
 Grade(ctx context.Context, input GraderInput) (GraderResult, error)
 }
 
+// EnvironmentTool describes one tool/skill/MCP-server entry that was wired
+// into the generation environment for this eval. Used by the tool_usage
+// grader to decide which env-dependent rules are applicable.
+type EnvironmentTool struct {
+	Name string // MCP server name or skill name
+	Kind string // "mcp" or "skill"
+	Repo string // for repo-sourced skills
+	Path string // for local skills (used to detect generator dir)
+}
+
 // GraderInput is a concrete struct containing everything a grader might need
 // (DM5). Graders use what they need and ignore the rest.
 type GraderInput struct {
@@ -57,6 +67,19 @@ type GraderInput struct {
 
 	// GeneratorArtifact is a pre-parsed pointer to the generator session artifact.
 	GeneratorArtifact *GeneratorArtifact
+
+	// EnvironmentTools lists every tool/skill/MCP-server entry available
+	// to the generator session. Graders that score tool use compare this
+	// against actual usage signals (SkillsInvoked, MCPServersUsed).
+	EnvironmentTools []EnvironmentTool
+
+	// SkillsInvoked is the set of skill names actually invoked during
+	// generation (derived from skill.invoked events).
+	SkillsInvoked []string
+
+	// MCPServersUsed is the set of MCP server names that recorded at least
+	// one tool call during generation.
+	MCPServersUsed []string
 }
 
 // ReviewBucket is a graders-package mirror of criteria.ReviewBucket / review.Bucket.
@@ -108,6 +131,12 @@ type GraderResult struct {
 
 	Points  []GraderPoint  `json:"points"`           // REQUIRED, len ≥ 1; the canonical sub-checks
 	Extras  *GraderExtras  `json:"extras,omitempty"` // kind-specific render-only payload
+
+	// Provenance: where the grader entry was declared. Populated by the
+	// engine after Grade() returns. SourceType is one of "prompt_file" or
+	// "criteria_file"; SourceFile is the originating file path.
+	SourceFile string `json:"source_file,omitempty"`
+	SourceType string `json:"source_type,omitempty"`
 }
 
 // GraderPoint represents one binary pass/fail check inside a grader.

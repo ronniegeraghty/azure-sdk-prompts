@@ -534,12 +534,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		// Skip grading entirely — we don't trust any partial result
 		// when the bundle couldn't be fully parsed for this eval.
 	} else {
-		// Resolve applicable graders, then partition into prompt (review
-		// panel) and typed (NewGrader) entries. promptMatched is
-		// consumed indirectly via reviewBuckets/mergedCriteria on
-		// graderInput; we only need typedMatched here.
+		// Resolve applicable graders. The unified execution loop below
+		// iterates this list in YAML declaration order, treating
+		// type=prompt entries as review items and everything else as
+		// typed graders.
 		matched := e.matchedForEval(props)
-		_, typedMatched := criteria.PartitionMatched(matched)
 
 		// Collect all grader results across typed graders and AI review.
 		var allGraderResults []graders.GraderResult
@@ -574,6 +573,43 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			GeneratorArtifact:     genArtifact,
 			GeneratorArtifactPath: generatorArtifactPath,
 		}
+		// Populate environment-aware fields consumed by tool_usage and
+		// related graders. env was built earlier from session events.
+		if env != nil {
+			graderInput.SkillsInvoked = append([]string(nil), env.SkillsInvoked...)
+		}
+		// MCPServersUsed = distinct MCP server names that recorded at
+		// least one tool-start event. env.MCPServers is the configured
+		// set (not necessarily used), so we derive usage from the
+		// action timeline directly.
+		if evalReport.ActionTimeline != nil {
+			seenServers := map[string]bool{}
+			for _, ev := range evalReport.ActionTimeline.Events {
+				if ev.MCPServer == "" || ev.Action != "start" {
+					continue
+				}
+				if !seenServers[ev.MCPServer] {
+					seenServers[ev.MCPServer] = true
+					graderInput.MCPServersUsed = append(graderInput.MCPServersUsed, ev.MCPServer)
+				}
+			}
+		}
+		if task.Config.Generator != nil {
+			for _, te := range task.Config.Generator.Tools {
+				kind := "skill"
+				if te.ResolvedType() == "mcp" {
+					kind = "mcp"
+				} else if te.ResolvedType() != "skill" {
+					continue
+				}
+				graderInput.EnvironmentTools = append(graderInput.EnvironmentTools, graders.EnvironmentTool{
+					Name: te.Name,
+					Kind: kind,
+					Repo: te.Repo,
+					Path: te.Path,
+				})
+			}
+		}
 		if task.Prompt.ReferenceAnswer != "" {
 			graderInput.ReferenceDir = task.Prompt.ReferenceAnswer
 		}
@@ -584,100 +620,178 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		graderInput.AgentFinalResponse = result.FinalResponse
 	}
 
-	// --- Phase 1: Typed graders (file, program, output_check, ...) ---
-	if len(typedMatched) > 0 {
-		typedConfigs := make([]graders.GraderConfig, 0, len(typedMatched))
-		for _, m := range typedMatched {
-			typedConfigs = append(typedConfigs, m.Entry.ToRuntimeConfig())
-		}
-		glg.Debug("Typed graders matched", "count", len(typedConfigs))
-		instances, instErr := criteria.InstantiateGraders(typedConfigs)
-		if instErr != nil {
-			glg.Error("Failed to instantiate typed graders", "error", instErr)
+	// --- Unified grader execution (#grader-redesign) ---
+	//
+	// Build one ordered execution list:
+	//   position 0: prompt-file criteria as a review item (if non-empty)
+	//   position 1+: matched criteria-file graders in YAML declaration order
+	//
+	// Each item is either a review-type (type=prompt → PromptReviewGrader)
+	// or a typed grader (everything else). Items are executed in order so
+	// the resulting GraderResults slice mirrors that order, with prompt-file
+	// criteria always first.
+	type graderExecItem struct {
+		isReview bool
+		bucket   graders.ReviewBucket // for review items
+		gc       graders.GraderConfig // for typed items
+		srcFile  string
+		srcType  string
+	}
+	var execItems []graderExecItem
+
+	// Position 0: prompt-file criteria, if any.
+	criteriaText := prompt.FormatParsedCriteria(task.Prompt.ParsedCriteria)
+	if criteriaText == "" {
+		criteriaText = task.Prompt.EvaluationCriteria
+	}
+	if strings.TrimSpace(criteriaText) != "" {
+		execItems = append(execItems, graderExecItem{
+			isReview: true,
+			bucket: graders.ReviewBucket{
+				Name:     "Criteria from prompt file",
+				Criteria: criteria.MergeUnifiedCriteria(nil, criteriaText),
+			},
+			srcFile: task.Prompt.FilePath,
+			srcType: "prompt_file",
+		})
+	}
+
+	// Then criteria-file graders in YAML declaration order.
+	for _, m := range matched {
+		if m.Entry.Type == graders.KindPrompt {
+			execItems = append(execItems, graderExecItem{
+				isReview: true,
+				bucket: graders.ReviewBucket{
+					Name:     m.Entry.Name,
+					Criteria: criteria.MergeUnifiedCriteria([]criteria.UnifiedGraderEntry{m.Entry}, ""),
+				},
+				srcFile: m.Source,
+				srcType: "criteria_file",
+			})
 		} else {
-			hooks := buildGraderHooks(sendRawEvent)
-			typedResults := criteria.RunGradersWithHooks(ctx, instances, typedConfigs, graderInput, hooks)
-			allGraderResults = append(allGraderResults, typedResults...)
-			glg.Debug("Typed graders complete", "count", len(typedResults))
+			execItems = append(execItems, graderExecItem{
+				isReview: false,
+				gc:       m.Entry.ToRuntimeConfig(),
+				srcFile:  m.Source,
+				srcType:  "criteria_file",
+			})
 		}
 	}
 
-	// --- Phase 2: AI review graders (one per bucket) ---
-	var lastReviewGrader *graders.PromptReviewGrader
-	if !e.opts.SkipReview {
-		sendPhase(progress.PhaseReviewing)
+	// Determine whether any review items exist before setting up the reviewer.
+	hasReviewItems := false
+	for _, it := range execItems {
+		if it.isReview {
+			hasReviewItems = true
+			break
+		}
+	}
 
-		var reviewer review.Reviewer
-		var panelReviewer *review.PanelReviewer
+	// Set up reviewer once (shared across all review items). Fall back to a
+	// single empty-criteria review item if review is requested but nothing
+	// in the exec list is a review (preserves legacy "always run review"
+	// behavior when configs/prompts declare no criteria).
+	var reviewer review.Reviewer
+	var panelReviewer *review.PanelReviewer
+	if !e.opts.SkipReview {
 		if e.reviewerFactory != nil {
 			reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
 			if err != nil {
 				glg.Warn("Reviewer creation failed, skipping review", "error", err)
 			}
 		}
-
-		if panelReviewer != nil || reviewer != nil {
-			// Create one grader per ReviewBucket so each bucket's criteria
-			// render as a separate grader line in the display. This replaces
-			// the legacy single "ai_review" grader aggregating all buckets.
-			buckets := e.reviewBuckets(task.Prompt, props)
-			if len(buckets) == 0 {
-				// No buckets (no criteria or prompt frontmatter) — fall back to
-				// creating a single grader with empty criteria so the reviewer
-				// still runs. This preserves the behavior for tests/configs that
-				// expect review to run even without explicit criteria.
-				buckets = []graders.ReviewBucket{{Name: "ai_review", Criteria: ""}}
-				glg.Debug("No review buckets; falling back to single empty review grader")
-			}
-			if panelReviewer != nil {
-				glg.Debug("Review panel models", "models", panelReviewer.Models())
-			}
-			glg.Debug("Running AI review graders", "bucket_count", len(buckets))
-
-				for i, bucket := range buckets {
-					reviewGrader := graders.NewPromptReviewGrader(bucket.Name, reviewer, panelReviewer)
-					lastReviewGrader = reviewGrader
-
-					// Build a per-bucket grader input with only this bucket's criteria.
-					bucketInput := graderInput
-					bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{bucket}
-					// Clear the merged EvalCriteria so the grader uses the bucket-specific criteria.
-					bucketInput.EvalCriteria = ""
-
-					emitGraderStart(sendRawEvent, reviewGrader)
-					reviewResult, reviewErr := reviewGrader.Grade(ctx, bucketInput)
-					if reviewErr != nil {
-						glg.Error("Review grader failed", "bucket", bucket.Name, "error", reviewErr)
-						sendEvent(progress.EventReasoning, fmt.Sprintf("Review bucket %q failed: %v", bucket.Name, reviewErr))
-						// Synthesize a failing result with a single failure Point so the
-						// renderer never sees a Points-less prompt_review result
-						// (Phase 3 invariant — see graders.NewErrorResult).
-						reviewResult = graders.NewErrorResult(
-							graders.KindPromptReview, bucket.Name, graders.GraderConfig{},
-							fmt.Sprintf("review grader error: %v", reviewErr),
-						)
-					} else if reviewGrader.LastConsolidated != nil {
-						glg.Debug("Review bucket complete",
-							"bucket", bucket.Name,
-							"passed", reviewGrader.LastConsolidated.OverallScore,
-							"max", reviewGrader.LastConsolidated.MaxScore)
-					}
-					// Apply default weight — review has weight 1.0, not a gate grader.
-					if reviewResult.Weight == 0 {
-						reviewResult.Weight = 1.0
-					}
-					emitGraderComplete(sendRawEvent, reviewGrader, reviewResult)
-					allGraderResults = append(allGraderResults, reviewResult)
-
-					// Populate backward-compat report fields from the LAST bucket.
-					// (Site only expects one consolidated review; multi-bucket
-					// per-grader breakdown is a display-only enhancement for now.)
-					if i == len(buckets)-1 {
-						evalReport.ReviewPanel = reviewGrader.LastPanel
-						evalReport.Review = reviewGrader.LastConsolidated
-					}
-				}
+		if (reviewer != nil || panelReviewer != nil) && !hasReviewItems {
+			execItems = append(execItems, graderExecItem{
+				isReview: true,
+				bucket:   graders.ReviewBucket{Name: "ai_review", Criteria: ""},
+			})
+			hasReviewItems = true
+			glg.Debug("No review buckets; falling back to single empty review grader")
 		}
+	}
+	if hasReviewItems && !e.opts.SkipReview {
+		sendPhase(progress.PhaseReviewing)
+	}
+	if panelReviewer != nil {
+		glg.Debug("Review panel models", "models", panelReviewer.Models())
+	}
+
+	var lastReviewGrader *graders.PromptReviewGrader
+	for _, item := range execItems {
+		if item.isReview {
+			if e.opts.SkipReview || (reviewer == nil && panelReviewer == nil) {
+				continue
+			}
+			reviewGrader := graders.NewPromptReviewGrader(item.bucket.Name, reviewer, panelReviewer)
+			lastReviewGrader = reviewGrader
+
+			bucketInput := graderInput
+			bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{item.bucket}
+			bucketInput.EvalCriteria = ""
+
+			emitGraderStart(sendRawEvent, reviewGrader)
+			reviewResult, reviewErr := reviewGrader.Grade(ctx, bucketInput)
+			if reviewErr != nil {
+				glg.Error("Review grader failed", "bucket", item.bucket.Name, "error", reviewErr)
+				sendEvent(progress.EventReasoning, fmt.Sprintf("Review bucket %q failed: %v", item.bucket.Name, reviewErr))
+				reviewResult = graders.NewErrorResult(
+					graders.KindPromptReview, item.bucket.Name, graders.GraderConfig{},
+					fmt.Sprintf("review grader error: %v", reviewErr),
+				)
+			} else if reviewGrader.LastConsolidated != nil {
+				glg.Debug("Review bucket complete",
+					"bucket", item.bucket.Name,
+					"passed", reviewGrader.LastConsolidated.OverallScore,
+					"max", reviewGrader.LastConsolidated.MaxScore)
+			}
+			if reviewResult.Weight == 0 {
+				reviewResult.Weight = 1.0
+			}
+			reviewResult.SourceFile = item.srcFile
+			reviewResult.SourceType = item.srcType
+			emitGraderComplete(sendRawEvent, reviewGrader, reviewResult)
+			allGraderResults = append(allGraderResults, reviewResult)
+		} else {
+			g, instErr := graders.NewGrader(item.gc)
+			if instErr != nil {
+				glg.Error("Failed to instantiate typed grader", "name", item.gc.Name, "error", instErr)
+				typedResult := graders.NewErrorResult(item.gc.Kind, item.gc.Name, item.gc,
+					fmt.Sprintf("instantiation error: %v", instErr))
+				typedResult.SourceFile = item.srcFile
+				typedResult.SourceType = item.srcType
+				allGraderResults = append(allGraderResults, typedResult)
+				continue
+			}
+			typedInput := graderInput
+			typedInput.Config = item.gc
+			emitGraderStart(sendRawEvent, g)
+			typedResult, typedErr := func() (r graders.GraderResult, e error) {
+				defer func() {
+					if rec := recover(); rec != nil {
+						e = fmt.Errorf("grader panicked: %v", rec)
+					}
+				}()
+				return g.Grade(ctx, typedInput)
+			}()
+			if typedErr != nil {
+				glg.Error("Typed grader failed", "name", item.gc.Name, "error", typedErr)
+				typedResult = graders.NewErrorResult(g.Kind(), g.Name(), item.gc, typedErr.Error())
+			}
+			if typedResult.Weight == 0 {
+				typedResult.Weight = item.gc.EffectiveWeight()
+			}
+			typedResult.Gate = item.gc.Gate
+			typedResult.SourceFile = item.srcFile
+			typedResult.SourceType = item.srcType
+			emitGraderComplete(sendRawEvent, g, typedResult)
+			allGraderResults = append(allGraderResults, typedResult)
+		}
+	}
+
+	// Populate backward-compat report fields from the LAST review grader.
+	if lastReviewGrader != nil {
+		evalReport.ReviewPanel = lastReviewGrader.LastPanel
+		evalReport.Review = lastReviewGrader.LastConsolidated
 	}
 
 	// --- Aggregate all results and update report ---
@@ -1258,6 +1372,8 @@ func convertGraderResults(results []graders.GraderResult) []report.GraderResult 
 			Pass:       r.Pass,
 			Gate:       r.Gate,
 			Message:    r.Message,
+			SourceFile: r.SourceFile,
+			SourceType: r.SourceType,
 		}
 		// Copy Points array.
 		if len(r.Points) > 0 {

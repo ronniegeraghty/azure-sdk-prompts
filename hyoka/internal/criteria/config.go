@@ -14,6 +14,7 @@ package criteria
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -95,6 +96,7 @@ var validTypedKinds = map[string]bool{
 	graders.KindActionSequence: true,
 	graders.KindToolConstraint: true,
 	graders.KindOutputCheck:    true,
+	graders.KindToolUsage:      true,
 }
 
 // IsValidUnifiedType returns true if t is a recognized unified-schema type
@@ -148,6 +150,10 @@ func validateEntry(e UnifiedGraderEntry) error {
 		hasChecks := len(e.Checks) > 0
 		if !hasPrompt && !hasChecks {
 			return fmt.Errorf("grader %q: type=prompt requires non-empty prompt or checks", tag)
+		}
+		if hasPrompt && !hasChecks {
+			slog.Warn("grader type=prompt has prompt but no checks: will synthesize a single pass/fail point at runtime; prefer adding explicit checks",
+				"grader", tag)
 		}
 		if hasChecks {
 			for i, c := range e.Checks {

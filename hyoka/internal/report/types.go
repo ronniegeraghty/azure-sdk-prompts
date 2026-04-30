@@ -47,6 +47,10 @@ type GraderResult struct {
 
 	Points []GraderPoint  `json:"points"`           // REQUIRED, len ≥ 1
 	Extras *GraderExtras  `json:"extras,omitempty"` // kind-specific render-only data
+
+	// Provenance: where the grader entry was declared.
+	SourceFile string `json:"source_file,omitempty"`
+	SourceType string `json:"source_type,omitempty"` // "prompt_file" or "criteria_file"
 }
 
 // GraderPoint is one binary pass/fail check inside a grader.
