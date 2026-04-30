@@ -18,12 +18,21 @@ cd hyoka
 # Download dependencies (uses go.work for workspace)
 go mod download
 
+# Install npm dependencies and git hooks
+npm install
+
 # Build the CLI
 go build ./hyoka/...
 
 # Run the CLI
 go run . <command>
 ```
+
+### Git hooks
+
+A **pre-commit hook** is installed via npm when you run `npm install`. If you modify `site/src/**`, the hook automatically rebuilds `site/dist/` and stages it for commit. This ensures the go:embed'd bundle never goes stale.
+
+**If the site build fails:** Fix the TypeScript/CSS errors, then retry your commit. The hook will run again.
 
 ## Running tests
 
