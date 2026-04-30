@@ -883,3 +883,43 @@ But only checks 1 and 2 should be scored.
 
 **Recommended Owner:** Neo (criteria/graders pipeline expert).
 
+
+---
+
+## 2026-04-30: CI Failure Diagnosis & Phantom Grader Investigation
+
+**Session:** 2026-04-30T04:32:44Z  
+**Role:** Lead CI Owner + Investigation Agent
+
+### Task 1: CI Failure Diagnosis
+
+Diagnosed periodic GitHub Actions failures reported by Ronnie. Findings:
+
+- **Scheduled workflows:** Healthy (Ralph Heartbeat: 60+ consecutive runs, 0 failures)
+- **Failing workflows:** 2 push-triggered (21 failures in 100 runs since 2026-04-29)
+  1. **CI (build-and-test):** 18 failures — go vet errors (sync.Once copy in cacheroot.go + GraderResult schema mismatch in 8 test files)
+  2. **Site Bundle Freshness:** 3 failures — stale `site/dist/` bundle not rebuilt after `site/src/**` changes
+
+Ownership delegated:
+- **Neo:** Fix CI/test sync + sync.Once handling (✅ DONE — commits 99a185ba, e007695e)
+- **Tank:** Add site bundle guardrail (✅ DONE — commit 0de4468b, Husky pre-commit hook)
+
+Output: `.squad/decisions.md` (merged) — Root cause analysis and handoff matrix
+
+### Task 2: Phantom Grader Point Investigation
+
+Diagnosed anomaly in multi-point grader output. Bug confirmed:
+
+**Root cause:** `hyoka/internal/criteria/buckets.go:136` formats parent grader line as numbered criterion (`1. **{Name}**`), causing LLMs to treat it as scoreable. Result: N+1 points instead of N.
+
+**Evidence:** reports/20260430-041731/.../python-pairwise/claude-opus-4.6/report.json — DefaultAzureCredential Authentication grader returned 3 points for 2-check entry.
+
+**Fix strategy:** Remove number from parent line — render as `**{Name}**` or `### {Name}` (section header, not criterion).
+
+**Owner:** Neo (queued after CI fixes)
+
+Output: `.squad/decisions.md` (merged) — Bug description and fix strategy
+
+### Status
+
+✅ Both diagnoses landed clean. All handoff decisions recorded in `.squad/decisions.md`.

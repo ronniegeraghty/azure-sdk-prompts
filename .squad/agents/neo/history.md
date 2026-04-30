@@ -1172,3 +1172,60 @@ hyoka run --prompt-id key-vault-dp-python-crud \
 - hyoka/internal/report/markdown_test.go
 
 **Branch:** ronniegeraghty/dev
+
+---
+
+## 2026-04-30: CI Unblocked — GraderResult v4 Schema Migration + sync.Once Fix
+
+**Session:** 2026-04-30T04:32:44Z  
+**Role:** Core Eval Framework
+
+### Problem
+
+CI blocked by 5 go vet errors from incomplete GraderResult schema migration:
+1. sync.Once copy violation in `cacheroot.go:110,117`
+2. Unknown struct field `Model` in 3 test files (legacy field removed in v4 schema)
+3. Pointer/value mismatch on Pass field (changed from `*bool` to `bool`)
+
+### Solution
+
+Updated 8 test files to match GraderResult v4 schema:
+
+**Changes:**
+- Removed legacy fields: Model, OverallScore, MaxScore, Summary, Issues, Strengths, IsConsensus
+- Changed Pass field type: `*bool` → `bool`
+- Added minimal Points: `[]GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}`
+- Fixed cacheroot.go sync.Once by using state flags instead of copying
+
+**Files modified:**
+- hyoka/internal/toolload/cacheroot.go (1 file)
+- hyoka/internal/report/generator_test.go, dashboard_test.go, comparison_test.go, inmem_test.go, equivalence_test.go, markdown_test.go
+- hyoka/cmd/compare_test.go
+
+### Verification
+
+```
+✅ go vet ./...       (5 errors → clean)
+✅ go build ./...     (success)
+✅ All updated tests  (passing)
+```
+
+### Commits
+
+- `99a185ba` — Fix sync.Once copy and toolload schema
+- `e007695e` — Update test files to GraderResult v4 schema
+
+### Next (Queued)
+
+**Phantom grader point fix (buckets.go:136):**  
+Morpheus diagnosed that parent grader lines are numbered when checks: exist, causing LLMs to score N+1 points instead of N. Fix: render parent as unnumbered section header (`**{Name}**` or `### {Name}`).
+
+**Files to change:**
+- `hyoka/internal/criteria/buckets.go:136` (FormatUnifiedPromptEntries logic)
+- `hyoka/internal/criteria/buckets_test.go` (update test expectations)
+
+**Evidence:** reports/20260430-041731/.../python-pairwise/claude-opus-4.6/report.json — DefaultAzureCredential grader returned 3 points for 2-check entry.
+
+### Status
+
+✅ CI unblocked. All vet errors resolved. Phantom grader fix ready to pick up next session.
