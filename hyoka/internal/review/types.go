@@ -1,5 +1,14 @@
 package review
 
+// ReviewCheck represents a single check with a stable ID, canonical text,
+// and optional preamble. Used to construct id-aware reviewer prompts and
+// validate reviewer responses.
+type ReviewCheck struct {
+	ID       string // Stable identifier (e.g., "check_1")
+	Text     string // Canonical check text (source of truth for labels)
+	Preamble string // Optional context/preamble shown before this check
+}
+
 // CriterionResult holds the pass/fail outcome for a single evaluation criterion.
 type CriterionResult struct {
 	Name   string `json:"name"`

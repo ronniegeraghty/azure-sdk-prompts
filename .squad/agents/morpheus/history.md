@@ -959,3 +959,12 @@ Defined four-part redesign with full implementation details, migration impact, a
 - Orchestration log: `.squad/orchestration-log/2026-04-30T18-29-54Z-morpheus.md`
 - Session log: `.squad/log/2026-04-30T18-29-54Z-grader-redesign.md`
 - Decisions merged into `.squad/decisions.md`
+
+## Learnings (Prompt Grader Determinism — 2026-04-27)
+
+- **Root cause of point-count flake:** `averageReview` (`reviewer.go:550`) keys reviewer judgments by exact-string `c.Name`, which is whatever the LLM echoed back into its `criterion` JSON field. Two paraphrases of the same logical check → two map buckets → vote split → score variance.
+- **Both grader-source flows already converge on the same shape** `(Preamble, []Check)` — YAML via `UnifiedGraderEntry.Checks`, prompt-file via `ParseEvaluationCriteria` → `CriterionEntry.Checks`. The splitter for prompt-file form was already rewritten (per parser.go:156-167 comment) to a flat checks list. No new splitting work needed.
+- **`mergeBucketResults` already prefixes non-`combined` bucket criterion names with `[bucket-name] `** for cross-bucket disambiguation in the vote. With stable IDs, the right pattern is `bucket::id` for the vote key and keep the human prefix for display only — separate the structured key from the display label.
+- **The dead-code path is genuinely dead:** `PanelReviewer.consolidate` only refers to itself; `buildConsolidationPrompt` is only called by that dead method. Three `TestBuildConsolidationPrompt*` tests in `review_test.go` go with it. Deterministic vote replaced LLM consolidation a while back but the corpse was left in place.
+- **Existing retry pattern in `runSingleReview` (lines 509-522) is the right hook for new ID validation** — it already retries on parse failure and validation failure with model-specific re-prompts. Adding "missing/extra ids" to the validation set is a tiny extension, not new infrastructure.
+- **Pattern worth capturing as a skill:** "deterministic LLM panel via stable IDs" — any place where multiple LLMs vote on the same items needs server-controlled IDs flowing through the prompt → response → vote chain. Free-text echo is unreliable. Capture this as a reusable pattern.

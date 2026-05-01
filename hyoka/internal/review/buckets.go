@@ -18,7 +18,8 @@ import (
 // results when multiple buckets are merged together.
 type Bucket struct {
 	Name     string
-	Criteria string
+	Criteria string        // Legacy string-based criteria (deprecated)
+	Checks   []ReviewCheck // Id-aware checks (new path)
 }
 
 // MultiBucketReviewer is implemented by reviewers that can split a review
