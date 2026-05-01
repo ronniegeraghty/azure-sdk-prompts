@@ -17,7 +17,6 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/trends"
 	"github.com/spf13/cobra"
@@ -526,15 +525,6 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("evaluation failed: %w", err)
 			}
 
-			// Per-eval summaries: one block per individual evaluation, showing
-			// the result, headline grader-points score, and a per-grader breakdown.
-			// Printed before the run-level summary so users see detail-then-aggregate.
-			if !f.dryRun {
-				for _, r := range summary.Results {
-					printEvalSummary(r)
-				}
-			}
-
 			fmt.Printf("\nRun Summary:\n")
 			fmt.Printf("  Run ID:      %s\n", summary.RunID)
 			fmt.Printf("  Evaluations: %d\n", summary.TotalEvals)
@@ -591,35 +581,3 @@ func runCmd() *cobra.Command {
 	return cmd
 }
 
-// printEvalSummary writes a brief per-eval summary block to stdout, showing
-// the headline grader-points score and a per-grader pass/total breakdown.
-// Designed to complement (not replace) the run-level summary.
-func printEvalSummary(r *report.EvalReport) {
-	icon := "❌"
-	if r.Success {
-		icon = "✅"
-	}
-	passed, total := report.TotalGraderPoints(r.GraderResults)
-	fmt.Printf("\n%s %s / %s", icon, r.PromptID, r.ConfigName)
-	if total > 0 {
-		fmt.Printf("  %d/%d points", passed, total)
-	}
-	if r.Error != "" {
-		fmt.Printf("  (error: %s)", r.Error)
-	}
-	fmt.Printf("  (%.1fs)\n", r.Duration)
-	for _, g := range r.GraderResults {
-		gp, gt := 0, 0
-		for _, p := range g.Points {
-			gt++
-			if p.Pass {
-				gp++
-			}
-		}
-		gIcon := "❌"
-		if g.Pass {
-			gIcon = "✅"
-		}
-		fmt.Printf("  %s %s (%s): %d/%d\n", gIcon, g.GraderName, g.GraderType, gp, gt)
-	}
-}

@@ -791,6 +791,10 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			})
 			terminalEventSent = true
 
+			// Per-eval grader breakdown for non-interactive modes (interactive
+			// renderer already prints graders inline grouped by source).
+			display.WriteEvalBreakdown(t.Prompt.ID, t.Config.Name, report.RenderGraderBreakdown(evalReport.GraderResults))
+
 			mu.Lock()
 			defer mu.Unlock()
 

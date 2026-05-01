@@ -638,6 +638,19 @@ func groupGradersBySource(results []GraderResult) []graderFileGroup {
 	return groups
 }
 
+// RenderGraderBreakdown returns the grader section rendered in the 3-level
+// grouped format used by the per-eval markdown report. It is exported so
+// callers (e.g. the live progress display) can present the same breakdown to
+// the terminal after each individual evaluation completes.
+func RenderGraderBreakdown(results []GraderResult) string {
+	if len(results) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	writeGraderResults(&b, results)
+	return b.String()
+}
+
 // writeGraderResults renders the grader section in the 3-level grouped format:
 //
 //   - {basename} ({source type}):

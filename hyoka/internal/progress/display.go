@@ -196,6 +196,29 @@ func NewDisplay(cfg DisplayConfig) *Display {
 	return d
 }
 
+// WriteEvalBreakdown emits a per-eval grader breakdown immediately after a
+// single evaluation finishes. It is a no-op when:
+//   - the display is fully disabled (ModeOff), or
+//   - the interactive renderer is in use, since interactive already renders
+//     graders inline grouped by source file as they complete.
+//
+// In CI/log/ANSI modes the breakdown is written to the display's writer with
+// a leading "Graders:" header. The text is expected to be the output of
+// report.RenderGraderBreakdown so the format matches the markdown report.
+func (d *Display) WriteEvalBreakdown(promptID, configName, text string) {
+	if d == nil || d.disabled || d.interactive != nil {
+		return
+	}
+	if text == "" {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	header := fmt.Sprintf("\nGraders for %s / %s:\n", promptID, configName)
+	fmt.Fprint(d.w, header)
+	fmt.Fprint(d.w, text)
+}
+
 // --- ANSI fixed-region rendering (terminal only) ---
 
 // buildRegion renders all eval sections plus a summary line into a buffer.
