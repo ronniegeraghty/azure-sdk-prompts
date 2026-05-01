@@ -2123,3 +2123,71 @@ if !found {
 t.Errorf("expected empty/missing id error, got %v", errs)
 }
 }
+
+// TestAverageReview_AnchoredToExpectedCheckIDs verifies that consensus
+// is anchored to the expected check list, marking missing checks as failed.
+func TestAverageReview_AnchoredToExpectedCheckIDs(t *testing.T) {
+	expected := []ReviewCheck{
+		{ID: "check_1", Text: "Uses DefaultAzureCredential"},
+		{ID: "check_2", Text: "Handles errors properly"},
+		{ID: "check_3", Text: "Uses environment variables"},
+	}
+
+	// Panel where reviewer 2 has no vote for check_3
+	panel := []ReviewResult{
+		{
+			Model: "reviewer-1",
+			Scores: ReviewScores{
+				Criteria: []CriterionResult{
+					{ID: "check_1", Name: "Uses DefaultAzureCredential", Passed: true},
+					{ID: "check_2", Name: "Handles errors properly", Passed: true},
+					{ID: "check_3", Name: "Uses environment variables", Passed: false},
+				},
+			},
+		},
+		{
+			Model: "reviewer-2",
+			Scores: ReviewScores{
+				Criteria: []CriterionResult{
+					{ID: "check_1", Name: "Uses DefaultAzureCredential", Passed: true},
+					{ID: "check_2", Name: "Handles errors properly", Passed: false},
+					// check_3 missing → should appear in consensus as failed
+				},
+			},
+		},
+	}
+
+	consensus := averageReview(panel, expected)
+
+	if consensus == nil {
+		t.Fatal("consensus is nil")
+	}
+	if len(consensus.Scores.Criteria) != 3 {
+		t.Errorf("consensus has %d criteria, want 3", len(consensus.Scores.Criteria))
+	}
+	if consensus.MaxScore != 3 {
+		t.Errorf("MaxScore = %d, want 3", consensus.MaxScore)
+	}
+
+	// check_1: both passed → should pass
+	c1 := consensus.Scores.Criteria[0]
+	if c1.ID != "check_1" || !c1.Passed {
+		t.Errorf("check_1: ID=%q Passed=%t, want ID=check_1 Passed=true", c1.ID, c1.Passed)
+	}
+
+	// check_2: reviewer-2 failed → should fail (any-fail voting)
+	c2 := consensus.Scores.Criteria[1]
+	if c2.ID != "check_2" || c2.Passed {
+		t.Errorf("check_2: ID=%q Passed=%t, want ID=check_2 Passed=false", c2.ID, c2.Passed)
+	}
+
+	// check_3: reviewer-1 failed it, reviewer-2 didn't vote → should fail (any-fail voting)
+	// The key test is that it APPEARS in the consensus with the correct ID in expected order
+	c3 := consensus.Scores.Criteria[2]
+	if c3.ID != "check_3" {
+		t.Errorf("check_3: ID=%q, want check_3", c3.ID)
+	}
+	if c3.Passed {
+		t.Errorf("check_3 should fail (any-fail voting)")
+	}
+}

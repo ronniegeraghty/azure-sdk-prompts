@@ -701,8 +701,9 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 		reasons    []string
 	}
 	criteriaMap := make(map[string]*criterionAgg)
-	var criteriaOrder []string
+	var observedOrder []string // for legacy path when expected is empty
 
+	// First pass: collect votes from all reviewers
 	for _, r := range panel {
 		for _, c := range r.Scores.Criteria {
 			// Extract bucket name if present in Name
@@ -741,7 +742,7 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 					label:      label,
 				}
 				criteriaMap[voteKey] = agg
-				criteriaOrder = append(criteriaOrder, voteKey)
+				observedOrder = append(observedOrder, voteKey)
 			}
 			agg.total++
 			if !c.Passed {
@@ -753,21 +754,87 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 		}
 	}
 
-	// Build consensus criteria — fails if ANY reviewer failed it
+	// Build consensus criteria
 	var criteria []CriterionResult
 	passedCount := 0
-	for _, voteKey := range criteriaOrder {
-		agg := criteriaMap[voteKey]
-		passed := agg.failCount == 0 // strict: any fail = fail
-		reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
-		criteria = append(criteria, CriterionResult{
-			ID:     agg.id,
-			Name:   agg.label, // canonical label (bucket-prefixed if applicable)
-			Passed: passed,
-			Reason: reason,
-		})
-		if passed {
-			passedCount++
+
+	if len(expected) > 0 {
+		// New path: anchor to expected checks (in expected order)
+		// This ensures MaxScore is deterministic even if reviewers skip checks
+		for _, exp := range expected {
+			// Check for votes on this expected ID (may be bucketed or not)
+			foundVotes := false
+			
+			// First, check for non-bucketed vote (direct ID match)
+			if agg, hasVotes := criteriaMap[exp.ID]; hasVotes {
+				foundVotes = true
+				passed := agg.failCount == 0 // strict: any fail = fail
+				reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
+				criteria = append(criteria, CriterionResult{
+					ID:     agg.id,
+					Name:   agg.label,
+					Passed: passed,
+					Reason: reason,
+				})
+				if passed {
+					passedCount++
+				}
+			}
+			
+			// Then, check for bucketed votes (bucket::ID pattern)
+			// This handles cases where the same check appears in multiple buckets
+			for voteKey, agg := range criteriaMap {
+				// Extract ID from bucket::id pattern
+				var checkID string
+				if strings.Contains(voteKey, "::") {
+					parts := strings.SplitN(voteKey, "::", 2)
+					if len(parts) == 2 {
+						checkID = parts[1]
+					}
+				}
+				
+				// If this vote matches the expected ID and wasn't already counted
+				if checkID == exp.ID && voteKey != exp.ID {
+					foundVotes = true
+					passed := agg.failCount == 0 // strict: any fail = fail
+					reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
+					criteria = append(criteria, CriterionResult{
+						ID:     agg.id,
+						Name:   agg.label,
+						Passed: passed,
+						Reason: reason,
+					})
+					if passed {
+						passedCount++
+					}
+				}
+			}
+			
+			if !foundVotes {
+				// No reviewer voted on this check → mark as failed
+				criteria = append(criteria, CriterionResult{
+					ID:     exp.ID,
+					Name:   exp.Text,
+					Passed: false,
+					Reason: "no reviewer returned a vote for this check",
+				})
+			}
+		}
+	} else {
+		// Legacy path: walk observed votes (when expected is empty)
+		for _, voteKey := range observedOrder {
+			agg := criteriaMap[voteKey]
+			passed := agg.failCount == 0 // strict: any fail = fail
+			reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
+			criteria = append(criteria, CriterionResult{
+				ID:     agg.id,
+				Name:   agg.label, // canonical label (bucket-prefixed if applicable)
+				Passed: passed,
+				Reason: reason,
+			})
+			if passed {
+				passedCount++
+			}
 		}
 	}
 
