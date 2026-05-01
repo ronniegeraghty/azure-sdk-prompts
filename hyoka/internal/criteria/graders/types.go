@@ -24,12 +24,13 @@ const (
 	KindFile           = "file"
 	KindProgram        = "program"
 	KindPrompt         = "prompt"
-	KindBehavior       = "behavior"
+	KindBehavior       = "behavior"       // DEPRECATED: use KindTool
 	KindActionSequence = "action_sequence"
-	KindToolConstraint = "tool_constraint"
+	KindToolConstraint = "tool_constraint" // DEPRECATED: use KindTool
 	KindPromptReview   = "prompt_review"
 	KindOutputCheck    = "output_check"
-	KindToolUsage      = "tool_usage"
+	KindToolUsage      = "tool_usage" // DEPRECATED: use KindTool
+	KindTool           = "tool"       // Canonical tool-perspective grader
 )
 
 // validKinds is the set of recognized grader kind values.
@@ -37,12 +38,13 @@ var validKinds = map[string]bool{
 	KindFile:           true,
 	KindProgram:        true,
 	KindPrompt:         true,
-	KindBehavior:       true,
+	KindBehavior:       true, // deprecated
 	KindActionSequence: true,
-	KindToolConstraint: true,
+	KindToolConstraint: true, // deprecated
 	KindPromptReview:   true,
 	KindOutputCheck:    true,
-	KindToolUsage:      true,
+	KindToolUsage:      true, // deprecated
+	KindTool:           true,
 }
 
 // GraderConfigFile is the top-level YAML structure containing a list of graders.
@@ -180,6 +182,20 @@ type ToolUsageRule struct {
 	//   "any_skill_invoked"      — skill appears in SkillsInvoked
 	//   "skill_invoked"          — same as any_skill_invoked
 	Expect string `yaml:"expect" json:"expect"`
+}
+
+// ToolConfig holds configuration for the "tool" grader kind (canonical).
+// The tool grader consolidates behavior, tool_constraint, and tool_usage.
+type ToolConfig struct {
+	Checks []ToolCheckRule `yaml:"checks" json:"checks"`
+}
+
+// ToolCheckRule defines one check within a ToolConfig. See tool_grader.go for semantics.
+type ToolCheckRule struct {
+	Kind  string `yaml:"kind" json:"kind"`
+	Name  string `yaml:"name,omitempty" json:"name,omitempty"`
+	Group string `yaml:"group,omitempty" json:"group,omitempty"`
+	N     int    `yaml:"n,omitempty" json:"n,omitempty"`
 }
 
 // EffectiveWeight returns the grader's weight, defaulting to 1.0 if unset.
