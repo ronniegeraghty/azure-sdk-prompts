@@ -521,7 +521,7 @@ func TestPanelReviewerSetSessionTimeout(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAverageReviewEmpty(t *testing.T) {
-	result := averageReview(nil)
+	result := averageReview(nil, nil)
 	if result.Summary != "No reviews to consolidate" {
 		t.Errorf("Summary = %q, want %q", result.Summary, "No reviews to consolidate")
 	}
@@ -541,7 +541,7 @@ func TestAverageReviewSingleReviewer(t *testing.T) {
 		Strengths:    []string{"compiles"},
 	}}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if result.OverallScore != 1 {
 		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
@@ -602,7 +602,7 @@ func TestAverageReviewMajorityVoting(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	criteriaMap := map[string]bool{}
 	for _, c := range result.Scores.Criteria {
@@ -645,7 +645,7 @@ func TestAverageReviewDeduplicatesIssuesAndStrengths(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if len(result.Issues) != 3 {
 		t.Errorf("Issues count = %d, want 3 (dedup 'dup issue')", len(result.Issues))
@@ -669,7 +669,7 @@ func TestAverageReviewDisjointCriteria(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if len(result.Scores.Criteria) != 2 {
 		t.Errorf("Criteria count = %d, want 2 (union of disjoint sets)", len(result.Scores.Criteria))
@@ -701,7 +701,7 @@ func TestAverageReviewSummaryFormat(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if !strings.Contains(result.Summary, "2 reviewers") {
 		t.Errorf("Summary should mention reviewer count, got: %q", result.Summary)
@@ -721,7 +721,7 @@ func TestAverageReviewPreservesCriteriaOrder(t *testing.T) {
 		}},
 	}}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	expected := []string{"Build", "Style", "Errors", "Docs"}
 	for i, c := range result.Scores.Criteria {
@@ -738,7 +738,7 @@ func TestAverageReviewEvenSplitFailsByCriteria(t *testing.T) {
 		{Scores: ReviewScores{Criteria: []CriterionResult{{Name: "X", Passed: false}}}},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if len(result.Scores.Criteria) != 1 {
 		t.Fatal("expected 1 criterion")
@@ -1113,7 +1113,7 @@ func TestAverageReviewAllEmptyCriteria(t *testing.T) {
 		{Scores: ReviewScores{Criteria: nil}},
 		{Scores: ReviewScores{Criteria: nil}},
 	}
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 	if len(result.Scores.Criteria) != 0 {
 		t.Errorf("expected 0 criteria, got %d", len(result.Scores.Criteria))
 	}
@@ -1130,7 +1130,7 @@ func TestAverageReviewNilIssuesAndStrengths(t *testing.T) {
 			Strengths: nil,
 		},
 	}
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 	if result.OverallScore != 1 {
 		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
 	}
@@ -1816,7 +1816,7 @@ func TestDeterministicVoteStrictFailure(t *testing.T) {
 		},
 	}
 
-	result := deterministicVote(panel)
+	result := deterministicVote(panel, nil)
 
 	criteriaMap := map[string]bool{}
 	for _, c := range result.Scores.Criteria {

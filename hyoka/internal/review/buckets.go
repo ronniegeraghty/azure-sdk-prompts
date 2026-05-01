@@ -101,6 +101,16 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 	slog.Info("Starting bucketed panel review",
 		"models", p.models, "bucket_count", len(buckets))
 
+	// Collect all checks across all buckets for vote consolidation
+	var allChecks []ReviewCheck
+	for _, b := range buckets {
+		checks := b.Checks
+		if len(checks) == 0 {
+			checks = criteriaStringToChecks(b.Criteria)
+		}
+		allChecks = append(allChecks, checks...)
+	}
+
 	var panel []ReviewResult
 	for _, model := range p.models {
 		if ctx.Err() != nil {
@@ -144,7 +154,7 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 	if len(panel) == 0 {
 		return nil, nil, fmt.Errorf("all reviewers failed across all buckets")
 	}
-	consolidated := deterministicVote(panel)
+	consolidated := deterministicVote(panel, allChecks)
 	consolidated.Model = "consensus"
 	slog.Info("Bucketed panel review complete",
 		"panel_size", len(panel),
@@ -175,6 +185,7 @@ func mergeBucketResults(parts []bucketResult) *ReviewResult {
 		}
 		for _, c := range r.Scores.Criteria {
 			cc := c
+			// Preserve ID for vote keying; prefix Name for display
 			if p.name != "" && p.name != "combined" {
 				cc.Name = fmt.Sprintf("[%s] %s", p.name, c.Name)
 			}

@@ -333,11 +333,12 @@ func parseReviewResponseV2(text string, expected []ReviewCheck) (*ReviewResult, 
 		return nil, validationErrors
 	}
 
-	// Populate criteria with canonical labels
+	// Populate criteria with canonical labels and stable IDs
 	criteria := make([]CriterionResult, len(resp.Criteria))
 	for i, c := range resp.Criteria {
 		criteria[i] = CriterionResult{
-			Name:   expectedIDs[c.ID], // canonical label from YAML
+			ID:     c.ID,               // stable id for vote keying
+			Name:   expectedIDs[c.ID],  // canonical label from YAML
 			Passed: c.Passed,
 			Reason: c.Reasoning,
 		}
@@ -479,7 +480,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 	// Deterministic multi-model voting: for each criterion, if ANY reviewer
 	// says it failed, mark it as failed. No AI consolidation needed.
 	slog.Info("Computing deterministic consensus (any-fail voting)", "panel_size", len(panel))
-	consolidated = deterministicVote(panel)
+	consolidated = deterministicVote(panel, checks)
 	consolidated.Model = "consensus"
 	slog.Info("Panel review complete", "panel_size", len(panel), "consensus_score", consolidated.OverallScore, "max_score", consolidated.MaxScore)
 
@@ -693,27 +694,69 @@ func (p *PanelReviewer) consolidate(ctx context.Context, originalPrompt string, 
 // averageReview computes deterministic voting across a panel.
 // For each criterion, it FAILS if ANY reviewer marked it failed (strict voting).
 // This ensures no false passes when reviewers disagree.
-func averageReview(panel []ReviewResult) *ReviewResult {
+// Criteria are keyed by ID (bucket::check_id for bucketed, check_id for combined).
+func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 	if len(panel) == 0 {
 		return &ReviewResult{Summary: "No reviews to consolidate"}
 	}
 
-	// Collect all criteria by name, track fail counts
+	// Build id → canonical label lookup from expected
+	expectedLabels := make(map[string]string)
+	for _, c := range expected {
+		expectedLabels[c.ID] = c.Text
+	}
+
+	// Collect all criteria by stable ID, track fail counts
 	type criterionAgg struct {
-		failCount int
-		total     int
-		reasons   []string
+		id         string
+		bucketName string   // extracted from prefixed Name
+		label      string   // canonical label from expected
+		failCount  int
+		total      int
+		reasons    []string
 	}
 	criteriaMap := make(map[string]*criterionAgg)
 	var criteriaOrder []string
 
 	for _, r := range panel {
 		for _, c := range r.Scores.Criteria {
-			agg, exists := criteriaMap[c.Name]
+			// Extract bucket name if present in Name
+			bucketName := ""
+			if strings.HasPrefix(c.Name, "[") {
+				closeIdx := strings.Index(c.Name, "]")
+				if closeIdx > 0 {
+					bucketName = c.Name[1:closeIdx]
+				}
+			}
+
+			// Build vote key: bucket::id or just id
+			var voteKey string
+			if bucketName != "" && c.ID != "" {
+				voteKey = bucketName + "::" + c.ID
+			} else if c.ID != "" {
+				voteKey = c.ID
+			} else {
+				// Fallback for legacy path: key by name
+				voteKey = c.Name
+			}
+
+			agg, exists := criteriaMap[voteKey]
 			if !exists {
-				agg = &criterionAgg{}
-				criteriaMap[c.Name] = agg
-				criteriaOrder = append(criteriaOrder, c.Name)
+				label := c.Name // default to display name
+				if c.ID != "" && expectedLabels[c.ID] != "" {
+					label = expectedLabels[c.ID]
+					// Prefix with bucket if applicable
+					if bucketName != "" {
+						label = fmt.Sprintf("[%s] %s", bucketName, label)
+					}
+				}
+				agg = &criterionAgg{
+					id:         c.ID,
+					bucketName: bucketName,
+					label:      label,
+				}
+				criteriaMap[voteKey] = agg
+				criteriaOrder = append(criteriaOrder, voteKey)
 			}
 			agg.total++
 			if !c.Passed {
@@ -728,12 +771,13 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 	// Build consensus criteria — fails if ANY reviewer failed it
 	var criteria []CriterionResult
 	passedCount := 0
-	for _, name := range criteriaOrder {
-		agg := criteriaMap[name]
+	for _, voteKey := range criteriaOrder {
+		agg := criteriaMap[voteKey]
 		passed := agg.failCount == 0 // strict: any fail = fail
 		reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
 		criteria = append(criteria, CriterionResult{
-			Name:   name,
+			ID:     agg.id,
+			Name:   agg.label, // canonical label (bucket-prefixed if applicable)
 			Passed: passed,
 			Reason: reason,
 		})
@@ -778,8 +822,8 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 // deterministicVote computes a consensus result using strict any-fail voting.
 // For each criterion, if ANY reviewer says it failed, the criterion fails.
 // This replaces AI consolidation with deterministic, reproducible logic.
-func deterministicVote(panel []ReviewResult) *ReviewResult {
-	return averageReview(panel)
+func deterministicVote(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
+	return averageReview(panel, expected)
 }
 
 func copyDirToTemp(src string, pattern string) (string, error) {

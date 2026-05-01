@@ -11,7 +11,8 @@ type ReviewCheck struct {
 
 // CriterionResult holds the pass/fail outcome for a single evaluation criterion.
 type CriterionResult struct {
-	Name   string `json:"name"`
+	ID     string `json:"id,omitempty"`     // Stable check id (e.g., "check_1"), for vote keying
+	Name   string `json:"name"`             // Display label (canonical YAML text, possibly bucket-prefixed)
 	Passed bool   `json:"passed"`
 	Reason string `json:"reason,omitempty"`
 }

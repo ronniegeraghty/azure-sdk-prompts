@@ -1,0 +1,18 @@
+refactor(review): vote keys by id; canonical label from expected check
+
+Add ID field to CriterionResult for stable vote keying. Update
+parseReviewResponseV2 to populate ID alongside Name. Vote aggregation now keys
+by bucket::check_id (non-combined) or check_id (combined), not by paraphrased
+name.
+
+averageReview/deterministicVote take []ReviewCheck parameter to look up
+canonical labels. criterionAgg carries id, bucketName, label separately. Final
+CriterionResult.Name is canonical (bucket-prefixed per mergeBucketResults).
+
+Strict-fail for missing: if a reviewer's response was successfully parsed but
+is missing some id, that id is not in the vote (defense in depth — commit 5
+retry-then-drop should prevent this).
+
+All tests updated to pass nil checks (legacy vote path).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
