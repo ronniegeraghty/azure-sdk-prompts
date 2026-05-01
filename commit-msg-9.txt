@@ -1,0 +1,15 @@
+chore(review): legacy criteria paths retained for backward compat
+
+No code removed in this commit. Bucket.Criteria string field is still used by:
+- Single-bucket fast paths (ReviewBuckets line 47, ReviewPanelBuckets line 81)
+- External graders (prompt_review_grader.go)
+- Tests (buckets_test.go)
+
+The v1 parseReviewResponse (criterion text-keyed) is still called by Review()
+and ReviewPanel() for single-bucket and legacy cases.
+
+The multi-bucket paths (ReviewPanelBuckets with len(buckets) > 1) use the new
+id-aware path. Full migration (deleting Criteria field + v1 parser) requires
+updating all call sites to use Checks.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
