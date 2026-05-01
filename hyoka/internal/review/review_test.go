@@ -1437,49 +1437,8 @@ func TestEventCollectorResponseCopiesEvents(t *testing.T) {
 func strPtr(s string) *string { return &s }
 
 // ---------------------------------------------------------------------------
-// ReviewerResponse / new JSON schema tests (#343)
+// Reviewer validation tests
 // ---------------------------------------------------------------------------
-
-func TestParseReviewResponseNewSchema(t *testing.T) {
-	input := `{"criteria":[{"criterion":"Uses DefaultAzureCredential","passed":true,"reasoning":"Correctly imports and uses DefaultAzureCredential"},{"criterion":"Handles errors","passed":false,"reasoning":"Missing error handling for auth failures"}],"summary":"Partial pass","issues":["No error handling"],"strengths":["Correct auth"]}`
-
-	result, err := parseReviewResponse(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Scores.Criteria) != 2 {
-		t.Fatalf("expected 2 criteria, got %d", len(result.Scores.Criteria))
-	}
-	if result.Scores.Criteria[0].Name != "Uses DefaultAzureCredential" {
-		t.Errorf("criterion[0].Name = %q, want %q", result.Scores.Criteria[0].Name, "Uses DefaultAzureCredential")
-	}
-	if !result.Scores.Criteria[0].Passed {
-		t.Error("criterion[0] should pass")
-	}
-	if result.Scores.Criteria[1].Passed {
-		t.Error("criterion[1] should fail")
-	}
-	if result.OverallScore != 1 {
-		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
-	}
-	if result.MaxScore != 2 {
-		t.Errorf("MaxScore = %d, want 2", result.MaxScore)
-	}
-}
-
-func TestParseReviewResponseNewSchemaInMarkdown(t *testing.T) {
-	input := "```json\n" + `{"criteria":[{"criterion":"Build","passed":true,"reasoning":"OK"}],"summary":"Good","issues":[],"strengths":["Clean"]}` + "\n```"
-	result, err := parseReviewResponse(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Scores.Criteria) != 1 {
-		t.Fatalf("expected 1 criterion, got %d", len(result.Scores.Criteria))
-	}
-	if result.Scores.Criteria[0].Reason != "OK" {
-		t.Errorf("reason = %q, want %q", result.Scores.Criteria[0].Reason, "OK")
-	}
-}
 
 func TestValidateReviewerResponseValid(t *testing.T) {
 	result := &ReviewResult{

@@ -974,3 +974,15 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 - Shows on passing evals (previously silent) and failing evals (replacing terse "12/26 points")
 - All progress tests pass
 - Live run verification confirms correct display: `❌ Total checks that passed across all graders: 23/26`
+
+## 2026-05-01 C13: Per-check diff in pairwise reports
+
+**Commit:** 8a584f17
+
+**Context:** User reported that pairwise pages don't show which specific checks improved/regressed when tools are removed. We had tool-level impact scores but no granular per-check visibility.
+
+**Solution:** Added `PairwiseCheckDiff` type and `check_diffs` map to `PairwiseReport`. For each variant, compute per-check diffs against baseline, classifying movement as "improved", "regressed", or "unchanged". Avoided import cycle by creating lightweight `EvalReportData` type in pairwise package.
+
+**API Contract:** Each variant's check diffs are keyed by variant config name (e.g., "without-tool-a"). Frontend (Trinity) can now render check-level deltas.
+
+**Testing:** Added `checkdiff_test.go` with 6 test cases covering improved/regressed/unchanged scenarios, missing checks, extra checks in variants, and nil inputs. All tests pass.
