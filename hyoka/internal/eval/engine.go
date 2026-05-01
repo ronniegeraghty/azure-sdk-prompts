@@ -769,14 +769,14 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				guardrailReason = extractGuardrailShortReason(evalReport.GuardrailAbortReason)
 			}
 			// Compute grader points totals for both pass and fail events
-			graderPointsPassed, graderPointsTotal := report.TotalGraderPoints(evalReport.GraderResults)
+			graderChecksPassed, graderChecksTotal := report.TotalGraderChecks(evalReport.GraderResults)
 			if evalReport.Error != "" {
 				evtType = progress.EventError
 				msg = "ERROR"
 			} else if !evalReport.Success {
 				evtType = progress.EventFailed
-				if graderPointsTotal > 0 {
-					msg = fmt.Sprintf("%d/%d points", graderPointsPassed, graderPointsTotal)
+				if graderChecksTotal > 0 {
+					msg = fmt.Sprintf("%d/%d points", graderChecksPassed, graderChecksTotal)
 				} else if evalReport.Review != nil {
 					msg = fmt.Sprintf("%d/%d points", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
 				}
@@ -790,8 +790,8 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				FileCount:          len(evalReport.GeneratedFiles),
 				ReviewScore:        reviewScore,
 				GuardrailReason:    guardrailReason,
-				GraderPointsPassed: graderPointsPassed,
-				GraderPointsTotal:  graderPointsTotal,
+				GraderChecksPassed: graderChecksPassed,
+				GraderChecksTotal:  graderChecksTotal,
 			})
 			terminalEventSent = true
 
@@ -1056,12 +1056,12 @@ func evalReportToData(r *report.EvalReport) *pairwise.EvalReportData {
 	}
 	
 	for _, grader := range r.GraderResults {
-		points := make([]pairwise.PointData, 0, len(grader.Points))
-		for _, point := range grader.Points {
+		points := make([]pairwise.PointData, 0, len(grader.Checks))
+		for _, check := range grader.Checks {
 			points = append(points, pairwise.PointData{
-				Label:   point.Label,
-				Pass:    point.Pass,
-				Message: point.Message,
+				Label:   check.Label,
+				Pass:    check.Pass,
+				Message: check.Message,
 			})
 		}
 		data.Graders = append(data.Graders, pairwise.GraderData{

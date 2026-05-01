@@ -53,12 +53,12 @@ func (g *FileGrader) Kind() string { return KindFile }
 func (g *FileGrader) Name() string { return g.name }
 
 // Grade checks file existence and optionally matches content against the pattern.
-// Per v4 spec: emits two points when Pattern is set (file present + pattern matches),
+// Per v4 spec: emits two checks when Pattern is set (file present + pattern matches),
 // one point otherwise (file present). No 0.5 partial credit.
 func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, error) {
 	fullPath := filepath.Join(input.WorkspacePath, g.path)
 
-	var points []GraderPoint
+	var checks []GraderCheck
 	var fileExtra FileExtra
 
 	fileExtra.Path = g.path
@@ -71,25 +71,25 @@ func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 
 		if g.mustExist {
 			// Required file missing → fail
-			points = append(points, GraderPoint{
+			checks = append(checks, GraderCheck{
 				Label:   fmt.Sprintf("file present: %s", g.path),
 				Pass:    false,
 				Message: fmt.Sprintf("file not found at %s", fullPath),
 			})
 			msg := fmt.Sprintf("required file %q not found", g.path)
-			return NewResult(KindFile, g.name, input.Config, points, msg, &GraderExtras{
+			return NewResult(KindFile, g.name, input.Config, checks, msg, &GraderExtras{
 				File: &FileExtras{Files: []FileExtra{fileExtra}},
 			}), nil
 		}
 
 		// Optional file missing → pass
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   fmt.Sprintf("file present: %s", g.path),
 			Pass:    true,
 			Message: fmt.Sprintf("optional file %q not required", g.path),
 		})
 		msg := fmt.Sprintf("optional file %q not found (ok)", g.path)
-		return NewResult(KindFile, g.name, input.Config, points, msg, &GraderExtras{
+		return NewResult(KindFile, g.name, input.Config, checks, msg, &GraderExtras{
 			File: &FileExtras{Files: []FileExtra{fileExtra}},
 		}), nil
 	}
@@ -102,7 +102,7 @@ func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 	}
 
 	// First point: file present
-	points = append(points, GraderPoint{
+	checks = append(checks, GraderCheck{
 		Label:   fmt.Sprintf("file present: %s", g.path),
 		Pass:    true,
 		Message: "",
@@ -115,14 +115,14 @@ func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 
 		label := fmt.Sprintf("pattern matches: %s", g.path)
 		if matched {
-			points = append(points, GraderPoint{
+			checks = append(checks, GraderCheck{
 				Label:    label,
 				Pass:     true,
 				Message:  "",
 				Evidence: map[string]string{"pattern": g.rawPat},
 			})
 		} else {
-			points = append(points, GraderPoint{
+			checks = append(checks, GraderCheck{
 				Label:    label,
 				Pass:     false,
 				Message:  fmt.Sprintf("pattern %q not found in file", g.rawPat),
@@ -136,7 +136,7 @@ func (g *FileGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 		msg = fmt.Sprintf("file %q exists but pattern %q not matched", g.path, g.rawPat)
 	}
 
-	return NewResult(KindFile, g.name, input.Config, points, msg, &GraderExtras{
+	return NewResult(KindFile, g.name, input.Config, checks, msg, &GraderExtras{
 		File: &FileExtras{Files: []FileExtra{fileExtra}},
 	}), nil
 }

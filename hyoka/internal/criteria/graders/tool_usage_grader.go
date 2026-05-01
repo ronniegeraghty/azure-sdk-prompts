@@ -74,7 +74,7 @@ func (g *ToolUsageGrader) Grade(_ context.Context, input GraderInput) (GraderRes
 	skillSet := stringSet(input.SkillsInvoked)
 	mcpSet := stringSet(input.MCPServersUsed)
 
-	var points []GraderPoint
+	var checks []GraderCheck
 	for _, rule := range g.cfg.Rules {
 		match := findEnvTool(input.EnvironmentTools, rule)
 		if match == nil {
@@ -84,18 +84,18 @@ func (g *ToolUsageGrader) Grade(_ context.Context, input GraderInput) (GraderRes
 			continue
 		}
 		p := evaluateRule(rule, *match, skillSet, mcpSet)
-		points = append(points, p)
+		checks = append(checks, p)
 	}
 
-	if len(points) == 0 {
-		points = []GraderPoint{{
+	if len(checks) == 0 {
+		checks = []GraderCheck{{
 			Label:   "no_applicable_rules",
 			Pass:    true,
 			Message: "no tool_usage rules were applicable to this environment",
 		}}
 	}
-	msg := summarizePoints(points)
-	return NewResult(KindToolUsage, g.name, input.Config, points, msg, nil), nil
+	msg := summarizePoints(checks)
+	return NewResult(KindToolUsage, g.name, input.Config, checks, msg, nil), nil
 }
 
 func stringSet(xs []string) map[string]bool {
@@ -153,20 +153,20 @@ func evaluateRule(rule ToolUsageRule, et EnvironmentTool, skillSet, mcpSet map[s
 	switch rule.Expect {
 	case "at_least_one_tool_call":
 		used := mcpSet[et.Name]
-		return GraderPoint{
+		return GraderCheck{
 			Label:   fmt.Sprintf("mcp_server:%s tool call recorded", et.Name),
 			Pass:    used,
 			Message: tcMessage(used, "at least one tool call recorded", "no tool calls recorded"),
 		}
 	case "any_skill_invoked", "skill_invoked":
 		used := skillSet[et.Name]
-		return GraderPoint{
+		return GraderCheck{
 			Label:   fmt.Sprintf("skill:%s invoked", et.Name),
 			Pass:    used,
 			Message: tcMessage(used, "skill was invoked", "skill was not invoked"),
 		}
 	default:
-		return GraderPoint{
+		return GraderCheck{
 			Label:   fmt.Sprintf("%s:%s unknown expectation", rule.Type, et.Name),
 			Pass:    false,
 			Message: fmt.Sprintf("unknown expect value %q", rule.Expect),
@@ -181,12 +181,12 @@ func tcMessage(pass bool, okMsg, failMsg string) string {
 	return failMsg
 }
 
-func summarizePoints(points []GraderPoint) string {
+func summarizePoints(checks []GraderPoint) string {
 	passed := 0
-	for _, p := range points {
+	for _, p := range checks {
 		if p.Pass {
 			passed++
 		}
 	}
-	return fmt.Sprintf("tool_usage: %d/%d rules passed", passed, len(points))
+	return fmt.Sprintf("tool_usage: %d/%d rules passed", passed, len(checks))
 }

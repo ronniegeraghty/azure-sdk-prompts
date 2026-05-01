@@ -102,7 +102,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		producedFiles = append(producedFiles, FileEntry{Path: f.Path, Size: f.Size})
 	}
 
-	var points []GraderPoint
+	var checks []GraderCheck
 
 	// --- Run each configured sub-check. Order is stable for reporting. ---
 
@@ -114,7 +114,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		} else {
 			msg = fmt.Sprintf("produced %d file(s), need >= %d", len(produced), g.cfg.MinFiles)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:    fmt.Sprintf("min_files (%d)", g.cfg.MinFiles),
 			Pass:     pass,
 			Message:  msg,
@@ -130,7 +130,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		} else {
 			msg = fmt.Sprintf("produced %d file(s), exceeds max of %d", len(produced), g.cfg.MaxFiles)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:    fmt.Sprintf("max_files (%d)", g.cfg.MaxFiles),
 			Pass:     pass,
 			Message:  msg,
@@ -154,7 +154,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 			msg = fmt.Sprintf("missing %d/%d required file(s): %s",
 				len(missing), len(g.cfg.RequireFiles), strings.Join(missing, ", "))
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   "require_files",
 			Pass:    pass,
 			Message: msg,
@@ -176,7 +176,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		} else {
 			msg = fmt.Sprintf("found forbidden file(s): %s", strings.Join(found, ", "))
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   "forbid_files",
 			Pass:    pass,
 			Message: msg,
@@ -198,7 +198,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		} else {
 			msg = fmt.Sprintf("not modified by agent: %s", strings.Join(notUpdated, ", "))
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   "require_updated",
 			Pass:    pass,
 			Message: msg,
@@ -226,7 +226,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 			msg = fmt.Sprintf("%d file(s) below %d bytes: %s",
 				len(offenders), g.cfg.MinBytesPerFile, strings.Join(offenders, ", "))
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   fmt.Sprintf("min_bytes_per_file (%d)", g.cfg.MinBytesPerFile),
 			Pass:    pass,
 			Message: msg,
@@ -248,7 +248,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 			msg = fmt.Sprintf("%d file(s) above %d bytes: %s",
 				len(offenders), g.cfg.MaxBytesPerFile, strings.Join(offenders, ", "))
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   fmt.Sprintf("max_bytes_per_file (%d)", g.cfg.MaxBytesPerFile),
 			Pass:    pass,
 			Message: msg,
@@ -259,8 +259,8 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 	// Phase 3 invariant: every grader emits ≥ 1 Point. When no knobs are
 	// configured the grader still emits a single trivially-passing Point so
 	// the site never falls back to its legacy "PASS"/"100%" header.
-	if len(points) == 0 {
-		points = []GraderPoint{{
+	if len(checks) == 0 {
+		checks = []GraderCheck{{
 			Label:   "no_knobs",
 			Pass:    true,
 			Message: "no output_check knobs configured — trivially passed",
@@ -268,14 +268,14 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 	}
 
 	failCount := 0
-	for _, p := range points {
+	for _, p := range checks {
 		if !p.Pass {
 			failCount++
 		}
 	}
-	msg := fmt.Sprintf("output_check passed all %d configured knob(s)", len(points))
+	msg := fmt.Sprintf("output_check passed all %d configured knob(s)", len(checks))
 	if failCount > 0 {
-		msg = fmt.Sprintf("output_check failed %d/%d knob(s)", failCount, len(points))
+		msg = fmt.Sprintf("output_check failed %d/%d knob(s)", failCount, len(checks))
 	}
 
 	extras := &GraderExtras{
@@ -284,7 +284,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		},
 	}
 
-	return NewResult(KindOutputCheck, g.name, input.Config, points, msg, extras), nil
+	return NewResult(KindOutputCheck, g.name, input.Config, checks, msg, extras), nil
 }
 
 // flattenDelta returns the agent's produced files (new + modified) with

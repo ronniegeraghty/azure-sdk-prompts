@@ -57,7 +57,7 @@ func makeGraders(scores ...float64) []report.GraderResult {
 			Score:      s,
 			Weight:     1.0,
 			Pass:       pass,
-			Points: []report.GraderPoint{
+			Checks: []report.GraderPoint{
 				{Label: "check", Pass: pass, Weight: 1.0},
 			},
 		})
@@ -190,12 +190,12 @@ func TestCompareConfigs_GraderDiffs(t *testing.T) {
 	dir := t.TempDir()
 
 	gradersA := []report.GraderResult{
-		{GraderName: "correctness", GraderType: "prompt", Score: 0.5, Weight: 1.0, Pass: true, Points: []report.GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-		{GraderName: "security", GraderType: "prompt", Score: 0.3, Weight: 1.0, Pass: false, Points: []report.GraderPoint{{Label: "check", Pass: false, Weight: 1.0}}},
+		{GraderName: "correctness", GraderType: "prompt", Score: 0.5, Weight: 1.0, Pass: true, Checks: []report.GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "security", GraderType: "prompt", Score: 0.3, Weight: 1.0, Pass: false, Checks: []report.GraderPoint{{Label: "check", Pass: false, Weight: 1.0}}},
 	}
 	gradersB := []report.GraderResult{
-		{GraderName: "correctness", GraderType: "prompt", Score: 0.8, Weight: 1.0, Pass: true, Points: []report.GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-		{GraderName: "security", GraderType: "prompt", Score: 0.9, Weight: 1.0, Pass: true, Points: []report.GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "correctness", GraderType: "prompt", Score: 0.8, Weight: 1.0, Pass: true, Checks: []report.GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "security", GraderType: "prompt", Score: 0.9, Weight: 1.0, Pass: true, Checks: []report.GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	writeReport(t, dir, "run-001", "prompt-alpha", "config-a", "2025-01-01T10:00:00Z", gradersA, nil)

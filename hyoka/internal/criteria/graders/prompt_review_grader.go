@@ -109,7 +109,7 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 	logCriteriaCountMismatch(g.name, input, len(consolidated.Scores.Criteria))
 
 	// Per v4 spec: one Point per criterion, Weight = criterion max
-	var points []GraderPoint
+	var checks []GraderCheck
 	for i, c := range consolidated.Scores.Criteria {
 		label := c.Name
 		if label == "" {
@@ -120,7 +120,7 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 			pointMsg = c.Reason
 		}
 		// Default weight to 1.0 (review package doesn't track per-criterion max)
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    c.Passed,
 			Message: pointMsg,
@@ -128,9 +128,9 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 		})
 	}
 	
-	if len(points) == 0 {
+	if len(checks) == 0 {
 		// Fallback: review with no criteria — synthesize one point
-		points = []GraderPoint{{
+		checks = []GraderCheck{{
 			Label:   "consensus",
 			Pass:    consolidated.Scores.AllPassed(),
 			Message: consolidated.Summary,
@@ -172,7 +172,7 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 	}
 
 	msg := consolidated.Summary
-	return NewResult(KindPromptReview, g.name, input.Config, points, msg, extras), nil
+	return NewResult(KindPromptReview, g.name, input.Config, checks, msg, extras), nil
 }
 
 func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput, workDir string, result GraderResult, artifact *review.GeneratorArtifact) (GraderResult, error) {
@@ -206,7 +206,7 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 	logCriteriaCountMismatch(g.name, input, len(reviewResult.Scores.Criteria))
 
 	// Per v4 spec: one Point per criterion, Weight = criterion max
-	var points []GraderPoint
+	var checks []GraderCheck
 	for i, c := range reviewResult.Scores.Criteria {
 		label := c.Name
 		if label == "" {
@@ -217,7 +217,7 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 			pointMsg = c.Reason
 		}
 		// Default weight to 1.0 (review package doesn't track per-criterion max)
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    c.Passed,
 			Message: pointMsg,
@@ -225,8 +225,8 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 		})
 	}
 	
-	if len(points) == 0 {
-		points = []GraderPoint{{
+	if len(checks) == 0 {
+		checks = []GraderCheck{{
 			Label:   "review",
 			Pass:    reviewResult.Scores.AllPassed(),
 			Message: reviewResult.Summary,
@@ -246,7 +246,7 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 	}
 
 	msg := reviewResult.Summary
-	return NewResult(KindPromptReview, g.name, input.Config, points, msg, extras), nil
+	return NewResult(KindPromptReview, g.name, input.Config, checks, msg, extras), nil
 }
 
 // toReviewBuckets converts grader-package buckets to review-package buckets.

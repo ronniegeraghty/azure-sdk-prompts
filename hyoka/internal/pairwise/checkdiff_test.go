@@ -11,7 +11,7 @@ func TestComputeCheckDiffs(t *testing.T) {
 			{
 				Name: "file_check",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "main.py exists", Pass: false, Message: "file not found"},
 					{Label: "config.json exists", Pass: true, Message: "found"},
 				},
@@ -19,7 +19,7 @@ func TestComputeCheckDiffs(t *testing.T) {
 			{
 				Name: "build_test",
 				Type: "program",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "build succeeds", Pass: true, Message: "built successfully"},
 				},
 			},
@@ -32,7 +32,7 @@ func TestComputeCheckDiffs(t *testing.T) {
 			{
 				Name: "file_check",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "main.py exists", Pass: true, Message: "file found"},
 					{Label: "config.json exists", Pass: true, Message: "found"},
 				},
@@ -40,7 +40,7 @@ func TestComputeCheckDiffs(t *testing.T) {
 			{
 				Name: "build_test",
 				Type: "program",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "build succeeds", Pass: false, Message: "build failed: syntax error"},
 				},
 			},
@@ -53,7 +53,7 @@ func TestComputeCheckDiffs(t *testing.T) {
 			{
 				Name: "file_check",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "main.py exists", Pass: false, Message: "still not found"},
 					{Label: "config.json exists", Pass: true, Message: "found"},
 				},
@@ -61,7 +61,7 @@ func TestComputeCheckDiffs(t *testing.T) {
 			{
 				Name: "build_test",
 				Type: "program",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "build succeeds", Pass: true, Message: "built successfully"},
 				},
 			},
@@ -164,7 +164,7 @@ func TestComputeCheckDiffsMissingChecks(t *testing.T) {
 			{
 				Name: "grader_a",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "check_1", Pass: true},
 					{Label: "check_2", Pass: false},
 				},
@@ -179,7 +179,7 @@ func TestComputeCheckDiffsMissingChecks(t *testing.T) {
 			{
 				Name: "grader_a",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "check_1", Pass: false},
 					// check_2 missing
 				},
@@ -218,7 +218,7 @@ func TestComputeCheckDiffsExtraChecksInVariant(t *testing.T) {
 			{
 				Name: "grader_a",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "check_1", Pass: true},
 				},
 			},
@@ -232,7 +232,7 @@ func TestComputeCheckDiffsExtraChecksInVariant(t *testing.T) {
 			{
 				Name: "grader_a",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "check_1", Pass: true},
 					{Label: "check_2_new", Pass: true}, // new check not in baseline
 				},
@@ -262,7 +262,7 @@ func TestIndexPoints(t *testing.T) {
 			{
 				Name: "grader_a",
 				Type: "file",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "check_1", Pass: true, Message: "msg1"},
 					{Label: "check_2", Pass: false, Message: "msg2"},
 				},
@@ -270,7 +270,7 @@ func TestIndexPoints(t *testing.T) {
 			{
 				Name: "grader_b",
 				Type: "program",
-				Points: []PointData{
+				Checks: []PointData{
 					{Label: "test_1", Pass: true},
 				},
 			},

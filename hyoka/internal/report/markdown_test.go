@@ -40,8 +40,8 @@ func TestWriteMarkdownReport(t *testing.T) {
 			Strengths:    []string{"Clean code structure"},
 		},
 		GraderResults: []GraderResult{
-			{GraderName: "md-grader", GraderType: "review", Score: 0.8, Weight: 1.0, Pass: true, Message: "Grader output for MD", Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-			{GraderName: "consensus", GraderType: "review", Score: 0.8, Weight: 1.0, Pass: true, Message: "MD consensus", Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+			{GraderName: "md-grader", GraderType: "review", Score: 0.8, Weight: 1.0, Pass: true, Message: "Grader output for MD", Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+			{GraderName: "consensus", GraderType: "review", Score: 0.8, Weight: 1.0, Pass: true, Message: "MD consensus", Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 		},
 		SessionEvents: []SessionEventRecord{
 			{Type: "user.message", Content: "Write a dotnet storage auth sample"},
@@ -300,7 +300,7 @@ func TestWriteGraderResults_GroupedBySourceFile(t *testing.T) {
 			Pass:       true,
 			SourceFile: "/prompts/crud-secrets.prompt.md",
 			SourceType: "prompt_file",
-			Points: []GraderPoint{
+			Checks: []GraderPoint{
 				{Label: "check 1", Pass: true},
 				{Label: "check 2", Pass: true},
 			},
@@ -311,7 +311,7 @@ func TestWriteGraderResults_GroupedBySourceFile(t *testing.T) {
 			Pass:       false,
 			SourceFile: "/criteria/python.yaml",
 			SourceType: "criteria_file",
-			Points: []GraderPoint{
+			Checks: []GraderPoint{
 				{Label: "Uses DefaultAzureCredential", Pass: true},
 				{Label: "Uses async/await patterns", Pass: false},
 			},
@@ -322,7 +322,7 @@ func TestWriteGraderResults_GroupedBySourceFile(t *testing.T) {
 			Pass:       true,
 			SourceFile: "/criteria/python.yaml",
 			SourceType: "criteria_file",
-			Points: []GraderPoint{
+			Checks: []GraderPoint{
 				{Label: "min_files (1)", Pass: true},
 				{Label: "min_bytes_per_file (1)", Pass: true},
 			},
@@ -371,7 +371,7 @@ func TestWriteGraderResults_FlatFallbackWhenNoSourceFile(t *testing.T) {
 			GraderType: "output_check",
 			Pass:       true,
 			// SourceFile intentionally empty
-			Points: []GraderPoint{
+			Checks: []GraderPoint{
 				{Label: "file exists", Pass: true},
 			},
 		},

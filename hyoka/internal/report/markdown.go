@@ -678,12 +678,12 @@ func writeGraderResults(b *strings.Builder, results []GraderResult) {
 		for _, g := range grp.graders {
 			// Count pass/total from Points.
 			passed := 0
-			for _, p := range g.Points {
-				if p.Pass {
+			for _, c := range g.Checks {
+				if c.Pass {
 					passed++
 				}
 			}
-			total := len(g.Points)
+			total := len(g.Checks)
 			graderPass := "Pass"
 			if !g.Pass {
 				graderPass = "Fail"
@@ -701,19 +701,19 @@ func writeGraderResults(b *strings.Builder, results []GraderResult) {
 				fmt.Fprintf(b, "  - %s (%s): %s (%d/%d)\n", g.GraderName, graderType, graderPass, passed, total)
 			}
 
-			for _, p := range g.Points {
-				pointPass := "Pass"
-				if !p.Pass {
-					pointPass = "Fail"
+			for _, c := range g.Checks {
+				checkPass := "Pass"
+				if !c.Pass {
+					checkPass = "Fail"
 				}
-				label := p.Label
+				label := c.Label
 				if label == "" {
 					label = g.GraderName
 				}
 				if flatFallback {
-					fmt.Fprintf(b, "    - %s: %s\n", label, pointPass)
+					fmt.Fprintf(b, "    - %s: %s\n", label, checkPass)
 				} else {
-					fmt.Fprintf(b, "      - %s: %s\n", label, pointPass)
+					fmt.Fprintf(b, "      - %s: %s\n", label, checkPass)
 				}
 			}
 		}

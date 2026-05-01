@@ -40,13 +40,13 @@ func buildDelta(files []dFile) *WorkspaceDelta {
 
 func findPoint(t *testing.T, res GraderResult, labelSubstr string) GraderPoint {
 	t.Helper()
-	for _, p := range res.Points {
+	for _, p := range res.Checks {
 		if strings.Contains(p.Label, labelSubstr) {
 			return p
 		}
 	}
-	t.Fatalf("point with label containing %q not found in result (have %d points)", labelSubstr, len(res.Points))
-	return GraderPoint{}
+	t.Fatalf("point with label containing %q not found in result (have %d points)", labelSubstr, len(res.Checks))
+	return GraderCheck{}
 }
 
 func TestOutputCheckGrader_NoKnobs_TriviallyPasses(t *testing.T) {
@@ -63,11 +63,11 @@ func TestOutputCheckGrader_NoKnobs_TriviallyPasses(t *testing.T) {
 	}
 	// Phase 3 invariant: every grader emits ≥ 1 Point. The "no knobs" case
 	// emits a single trivially-passing "no_knobs" Point.
-	if len(res.Points) != 1 {
-		t.Errorf("expected exactly one (trivial-pass) sub-check, got %d", len(res.Points))
+	if len(res.Checks) != 1 {
+		t.Errorf("expected exactly one (trivial-pass) sub-check, got %d", len(res.Checks))
 	}
-	if len(res.Points) >= 1 && res.Points[0].Label != "no_knobs" {
-		t.Errorf("expected single Point with label 'no_knobs', got %q", res.Points[0].Label)
+	if len(res.Checks) >= 1 && res.Checks[0].Label != "no_knobs" {
+		t.Errorf("expected single Point with label 'no_knobs', got %q", res.Checks[0].Label)
 	}
 }
 
@@ -278,15 +278,15 @@ func TestOutputCheckGrader_AllChecksReported_NoEarlyExit(t *testing.T) {
 	if res.Pass {
 		t.Fatalf("expected overall fail, got pass; msg=%q", res.Message)
 	}
-	if n := len(res.Points); n != 5 {
-		t.Errorf("expected 5 sub-checks, got %d: %+v", n, res.Points)
+	if n := len(res.Checks); n != 5 {
+		t.Errorf("expected 5 sub-checks, got %d: %+v", n, res.Checks)
 	}
 	// min_files, forbid_files, max_bytes_per_file should fail;
 	// require_files and min_bytes_per_file should pass.
 	wantFail := map[string]bool{"min_files (10)": true, "forbid_files": true, "max_bytes_per_file (20)": true}
 	wantPass := map[string]bool{"require_files": true, "min_bytes_per_file (5)": true}
 	seen := map[string]bool{}
-	for _, sc := range res.Points {
+	for _, sc := range res.Checks {
 		seen[sc.Label] = true
 		if wantFail[sc.Label] && sc.Pass {
 			t.Errorf("sub-check %q expected fail, passed: %q", sc.Label, sc.Message)
@@ -326,10 +326,10 @@ func TestOutputCheckGrader_AllChecksPass_OverallPass(t *testing.T) {
 	if !res.Pass || res.Score != 1.0 {
 		t.Errorf("want overall pass, got Pass=%v Score=%v msg=%q", res.Pass, res.Score, res.Message)
 	}
-	if len(res.Points) != 7 {
-		t.Errorf("expected 7 points, got %d", len(res.Points))
+	if len(res.Checks) != 7 {
+		t.Errorf("expected 7 points, got %d", len(res.Checks))
 	}
-	for _, point := range res.Points {
+	for _, point := range res.Checks {
 		if !point.Pass {
 			t.Errorf("point %q unexpectedly failed: %q", point.Label, point.Message)
 		}

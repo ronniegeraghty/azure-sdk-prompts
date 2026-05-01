@@ -64,7 +64,7 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 	}
 	
 	var violations []string
-	var points []GraderPoint
+	var checks []GraderCheck
 	
 	// Per-tool Points for required tools
 	for _, tool := range g.requiredTools {
@@ -76,7 +76,7 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 			violations = append(violations, fmt.Sprintf("required tool %q not found", tool))
 			pointMsg = fmt.Sprintf("required tool %q not found", tool)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    present,
 			Message: pointMsg,
@@ -93,7 +93,7 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 			violations = append(violations, fmt.Sprintf("forbidden tool %q was used", tool))
 			pointMsg = fmt.Sprintf("forbidden tool %q was used", tool)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    !used,
 			Message: pointMsg,
@@ -110,7 +110,7 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 			violations = append(violations, fmt.Sprintf("turn count %d exceeds limit %d", maxTurn, g.maxTurns))
 			pointMsg = fmt.Sprintf("turn count %d exceeds limit %d", maxTurn, g.maxTurns)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    within,
 			Message: pointMsg,
@@ -125,15 +125,15 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 	}
 	
 	// Handle no-constraints case (per spec: must emit at least one Point)
-	if len(points) == 0 {
-		points = []GraderPoint{{
+	if len(checks) == 0 {
+		checks = []GraderCheck{{
 			Label:   "no constraints",
 			Pass:    true,
 			Message: "no behavior constraints configured — trivially passed",
 		}}
 	}
 	
-	return NewResult(KindBehavior, g.name, input.Config, points, msg, &GraderExtras{Behavior: extras}), nil
+	return NewResult(KindBehavior, g.name, input.Config, checks, msg, &GraderExtras{Behavior: extras}), nil
 }
 
 // ActionSequenceGrader verifies that the action log contains an expected
@@ -189,7 +189,7 @@ func (g *ActionSequenceGrader) Grade(_ context.Context, input GraderInput) (Grad
 	}
 	
 	// Per-step Points: one Point per expected action position
-	var points []GraderPoint
+	var checks []GraderCheck
 	for i, expectedTool := range g.expectedActions {
 		label := fmt.Sprintf("step %d: expected %s", i+1, expectedTool)
 		matched := i < matchIdx
@@ -202,7 +202,7 @@ func (g *ActionSequenceGrader) Grade(_ context.Context, input GraderInput) (Grad
 				pointMsg = "sequence too short"
 			}
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    matched,
 			Message: pointMsg,
@@ -214,7 +214,7 @@ func (g *ActionSequenceGrader) Grade(_ context.Context, input GraderInput) (Grad
 		msg = fmt.Sprintf("matched %d/%d expected actions", matchIdx, len(g.expectedActions))
 	}
 	
-	return NewResult(KindActionSequence, g.name, input.Config, points, msg, &GraderExtras{ActionSequence: extras}), nil
+	return NewResult(KindActionSequence, g.name, input.Config, checks, msg, &GraderExtras{ActionSequence: extras}), nil
 }
 
 // ToolConstraintGrader enforces granular tool usage constraints:
@@ -276,7 +276,7 @@ func (g *ToolConstraintGrader) Grade(_ context.Context, input GraderInput) (Grad
 	}
 	
 	var violations []string
-	var points []GraderPoint
+	var checks []GraderCheck
 	
 	// Required tools
 	for _, tool := range g.required {
@@ -288,7 +288,7 @@ func (g *ToolConstraintGrader) Grade(_ context.Context, input GraderInput) (Grad
 			violations = append(violations, fmt.Sprintf("required tool %q not called", tool))
 			pointMsg = fmt.Sprintf("required tool %q not called", tool)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    called,
 			Message: pointMsg,
@@ -305,7 +305,7 @@ func (g *ToolConstraintGrader) Grade(_ context.Context, input GraderInput) (Grad
 			violations = append(violations, fmt.Sprintf("forbidden tool %q called %d time(s)", tool, toolCounts[tool]))
 			pointMsg = fmt.Sprintf("forbidden tool %q called %d time(s)", tool, toolCounts[tool])
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    !used,
 			Message: pointMsg,
@@ -322,7 +322,7 @@ func (g *ToolConstraintGrader) Grade(_ context.Context, input GraderInput) (Grad
 			violations = append(violations, fmt.Sprintf("tool %q called %d time(s), minimum is %d", tool, toolCounts[tool], minCount))
 			pointMsg = fmt.Sprintf("tool %q called %d time(s), minimum is %d", tool, toolCounts[tool], minCount)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    ok,
 			Message: pointMsg,
@@ -343,7 +343,7 @@ func (g *ToolConstraintGrader) Grade(_ context.Context, input GraderInput) (Grad
 			violations = append(violations, fmt.Sprintf("tool %q called %d time(s), maximum is %d", tool, toolCounts[tool], maxCount))
 			pointMsg = fmt.Sprintf("tool %q called %d time(s), maximum is %d", tool, toolCounts[tool], maxCount)
 		}
-		points = append(points, GraderPoint{
+		checks = append(checks, GraderCheck{
 			Label:   label,
 			Pass:    ok,
 			Message: pointMsg,
@@ -363,15 +363,15 @@ func (g *ToolConstraintGrader) Grade(_ context.Context, input GraderInput) (Grad
 	}
 	
 	// Handle no-constraints case (per spec: must emit at least one Point)
-	if len(points) == 0 {
-		points = []GraderPoint{{
+	if len(checks) == 0 {
+		checks = []GraderCheck{{
 			Label:   "no constraints",
 			Pass:    true,
 			Message: "no tool constraints configured — trivially passed",
 		}}
 	}
 	
-	return NewResult(KindToolConstraint, g.name, input.Config, points, msg, &GraderExtras{ToolConstraint: extras}), nil
+	return NewResult(KindToolConstraint, g.name, input.Config, checks, msg, &GraderExtras{ToolConstraint: extras}), nil
 }
 
 // ---------------------------------------------------------------------------

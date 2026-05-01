@@ -180,11 +180,11 @@ func TestToolUsageGrader_Grade(t *testing.T) {
 			if err != nil {
 				t.Fatalf("grade: %v", err)
 			}
-			if len(res.Points) != tc.wantPoints {
-				t.Fatalf("points=%d want=%d (%+v)", len(res.Points), tc.wantPoints, res.Points)
+			if len(res.Checks) != tc.wantPoints {
+				t.Fatalf("points=%d want=%d (%+v)", len(res.Checks), tc.wantPoints, res.Checks)
 			}
 			passing := 0
-			for _, p := range res.Points {
+			for _, p := range res.Checks {
 				if p.Pass {
 					passing++
 				}
@@ -192,8 +192,8 @@ func TestToolUsageGrader_Grade(t *testing.T) {
 			if passing != tc.wantPassing {
 				t.Errorf("passing=%d want=%d", passing, tc.wantPassing)
 			}
-			if tc.wantLabel0 != "" && res.Points[0].Label != tc.wantLabel0 {
-				t.Errorf("points[0].Label=%q want=%q", res.Points[0].Label, tc.wantLabel0)
+			if tc.wantLabel0 != "" && res.Checks[0].Label != tc.wantLabel0 {
+				t.Errorf("points[0].Label=%q want=%q", res.Checks[0].Label, tc.wantLabel0)
 			}
 		})
 	}

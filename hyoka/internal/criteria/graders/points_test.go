@@ -35,11 +35,11 @@ func TestOutputCheckGraderPoints(t *testing.T) {
 	if res.Pass {
 		t.Errorf("expected Pass=false (forbid_files violated), got true; message=%q", res.Message)
 	}
-	if got, want := len(res.Points), 3; got != want {
-		t.Fatalf("len(Points) = %d, want %d (one per configured knob); points=%+v", got, want, res.Points)
+	if got, want := len(res.Checks), 3; got != want {
+		t.Fatalf("len(Points) = %d, want %d (one per configured knob); points=%+v", got, want, res.Checks)
 	}
-	pointByLabel := make(map[string]GraderPoint, len(res.Points))
-	for _, p := range res.Points {
+	pointByLabel := make(map[string]GraderPoint, len(res.Checks))
+	for _, p := range res.Checks {
 		pointByLabel[p.Label] = p
 	}
 	if p, ok := pointByLabel["min_files (1)"]; !ok || !p.Pass {
@@ -70,11 +70,11 @@ func TestProgramGraderEmitsSinglePoint(t *testing.T) {
 	if !res.Pass {
 		t.Fatalf("expected Pass=true for exit 0, got false; message=%q", res.Message)
 	}
-	if got, want := len(res.Points), 1; got != want {
+	if got, want := len(res.Checks), 1; got != want {
 		t.Fatalf("len(Points) = %d, want %d", got, want)
 	}
-	if res.Points[0].Label != "exit code 0" || !res.Points[0].Pass {
-		t.Errorf("Point[0] = %+v, want Name=\"exit code 0\" Pass=true", res.Points[0])
+	if res.Checks[0].Label != "exit code 0" || !res.Checks[0].Pass {
+		t.Errorf("Point[0] = %+v, want Name=\"exit code 0\" Pass=true", res.Checks[0])
 	}
 }
 
@@ -101,10 +101,10 @@ func TestBehaviorGraderPointsPerConstraint(t *testing.T) {
 		t.Fatalf("expected Pass=true, got false; message=%q", res.Message)
 	}
 	// 2 required + 1 forbidden + 1 max_turns = 4 points.
-	if got, want := len(res.Points), 4; got != want {
-		t.Fatalf("len(Points) = %d, want %d; points=%+v", got, want, res.Points)
+	if got, want := len(res.Checks), 4; got != want {
+		t.Fatalf("len(Points) = %d, want %d; points=%+v", got, want, res.Checks)
 	}
-	for _, p := range res.Points {
+	for _, p := range res.Checks {
 		if !p.Pass {
 			t.Errorf("expected all points to pass, got %+v", p)
 		}
@@ -321,10 +321,10 @@ res, err := g.Grade(context.Background(), tc.input)
 if err != nil {
 t.Fatalf("Grade: %v", err)
 }
-if len(res.Points) == 0 {
+if len(res.Checks) == 0 {
 t.Fatalf("grader %s emitted zero Points — Phase 3 invariant violated", tc.name)
 }
-for i, p := range res.Points {
+for i, p := range res.Checks {
 if p.Label == "" {
 t.Errorf("grader %s Point[%d] has empty Label", tc.name, i)
 }
@@ -337,10 +337,10 @@ t.Errorf("grader %s Point[%d] has empty Label", tc.name, i)
 // constructor always synthesizes a single failing Point.
 func TestNewErrorResult_AlwaysEmitsPoint(t *testing.T) {
 r := NewErrorResult(KindFile, "boom", GraderConfig{Weight: 1.0}, "kaboom")
-if len(r.Points) != 1 {
-t.Fatalf("expected 1 Point, got %d", len(r.Points))
+if len(r.Checks) != 1 {
+t.Fatalf("expected 1 Point, got %d", len(r.Checks))
 }
-if r.Points[0].Pass {
+if r.Checks[0].Pass {
 t.Errorf("expected failing Point, got Pass=true")
 }
 if r.Pass {

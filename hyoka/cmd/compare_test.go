@@ -126,7 +126,7 @@ func writeTestReport(t *testing.T, dir, runID, promptID, config, timestamp strin
 t.Helper()
 pass := score >= 0.5
 graders := []report.GraderResult{
-{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Points: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
+{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Checks: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
 }
 r := report.EvalReport{
 SchemaVersion:  2,

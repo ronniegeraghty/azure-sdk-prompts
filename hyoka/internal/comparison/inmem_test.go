@@ -220,7 +220,7 @@ func mkReport(promptID, config, ts string, score float64) report.EvalReport {
 				Score:      score,
 				Weight:     1.0,
 				Pass:       pass,
-				Points: []report.GraderPoint{
+				Checks: []report.GraderPoint{
 					{Label: "check", Pass: pass, Weight: 1.0},
 				},
 			},

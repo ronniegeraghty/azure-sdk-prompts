@@ -24,7 +24,7 @@ func (a *PromptGraderAdapter) Grade(ctx context.Context, input GraderInput) (Gra
 		return GraderResult{}, fmt.Errorf("prompt grader %q: %w", a.inner.Name, err)
 	}
 
-	var points []GraderPoint
+	var checks []GraderCheck
 	label := fmt.Sprintf("LLM judge: %s", a.inner.Name)
 	pointMsg := ""
 	if !pr.Passed {
@@ -35,7 +35,7 @@ func (a *PromptGraderAdapter) Grade(ctx context.Context, input GraderInput) (Gra
 		}
 		pointMsg = fmt.Sprintf("score %d/%d: %s", pr.Details.RawScore, pr.Details.MaxScore, reasoning)
 	}
-	points = append(points, GraderPoint{
+	checks = append(checks, GraderCheck{
 		Label:   label,
 		Pass:    pr.Passed,
 		Message: pointMsg,
@@ -56,5 +56,5 @@ func (a *PromptGraderAdapter) Grade(ctx context.Context, input GraderInput) (Gra
 		},
 	}
 
-	return NewResult(KindPrompt, a.inner.Name, input.Config, points, msg, extras), nil
+	return NewResult(KindPrompt, a.inner.Name, input.Config, checks, msg, extras), nil
 }

@@ -382,7 +382,7 @@ for _, gr := range r.GraderResults {
 entry.GraderScores = append(entry.GraderScores, GraderScore{
 GraderName: gr.GraderName,
 Score:      gr.Score,
-MaxScore:   len(gr.Points), // v4: MaxScore is the number of points
+MaxScore:   len(gr.Checks), // v4: MaxScore is the number of checks
 })
 }
 

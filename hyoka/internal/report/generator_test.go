@@ -141,7 +141,7 @@ func TestGraderResultsRoundTrip(t *testing.T) {
 			Weight:     1.0,
 			Pass:       true,
 			Message:    "Good code",
-			Points: []GraderPoint{
+			Checks: []GraderPoint{
 				{Label: "design", Pass: true, Weight: 1.0},
 			},
 		},
@@ -152,7 +152,7 @@ func TestGraderResultsRoundTrip(t *testing.T) {
 			Weight:     1.0,
 			Pass:       true,
 			Message:    "Consensus result",
-			Points: []GraderPoint{
+			Checks: []GraderPoint{
 				{Label: "overall", Pass: true, Weight: 1.0},
 			},
 		},
@@ -720,9 +720,9 @@ func TestSessionSetupOmittedWhenEmpty(t *testing.T) {
 
 func TestBuildScoreBreakdownWeightedAverage(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-		{GraderName: "build", GraderType: "program", Score: 0.6, Weight: 1.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "build", GraderType: "program", Score: 0.6, Weight: 1.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -767,8 +767,8 @@ func TestBuildScoreBreakdownWeightedAverage(t *testing.T) {
 
 func TestBuildScoreBreakdownGateFailure(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "file_exists", GraderType: "file", Score: 0.0, Weight: 1.0, Gate: true, Pass: false, Points: []GraderPoint{{Label: "check", Pass: false, Weight: 1.0}}},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.9, Weight: 2.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "file_exists", GraderType: "file", Score: 0.0, Weight: 1.0, Gate: true, Pass: false, Checks: []GraderPoint{{Label: "check", Pass: false, Weight: 1.0}}},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.9, Weight: 2.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -866,8 +866,8 @@ func TestSessionSetupJSONRoundTrip(t *testing.T) {
 
 func TestBuildScoreBreakdownDefaultWeight(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "grader_a", GraderType: "file", Score: 1.0, Weight: 0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-		{GraderName: "grader_b", GraderType: "file", Score: 0.5, Weight: 0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "grader_a", GraderType: "file", Score: 1.0, Weight: 0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "grader_b", GraderType: "file", Score: 0.5, Weight: 0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -902,7 +902,7 @@ func TestBuildScoreBreakdownNilForLegacyReview(t *testing.T) {
 	// Legacy review-only results have no Score/Weight/Gate data (all zero-valued)
 	// The Points field is required now, so this test validates handling of minimal data
 	results := []GraderResult{
-		{GraderName: "reviewer", GraderType: "review", Score: 0, Weight: 0, Points: []GraderPoint{{Label: "review", Pass: true, Weight: 1.0}}},
+		{GraderName: "reviewer", GraderType: "review", Score: 0, Weight: 0, Checks: []GraderPoint{{Label: "review", Pass: true, Weight: 1.0}}},
 	}
 	sb := BuildScoreBreakdown(results)
 	if sb == nil {
@@ -914,8 +914,8 @@ func TestScoreBreakdownJSONRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
 	graderResults := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Gate: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-		{GraderName: "review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Gate: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	r := &EvalReport{
@@ -974,8 +974,8 @@ func TestScoreBreakdownInMarkdownReport(t *testing.T) {
 	dir := t.TempDir()
 
 	graderResults := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 0.5, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
-		{GraderName: "review", GraderType: "prompt", Score: 0.6, Weight: 1.0, Pass: true, Points: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 0.5, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "review", GraderType: "prompt", Score: 0.6, Weight: 1.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	r := &EvalReport{

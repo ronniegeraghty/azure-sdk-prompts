@@ -809,8 +809,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			// one entry per grader, including prompt_review.
 			// Total is the sum of all grader points across all graders;
 			// graders with zero points count as 1 point for backward compat.
-			evalReport.GradersTotal = countTotalPoints(agg.Results)
-			evalReport.GradersPassed = countPassedPoints(agg.Results)
+			evalReport.GradersTotal = countTotalChecks(agg.Results)
+			evalReport.GradersPassed = countPassedChecks(agg.Results)
 
 			if !agg.Pass && !evalFailed {
 				evalReport.Success = false
@@ -1234,35 +1234,35 @@ func countPassed(results []graders.GraderResult) int {
 	return n
 }
 
-// countTotalPoints returns the total number of grader points across all graders.
-// Graders with zero points are counted as having 1 point for backward compatibility
-// with legacy graders that don't populate the Points slice.
-func countTotalPoints(results []graders.GraderResult) int {
+// countTotalChecks returns the total number of grader checks across all graders.
+// Graders with zero checks are counted as having 1 check for backward compatibility
+// with legacy graders that don't populate the Checks slice.
+func countTotalChecks(results []graders.GraderResult) int {
 	total := 0
 	for _, r := range results {
-		if len(r.Points) > 0 {
-			total += len(r.Points)
+		if len(r.Checks) > 0 {
+			total += len(r.Checks)
 		} else {
-			// Legacy grader with no Points: treat as 1 point
+			// Legacy grader with no Checks: treat as 1 check
 			total++
 		}
 	}
 	return total
 }
 
-// countPassedPoints returns the number of passed grader points across all graders.
-// For graders without Points, the grader's overall Pass field is used (1 if true, 0 if false).
-func countPassedPoints(results []graders.GraderResult) int {
+// countPassedChecks returns the number of passed grader checks across all graders.
+// For graders without Checks, the grader's overall Pass field is used (1 if true, 0 if false).
+func countPassedChecks(results []graders.GraderResult) int {
 	passed := 0
 	for _, r := range results {
-		if len(r.Points) > 0 {
-			for _, pt := range r.Points {
-				if pt.Pass {
+		if len(r.Checks) > 0 {
+			for _, ch := range r.Checks {
+				if ch.Pass {
 					passed++
 				}
 			}
 		} else {
-			// Legacy grader with no Points: use overall Pass
+			// Legacy grader with no Checks: use overall Pass
 			if r.Pass {
 				passed++
 			}
@@ -1354,15 +1354,15 @@ func convertGraderResults(results []graders.GraderResult) []report.GraderResult 
 		// graderless result reached here, synthesize a fallback Point so the
 		// report stays well-formed. This branch should be unreachable — emit
 		// a loud warning so the bug is visible in logs.
-		if len(r.Points) == 0 {
-			slog.Warn("grader returned zero Points — synthesizing fallback (this is a bug; see graders.NewErrorResult)",
+		if len(r.Checks) == 0 {
+			slog.Warn("grader returned zero Checks — synthesizing fallback (this is a bug; see graders.NewErrorResult)",
 				"grader", r.Name, "kind", r.Kind, "pass", r.Pass)
-			fallback := graders.GraderPoint{
+			fallback := graders.GraderCheck{
 				Label:   "grader executed",
 				Pass:    r.Pass,
 				Message: r.Message,
 			}
-			r.Points = []graders.GraderPoint{fallback}
+			r.Checks = []graders.GraderCheck{fallback}
 		}
 		rr := report.GraderResult{
 			GraderName: r.Name,
@@ -1375,16 +1375,16 @@ func convertGraderResults(results []graders.GraderResult) []report.GraderResult 
 			SourceFile: r.SourceFile,
 			SourceType: r.SourceType,
 		}
-		// Copy Points array.
-		if len(r.Points) > 0 {
-			rr.Points = make([]report.GraderPoint, len(r.Points))
-			for j, p := range r.Points {
-				rr.Points[j] = report.GraderPoint{
-					Label:    p.Label,
-					Pass:     p.Pass,
-					Message:  p.Message,
-					Weight:   p.Weight,
-					Evidence: p.Evidence,
+		// Copy Checks array.
+		if len(r.Checks) > 0 {
+			rr.Checks = make([]report.GraderCheck, len(r.Checks))
+			for j, c := range r.Checks {
+				rr.Checks[j] = report.GraderCheck{
+					Label:    c.Label,
+					Pass:     c.Pass,
+					Message:  c.Message,
+					Weight:   c.Weight,
+					Evidence: c.Evidence,
 				}
 			}
 		}
@@ -1678,11 +1678,11 @@ case graders.KindPromptReview, graders.KindPrompt:
 s := result.Score
 scorePtr = &s
 }
-var points []progress.GraderPoint
-if len(result.Points) > 0 {
-points = make([]progress.GraderPoint, len(result.Points))
-for i, p := range result.Points {
-points[i] = progress.GraderPoint{Label: p.Label, Pass: p.Pass, Message: p.Message}
+var points []progress.GraderCheck
+if len(result.Checks) > 0 {
+points = make([]progress.GraderCheck, len(result.Checks))
+for i, c := range result.Checks {
+points[i] = progress.GraderCheck{Label: c.Label, Pass: c.Pass, Message: c.Message}
 }
 }
 sendRawEvent(progress.ProgressEvent{

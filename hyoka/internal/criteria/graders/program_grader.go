@@ -76,7 +76,7 @@ func (g *ProgramGrader) Grade(ctx context.Context, input GraderInput) (GraderRes
 		DurationMs: elapsed.Milliseconds(),
 	}
 
-	var points []GraderPoint
+	var checks []GraderCheck
 	var msg string
 
 	if err != nil {
@@ -87,12 +87,12 @@ func (g *ProgramGrader) Grade(ctx context.Context, input GraderInput) (GraderRes
 			} else {
 				msg = fmt.Sprintf("command cancelled: %v", ctx.Err())
 			}
-			points = append(points, GraderPoint{
+			checks = append(checks, GraderCheck{
 				Label:   "exit code 0",
 				Pass:    false,
 				Message: msg,
 			})
-			return NewResult(KindProgram, g.name, input.Config, points, msg, &GraderExtras{Program: extras}), nil
+			return NewResult(KindProgram, g.name, input.Config, checks, msg, &GraderExtras{Program: extras}), nil
 		}
 
 		var exitErr *exec.ExitError
@@ -108,22 +108,22 @@ func (g *ProgramGrader) Grade(ctx context.Context, input GraderInput) (GraderRes
 			if stderrTail != "" {
 				pointMsg = fmt.Sprintf("exited with code %d; stderr: %s", exitErr.ExitCode(), stderrTail)
 			}
-			points = append(points, GraderPoint{
+			checks = append(checks, GraderCheck{
 				Label:   "exit code 0",
 				Pass:    false,
 				Message: pointMsg,
 			})
-			return NewResult(KindProgram, g.name, input.Config, points, msg, &GraderExtras{Program: extras}), nil
+			return NewResult(KindProgram, g.name, input.Config, checks, msg, &GraderExtras{Program: extras}), nil
 		}
 
 		return GraderResult{}, fmt.Errorf("program grader %q: %w", g.name, err)
 	}
 
 	msg = fmt.Sprintf("command succeeded (took %s)", elapsed)
-	points = append(points, GraderPoint{
+	checks = append(checks, GraderCheck{
 		Label:   "exit code 0",
 		Pass:    true,
 		Message: "",
 	})
-	return NewResult(KindProgram, g.name, input.Config, points, msg, &GraderExtras{Program: extras}), nil
+	return NewResult(KindProgram, g.name, input.Config, checks, msg, &GraderExtras{Program: extras}), nil
 }

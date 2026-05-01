@@ -125,12 +125,12 @@ type GraderResult struct {
 	Weight  float64 `json:"weight"`            // aggregation weight (from config)
 	Gate    bool    `json:"gate"`              // gate flag (from config)
 
-	// Derived from Points — see NewResult helper.
-	Score   float64 `json:"score"`             // sum(point.Weight * pass) / sum(point.Weight); 0 if no points
-	Pass    bool    `json:"pass"`              // AND over Points[i].Pass
+	// Derived from Checks — see NewResult helper.
+	Score   float64 `json:"score"`             // sum(check.Weight * pass) / sum(check.Weight); 0 if no checks
+	Pass    bool    `json:"pass"`              // AND over Checks[i].Pass
 	Message string  `json:"message"`           // headline summary (≤ ~120 chars)
 
-	Points  []GraderPoint  `json:"points"`           // REQUIRED, len ≥ 1; the canonical sub-checks
+	Checks  []GraderCheck  `json:"points"`           // REQUIRED, len ≥ 1; the canonical sub-checks (JSON tag unchanged for back-compat; C10 will dual-emit)
 	Extras  *GraderExtras  `json:"extras,omitempty"` // kind-specific render-only payload
 
 	// Provenance: where the grader entry was declared. Populated by the
@@ -140,15 +140,18 @@ type GraderResult struct {
 	SourceType string `json:"source_type,omitempty"`
 }
 
-// GraderPoint represents one binary pass/fail check inside a grader.
-// A grader's overall Pass is the AND of every Point.Pass.
-type GraderPoint struct {
+// GraderCheck represents one binary pass/fail check inside a grader.
+// A grader's overall Pass is the AND of every Check.Pass.
+type GraderCheck struct {
 	Label    string             `json:"label"`              // short, what was checked (e.g. "file present: src/main.py")
 	Pass     bool               `json:"pass"`
 	Message  string             `json:"message,omitempty"`  // why it passed/failed (the "reason" Ronnie asked for)
 	Weight   float64            `json:"weight,omitempty"`   // for Score weighting; defaults to 1.0 when 0/omitted
 	Evidence map[string]string  `json:"evidence,omitempty"` // tiny, optional, string-only KV (e.g. {"pattern":"^def "})
 }
+
+// Deprecated: use GraderCheck. Will be removed next release.
+type GraderPoint = GraderCheck
 
 // GraderExtras is a discriminated union carrying kind-specific render-only data.
 // Only one field should be populated per result.
@@ -261,24 +264,24 @@ type ReviewCriterionResult struct {
 	Weight int    `json:"weight,omitempty"` // max points for this criterion
 }
 
-// NewResult constructs a GraderResult with Pass and Score derived from Points.
-// Points must be non-empty; panics if empty. Each point's Weight defaults to 1.0
+// NewResult constructs a GraderResult with Pass and Score derived from Checks.
+// Checks must be non-empty; panics if empty. Each check's Weight defaults to 1.0
 // when zero or omitted.
 //
-// Invariant (Phase 3, 2026-04-25): every grader MUST emit at least one Point.
-// A Points-less GraderResult is a bug — the site's defensive "PASS"/"100%"
+// Invariant (Phase 3, 2026-04-25): every grader MUST emit at least one Check.
+// A Checks-less GraderResult is a bug — the site's defensive "PASS"/"100%"
 // fallback exists only as a safety net for legacy data on disk, never for
 // freshly-generated results. Use NewErrorResult below when an internal error
 // prevents a real check.
-func NewResult(kind, name string, cfg GraderConfig, points []GraderPoint, msg string, extras *GraderExtras) GraderResult {
-	if len(points) == 0 {
-		panic(fmt.Sprintf("grader %s (%s) must emit at least one Point", name, kind))
+func NewResult(kind, name string, cfg GraderConfig, checks []GraderCheck, msg string, extras *GraderExtras) GraderResult {
+	if len(checks) == 0 {
+		panic(fmt.Sprintf("grader %s (%s) must emit at least one Check", name, kind))
 	}
 
-	// Derive Pass: AND over all Points
+	// Derive Pass: AND over all Checks
 	pass := true
-	for _, p := range points {
-		if !p.Pass {
+	for _, c := range checks {
+		if !c.Pass {
 			pass = false
 			break
 		}
@@ -286,13 +289,13 @@ func NewResult(kind, name string, cfg GraderConfig, points []GraderPoint, msg st
 
 	// Derive Score: weighted sum / total weight
 	var weightedSum, totalWeight float64
-	for _, p := range points {
-		w := p.Weight
+	for _, c := range checks {
+		w := c.Weight
 		if w == 0 {
 			w = 1.0
 		}
 		totalWeight += w
-		if p.Pass {
+		if c.Pass {
 			weightedSum += w
 		}
 	}
@@ -309,15 +312,15 @@ func NewResult(kind, name string, cfg GraderConfig, points []GraderPoint, msg st
 		Score:   score,
 		Pass:    pass,
 		Message: msg,
-		Points:  points,
+		Checks:  checks,
 		Extras:  extras,
 	}
 }
 
 // NewErrorResult constructs a GraderResult representing a grader that failed
 // to execute (returned an error, panicked, or was skipped). It synthesizes a
-// single failing "grader execution" Point so the result still satisfies the
-// "every grader must emit ≥ 1 Point" invariant. Without this, the site's
+// single failing "grader execution" Check so the result still satisfies the
+// "every grader must emit ≥ 1 Check" invariant. Without this, the site's
 // renderer can't distinguish a graderless failure from a passing grader and
 // falls back to "PASS"/"100%".
 //
@@ -327,12 +330,12 @@ func NewErrorResult(kind, name string, cfg GraderConfig, msg string) GraderResul
 	if msg == "" {
 		msg = "grader execution failed"
 	}
-	points := []GraderPoint{{
+	checks := []GraderCheck{{
 		Label:   "grader executed",
 		Pass:    false,
 		Message: msg,
 	}}
-	return NewResult(kind, name, cfg, points, msg, nil)
+	return NewResult(kind, name, cfg, checks, msg, nil)
 }
 
 // AggregateResult holds the final aggregated score from all graders.

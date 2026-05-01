@@ -46,7 +46,7 @@ GraderType: "review",
 Score:      0.85,
 Weight:     2.0,
 Pass:       pass,
-Points: []report.GraderPoint{
+Checks: []report.GraderPoint{
 {Label: "correctness", Pass: pass, Weight: 1.0},
 },
 },
@@ -57,7 +57,7 @@ Score:      1.0,
 Weight:     1.0,
 Pass:       pass,
 Gate:       true,
-Points: []report.GraderPoint{
+Checks: []report.GraderPoint{
 {Label: "file-exists", Pass: pass, Weight: 1.0},
 },
 },
@@ -108,7 +108,7 @@ ConfigName:    config,
 Timestamp:     timestamp,
 Success:       true,
 GraderResults: []report.GraderResult{
-{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Points: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
+{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Checks: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
 },
 }
 r.ScoreBreakdown = report.BuildScoreBreakdown(r.GraderResults)

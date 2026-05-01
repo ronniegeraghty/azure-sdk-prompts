@@ -35,17 +35,17 @@ type GeneratorArtifact = artifact.GeneratorArtifact
 const CurrentSchemaVersion = 4
 
 // GraderResult holds the output from a single grader (v4 schema).
-// Pass and Score are derived from Points. Every grader emits at least one Point.
+// Pass and Score are derived from Checks. Every grader emits at least one Check.
 type GraderResult struct {
 	GraderName string  `json:"grader_name"`
 	GraderType string  `json:"grader_type"` // "file", "program", "prompt", "behavior", etc.
-	Score      float64 `json:"score"`       // 0.0–1.0 weighted average from Points
+	Score      float64 `json:"score"`       // 0.0–1.0 weighted average from Checks
 	Weight     float64 `json:"weight"`      // Weight for aggregation
-	Pass       bool    `json:"pass"`        // AND of all Points[i].Pass
+	Pass       bool    `json:"pass"`        // AND of all Checks[i].Pass
 	Gate       bool    `json:"gate,omitempty"`
 	Message    string  `json:"message"` // Human-readable summary
 
-	Points []GraderPoint `json:"points"`           // REQUIRED, len ≥ 1
+	Checks []GraderCheck `json:"points"`           // REQUIRED, len ≥ 1 (JSON tag unchanged for back-compat; C10 will dual-emit)
 	Extras *GraderExtras `json:"extras,omitempty"` // kind-specific render-only data
 
 	// Source provenance: where the grader entry was declared.
@@ -54,14 +54,17 @@ type GraderResult struct {
 	SourceType string `json:"source_type,omitempty"` // "prompt_file" or "criteria_file"
 }
 
-// GraderPoint is one binary pass/fail check inside a grader.
-type GraderPoint struct {
+// GraderCheck is one binary pass/fail check inside a grader.
+type GraderCheck struct {
 	Label    string            `json:"label"` // what was checked
 	Pass     bool              `json:"pass"`
 	Message  string            `json:"message,omitempty"`  // why it passed/failed
 	Weight   float64           `json:"weight,omitempty"`   // for Score weighting; defaults to 1.0
 	Evidence map[string]string `json:"evidence,omitempty"` // optional string-only KV
 }
+
+// Deprecated: use GraderCheck. Will be removed next release.
+type GraderPoint = GraderCheck
 
 // GraderExtras is a discriminated union carrying kind-specific render-only data.
 type GraderExtras struct {
@@ -762,22 +765,27 @@ type RunSummary struct {
 
 // BuildScoreBreakdown computes a ScoreBreakdown from the grader results on a report.
 // It mirrors the AggregateResults logic from the graders package to show users
-// TotalGraderPoints returns the sum of (passed, total) GraderPoint counts across
+// TotalGraderChecks returns the sum of (passed, total) GraderCheck counts across
 // all GraderResults. This is the headline "score" for an eval — every individual
 // pass/fail check across every grader (prompt, file, output_check, etc.).
 //
 // Use this instead of Review.OverallScore/MaxScore (which only counts the LLM
 // judge's prompt-review criteria, often a small subset of the full grader set).
-func TotalGraderPoints(results []GraderResult) (passed, total int) {
+func TotalGraderChecks(results []GraderResult) (passed, total int) {
 	for _, r := range results {
-		for _, p := range r.Points {
+		for _, c := range r.Checks {
 			total++
-			if p.Pass {
+			if c.Pass {
 				passed++
 			}
 		}
 	}
 	return passed, total
+}
+
+// Deprecated: use TotalGraderChecks. Will be removed next release.
+func TotalGraderPoints(results []GraderResult) (passed, total int) {
+	return TotalGraderChecks(results)
 }
 
 // exactly how the final score was derived.
@@ -914,7 +922,7 @@ func GraderResultsFromReview(consolidated *review.ReviewResult, panel []review.R
 			Weight:     1.0,
 			Pass:       r.OverallScore >= r.MaxScore,
 			Message:    r.Summary,
-			Points:     points,
+			Checks:     points,
 			Extras: &GraderExtras{
 				Review: &ReviewExtras{
 					Model:       r.Model,
@@ -972,7 +980,7 @@ func GraderResultsFromReview(consolidated *review.ReviewResult, panel []review.R
 		Weight:     1.0,
 		Pass:       consolidated.OverallScore >= consolidated.MaxScore,
 		Message:    consolidated.Summary,
-		Points:     consPoints,
+		Checks:     consPoints,
 		Extras: &GraderExtras{
 			Review: &ReviewExtras{
 				Model:       consolidated.Model,
