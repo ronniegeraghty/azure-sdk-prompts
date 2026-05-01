@@ -40,7 +40,7 @@ func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 			When: map[string]string{"plane": "data-plane"},
 			Graders: []UnifiedGraderEntry{
 				promptEntry("b", "B", false),
-				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}}),
+				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}},,
 		}},
 	}}}
 
