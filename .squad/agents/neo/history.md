@@ -1326,3 +1326,43 @@ Implemented comprehensive grader redesign across engine, graders, and data model
 - Orchestration log: `.squad/orchestration-log/2026-04-30T18-29-54Z-neo.md`
 - Session log: `.squad/log/2026-04-30T18-29-54Z-grader-redesign.md`
 - Decisions merged into `.squad/decisions.md`
+
+---
+
+## 2026-05-01 — Prompt Grader Determinism (ID-Based Vote Pipeline)
+
+**Branch:** `ronniegeraghty/dev` (commits f27810b5..d61acc92, 7 commits)
+
+### What shipped
+
+Stable check IDs eliminate non-deterministic reviewer paraphrasing in prompt-grader vote aggregation.
+
+**Commits 4-10:**
+1. **f27810b5:** `feat(review): id-aware response parser + validator` — `parseReviewResponseV2` validates reviewer responses against expected `[]ReviewCheck`. Returns canonical labels from YAML (not paraphrased LLM text). Validator ensures returned id-set = expected id-set.
+2. **d5fc8b93:** `feat(review): switch reviewer + bucket paths to id-aware variants` — `runSingleReview` accepts `[]ReviewCheck`, calls V2 parser when checks provided. Retry loop gives precise feedback: "Your response is missing ids: [check_2]. Extra ids: [check_99]. Please return exactly: [check_1, check_2, check_3]." After max retries, drops reviewer with `slog.Warn`.
+3. **d3872f35:** `refactor(review): vote keys by id; canonical label from expected check` — Add `ID` field to `CriterionResult`. Vote aggregation keys by `bucket::check_id` (non-combined) or `check_id` (combined), not by paraphrased name. `averageReview`/`deterministicVote` take `[]ReviewCheck` parameter to look up canonical labels.
+4. **8bfea376:** `refactor(graders): prompt_review_grader uses canonical label` — Verified grader label wiring is correct (empty commit).
+5. **99836165:** `chore(review): delete dead consolidation path` — Deleted `PanelReviewer.consolidate`, `buildConsolidationPrompt`, 3 test functions (replaced by `deterministicVote` in commit #580/PR #603).
+6. **194d9bf2:** `chore(review): legacy criteria paths retained for backward compat` — `Bucket.Criteria` string field still used by single-bucket fast paths, external graders, tests. V1 `parseReviewResponse` retained. Full migration requires updating all call sites to use `Checks`.
+7. **d61acc92:** `test(review): add determinism regression test + unit tests` — 8 new tests: `TestParseReviewResponseV2_*` (validator coverage), `TestAverageReview_KeysByID_NotName` (vote keys by id), `TestAverageReview_BucketScoping` (bucket::id scoping), `TestBuildReviewPrompt_RendersIDs` (check_N: format), `TestParseReviewResponseV2_RejectsLegacyText` (v1 rejection).
+
+### Smoke test (determinism proof)
+
+Ran `test-dp-test-hello-markdown` twice with `test/baseline` config (2 models, panel review). Grader breakdowns **identical** across runs:
+- Same point counts per grader (e.g., "Markdown Structure (prompt): Fail (2/3)")
+- Same pass/fail verdicts per check (e.g., "A file named `hello.md`: Pass")
+- No label drift or duplicate points
+
+Before this change: same prompt + config produced 25 vs 26 points (reviewer paraphrases split buckets). After: identical structured output.
+
+### Learnings
+
+- **Stable-ID pattern:** Assign `check_N` at criteria-bundling time (1-based index). Flow through prompt (`check_1: text`), reviewer JSON contract (`{"id": "check_1", "passed": ...}`), vote key (`bucket::check_1`), and final label (canonical from YAML).
+- **Retry-then-drop validator semantics:** On validation error, re-prompt with missing/extra id details. After max retries, drop reviewer with `slog.Warn` + error return (existing "all reviewers failed" path handles empty panel).
+- **Bucket::id keying convention:** Vote key = `<bucket-name>::<check_id>` for non-`combined` buckets, plain `<check_id>` for `combined`. Display label = canonical YAML text (bucket-prefixed per `mergeBucketResults`).
+- **CONTRACT for future changes:** Any code touching the reviewer-pipeline must preserve: (1) stable IDs assigned once, (2) canonical labels from YAML (never from LLM echo), (3) bucket::id vote keys (no paraphrased name keys).
+
+### Test discipline
+
+All review package tests pass (`-race`). 8 new unit tests. Smoke test confirms determinism (identical grader breakdowns across runs).
+

@@ -1,121 +1,102 @@
 ---
-name: "deterministic-llm-panel"
-description: "How to build deterministic multi-model LLM voting panels via server-controlled stable IDs"
-domain: "llm-orchestration, evaluation, multi-model-consensus"
-confidence: "high"
-source: "earned (hyoka prompt-grader determinism fix, 2026-04-27)"
+name: Deterministic LLM Panel
+description: Stable id-based voting for multi-model review panels
+created: 2026-04-27
+updated: 2026-05-01
+status: shipped
 ---
 
-## Context
+# Deterministic LLM Panel Pattern
 
-Use this pattern any time you have:
-- Multiple LLMs reviewing the same set of items (criteria, claims, options).
-- A vote / merge step that must produce identical output for identical input.
-- Items defined by free-text labels that the LLMs would otherwise echo back paraphrased.
+## Problem
 
-The failure mode this prevents: paraphrase drift across reviewers causes the vote function to split logically-identical items into separate buckets, producing non-deterministic counts run-to-run.
+Multi-model review panels produce non-deterministic results when each reviewer LLM paraphrases the same check text differently. Vote aggregation keyed by exact string match on `c.Name` causes paraphrases to split into separate criteria → inconsistent point counts across runs.
 
-## The Pattern
+## Solution
 
-### 1. Assign stable IDs at item-definition time
+**Stable check IDs** assigned once at criteria-bundling time flow through the entire pipeline:
+1. Reviewer prompt: `check_1: File hello.md exists...`
+2. Reviewer JSON contract: `{"id": "check_1", "passed": true, "reasoning": "..."}`
+3. Vote aggregation: key by `bucket::check_1` (not by paraphrased name)
+4. Final label: Canonical YAML text (never from LLM echo)
 
-The application — never the LLM — owns the IDs. Format: short, stable, easy to echo (`check_1`, `option_a`, `claim_3`). Slug-from-text is tempting but fragile (collisions, length, instability under text edits).
+## Implementation References
 
-```go
-type Item struct {
-    ID    string // "check_1" — owned by us
-    Text  string // human-readable label, source of truth
-    Group string // optional namespace (bucket/section)
+- **ID assignment:** `hyoka/internal/criteria/buckets.go:326` (`FormatUnifiedPromptEntries` emits `ReviewCheck` with `check_<n>` IDs)
+- **Prompt rendering:** `hyoka/internal/review/prompt.go:87` (`BuildReviewPrompt` renders `check_1: text` format)
+- **Validator:** `hyoka/internal/review/reviewer.go:278` (`parseReviewResponseV2` validates id-set match)
+- **Vote keying:** `hyoka/internal/review/reviewer.go:694` (`averageReview` keys by `bucket::id`, not `Name`)
+
+## Key Patterns
+
+### 1. Stable ID Format
+
+`check_<n>` where `n` is 1-based index within the rendered bucket. Deterministic, short, easy for LLMs to echo back.
+
+### 2. Reviewer JSON Contract
+
+```json
+{
+  "criteria": [
+    {"id": "check_1", "passed": true, "reasoning": "..."}
+  ],
+  "summary": "...",
+  "issues": ["..."],
+  "strengths": ["..."]
 }
 ```
 
-### 2. Send IDs in the prompt; rule out paraphrase
+**Dropped from contract:** `criterion` text field (LLM no longer trusted to echo label).
 
+### 3. Validator Retry-Then-Drop
+
+On validation error, re-prompt with precise feedback:
 ```
-You MUST return one judgment per id below. No extras, no missing entries.
-
-- check_1: <text>
-- check_2: <text>
-
-Schema:
-{"results":[{"id":"check_1","passed":true,"reasoning":"..."}, ...]}
-
-Rules:
-- The "id" field MUST be one of: check_1, check_2.
-- Do NOT invent ids. Do NOT omit ids. Do NOT echo the item text.
+Your response is missing ids: [check_2]. Extra ids: [check_99].
+Please return exactly: [check_1, check_2, check_3].
 ```
 
-The "Do NOT echo" rule matters — it removes a degree of freedom the LLM would otherwise use to drift.
-
-### 3. Validate the response against the expected ID set
-
+After max retries (2), drop reviewer with `slog.Warn`:
 ```go
-func validate(expected []string, got []Result) []string {
-    var errs []string
-    expectedSet := setOf(expected)
-    seen := map[string]bool{}
-    for _, r := range got {
-        if !expectedSet[r.ID]   { errs = append(errs, "extra id: " + r.ID) }
-        if seen[r.ID]           { errs = append(errs, "duplicate id: " + r.ID) }
-        seen[r.ID] = true
-    }
-    for _, id := range expected {
-        if !seen[id] { errs = append(errs, "missing id: " + id) }
-    }
-    return errs
-}
+slog.Warn("reviewer dropped: invalid criteria ids after retries",
+    "model", model, "validation_errors", validationErrors)
 ```
 
-### 4. Re-prompt once on shape failure, then drop the reviewer
+### 4. Bucket::ID Vote Keying
 
-Three-tier resilience: parse → validate → drop. Don't fail the whole panel because one reviewer was flaky; don't accept a malformed reviewer because then the whole point of the panel is undermined.
+- Vote key: `<bucket-name>::<check_id>` for non-`combined` buckets, plain `<check_id>` for `combined`
+- Display label: Canonical YAML text (bucket-prefixed if applicable)
 
+Example:
 ```go
-for attempt := 0; attempt <= maxRetries; attempt++ {
-    resp := callLLM(prompt)
-    if errs := validate(expected, resp); len(errs) > 0 && attempt < maxRetries {
-        prompt = repromptWithSpecificErrors(errs)
-        continue
-    } else if len(errs) > 0 {
-        slog.Warn("reviewer dropped: invalid ids after retries", "model", m)
-        return nil // panel handles missing reviewer
-    }
-    return resp
-}
+// Bucket "security" has check_1: "No hardcoded secrets"
+voteKey := "security::check_1"
+displayLabel := "[security] No hardcoded secrets"
 ```
 
-### 5. Vote keys by ID; display label comes from the application
+### 5. Canonical Labels from YAML
 
-```go
-type agg struct {
-    id        string
-    label     string // from the application's Item.Text — NEVER from any LLM
-    failCount int
-    total     int
-}
-m := map[string]*agg{} // key = id (or "group::id" for namespaced)
-```
+`parseReviewResponseV2` sets `CriterionResult.Name` from `expected[i].Text` (YAML source of truth), **never** from LLM echo. This ensures identical labels across runs.
 
-Display layer reads `agg.label`. Vote logic reads `agg.id`. Truncation/styling is a display concern, not a vote concern.
+## Smoke Test Proof
 
-### 6. Treat missing-from-reviewer as fail (strict consensus)
+Ran `test-dp-test-hello-markdown` twice with `test/baseline` config (2 models, panel review). Grader breakdowns **identical**:
+- Same point counts per grader
+- Same pass/fail verdicts per check
+- No label drift or duplicate points
 
-If a reviewer returns a partial response that somehow passed validation, count any expected-but-not-returned id as "failed by that reviewer". Matches the strict any-fail philosophy: silence is not consent.
+## When to Use This Pattern
 
-## Anti-patterns
+- Multi-model review panels where LLMs vote on the same criteria
+- Any system where LLM outputs are aggregated/compared (e.g., grading, consensus)
+- Scenarios requiring reproducible, auditable results across LLM runs
 
-- **❌ Trusting the LLM to echo the item text verbatim.** "Use the original text as the id" is a request, not a contract.
-- **❌ Slugs derived from text as IDs.** Edit the text → ID changes → historical comparisons break. Collisions on similar items.
-- **❌ String concatenation for namespaced keys without sanitization.** `bucket::id` collides if `bucket` contains `::`.
-- **❌ Failing the whole eval on one bad reviewer.** That's why the panel exists. Drop with a warning.
-- **❌ Validating only "criteria array non-empty".** Misses extras, missing, duplicates, malformed shapes.
+## Contract for Future Changes
 
-## When NOT to apply
+Any code touching the reviewer-pipeline MUST preserve:
+1. **Stable IDs assigned once** (at criteria-bundling time, 1-based index)
+2. **Canonical labels from YAML** (never from LLM echo)
+3. **Bucket::id vote keys** (no paraphrased name keys)
 
-- Single-LLM evaluation (no vote → no key collisions).
-- LLM is producing freeform output that's not being merged with other LLMs' output.
-- Item set is itself LLM-generated (no canonical IDs to assign — different problem).
+Violating these rules will re-introduce non-determinism.
 
-## Verification
-
-A determinism regression test belongs in the test suite: run the same input twice with a deterministic stub that returns paraphrased labels. Assert identical structure. If this test isn't in CI, the pattern isn't truly enforced.
