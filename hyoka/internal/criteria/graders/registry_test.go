@@ -21,7 +21,7 @@ func makeYAMLNode(t *testing.T, data string) yaml.Node {
 
 func TestNewGraderFileKind(t *testing.T) {
 	gc := GraderConfig{
-		Kind:   KindFile,
+		Kind:   KindWorkspace,
 		Name:   "test_file",
 		Config: makeYAMLNode(t, `path: "main.py"`),
 	}
@@ -29,7 +29,7 @@ func TestNewGraderFileKind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if g.Name() != "test_file" || g.Kind() != KindFile {
+	if g.Name() != "test_file" || g.Kind() != KindWorkspace {
 		t.Errorf("unexpected name=%q kind=%q", g.Name(), g.Kind())
 	}
 }
@@ -66,7 +66,7 @@ func TestNewGraderPromptKind(t *testing.T) {
 
 func TestNewGraderBehaviorKind(t *testing.T) {
 	gc := GraderConfig{
-		Kind:   KindBehavior,
+		Kind:   KindTool,
 		Name:   "test_behavior",
 		Config: makeYAMLNode(t, `required_tools: ["azure-mcp"]`),
 	}
@@ -74,14 +74,14 @@ func TestNewGraderBehaviorKind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if g.Kind() != KindBehavior {
-		t.Errorf("expected kind %q, got %q", KindBehavior, g.Kind())
+	if g.Kind() != KindTool {
+		t.Errorf("expected kind %q, got %q", KindTool, g.Kind())
 	}
 }
 
 func TestNewGraderActionSequenceKind(t *testing.T) {
 	gc := GraderConfig{
-		Kind:   KindActionSequence,
+		Kind:   KindActivity,
 		Name:   "test_as",
 		Config: makeYAMLNode(t, `expected_actions: ["read_file"]`),
 	}
@@ -89,14 +89,14 @@ func TestNewGraderActionSequenceKind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if g.Kind() != KindActionSequence {
-		t.Errorf("expected kind %q, got %q", KindActionSequence, g.Kind())
+	if g.Kind() != KindActivity {
+		t.Errorf("expected kind %q, got %q", KindActivity, g.Kind())
 	}
 }
 
 func TestNewGraderToolConstraintKind(t *testing.T) {
 	gc := GraderConfig{
-		Kind:   KindToolConstraint,
+		Kind:   KindTool,
 		Name:   "test_tc",
 		Config: makeYAMLNode(t, "required: [\"a\"]\nmin_calls:\n  a: 1"),
 	}
@@ -104,8 +104,8 @@ func TestNewGraderToolConstraintKind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if g.Kind() != KindToolConstraint {
-		t.Errorf("expected kind %q, got %q", KindToolConstraint, g.Kind())
+	if g.Kind() != KindTool {
+		t.Errorf("expected kind %q, got %q", KindTool, g.Kind())
 	}
 }
 

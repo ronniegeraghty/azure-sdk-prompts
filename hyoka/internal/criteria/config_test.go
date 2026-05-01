@@ -27,8 +27,8 @@ func TestValidateEntry_TypedOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if got := gc.Graders[0].Type; got != graders.KindOutputCheck {
-		t.Fatalf("type = %q want %q", got, graders.KindOutputCheck)
+	if got := gc.Graders[0].Type; got != graders.KindWorkspace {
+		t.Fatalf("type = %q want %q", got, graders.KindWorkspace)
 	}
 }
 
@@ -312,7 +312,7 @@ graders:
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
-	if gc.Graders[0].Type != graders.KindPrompt || gc.Graders[1].Type != graders.KindOutputCheck {
+	if gc.Graders[0].Type != graders.KindPrompt || gc.Graders[1].Type != graders.KindWorkspace {
 		t.Fatalf("types wrong: %+v", gc.Graders)
 	}
 }

@@ -4,7 +4,22 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"strings"
 	"testing"
+	
+	"gopkg.in/yaml.v3"
 )
+
+// stringSliceToYAMLNode converts a []string to a yaml.Node sequence for test fixtures
+func stringSliceToYAMLNode(strs []string) yaml.Node {
+	var node yaml.Node
+	node.Kind = yaml.SequenceNode
+	for _, s := range strs {
+		var strNode yaml.Node
+		strNode.Kind = yaml.ScalarNode
+		strNode.Value = s
+		node.Content = append(node.Content, &strNode)
+	}
+	return node
+}
 
 func promptEntry(name, crit string, isolate bool) UnifiedGraderEntry {
 	return UnifiedGraderEntry{Type: graders.KindPrompt, Name: name, Prompt: crit, Isolate: isolate}
@@ -19,14 +34,13 @@ func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 		When: map[string]string{"language": "python"},
 		Graders: []UnifiedGraderEntry{
 			promptEntry("a", "A", false),
-		},
+	},
 		Groups: []UnifiedGraderGroup{{
 			Name: "g",
 			When: map[string]string{"plane": "data-plane"},
 			Graders: []UnifiedGraderEntry{
 				promptEntry("b", "B", false),
-				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}},
-			},
+				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}}),
 		}},
 	}}}
 
@@ -63,9 +77,9 @@ func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 func TestPartitionMatched_SplitsPromptAndTyped(t *testing.T) {
 	matched := []MatchedUnifiedEntry{
 		{Entry: promptEntry("a", "A", false)},
-		{Entry: typedEntry(graders.KindFile, "f1")},
+		{Entry: typedEntry(graders.KindWorkspace, "f1")},
 		{Entry: promptEntry("b", "B", true)},
-		{Entry: typedEntry(graders.KindOutputCheck, "oc1")},
+		{Entry: typedEntry(graders.KindWorkspace, "oc1")},
 	}
 	prompts, typed := PartitionMatched(matched)
 	if len(prompts) != 2 || prompts[0].Entry.Name != "a" || prompts[1].Entry.Name != "b" {
@@ -255,12 +269,12 @@ func TestMergeUnifiedCriteria_ContainsAllAndPromptCriteria(t *testing.T) {
 
 func TestUnifiedGraderEntry_ToRuntimeConfig_CopiesFields(t *testing.T) {
 	e := UnifiedGraderEntry{
-		Type:   graders.KindFile,
+		Type:   graders.KindWorkspace,
 		Name:   "n",
 		Weight: 0.5,
 	}
 	rc := e.ToRuntimeConfig()
-	if rc.Kind != graders.KindFile || rc.Name != "n" || rc.Weight != 0.5 {
+	if rc.Kind != graders.KindWorkspace || rc.Name != "n" || rc.Weight != 0.5 {
 		t.Errorf("runtime config unexpected: %+v", rc)
 	}
 }
@@ -279,8 +293,7 @@ want:    "",
 {
 name: "legacy single-prompt no checks",
 entries: []UnifiedGraderEntry{
-{Type: graders.KindPrompt, Name: "Auth", Prompt: "Uses managed identity"},
-},
+{Type: graders.KindPrompt, Name: "Auth", Prompt: "Uses managed identity"}),
 want: "**Auth**: Uses managed identity",
 },
 {
@@ -290,12 +303,10 @@ entries: []UnifiedGraderEntry{
 Type:   graders.KindPrompt,
 Name:   "Markdown Structure",
 Prompt: "Check the following criteria:",
-Checks: []string{
+Checks: stringSliceToYAMLNode([]string{
 "File hello.md exists and contains a level-1 heading.",
-"File contains exactly three bullet list items.",
-},
-},
-},
+"File contains exactly three bullet list items.", }),
+}),
 want: "**Markdown Structure**\n" +
 "Check the following criteria:\n" +
 "1. File hello.md exists and contains a level-1 heading.\n" +
@@ -307,8 +318,7 @@ entries: []UnifiedGraderEntry{
 {
 Type:   graders.KindPrompt,
 Name:   "X",
-Checks: []string{"a", "b"},
-},
+Checks: stringSliceToYAMLNode([]string{"a", "b"}),
 },
 want: "**X**\n" +
 "1. a\n" +
@@ -318,8 +328,7 @@ want: "**X**\n" +
 name: "mixed legacy + checks",
 entries: []UnifiedGraderEntry{
 {Type: graders.KindPrompt, Name: "Old", Prompt: "p"},
-{Type: graders.KindPrompt, Name: "New", Prompt: "preamble", Checks: []string{"one"}},
-},
+{Type: graders.KindPrompt, Name: "New", Prompt: "preamble", Checks: stringSliceToYAMLNode([]string{"one"}}),
 want: "**Old**: p\n\n" +
 "**New**\n" +
 "preamble\n" +

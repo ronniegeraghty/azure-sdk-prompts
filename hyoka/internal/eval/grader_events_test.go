@@ -30,7 +30,7 @@ func (f *fakeGrader) Grade(_ context.Context, _ graders.GraderInput) (graders.Gr
 
 func TestEmitGraderStart_PopulatesIDAndKind(t *testing.T) {
 	var r reporter
-	g := &fakeGrader{kind: graders.KindFile, name: "my-file-check"}
+	g := &fakeGrader{kind: graders.KindWorkspace, name: "my-file-check"}
 	emitGraderStart(r.emit, g, "", "")
 	if len(r.events) != 1 {
 		t.Fatalf("want 1 event, got %d", len(r.events))
@@ -42,13 +42,13 @@ func TestEmitGraderStart_PopulatesIDAndKind(t *testing.T) {
 	if got.GraderID != "my-file-check" {
 		t.Errorf("GraderID = %q, want my-file-check", got.GraderID)
 	}
-	if got.GraderKind != graders.KindFile {
-		t.Errorf("GraderKind = %q, want %q", got.GraderKind, graders.KindFile)
+	if got.GraderKind != graders.KindWorkspace {
+		t.Errorf("GraderKind = %q, want %q", got.GraderKind, graders.KindWorkspace)
 	}
 }
 
 func TestEmitGraderStart_NilSenderNoPanic(t *testing.T) {
-	g := &fakeGrader{kind: graders.KindFile, name: "x"}
+	g := &fakeGrader{kind: graders.KindWorkspace, name: "x"}
 	// Must not panic on nil sender or nil grader.
 	emitGraderStart(nil, g, "", "")
 	emitGraderStart(func(progress.ProgressEvent) { t.Fatal("called with nil grader") }, nil, "", "")
@@ -64,13 +64,13 @@ func TestEmitGraderComplete_ScorePolicy(t *testing.T) {
 		wantResult  string
 		wantScorePtr bool
 	}{
-		{"file pass", graders.KindFile, true, 1.0, "main.py present", progress.GraderResultPass, false},
-		{"file fail", graders.KindFile, false, 0, "main.py missing", progress.GraderResultFail, false},
+		{"file pass", graders.KindWorkspace, true, 1.0, "main.py present", progress.GraderResultPass, false},
+		{"file fail", graders.KindWorkspace, false, 0, "main.py missing", progress.GraderResultFail, false},
 		{"program fail", graders.KindProgram, false, 0, "build failed", progress.GraderResultFail, false},
-		{"behavior pass", graders.KindBehavior, true, 1.0, "ok", progress.GraderResultPass, false},
-		{"action_sequence pass", graders.KindActionSequence, true, 1.0, "seq ok", progress.GraderResultPass, false},
-		{"tool_constraint fail", graders.KindToolConstraint, false, 0, "blocked tool", progress.GraderResultFail, false},
-		{"output_check fail", graders.KindOutputCheck, false, 0, "too few files", progress.GraderResultFail, false},
+		{"behavior pass", graders.KindTool, true, 1.0, "ok", progress.GraderResultPass, false},
+		{"action_sequence pass", graders.KindActivity, true, 1.0, "seq ok", progress.GraderResultPass, false},
+		{"tool_constraint fail", graders.KindTool, false, 0, "blocked tool", progress.GraderResultFail, false},
+		{"output_check fail", graders.KindWorkspace, false, 0, "too few files", progress.GraderResultFail, false},
 		// Only prompt / prompt_review populate Score:
 		{"prompt_review pass", graders.KindPromptReview, true, 0.85, "panel 8.5/10", progress.GraderResultPass, true},
 		{"prompt pass", graders.KindPrompt, true, 0.5, "judge 5/10", progress.GraderResultPass, true},
@@ -117,7 +117,7 @@ func TestEmitGraderComplete_ScorePolicy(t *testing.T) {
 }
 
 func TestEmitGraderComplete_NilSenderNoPanic(t *testing.T) {
-	g := &fakeGrader{kind: graders.KindFile, name: "x"}
+	g := &fakeGrader{kind: graders.KindWorkspace, name: "x"}
 	emitGraderComplete(nil, g, graders.GraderResult{Pass: true, Message: "m"})
 	// also nil grader
 	emitGraderComplete(func(progress.ProgressEvent) { t.Fatal("unexpected") }, nil, graders.GraderResult{})
@@ -139,19 +139,19 @@ func TestRunGradersWithHooks_EmitsStartAndCompletePerGrader(t *testing.T) {
 	hooks := buildGraderHooks(r.emit)
 
 	instances := []graders.Grader{
-		&fakeGrader{kind: graders.KindFile, name: "file-check", result: graders.GraderResult{
-			Kind: graders.KindFile, Name: "file-check", Pass: true, Message: "ok",
+		&fakeGrader{kind: graders.KindWorkspace, name: "file-check", result: graders.GraderResult{
+			Kind: graders.KindWorkspace, Name: "file-check", Pass: true, Message: "ok",
 		}},
-		&fakeGrader{kind: graders.KindBehavior, name: "behavior-check", result: graders.GraderResult{
-			Kind: graders.KindBehavior, Name: "behavior-check", Pass: false, Message: "missing required tool",
+		&fakeGrader{kind: graders.KindTool, name: "behavior-check", result: graders.GraderResult{
+			Kind: graders.KindTool, Name: "behavior-check", Pass: false, Message: "missing required tool",
 		}},
 		&fakeGrader{kind: graders.KindPromptReview, name: "ai_review", result: graders.GraderResult{
 			Kind: graders.KindPromptReview, Name: "ai_review", Pass: true, Score: 0.9, Message: "panel 9/10",
 		}},
 	}
 	configs := []graders.GraderConfig{
-		{Kind: graders.KindFile, Name: "file-check"},
-		{Kind: graders.KindBehavior, Name: "behavior-check"},
+		{Kind: graders.KindWorkspace, Name: "file-check"},
+		{Kind: graders.KindTool, Name: "behavior-check"},
 		{Kind: graders.KindPromptReview, Name: "ai_review"},
 	}
 	results := criteria.RunGradersWithHooks(context.Background(), instances, configs, graders.GraderInput{}, hooks)
@@ -168,10 +168,10 @@ func TestRunGradersWithHooks_EmitsStartAndCompletePerGrader(t *testing.T) {
 		id   string
 		kind string
 	}{
-		{progress.EventGraderStart, "file-check", graders.KindFile},
-		{progress.EventGraderComplete, "file-check", graders.KindFile},
-		{progress.EventGraderStart, "behavior-check", graders.KindBehavior},
-		{progress.EventGraderComplete, "behavior-check", graders.KindBehavior},
+		{progress.EventGraderStart, "file-check", graders.KindWorkspace},
+		{progress.EventGraderComplete, "file-check", graders.KindWorkspace},
+		{progress.EventGraderStart, "behavior-check", graders.KindTool},
+		{progress.EventGraderComplete, "behavior-check", graders.KindTool},
 		{progress.EventGraderStart, "ai_review", graders.KindPromptReview},
 		{progress.EventGraderComplete, "ai_review", graders.KindPromptReview},
 	}
@@ -216,9 +216,9 @@ func TestRunGradersWithHooks_EmitsStartAndCompletePerGrader(t *testing.T) {
 func TestRunGradersWithHooks_NilReporterNoPanic(t *testing.T) {
 	hooks := buildGraderHooks(nil)
 	instances := []graders.Grader{
-		&fakeGrader{kind: graders.KindFile, name: "f1", result: graders.GraderResult{Pass: true, Message: "ok"}},
+		&fakeGrader{kind: graders.KindWorkspace, name: "f1", result: graders.GraderResult{Pass: true, Message: "ok"}},
 	}
-	configs := []graders.GraderConfig{{Kind: graders.KindFile, Name: "f1"}}
+	configs := []graders.GraderConfig{{Kind: graders.KindWorkspace, Name: "f1"}}
 	results := criteria.RunGradersWithHooks(context.Background(), instances, configs, graders.GraderInput{}, hooks)
 	if len(results) != 1 {
 		t.Fatalf("want 1 result, got %d", len(results))

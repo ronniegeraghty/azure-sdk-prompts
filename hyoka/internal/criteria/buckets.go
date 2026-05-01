@@ -143,14 +143,22 @@ func FormatUnifiedPromptEntries(entries []UnifiedGraderEntry) string {
 	var blocks []string
 	for _, e := range entries {
 		var b strings.Builder
-		if len(e.Checks) > 0 {
+		// Decode checks as []string for prompt graders
+		var checkStrs []string
+		if hasChecks(e.Checks) {
+			if err := e.Checks.Decode(&checkStrs); err != nil {
+				// Skip malformed checks; validation should have caught this
+				continue
+			}
+		}
+		if len(checkStrs) > 0 {
 			fmt.Fprintf(&b, "**%s**\n", e.Name)
 			if preamble := strings.TrimSpace(e.Prompt); preamble != "" {
 				fmt.Fprintf(&b, "%s\n", preamble)
 			}
-			for j, c := range e.Checks {
+			for j, c := range checkStrs {
 				fmt.Fprintf(&b, "%d. %s", j+1, strings.TrimSpace(c))
-				if j < len(e.Checks)-1 {
+				if j < len(checkStrs)-1 {
 					b.WriteString("\n")
 				}
 			}
@@ -179,7 +187,15 @@ func FormatUnifiedPromptEntriesToChecks(entries []UnifiedGraderEntry) []review.R
 	var checks []review.ReviewCheck
 	checkNum := 1
 	for _, e := range entries {
-		if len(e.Checks) == 0 {
+		// Decode checks as []string for prompt graders
+		var checkStrs []string
+		if hasChecks(e.Checks) {
+			if err := e.Checks.Decode(&checkStrs); err != nil {
+				// Skip malformed checks; validation should have caught this
+				continue
+			}
+		}
+		if len(checkStrs) == 0 {
 			continue
 		}
 		preamble := ""
@@ -192,7 +208,7 @@ func FormatUnifiedPromptEntriesToChecks(entries []UnifiedGraderEntry) []review.R
 			}
 			preamble += prompt
 		}
-		for _, c := range e.Checks {
+		for _, c := range checkStrs {
 			c = strings.TrimSpace(c)
 			if c == "" {
 				continue
@@ -440,17 +456,17 @@ func bucketName(raw string, index int) string {
 
 // ToRuntimeConfig converts a UnifiedGraderEntry into the graders.GraderConfig shape
 // consumed by NewGrader. Typed entries (type != prompt) carry their payload
-// in Details; prompt entries are not expected to flow through NewGrader
+// in Checks; prompt entries are not expected to flow through NewGrader
 // under the Phase 2 design (they feed the review panel instead).
 //
-// The returned graders.GraderConfig has Kind=Type, Config=Details, Weight and Name
+// The returned graders.GraderConfig has Kind=Type, Config=Checks, Weight and Name
 // copied, Gate=false (Phase 2 locked decision: no gating), and an empty
 // WhenMap — matching has already been resolved by MatchingUnifiedEntries.
 func (e UnifiedGraderEntry) ToRuntimeConfig() graders.GraderConfig {
 	return graders.GraderConfig{
 		Kind:   e.Type,
 		Name:   e.Name,
-		Config: cloneYAMLNode(e.Details),
+		Config: cloneYAMLNode(e.Checks),
 		Weight: e.EffectiveWeight(),
 	}
 }

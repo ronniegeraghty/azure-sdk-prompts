@@ -9,23 +9,16 @@ graders:
       - Uses DefaultAzureCredential (or another azure-identity credential) for authentication. No hardcoded connection strings, account keys, SAS tokens, or secrets embedded in source.
       - Uses async/await patterns appropriately for Azure SDK operations.
   - name: Output Files Exist
-    type: output_check
+    type: workspace
     weight: 1.0
-    details:
-      min_files: 1
-      min_bytes_per_file: 1
+    checks:
+      - kind: file
+        name: "*.py"
+        state: present
+        min_bytes: 1
   - name: Tool Usage Verification
-    type: tool_usage
+    type: tool
     weight: 1.0
-    details:
-      rules:
-        - type: mcp_server
-          name: azure
-          expect: at_least_one_tool_call
-        - type: skill_plugin
-          name: azure-sdk-python
-          expect: any_skill_invoked
-        - type: skill_repo
-          repo: mauromedda/agent-toolkit
-          skill: python
-          expect: skill_invoked
+    checks:
+      - kind: tool_used
+        tool: azure

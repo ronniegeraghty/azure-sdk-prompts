@@ -26,19 +26,18 @@ graders:
   - name: Workspace Check
     type: workspace
     weight: 1.0
-    details:
-      checks:
-        - kind: require_to_create
-          files: [hello.md]
-        - kind: forbidden_to_create
-          files: [.env, secrets.txt]
-        - kind: forbidden_to_delete
-          files: ["*"]
-        - kind: file
-          name: hello.md
-          state: present
-          min_bytes: 10
-          contains: "#"
+    checks:
+      - kind: require_to_create
+        files: [hello.md]
+      - kind: forbidden_to_create
+        files: [.env, secrets.txt]
+      - kind: forbidden_to_delete
+        files: ["*"]
+      - kind: file
+        name: hello.md
+        state: present
+        min_bytes: 10
+        contains: "#"
 
   # ---------------------------------------------------------------------------
   # 3. tool — unified tool checks. Exercises all four canonical check kinds.
@@ -46,18 +45,17 @@ graders:
   - name: Tool Usage
     type: tool
     weight: 1.0
-    details:
-      checks:
-        - kind: tool_used
-          tool: skill
-          min_calls: 1
-        - kind: tool_not_used
-          tool: bash
-        - kind: any_from_group
-          group: test-skills
-        - kind: none_from_group
-          group: test-skills
-          except: [markdown-headings, markdown-lists]
+    checks:
+      - kind: tool_used
+        tool: skill
+        min_calls: 1
+      - kind: tool_not_used
+        tool: bash
+      - kind: any_from_group
+        group: test-skills
+      - kind: none_from_group
+        group: test-skills
+        except: [markdown-headings, markdown-lists]
 
   # ---------------------------------------------------------------------------
   # 4. activity — action log and session activity checks. Exercises multiple check kinds.
@@ -65,28 +63,28 @@ graders:
   - name: Activity Check
     type: activity
     weight: 1.0
-    details:
-      checks:
-        - kind: turn_limit
-          max: 25
-        - kind: action_count
-          min: 1
-          max: 100
-        - kind: tool_call_count
-          min: 1
-        - kind: not_truncated
-        - kind: terminated_by
-          equals: completed
+    checks:
+      - kind: turn_limit
+        max: 25
+      - kind: action_count
+        min: 1
+        max: 100
+      - kind: tool_call_count
+        min: 1
+      - kind: not_truncated
+      - kind: terminated_by
+        equals: completed
 
   # ---------------------------------------------------------------------------
-  # 5. program — runs a command in the workspace; exit 0 = pass.
+  # 5. program — runs a command check in the workspace; exit 0 = pass.
   # ---------------------------------------------------------------------------
   - name: Hello.md Exists (program)
     type: program
     weight: 0.3
-    details:
-      command: test
-      args:
-        - -f
-        - hello.md
-      timeout: 5
+    checks:
+      - kind: command
+        command: test
+        args:
+          - -f
+          - hello.md
+        timeout: 5

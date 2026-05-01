@@ -252,6 +252,18 @@ func evaluateToolCheck(rule ToolCheckRule, checkID string, toolSet map[string]bo
 	}
 }
 
+// Helper functions
+
+func collectToolSet(log []ActionEvent) map[string]bool {
+	toolSet := make(map[string]bool)
+	for _, e := range log {
+		if e.Tool != "" {
+			toolSet[e.Tool] = true
+		}
+	}
+	return toolSet
+}
+
 // resolveGroup returns the list of tool names that belong to the specified group.
 // Groups resolve by entry Name from the tool topology. For now, this is a simple
 // implementation that returns all tools (the full Environment Tools will later

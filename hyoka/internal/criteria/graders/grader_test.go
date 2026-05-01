@@ -7,9 +7,9 @@ import (
 
 func TestAggregateResultsWeightedAverage(t *testing.T) {
 	results := []GraderResult{
-		{Kind: KindFile, Name: "file_check", Score: 1.0, Weight: 1.0, Pass: true},
+		{Kind: KindWorkspace, Name: "file_check", Score: 1.0, Weight: 1.0, Pass: true},
 		{Kind: KindPrompt, Name: "review", Score: 0.8, Weight: 2.0, Pass: true},
-		{Kind: KindBehavior, Name: "behavior", Score: 0.6, Weight: 1.0, Pass: true},
+		{Kind: KindTool, Name: "behavior", Score: 0.6, Weight: 1.0, Pass: true},
 	}
 
 	agg, err := AggregateResults(results)
@@ -35,7 +35,7 @@ func TestAggregateResultsGateFieldNoLongerShortCircuits(t *testing.T) {
 	// short-circuits aggregation. Every grader result contributes to the
 	// weighted score; Pass is the AND of every result's Pass.
 	results := []GraderResult{
-		{Kind: KindFile, Name: "file_check", Score: 1.0, Weight: 1.0, Pass: true, Gate: true},
+		{Kind: KindWorkspace, Name: "file_check", Score: 1.0, Weight: 1.0, Pass: true, Gate: true},
 		{Kind: KindProgram, Name: "build", Score: 0.0, Weight: 1.0, Pass: false, Gate: true},
 		{Kind: KindPrompt, Name: "review", Score: 0.9, Weight: 2.0, Pass: true},
 	}
@@ -60,7 +60,7 @@ func TestAggregateResultsGateFieldNoLongerShortCircuits(t *testing.T) {
 
 func TestAggregateResultsGatePassDoesNotOverride(t *testing.T) {
 	results := []GraderResult{
-		{Kind: KindFile, Name: "file_check", Score: 1.0, Weight: 1.0, Pass: true, Gate: true},
+		{Kind: KindWorkspace, Name: "file_check", Score: 1.0, Weight: 1.0, Pass: true, Gate: true},
 		{Kind: KindPrompt, Name: "review", Score: 0.5, Weight: 1.0, Pass: true},
 	}
 
@@ -93,8 +93,8 @@ func TestAggregateResultsEmptyReturnsError(t *testing.T) {
 
 func TestAggregateResultsDefaultWeight(t *testing.T) {
 	results := []GraderResult{
-		{Kind: KindFile, Name: "a", Score: 1.0, Weight: 0, Pass: true},
-		{Kind: KindFile, Name: "b", Score: 0.5, Weight: 0, Pass: true},
+		{Kind: KindWorkspace, Name: "a", Score: 1.0, Weight: 0, Pass: true},
+		{Kind: KindWorkspace, Name: "b", Score: 0.5, Weight: 0, Pass: true},
 	}
 
 	agg, err := AggregateResults(results)
@@ -129,7 +129,7 @@ func TestAggregateResultsSingleResult(t *testing.T) {
 
 func TestAggregateResultsNonGateFailureDoesNotForceZero(t *testing.T) {
 	results := []GraderResult{
-		{Kind: KindFile, Name: "check", Score: 0.0, Weight: 1.0, Pass: false, Gate: false},
+		{Kind: KindWorkspace, Name: "check", Score: 0.0, Weight: 1.0, Pass: false, Gate: false},
 		{Kind: KindPrompt, Name: "review", Score: 0.8, Weight: 1.0, Pass: true},
 	}
 
@@ -155,7 +155,7 @@ func TestAggregateResultsMultipleFailuresWithGateFlag(t *testing.T) {
 	// Phase 2 cutover (#625): multiple failing results with Gate=true no
 	// longer force Score=0 or GateFailed=true. Every result contributes.
 	results := []GraderResult{
-		{Kind: KindFile, Name: "gate1", Score: 0.0, Weight: 1.0, Pass: false, Gate: true},
+		{Kind: KindWorkspace, Name: "gate1", Score: 0.0, Weight: 1.0, Pass: false, Gate: true},
 		{Kind: KindProgram, Name: "gate2", Score: 0.0, Weight: 1.0, Pass: false, Gate: true},
 		{Kind: KindPrompt, Name: "review", Score: 1.0, Weight: 1.0, Pass: true},
 	}

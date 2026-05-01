@@ -57,12 +57,10 @@ type UnifiedGraderEntry struct {
 	// one line in the rendered review criteria and one Point in the
 	// resulting GraderResult. When set, Prompt is treated as optional
 	// preamble text shown to the judge before the numbered checks.
-	Checks []string `yaml:"checks,omitempty" json:"checks,omitempty"`
-
-	// Details is the typed-grader payload (e.g. min_files for output_check,
-	// path for file, command for program). Required for any type other
-	// than prompt; must be empty for type=prompt.
-	Details yaml.Node `yaml:"details,omitempty" json:"details,omitempty"`
+	//
+	// For typed graders (workspace, tool, activity, program), Checks is a
+	// yaml.Node that will be decoded into the type-specific []XxxCheck slice.
+	Checks yaml.Node `yaml:"checks,omitempty" json:"checks,omitempty"`
 }
 
 // UnifiedGraderGroup is a named collection of grader entries with optional
@@ -90,16 +88,10 @@ type UnifiedGraderConfig struct {
 // KindPromptReview is NOT included — it's the kind of manually-created
 // PromptReviewGrader instances, not a valid criteria-file type.
 var validTypedKinds = map[string]bool{
-	graders.KindFile:           true,
-	graders.KindProgram:        true,
-	// graders.KindBehavior removed — replaced by "activity"
-	// graders.KindActionSequence removed — replaced by "activity"
-	graders.KindToolConstraint: true,
-	// graders.KindOutputCheck removed — replaced by "workspace"
-	graders.KindToolUsage:      true,
-	graders.KindTool:           true,
-	"workspace":                true, // Canonical workspace grader
-	"activity":                 true, // Canonical activity grader
+	graders.KindProgram:   true,
+	graders.KindTool:      true,
+	graders.KindWorkspace: true,
+	graders.KindActivity:  true,
 }
 
 // IsValidUnifiedType returns true if t is a recognized unified-schema type
@@ -111,13 +103,13 @@ func IsValidUnifiedType(t string) bool {
 	return validTypedKinds[t]
 }
 
-// hasDetails reports whether n carries a non-empty YAML payload. yaml.v3
-// returns Kind==0 for absent fields; an explicit empty mapping has Kind!=0.
-func hasDetails(n yaml.Node) bool {
+// hasChecks reports whether n carries a non-empty YAML payload for checks.
+// yaml.v3 returns Kind==0 for absent fields; an explicit empty mapping has Kind!=0.
+func hasChecks(n yaml.Node) bool {
 	if n.Kind == 0 {
 		return false
 	}
-	// A null scalar (`details: ~`) is treated as empty.
+	// A null scalar (`checks: ~`) is treated as empty.
 	if n.Kind == yaml.ScalarNode && (n.Tag == "!!null" || n.Value == "") {
 		return false
 	}
@@ -143,15 +135,17 @@ func validateEntry(e UnifiedGraderEntry) error {
 		return fmt.Errorf("grader %q: type is required", tag)
 	}
 	
-	// Loud migration error for renamed types
-	if e.Type == graders.KindOutputCheck {
-		return fmt.Errorf("grader %q: type %q has been renamed to \"workspace\" with new check kinds; see docs/graders.md for migration guide", tag, e.Type)
+	// Reject deprecated types with loud migration errors.
+	deprecatedTypes := map[string]string{
+		"file":            "workspace",
+		"behavior":        "tool or activity",
+		"action_sequence": "activity",
+		"tool_constraint": "tool",
+		"output_check":    "workspace",
+		"tool_usage":      "tool",
 	}
-	if e.Type == graders.KindActionSequence {
-		return fmt.Errorf("grader %q: type %q has been renamed to \"activity\" with new check kinds (contains_subsequence); see docs/graders.md for migration guide", tag, e.Type)
-	}
-	if e.Type == graders.KindBehavior {
-		return fmt.Errorf("grader %q: type %q has been replaced by \"tool\" (for tool constraints) or \"activity\" (for turn limits); see docs/graders.md for migration guide", tag, e.Type)
+	if replacement, ok := deprecatedTypes[e.Type]; ok {
+		return fmt.Errorf("grader %q: type %q is no longer supported — use %q instead (see docs/graders.md)", tag, e.Type, replacement)
 	}
 	
 	if !IsValidUnifiedType(e.Type) {
@@ -162,35 +156,36 @@ func validateEntry(e UnifiedGraderEntry) error {
 	}
 	if e.Type == graders.KindPrompt {
 		hasPrompt := strings.TrimSpace(e.Prompt) != ""
-		hasChecks := len(e.Checks) > 0
-		if !hasPrompt && !hasChecks {
+		// For prompt graders, we need to decode Checks as []string
+		var promptChecks []string
+		if hasChecks(e.Checks) {
+			if err := e.Checks.Decode(&promptChecks); err != nil {
+				return fmt.Errorf("grader %q: failed to decode checks as []string: %w", tag, err)
+			}
+		}
+		hasChecksArray := len(promptChecks) > 0
+		if !hasPrompt && !hasChecksArray {
 			return fmt.Errorf("grader %q: type=prompt requires non-empty prompt or checks", tag)
 		}
-		if hasPrompt && !hasChecks {
+		if hasPrompt && !hasChecksArray {
 			slog.Warn("grader type=prompt has prompt but no checks: will synthesize a single pass/fail check at runtime; prefer adding explicit checks",
 				"grader", tag)
 		}
-		if hasChecks {
-			for i, c := range e.Checks {
+		if hasChecksArray {
+			for i, c := range promptChecks {
 				if strings.TrimSpace(c) == "" {
 					return fmt.Errorf("grader %q: checks[%d] must be a non-empty string", tag, i)
 				}
 			}
 		}
-		if hasDetails(e.Details) {
-			return fmt.Errorf("grader %q: type=prompt must not set details", tag)
-		}
 		return nil
 	}
-	// Typed grader.
+	// Typed grader — require checks.
 	if e.Prompt != "" {
-		return fmt.Errorf("grader %q: type=%s must not set prompt (use details)", tag, e.Type)
+		return fmt.Errorf("grader %q: type=%s must not set prompt", tag, e.Type)
 	}
-	if len(e.Checks) > 0 {
-		return fmt.Errorf("grader %q: type=%s must not set checks (only valid for type=prompt)", tag, e.Type)
-	}
-	if !hasDetails(e.Details) {
-		return fmt.Errorf("grader %q: type=%s requires non-empty details", tag, e.Type)
+	if !hasChecks(e.Checks) {
+		return fmt.Errorf("grader %q: type=%s requires non-empty checks", tag, e.Type)
 	}
 	return nil
 }

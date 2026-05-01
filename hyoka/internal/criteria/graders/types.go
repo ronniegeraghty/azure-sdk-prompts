@@ -21,34 +21,22 @@ import (
 
 // Supported grader kinds.
 const (
-	KindFile           = "file"            // DEPRECATED: use KindWorkspace
-	KindProgram        = "program"
-	KindPrompt         = "prompt"
-	KindBehavior       = "behavior"       // DEPRECATED: use KindTool or KindActivity
-	KindActionSequence = "action_sequence" // DEPRECATED: use KindActivity
-	KindToolConstraint = "tool_constraint" // DEPRECATED: use KindTool
-	KindPromptReview   = "prompt_review"
-	KindOutputCheck    = "output_check"    // DEPRECATED: use KindWorkspace
-	KindToolUsage      = "tool_usage"      // DEPRECATED: use KindTool
-	KindTool           = "tool"            // Canonical tool-perspective grader
-	KindWorkspace      = "workspace"       // Canonical workspace-delta grader
-	KindActivity       = "activity"        // Canonical session-activity grader
+	KindProgram      = "program"
+	KindPrompt       = "prompt"
+	KindPromptReview = "prompt_review"
+	KindTool         = "tool"       // Canonical tool-perspective grader
+	KindWorkspace    = "workspace"  // Canonical workspace-delta grader
+	KindActivity     = "activity"   // Canonical session-activity grader
 )
 
 // validKinds is the set of recognized grader kind values.
 var validKinds = map[string]bool{
-	KindFile:           true,
-	KindProgram:        true,
-	KindPrompt:         true,
-	KindBehavior:       true, // deprecated
-	KindActionSequence: true,
-	KindToolConstraint: true, // deprecated
-	KindPromptReview:   true,
-	KindOutputCheck:    true,
-	KindToolUsage:      true, // deprecated
-	KindTool:           true,
-	KindWorkspace:      true,
-	KindActivity:       true,
+	KindProgram:      true,
+	KindPrompt:       true,
+	KindPromptReview: true,
+	KindTool:         true,
+	KindWorkspace:    true,
+	KindActivity:     true,
 }
 
 // GraderConfigFile is the top-level YAML structure containing a list of graders.
@@ -95,10 +83,17 @@ type FileConfig struct {
 }
 
 // ProgramConfig holds configuration for the "program" grader kind.
+// The grader runs one or more commands sequentially, each producing a check.
 type ProgramConfig struct {
-	Command string   `yaml:"command" json:"command"`
-	Args    []string `yaml:"args,omitempty" json:"args,omitempty"`
-	Timeout int      `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	Checks []ProgramCheck `yaml:"checks" json:"checks"`
+}
+
+// ProgramCheck defines a single command check within a program grader.
+type ProgramCheck struct {
+	Kind    string   `yaml:"kind" json:"kind"`                       // "command" (only supported kind)
+	Command string   `yaml:"command" json:"command"`                 // Command to run
+	Args    []string `yaml:"args,omitempty" json:"args,omitempty"`   // Command arguments
+	Timeout int      `yaml:"timeout,omitempty" json:"timeout,omitempty"` // Timeout in seconds (default: 30)
 }
 
 // PromptConfig holds configuration for the "prompt" grader kind.
@@ -106,20 +101,6 @@ type ProgramConfig struct {
 type PromptConfig struct {
 	Model  string `yaml:"model" json:"model"`
 	Rubric string `yaml:"rubric" json:"rubric"`
-}
-
-// BehaviorConfig holds configuration for the "behavior" grader kind.
-// DEPRECATED: Use ToolConfig or ActivityConfig instead.
-type BehaviorConfig struct {
-	RequiredTools  []string `yaml:"required_tools,omitempty" json:"required_tools,omitempty"`
-	ForbiddenTools []string `yaml:"forbidden_tools,omitempty" json:"forbidden_tools,omitempty"`
-	MaxTurns       int      `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`
-}
-
-// ActionSequenceConfig holds configuration for the "action_sequence" grader kind.
-// DEPRECATED: Use ActivityConfig with contains_subsequence instead.
-type ActionSequenceConfig struct {
-	ExpectedActions []string `yaml:"expected_actions" json:"expected_actions"`
 }
 
 // ActivityConfig holds configuration for the "activity" grader kind.
@@ -190,43 +171,6 @@ type WorkspaceCheck struct {
 	Excludes string   `yaml:"excludes,omitempty" json:"excludes,omitempty"`   // For kind: file, state: present
 }
 
-// ToolConstraintConfig holds configuration for the "tool_constraint" grader kind.
-type ToolConstraintConfig struct {
-	Required  []string       `yaml:"required,omitempty" json:"required,omitempty"`
-	Forbidden []string       `yaml:"forbidden,omitempty" json:"forbidden,omitempty"`
-	MinCalls  map[string]int `yaml:"min_calls,omitempty" json:"min_calls,omitempty"`
-	MaxCalls  map[string]int `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
-}
-
-// ToolUsageConfig holds configuration for the "tool_usage" grader kind.
-//
-// tool_usage is environment-aware: each rule is silently skipped when its
-// referenced tool/skill is not present in the eval's environment. This makes
-// it safe to declare the same rule across attribute-matched criteria files
-// (e.g. a python-language criteria file) regardless of which configs include
-// the relevant tool.
-type ToolUsageConfig struct {
-	Rules []ToolUsageRule `yaml:"rules" json:"rules"`
-}
-
-// ToolUsageRule is one rule within a ToolUsageConfig. Type selects how the
-// rule is matched against the environment and the usage signals.
-type ToolUsageRule struct {
-	// Type is one of "mcp_server", "skill_plugin", "skill_repo".
-	Type string `yaml:"type" json:"type"`
-	// Name matches an MCP server (Type=mcp_server) or skill (Type=skill_plugin).
-	Name string `yaml:"name,omitempty" json:"name,omitempty"`
-	// Repo matches a remote-skill repository (Type=skill_repo).
-	Repo string `yaml:"repo,omitempty" json:"repo,omitempty"`
-	// Skill optionally narrows a Repo match to a specific skill within it.
-	Skill string `yaml:"skill,omitempty" json:"skill,omitempty"`
-	// Expect describes the success condition. One of:
-	//   "at_least_one_tool_call" — server appears in MCPServersUsed
-	//   "any_skill_invoked"      — skill appears in SkillsInvoked
-	//   "skill_invoked"          — same as any_skill_invoked
-	Expect string `yaml:"expect" json:"expect"`
-}
-
 // ToolConfig holds configuration for the "tool" grader kind (canonical).
 // The tool grader consolidates behavior, tool_constraint, and tool_usage.
 type ToolConfig struct {
@@ -256,12 +200,6 @@ func (g *GraderConfig) EffectiveWeight() float64 {
 // or the config doesn't match the expected schema.
 func (g *GraderConfig) DecodeConfig() (any, error) {
 	switch g.Kind {
-	case KindFile:
-		var c FileConfig
-		if err := g.Config.Decode(&c); err != nil {
-			return nil, fmt.Errorf("decoding file config for %q: %w", g.Name, err)
-		}
-		return &c, nil
 	case KindProgram:
 		var c ProgramConfig
 		if err := g.Config.Decode(&c); err != nil {
@@ -274,46 +212,16 @@ func (g *GraderConfig) DecodeConfig() (any, error) {
 			return nil, fmt.Errorf("decoding prompt config for %q: %w", g.Name, err)
 		}
 		return &c, nil
-	case KindBehavior:
-		var c BehaviorConfig
-		if err := g.Config.Decode(&c); err != nil {
-			return nil, fmt.Errorf("decoding behavior config for %q: %w", g.Name, err)
-		}
-		return &c, nil
-	case KindActionSequence:
-		var c ActionSequenceConfig
-		if err := g.Config.Decode(&c); err != nil {
-			return nil, fmt.Errorf("decoding action_sequence config for %q: %w", g.Name, err)
-		}
-		return &c, nil
 	case "activity":
 		var c ActivityConfig
 		if err := g.Config.Decode(&c); err != nil {
 			return nil, fmt.Errorf("decoding activity config for %q: %w", g.Name, err)
 		}
 		return &c, nil
-	case KindToolConstraint:
-		var c ToolConstraintConfig
-		if err := g.Config.Decode(&c); err != nil {
-			return nil, fmt.Errorf("decoding tool_constraint config for %q: %w", g.Name, err)
-		}
-		return &c, nil
-	case KindOutputCheck:
-		var c OutputCheckConfig
-		if err := g.Config.Decode(&c); err != nil {
-			return nil, fmt.Errorf("decoding output_check config for %q: %w", g.Name, err)
-		}
-		return &c, nil
 	case "workspace":
 		var c WorkspaceConfig
 		if err := g.Config.Decode(&c); err != nil {
 			return nil, fmt.Errorf("decoding workspace config for %q: %w", g.Name, err)
-		}
-		return &c, nil
-	case KindToolUsage:
-		var c ToolUsageConfig
-		if err := g.Config.Decode(&c); err != nil {
-			return nil, fmt.Errorf("decoding tool_usage config for %q: %w", g.Name, err)
 		}
 		return &c, nil
 	case KindTool:

@@ -211,13 +211,30 @@ type FileExtra struct {
 }
 
 // ProgramExtras holds program execution render-only data.
+// ProgramExtras holds render-only data for program graders.
+// For check-based program graders, CheckResults contains per-check details.
 type ProgramExtras struct {
-	Command    string `json:"command"`
+	// Legacy fields (kept for backwards compat with old single-command program graders)
+	Command    string `json:"command,omitempty"`
 	Args       []string `json:"args,omitempty"`
-	ExitCode   int    `json:"exit_code"`
+	ExitCode   int    `json:"exit_code,omitempty"`
 	Stdout     string `json:"stdout,omitempty"`
 	Stderr     string `json:"stderr,omitempty"`
 	DurationMs int64  `json:"duration_ms,omitempty"`
+	
+	// New check-based field
+	CheckResults []ProgramCheckResult `json:"check_results,omitempty"`
+}
+
+// ProgramCheckResult holds execution details for a single program check.
+type ProgramCheckResult struct {
+	CheckNumber int      `json:"check_number"`
+	Command     string   `json:"command"`
+	Args        []string `json:"args,omitempty"`
+	ExitCode    int      `json:"exit_code"`
+	Stdout      string   `json:"stdout,omitempty"`
+	Stderr      string   `json:"stderr,omitempty"`
+	DurationMs  int64    `json:"duration_ms"`
 }
 
 // PromptExtras holds LLM-as-judge render-only data.

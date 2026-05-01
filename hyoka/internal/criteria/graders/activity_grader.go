@@ -362,3 +362,35 @@ func matchSubsequence(actual, expected []string) int {
 	}
 	return matchIdx
 }
+
+func maxTurnNumber(log []ActionEvent) int {
+	max := 0
+	for _, e := range log {
+		if e.TurnNumber > max {
+			max = e.TurnNumber
+		}
+	}
+	return max
+}
+
+func countTools(log []ActionEvent) map[string]int {
+	counts := make(map[string]int)
+	for _, e := range log {
+		if e.Tool != "" {
+			counts[e.Tool]++
+		}
+	}
+	return counts
+}
+
+func uniqueTools(tools []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, t := range tools {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			result = append(result, t)
+		}
+	}
+	return result
+}

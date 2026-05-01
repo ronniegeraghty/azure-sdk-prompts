@@ -1,46 +1,47 @@
 package graders
 
 import (
-"bytes"
-"context"
-"errors"
-"fmt"
-"os/exec"
-"time"
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os/exec"
+	"time"
 )
 
 // Default timeout for program graders when none is configured.
 const defaultProgramTimeout = 30 * time.Second
 
-// ProgramGrader runs a command and grades based on exit code.
-// Exit code 0 → Pass, non-zero → Fail.
+// ProgramGrader runs one or more commands and grades based on exit codes.
+// Each check produces one GraderCheck; the overall score is passed_checks / total_checks.
 type ProgramGrader struct {
-name    string
-command string
-args    []string
-timeout time.Duration
+	name   string
+	checks []ProgramCheck
 }
 
 // NewProgramGrader constructs a ProgramGrader from a parsed ProgramConfig.
 func NewProgramGrader(name string, cfg *ProgramConfig) (*ProgramGrader, error) {
-if name == "" {
-return nil, fmt.Errorf("program grader: name is required")
-}
-if cfg.Command == "" {
-return nil, fmt.Errorf("program grader %q: command is required", name)
-}
+	if name == "" {
+		return nil, fmt.Errorf("program grader: name is required")
+	}
+	if len(cfg.Checks) == 0 {
+		return nil, fmt.Errorf("program grader %q: at least one check is required", name)
+	}
+	
+	// Validate each check
+	for i, check := range cfg.Checks {
+		if check.Kind != "command" {
+			return nil, fmt.Errorf("program grader %q: check[%d]: unsupported kind %q (only 'command' is supported)", name, i, check.Kind)
+		}
+		if check.Command == "" {
+			return nil, fmt.Errorf("program grader %q: check[%d]: command is required", name, i)
+		}
+	}
 
-timeout := defaultProgramTimeout
-if cfg.Timeout > 0 {
-timeout = time.Duration(cfg.Timeout) * time.Second
-}
-
-return &ProgramGrader{
-name:    name,
-command: cfg.Command,
-args:    cfg.Args,
-timeout: timeout,
-}, nil
+	return &ProgramGrader{
+		name:   name,
+		checks: cfg.Checks,
+	}, nil
 }
 
 // Kind returns the grader type identifier.
@@ -49,17 +50,45 @@ func (g *ProgramGrader) Kind() string { return KindProgram }
 // Name returns the grader's name.
 func (g *ProgramGrader) Name() string { return g.name }
 
-// Grade executes the configured command in the workspace directory.
-// Exit code 0 produces Pass=true/Score=1.0; non-zero produces Pass=false/Score=0.0.
-// Per v4 spec: emits single point "exit code 0", with stderr tail in Message on fail.
+// Grade executes all configured command checks in the workspace directory.
+// Exit code 0 produces Pass=true for that check; non-zero produces Pass=false.
+// Overall score is passed_checks / total_checks.
 func (g *ProgramGrader) Grade(ctx context.Context, input GraderInput) (GraderResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, g.timeout)
-	defer cancel()
+	var allChecks []GraderCheck
+	var checkResults []ProgramCheckResult
+	passed := 0
 
+	for i, check := range g.checks {
+		timeout := defaultProgramTimeout
+		if check.Timeout > 0 {
+			timeout = time.Duration(check.Timeout) * time.Second
+		}
+
+		checkCtx, cancel := context.WithTimeout(ctx, timeout)
+		checkResult, graderCheck := g.runCheck(checkCtx, check, i+1, input.WorkspacePath)
+		cancel()
+
+		checkResults = append(checkResults, checkResult)
+		allChecks = append(allChecks, graderCheck)
+		if graderCheck.Pass {
+			passed++
+		}
+	}
+
+	extras := &ProgramExtras{
+		CheckResults: checkResults,
+	}
+
+	msg := fmt.Sprintf("%d/%d checks passed", passed, len(g.checks))
+	return NewResult(KindProgram, g.name, input.Config, allChecks, msg, &GraderExtras{Program: extras}), nil
+}
+
+// runCheck runs a single command check and returns both the detailed result and the grader check.
+func (g *ProgramGrader) runCheck(ctx context.Context, check ProgramCheck, checkNum int, workspacePath string) (ProgramCheckResult, GraderCheck) {
 	var stdout, stderr bytes.Buffer
 
-	cmd := exec.CommandContext(ctx, g.command, g.args...)
-	cmd.Dir = input.WorkspacePath
+	cmd := exec.CommandContext(ctx, check.Command, check.Args...)
+	cmd.Dir = workspacePath
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -67,63 +96,64 @@ func (g *ProgramGrader) Grade(ctx context.Context, input GraderInput) (GraderRes
 	err := cmd.Run()
 	elapsed := time.Since(start)
 
-	extras := &ProgramExtras{
-		Command:    g.command,
-		Args:       g.args,
-		ExitCode:   0,
-		Stdout:     stdout.String(),
-		Stderr:     stderr.String(),
-		DurationMs: elapsed.Milliseconds(),
+	result := ProgramCheckResult{
+		CheckNumber: checkNum,
+		Command:     check.Command,
+		Args:        check.Args,
+		ExitCode:    0,
+		Stdout:      stdout.String(),
+		Stderr:      stderr.String(),
+		DurationMs:  elapsed.Milliseconds(),
 	}
 
-	var checks []GraderCheck
-	var msg string
+	label := fmt.Sprintf("check %d: %s", checkNum, check.Command)
+	if len(check.Args) > 0 {
+		label = fmt.Sprintf("check %d: %s %v", checkNum, check.Command, check.Args)
+	}
 
 	if err != nil {
 		if ctx.Err() != nil {
-			extras.ExitCode = -1
+			result.ExitCode = -1
+			msg := "timed out"
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				msg = fmt.Sprintf("command timed out after %s", g.timeout)
-			} else {
-				msg = fmt.Sprintf("command cancelled: %v", ctx.Err())
+				msg = fmt.Sprintf("timed out after %s", elapsed)
 			}
-			checks = append(checks, GraderCheck{
-				Label:   "exit code 0",
+			return result, GraderCheck{
+				Label:   label,
 				Pass:    false,
 				Message: msg,
-			})
-			return NewResult(KindProgram, g.name, input.Config, checks, msg, &GraderExtras{Program: extras}), nil
+			}
 		}
 
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			extras.ExitCode = exitErr.ExitCode()
-			msg = fmt.Sprintf("command exited with code %d (took %s)", exitErr.ExitCode(), elapsed)
-			// Include stderr tail in point Message for debugging
+			result.ExitCode = exitErr.ExitCode()
 			stderrTail := stderr.String()
 			if len(stderrTail) > 500 {
 				stderrTail = "..." + stderrTail[len(stderrTail)-500:]
 			}
-			pointMsg := fmt.Sprintf("exited with code %d", exitErr.ExitCode())
+			msg := fmt.Sprintf("exited with code %d", exitErr.ExitCode())
 			if stderrTail != "" {
-				pointMsg = fmt.Sprintf("exited with code %d; stderr: %s", exitErr.ExitCode(), stderrTail)
+				msg = fmt.Sprintf("exited with code %d; stderr: %s", exitErr.ExitCode(), stderrTail)
 			}
-			checks = append(checks, GraderCheck{
-				Label:   "exit code 0",
+			return result, GraderCheck{
+				Label:   label,
 				Pass:    false,
-				Message: pointMsg,
-			})
-			return NewResult(KindProgram, g.name, input.Config, checks, msg, &GraderExtras{Program: extras}), nil
+				Message: msg,
+			}
 		}
 
-		return GraderResult{}, fmt.Errorf("program grader %q: %w", g.name, err)
+		// Unexpected error
+		return result, GraderCheck{
+			Label:   label,
+			Pass:    false,
+			Message: fmt.Sprintf("unexpected error: %v", err),
+		}
 	}
 
-	msg = fmt.Sprintf("command succeeded (took %s)", elapsed)
-	checks = append(checks, GraderCheck{
-		Label:   "exit code 0",
+	return result, GraderCheck{
+		Label:   label,
 		Pass:    true,
-		Message: "",
-	})
-	return NewResult(KindProgram, g.name, input.Config, checks, msg, &GraderExtras{Program: extras}), nil
+		Message: fmt.Sprintf("exit code 0 (took %s)", elapsed),
+	}
 }

@@ -90,7 +90,7 @@ func translateLegacy(gc *UnifiedGraderConfig) {
 
 func translateSlice(entries []UnifiedGraderEntry) {
 	for i := range entries {
-		if entries[i].Type == "" && entries[i].Prompt != "" && !hasDetails(entries[i].Details) {
+		if entries[i].Type == "" && entries[i].Prompt != "" && !hasChecks(entries[i].Checks) {
 			entries[i].Type = graders.KindPrompt
 		}
 	}
