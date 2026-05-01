@@ -25,7 +25,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 		"Program.cs": "using Azure.Storage.Blobs;\n// reference",
 	}
 
-	result := BuildReviewPrompt(prompt, generated, reference, "", nil)
+	result := BuildReviewPrompt(prompt, generated, reference, nil, nil)
 
 	if result == "" {
 		t.Fatal("expected non-empty review prompt")
@@ -50,7 +50,7 @@ func TestBuildReviewPromptNoReference(t *testing.T) {
 	prompt := "Write code"
 	generated := map[string]string{"main.go": "package main"}
 
-	result := BuildReviewPrompt(prompt, generated, nil, "", nil)
+	result := BuildReviewPrompt(prompt, generated, nil, nil, nil)
 
 	if !strings.Contains(result, "No reference answer provided") {
 		t.Error("expected 'No reference answer provided' when no reference given")
@@ -58,7 +58,7 @@ func TestBuildReviewPromptNoReference(t *testing.T) {
 }
 
 func TestBuildReviewPromptEmptyReference(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, map[string]string{}, "", nil)
+	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, map[string]string{}, nil, nil)
 	if !strings.Contains(result, "No reference answer provided") {
 		t.Error("empty reference map should show 'No reference answer provided'")
 	}
@@ -67,20 +67,23 @@ func TestBuildReviewPromptEmptyReference(t *testing.T) {
 func TestBuildReviewPromptWithEvaluationCriteria(t *testing.T) {
 	prompt := "Write Azure code"
 	generated := map[string]string{"main.go": "package main"}
-	criteria := "- Must use DefaultAzureCredential\n- Must handle errors"
+	checks := []ReviewCheck{
+		{ID: "check_1", Text: "Must use DefaultAzureCredential"},
+		{ID: "check_2", Text: "Must handle errors"},
+	}
 
-	result := BuildReviewPrompt(prompt, generated, nil, criteria, nil)
+	result := BuildReviewPrompt(prompt, generated, nil, checks, nil)
 
 	if !strings.Contains(result, "Evaluation Criteria") {
 		t.Error("expected evaluation criteria section")
 	}
-	if !strings.Contains(result, "DefaultAzureCredential") {
+	if !strings.Contains(result, "check_1") || !strings.Contains(result, "DefaultAzureCredential") {
 		t.Error("expected criteria content in prompt")
 	}
 }
 
 func TestBuildReviewPromptNoCriteria(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, nil, "", nil)
+	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, nil, nil, nil)
 	// When no criteria are passed, the "Evaluation Criteria" section should not appear.
 	if strings.Contains(result, "## Evaluation Criteria") {
 		t.Error("should not contain criteria section header when criteria is empty")
@@ -98,7 +101,7 @@ func TestBuildReviewPromptMultipleFiles(t *testing.T) {
 		"ref_help.go": "package helper // ref",
 	}
 
-	result := BuildReviewPrompt("prompt", generated, reference, "criteria", nil)
+	result := BuildReviewPrompt("prompt", generated, reference, nil, nil)
 
 	for name := range generated {
 		if !strings.Contains(result, name) {
@@ -113,14 +116,14 @@ func TestBuildReviewPromptMultipleFiles(t *testing.T) {
 }
 
 func TestBuildReviewPromptEmptyGeneratedFiles(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{}, nil, "", nil)
+	result := BuildReviewPrompt("prompt", map[string]string{}, nil, nil, nil)
 	if !strings.Contains(result, "Generated Code") {
 		t.Error("should still contain Generated Code header even with empty files")
 	}
 }
 
 func TestBuildReviewPromptContainsScoringInstructions(t *testing.T) {
-	result := BuildReviewPrompt("p", map[string]string{"f": "c"}, nil, "", nil)
+	result := BuildReviewPrompt("p", map[string]string{"f": "c"}, nil, nil, nil)
 	if !strings.Contains(result, "Scoring Instructions") {
 		t.Error("prompt should contain scoring instructions")
 	}
@@ -128,7 +131,7 @@ func TestBuildReviewPromptContainsScoringInstructions(t *testing.T) {
 
 func TestBuildReviewPromptPreservesOriginalPrompt(t *testing.T) {
 	original := "Write a Python script that uses azure-identity DefaultAzureCredential"
-	result := BuildReviewPrompt(original, map[string]string{"main.py": "pass"}, nil, "", nil)
+	result := BuildReviewPrompt(original, map[string]string{"main.py": "pass"}, nil, nil, nil)
 	if !strings.Contains(result, original) {
 		t.Error("prompt should contain the original prompt verbatim")
 	}
@@ -1217,7 +1220,7 @@ func TestBuildReviewPromptSpecialChars(t *testing.T) {
 	generated := map[string]string{
 		"test.go": "package main\nfunc main() { fmt.Println(\"hello\") }",
 	}
-	result := BuildReviewPrompt(prompt, generated, nil, "", nil)
+	result := BuildReviewPrompt(prompt, generated, nil, nil, nil)
 	if !strings.Contains(result, "backticks") {
 		t.Error("should preserve special characters in prompt")
 	}
@@ -1870,7 +1873,7 @@ artifact := &GeneratorArtifact{
 FinalResponse: "I have created the script as requested.",
 }
 
-result := BuildReviewPrompt(prompt, files, nil, "Must run without errors", artifact)
+result := BuildReviewPrompt(prompt, files, nil, criteriaStringToChecks("Must run without errors"), artifact)
 
 // Both sections must appear
 if !strings.Contains(result, "## Generated Code") {
@@ -1896,7 +1899,7 @@ artifact := &GeneratorArtifact{
 FinalResponse: "DefaultAzureCredential is a chained credential...",
 }
 
-result := BuildReviewPrompt(prompt, nil, nil, "Must be accurate", artifact)
+result := BuildReviewPrompt(prompt, nil, nil, criteriaStringToChecks("Must be accurate"), artifact)
 
 if !strings.Contains(result, "## Generated Code") {
 t.Error("prompt must include Generated Code section header")
@@ -1918,7 +1921,7 @@ func TestBuildReviewPrompt_NoArtifactWithFiles(t *testing.T) {
 prompt := "Write code"
 files := map[string]string{"test.py": "code"}
 
-result := BuildReviewPrompt(prompt, files, nil, "", nil)
+result := BuildReviewPrompt(prompt, files, nil, nil, nil)
 
 if !strings.Contains(result, "## Generated Code") {
 t.Error("prompt must include Generated Code section")
@@ -1940,7 +1943,7 @@ artifact := &GeneratorArtifact{
 FinalResponse: "", // empty
 }
 
-result := BuildReviewPrompt(prompt, files, nil, "", artifact)
+result := BuildReviewPrompt(prompt, files, nil, nil, artifact)
 
 if strings.Contains(result, "## Agent's Final Response") {
 t.Error("prompt should not include Agent's Final Response when FinalResponse is empty")
@@ -1956,7 +1959,7 @@ func TestCopilotReviewer_EmptyWorkspaceWithArtifact(t *testing.T) {
 
 	// We can't actually invoke the real reviewer without Copilot, but we can
 	// test that BuildReviewPrompt doesn't error and includes the response
-	prompt := BuildReviewPrompt("Explain Azure SDK", map[string]string{}, nil, "Must be clear", artifact)
+	prompt := BuildReviewPrompt("Explain Azure SDK", map[string]string{}, nil, criteriaStringToChecks("Must be clear"), artifact)
 
 	if !strings.Contains(prompt, "Here is my explanation") {
 		t.Error("prompt must include artifact response when no files present")

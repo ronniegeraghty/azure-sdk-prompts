@@ -91,7 +91,8 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		}
 	}
 
-	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria, artifact)
+	checks := criteriaStringToChecks(evaluationCriteria)
+	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
 
 	// Create isolated config directory to prevent user-level skills from
 	// leaking into the review session (#21).
@@ -363,7 +364,8 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		}
 	}
 
-	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria, artifact)
+	checks := criteriaStringToChecks(evaluationCriteria)
+	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
 
 	// Run reviewers sequentially — one Copilot session at a time
 	for i, model := range p.models {

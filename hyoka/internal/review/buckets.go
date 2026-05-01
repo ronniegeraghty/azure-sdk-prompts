@@ -120,7 +120,12 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 				break
 			}
 			slog.Debug("Bucket review starting", "model", model, "bucket", b.Name)
-			reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, b.Criteria, artifact)
+			// Prefer structured checks over legacy criteria string
+			checks := b.Checks
+			if len(checks) == 0 {
+				checks = criteriaStringToChecks(b.Criteria)
+			}
+			reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
 			res, rerr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir)
 			if rerr != nil {
 				slog.Warn("Bucket review failed", "model", model, "bucket", b.Name, "error", rerr)
