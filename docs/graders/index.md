@@ -43,12 +43,18 @@ graders:
 The `type:` field is the discriminator:
 - `prompt` — LLM-based review grader
 - `output_check` — Workspace file and size checks
-- `file` — Specific file existence or content checks
 - `program` — Run a custom program/script and evaluate exit code
-- `behavior` — Check tool and action constraints
+- `tool` — Unified tool-perspective checks (canonical)
 - `action_sequence` — Verify expected action sequence
-- `tool_constraint` — Constraint on tool usage and call counts
-- `prompt_review` — AI review panel orchestration (engine-internal; **not** a valid `type:` value in user criteria YAML)
+
+**Deprecated types** (still functional, emit warnings at load time):
+- `file` — use `output_check` with `require_files` instead
+- `behavior` — use `tool` instead
+- `tool_constraint` — use `tool` instead
+- `tool_usage` — use `tool` instead
+
+**Engine-internal types** (not valid in user YAML):
+- `prompt_review` — AI review panel orchestration (used by the engine, not user-configurable)
 
 ### Example: Mixed Prompt and Typed Graders
 

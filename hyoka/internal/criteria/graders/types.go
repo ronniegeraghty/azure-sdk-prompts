@@ -21,7 +21,7 @@ import (
 
 // Supported grader kinds.
 const (
-	KindFile           = "file"
+	KindFile           = "file"            // DEPRECATED: use KindOutputCheck
 	KindProgram        = "program"
 	KindPrompt         = "prompt"
 	KindBehavior       = "behavior"       // DEPRECATED: use KindTool

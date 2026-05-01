@@ -2,6 +2,7 @@ package graders
 
 import (
 	"fmt"
+	"log/slog"
 )
 
 // NewGrader creates a Grader instance from a GraderConfig by dispatching
@@ -14,6 +15,7 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 
 	switch gc.Kind {
 	case KindFile:
+		slog.Warn("grader kind 'file' is deprecated; use 'output_check' with require_files instead", "name", gc.Name, "kind", gc.Kind)
 		cfg, ok := decoded.(*FileConfig)
 		if !ok {
 			return nil, fmt.Errorf("grader %q: expected *FileConfig, got %T", gc.Name, decoded)
@@ -47,6 +49,7 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 		return &PromptGraderAdapter{inner: g}, nil
 
 	case KindBehavior:
+		slog.Warn("grader kind 'behavior' is deprecated; use 'tool' kind instead", "name", gc.Name, "kind", gc.Kind)
 		cfg, ok := decoded.(*BehaviorConfig)
 		if !ok {
 			return nil, fmt.Errorf("grader %q: expected *BehaviorConfig, got %T", gc.Name, decoded)
@@ -69,6 +72,7 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 		return g, nil
 
 	case KindToolConstraint:
+		slog.Warn("grader kind 'tool_constraint' is deprecated; use 'tool' kind instead", "name", gc.Name, "kind", gc.Kind)
 		cfg, ok := decoded.(*ToolConstraintConfig)
 		if !ok {
 			return nil, fmt.Errorf("grader %q: expected *ToolConstraintConfig, got %T", gc.Name, decoded)
@@ -91,6 +95,7 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 		return g, nil
 
 	case KindToolUsage:
+		slog.Warn("grader kind 'tool_usage' is deprecated; use 'tool' kind instead", "name", gc.Name, "kind", gc.Kind)
 		cfg, ok := decoded.(*ToolUsageConfig)
 		if !ok {
 			return nil, fmt.Errorf("grader %q: expected *ToolUsageConfig, got %T", gc.Name, decoded)

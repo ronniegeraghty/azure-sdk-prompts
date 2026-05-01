@@ -119,6 +119,30 @@ Size int64  `json:"size"`
 // are derived from Points at construction time — they are NOT independent
 // signals. Any field outside Points is render-only and may not influence
 // pass/fail.
+//
+// This is the canonical report shape returned by all graders. All graders
+// emit a GraderResult with:
+//   - Kind: the grader type (one of KindXxx constants)
+//   - Name: the grader instance name from YAML config
+//   - Weight: the grader's contribution weight for aggregation
+//   - SourceFile: the criteria file that defined this grader
+//   - SourceType: the original grader type from config (before any translation)
+//   - Checks: the list of individual pass/fail checks evaluated by this grader
+//   - Extras: kind-specific render-only data for display purposes
+//
+// Graders use the Extras field for kind-specific render-only data that does
+// not influence scoring. The canonical grader types are:
+//   - prompt: LLM-based review with a judge model
+//   - output_check: workspace file/byte checks
+//   - program: external program execution
+//   - tool: unified tool-perspective checks (replaces behavior/tool_constraint/tool_usage)
+//   - action_sequence: ordered action verification
+//
+// Deprecated grader types (emit warnings at load time):
+//   - behavior → use 'tool' instead
+//   - tool_constraint → use 'tool' instead
+//   - tool_usage → use 'tool' instead
+//   - file → use 'output_check' with require_files instead
 type GraderResult struct {
 	Kind    string  `json:"kind"`              // one of KindXxx
 	Name    string  `json:"name"`              // YAML instance name

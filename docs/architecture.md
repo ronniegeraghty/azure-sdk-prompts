@@ -38,7 +38,7 @@ hyoka/                         # Go module (github.com/ronniegeraghty/hyoka)
     │   ├── summary_stats.go   #   Aggregate statistics
     │   └── types.go           #   EvalReport struct
     │
-    ├── graders/               # Pluggable grader system (file, program, behavior, etc.)
+    ├── graders/               # Pluggable grader system (prompt, output_check, program, tool, etc.)
     ├── comparison/            # Cross-config and cross-run comparison engine
     ├── criteria/              # Tiered evaluation criteria (attribute-matched YAML)
     ├── plugin/                # Composable plugin system (bundles skills + MCP servers)
@@ -95,7 +95,7 @@ Copilot skills (SKILL.md files) provide domain knowledge to the generator and re
 The `hyoka init` command scaffolds a `.hyoka` project directory containing `configs/`, `prompts/`, `criteria/`, `skills/`, and `reports/` subdirectories. This allows teams to maintain their own evaluation setups outside the main repository.
 
 ### Graders
-Pluggable grading criteria defined in YAML. Five deterministic grader types are implemented (file, program, behavior, action_sequence, tool_constraint) with an AI prompt grader coming. Graders support property-based applicability (`when` conditions) and gate semantics for hard pass/fail requirements. See [grader-config-schema.md](grader-config-schema.md).
+Pluggable grading criteria defined in YAML. Canonical grader types include prompt (LLM-based review), output_check (workspace file/byte checks), program (external program execution), tool (unified tool-perspective checks), and action_sequence (ordered action verification). Legacy grader types (behavior, tool_constraint, tool_usage, file) are deprecated but remain functional with load-time warnings. Graders support property-based applicability (`when` conditions). See [grader-config-schema.md](grader-config-schema.md).
 
 ### Guardrails
 - **Turn limit**: 25 assistant turns per generation (prevents runaway sessions)

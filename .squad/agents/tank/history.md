@@ -986,3 +986,41 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 **API Contract:** Each variant's check diffs are keyed by variant config name (e.g., "without-tool-a"). Frontend (Trinity) can now render check-level deltas.
 
 **Testing:** Added `checkdiff_test.go` with 6 test cases covering improved/regressed/unchanged scenarios, missing checks, extra checks in variants, and nil inputs. All tests pass.
+
+## 2026-05-01 — C10: Dual-Emit JSON Migration (checks/points)
+
+**Status:** COMPLETE (commit d955565e on ronniegeraghty/dev)
+
+**Context:** Neo's C5 renamed `GraderPoint` → `GraderCheck` (with alias) and field `Points` → `Checks`, but kept `json:"points,omitempty"` to preserve back-compat. Tank's C10 implements the JSON migration horizon so the site can switch over without a flag day.
+
+**Changes:**
+
+**Go side (hyoka/internal/report/types.go):**
+- Changed `Checks []GraderCheck` tag from `json:"points"` to `json:"-"` (omit from default marshal)
+- Implemented custom `MarshalJSON()` to dual-emit Checks as BOTH `"checks"` AND `"points"` keys
+- Implemented custom `UnmarshalJSON()` to read from either key, preferring `"checks"` if both present
+- Added TODO comment: next-release cleanup (drop "points" key)
+- Created `dual_emit_test.go` with 3 test cases: legacy (points only), new (checks only), both (prefers checks)
+
+**Site side (site/src/app/data/types.ts + components):**
+- GraderResult interface now has `checks?: GraderPoint[]` AND `points?: GraderPoint[]` (both optional)
+- Added `getChecks(result)` helper that returns `result.checks ?? result.points ?? []`
+- Updated call sites:
+  - `lib/evalPass.ts`: uses `getChecks(g)` instead of `g.points`
+  - `lib/graderScore.ts`: uses `getChecks(result)` instead of `result.points ?? []`
+  - `components/GraderResultRow.tsx`: uses `getChecks(result)` instead of `result.points`
+  - `components/eval-detail-page.tsx`: uses `getChecks(g)` instead of `g.points ?? []`
+
+**Migration horizon:** One release. Next release will drop "points" key; readers MUST consume "checks" only.
+
+**Verification:**
+- `go test ./hyoka/internal/report/... -run TestGraderResult` — PASS (dual-emit + unmarshal tests)
+- `cd site && npm run build` — PASS (no TS errors)
+- Pre-existing failures in graders package (tool_grader.go) and report package (TestWriteReport) confirmed present on baseline branch — not introduced by this change.
+
+**Learnings:**
+- **ProgressEvent fields (GraderChecksPassed/Total) did NOT need dual-emit.** They're only used in-process via callbacks, never JSON-serialized.
+- **Custom Marshal/Unmarshal pattern is clean for dual-emit.** Use type alias to avoid recursion, emit both keys on write, prefer newer key on read.
+- **The `getChecks()` helper centralizes the fallback logic.** All site components now call one function instead of repeating `?? []` everywhere.
+
+**Decision:** Created `.squad/decisions/inbox/tank-json-dual-emit.md` documenting the migration horizon and next-release cleanup plan.
