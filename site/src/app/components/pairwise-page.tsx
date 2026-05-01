@@ -24,7 +24,7 @@ import {
   Activity,
 } from "lucide-react";
 import { fetchRuns } from "../data/api";
-import type { RunSummary, PairwiseReport, ToolImpact } from "../data/types";
+import type { RunSummary, PairwiseReport, ToolImpact, PairwiseCheckDiff } from "../data/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -475,6 +475,210 @@ function ToolUsageFrequencyChart({ reports }: { reports: PairwiseReport[] }) {
   );
 }
 
+// ── Check Diff Section ──────────────────────────────────────────────
+
+type MovementGroup = {
+  improved: PairwiseCheckDiff[];
+  regressed: PairwiseCheckDiff[];
+  unchanged_passing: PairwiseCheckDiff[];
+  unchanged_failing: PairwiseCheckDiff[];
+};
+
+function groupByMovement(diffs: PairwiseCheckDiff[]): MovementGroup {
+  const improved: PairwiseCheckDiff[] = [];
+  const regressed: PairwiseCheckDiff[] = [];
+  const unchanged_passing: PairwiseCheckDiff[] = [];
+  const unchanged_failing: PairwiseCheckDiff[] = [];
+
+  for (const d of diffs) {
+    if (d.movement === "improved") {
+      improved.push(d);
+    } else if (d.movement === "regressed") {
+      regressed.push(d);
+    } else if (d.baseline_passed && d.variant_passed) {
+      unchanged_passing.push(d);
+    } else {
+      unchanged_failing.push(d);
+    }
+  }
+
+  return { improved, regressed, unchanged_passing, unchanged_failing };
+}
+
+function CheckDiffSection({ report }: { report: PairwiseReport }) {
+  const [expandedVariants, setExpandedVariants] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, Set<string>>>({}); // variantName -> Set<category>
+
+  if (!report.check_diffs) {
+    return null;
+  }
+
+  const toggleVariant = (variantName: string) => {
+    setExpandedVariants((prev) => {
+      const next = new Set(prev);
+      if (next.has(variantName)) {
+        next.delete(variantName);
+      } else {
+        next.add(variantName);
+      }
+      return next;
+    });
+  };
+
+  const toggleCategory = (variantName: string, category: string) => {
+    setExpandedCategories((prev) => {
+      const variantSet = prev[variantName] || new Set<string>();
+      const next = new Set(variantSet);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return { ...prev, [variantName]: next };
+    });
+  };
+
+  const isCategoryExpanded = (variantName: string, category: string): boolean => {
+    return expandedCategories[variantName]?.has(category) ?? false;
+  };
+
+  const movementBadge = (movement: string) => {
+    switch (movement) {
+      case "improved":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400" style={{ fontSize: 11 }}>
+            <ArrowUpRight className="h-3 w-3" />
+            Improved
+          </span>
+        );
+      case "regressed":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-red-400" style={{ fontSize: 11 }}>
+            <ArrowDownRight className="h-3 w-3" />
+            Regressed
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/15 px-2 py-0.5 text-gray-400" style={{ fontSize: 11 }}>
+            <Minus className="h-3 w-3" />
+            Unchanged
+          </span>
+        );
+    }
+  };
+
+  const renderCheckRows = (diffs: PairwiseCheckDiff[]) => {
+    if (diffs.length === 0) return null;
+    return diffs.map((d, i) => (
+      <tr key={i} className="border-b border-white/5 transition hover:bg-white/[0.02]">
+        <td className="px-3 py-2.5 text-white/60" style={{ fontSize: 12 }}>
+          {d.grader_name}
+        </td>
+        <td className="px-3 py-2.5 text-white/50" style={{ fontSize: 12 }}>
+          {d.check_label}
+        </td>
+        <td className="px-3 py-2.5">{movementBadge(d.movement)}</td>
+        <td className="px-3 py-2.5 text-white/40" style={{ fontSize: 11, maxWidth: 300 }}>
+          {d.reasoning ? (
+            <span className="line-clamp-2" title={d.reasoning}>
+              {d.reasoning}
+            </span>
+          ) : (
+            <span className="text-white/20">—</span>
+          )}
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderCategory = (variantName: string, category: string, diffs: PairwiseCheckDiff[], bgColor: string, textColor: string) => {
+    if (diffs.length === 0) return null;
+    const isExpanded = isCategoryExpanded(variantName, category);
+    return (
+      <div className="mb-3">
+        <button
+          onClick={() => toggleCategory(variantName, category)}
+          className="flex w-full items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-4 py-2.5 text-left transition hover:bg-white/[0.04]"
+        >
+          <div className="flex items-center gap-2">
+            {isExpanded ? <ChevronDown className="h-4 w-4 text-white/40" /> : <ChevronRight className="h-4 w-4 text-white/40" />}
+            <span className="text-white/70" style={{ fontSize: 13, fontWeight: 500 }}>
+              {category}
+            </span>
+            <span className="rounded-full px-2 py-0.5" style={{ fontSize: 11, background: bgColor, color: textColor }}>
+              {diffs.length}
+            </span>
+          </div>
+        </button>
+        {isExpanded && (
+          <div className="mt-2 overflow-x-auto rounded-lg border border-white/8 bg-white/[0.02]">
+            <table className="w-full" style={{ fontSize: 12 }}>
+              <thead>
+                <tr className="border-b border-white/8">
+                  {["Grader", "Check", "Movement", "Reasoning"].map((h) => (
+                    <th key={h} className="px-3 py-2 text-left text-white/40" style={{ fontWeight: 500, fontSize: 11 }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>{renderCheckRows(diffs)}</tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="mb-8 rounded-xl border border-white/8 bg-white/[0.03] p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <Info className="h-4 w-4 text-blue-400" />
+        <h3 className="text-white" style={{ fontSize: 15, fontFamily: "'JetBrains Mono', monospace" }}>{report.prompt_id}</h3>
+      </div>
+      <p className="mb-5 text-white/35" style={{ fontSize: 12 }}>
+        Check-level movement for each variant. Improved = baseline failed → variant passed. Regressed = baseline passed → variant failed.
+      </p>
+
+      {Object.entries(report.check_diffs).map(([variantName, diffs]) => {
+        const isExpanded = expandedVariants.has(variantName);
+        const grouped = groupByMovement(diffs);
+        const totalChanged = grouped.improved.length + grouped.regressed.length;
+
+        return (
+          <div key={variantName} className="mb-4 rounded-lg border border-white/8 bg-white/[0.02] p-4">
+            <button
+              onClick={() => toggleVariant(variantName)}
+              className="flex w-full items-center justify-between text-left transition"
+            >
+              <div className="flex items-center gap-2">
+                {isExpanded ? <ChevronDown className="h-4 w-4 text-white/50" /> : <ChevronRight className="h-4 w-4 text-white/50" />}
+                <span className="text-white/80" style={{ fontSize: 14, fontWeight: 500, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {variantName}
+                </span>
+                {totalChanged > 0 && (
+                  <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-blue-400" style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {totalChanged} changed
+                  </span>
+                )}
+              </div>
+            </button>
+            {isExpanded && (
+              <div className="mt-3 space-y-0">
+                {renderCategory(variantName, "Improved", grouped.improved, "rgba(16,185,129,0.2)", "#10b981")}
+                {renderCategory(variantName, "Regressed", grouped.regressed, "rgba(239,68,68,0.2)", "#ef4444")}
+                {renderCategory(variantName, "Unchanged (Passing)", grouped.unchanged_passing, "rgba(107,114,128,0.2)", "#9ca3af")}
+                {renderCategory(variantName, "Unchanged (Failing)", grouped.unchanged_failing, "rgba(107,114,128,0.2)", "#9ca3af")}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────
 
 export function PairwisePage() {
@@ -692,6 +896,21 @@ export function PairwisePage() {
                 ))}
               </div>
             </div>
+
+            {/* Per-Prompt Check Diffs */}
+            {pairwiseReports.length > 0 && (
+              <div className="mb-8 space-y-6">
+                <div className="mb-4">
+                  <h3 className="text-white" style={{ fontSize: 16, fontWeight: 600 }}>Per-Prompt Check Analysis</h3>
+                  <p className="mt-1 text-white/40" style={{ fontSize: 13 }}>
+                    Detailed check-level differences for each prompt evaluation
+                  </p>
+                </div>
+                {pairwiseReports.map((report) => (
+                  <CheckDiffSection key={report.prompt_id} report={report} />
+                ))}
+              </div>
+            )}
 
             {/* Detailed Table */}
             <div className="rounded-xl border border-white/8 bg-white/[0.03] p-6">

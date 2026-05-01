@@ -368,11 +368,23 @@ export interface ToolImpact {
   without_pass: boolean;
 }
 
+export interface PairwiseCheckDiff {
+  grader_name: string;
+  grader_type: string;
+  check_id: string;
+  check_label: string;
+  baseline_passed: boolean;
+  variant_passed: boolean;
+  movement: "improved" | "regressed" | "unchanged";
+  reasoning?: string;
+}
+
 export interface PairwiseReport {
   prompt_id: string;
   baseline: VariantResult;
   variants: VariantResult[];
   impacts: ToolImpact[];
+  check_diffs?: Record<string, PairwiseCheckDiff[]>;
 }
 
 // Mirrors hyoka/internal/report.PairwiseRunReport — the payload returned by
