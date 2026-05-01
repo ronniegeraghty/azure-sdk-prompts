@@ -3,11 +3,10 @@ name: CI
 on:
   pull_request:
     branches:
-      - '**'  # All branches
+      - main
   push:
     branches:
       - main
-      - ronniegeraghty/dev
 
 jobs:
   build-and-test:

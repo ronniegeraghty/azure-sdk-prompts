@@ -11,7 +11,7 @@ name: Site Bundle Freshness
 on:
   pull_request:
     branches:
-      - '**'
+      - main
     paths:
       - 'site/**'
       - 'hyoka/internal/serve/embed.go'
@@ -19,7 +19,6 @@ on:
   push:
     branches:
       - main
-      - ronniegeraghty/dev
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
