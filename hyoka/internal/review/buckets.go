@@ -138,13 +138,29 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 			reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
 			res, rerr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir, checks)
 			if rerr != nil {
-				slog.Warn("Bucket review failed", "model", model, "bucket", b.Name, "error", rerr)
-				continue
+				slog.Warn("Bucket review failed, synthesizing failures for all checks in bucket", "model", model, "bucket", b.Name, "error", rerr)
+				// Synthesize a result with all checks marked as failed instead of dropping the bucket
+				res = &ReviewResult{
+					Model: model,
+					Scores: ReviewScores{
+						Criteria: []CriterionResult{},
+					},
+					Summary: fmt.Sprintf("Bucket %s failed: %v", b.Name, rerr),
+				}
+				for _, check := range checks {
+					res.Scores.Criteria = append(res.Scores.Criteria, CriterionResult{
+						ID:     check.ID,
+						Name:   check.Text,
+						Passed: false,
+						Reason: fmt.Sprintf("bucket invocation failed: %v", rerr),
+					})
+				}
 			}
 			results = append(results, bucketResult{name: b.Name, result: res})
 		}
 		if len(results) == 0 {
-			slog.Warn("All buckets failed for model", "model", model)
+			// This should never happen now since we synthesize failures instead of continue
+			slog.Warn("All buckets skipped for model (context cancelled?)", "model", model)
 			continue
 		}
 		merged := mergeBucketResults(results)

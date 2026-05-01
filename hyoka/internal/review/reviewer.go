@@ -569,8 +569,8 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 
 	slog.Debug("Sending review prompt", "model", model, "timeout", panelTimeout, "length", len(reviewPrompt))
 
-	// Send initial review prompt, then validate and retry up to 2 times
-	const maxRetries = 2
+	// Send initial review prompt, then validate and retry up to 3 times
+	const maxRetries = 3
 	var result *ReviewResult
 	currentPrompt := reviewPrompt
 
@@ -632,21 +632,52 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 						fmt.Fprintf(&retryMsg, "- %s\n", e)
 					}
 					if len(missing) > 0 {
-						fmt.Fprintf(&retryMsg, "\nMissing ids: %v\n", missing)
+						fmt.Fprintf(&retryMsg, "\nYou MUST include these missing check IDs in your response: %v\n", missing)
 					}
 					if len(extra) > 0 {
-						fmt.Fprintf(&retryMsg, "Extra ids: %v\n", extra)
+						fmt.Fprintf(&retryMsg, "You included unexpected IDs: %v\n", extra)
 					}
-					fmt.Fprintf(&retryMsg, "\nPlease return exactly: %s\n", formatIDList(checks))
+					fmt.Fprintf(&retryMsg, "\nPlease return a COMPLETE response with exactly these IDs: %s\n", formatIDList(checks))
 					currentPrompt = retryMsg.String()
 					slog.Debug("Retry prompt prepared", "model", model, "attempt", attempt, "missing", missing, "extra", extra)
 					continue
 				}
-				// Max retries exceeded: drop reviewer
-				slog.Warn("reviewer dropped: invalid criteria ids after retries",
+				// Max retries exceeded: synthesize failing checks for missing IDs instead of dropping reviewer
+				slog.Warn("reviewer failed to return valid criteria after 3 retries, synthesizing failures for missing checks",
 					"model", model,
 					"validation_errors", validationErrors)
-				return nil, fmt.Errorf("reviewer %s dropped after %d retries: %v", model, maxRetries, validationErrors)
+				
+				// Determine which IDs are missing
+				expectedIDs := make(map[string]bool)
+				for _, c := range checks {
+					expectedIDs[c.ID] = true
+				}
+				returnedIDs := make(map[string]bool)
+				if result != nil {
+					for _, c := range result.Scores.Criteria {
+						returnedIDs[c.ID] = true
+					}
+				}
+				
+				// Synthesize failures for missing IDs
+				if result == nil {
+					result = &ReviewResult{
+						Model: model,
+						Scores: ReviewScores{
+							Criteria: []CriterionResult{},
+						},
+					}
+				}
+				for _, check := range checks {
+					if !returnedIDs[check.ID] {
+						result.Scores.Criteria = append(result.Scores.Criteria, CriterionResult{
+							ID:     check.ID,
+							Name:   check.Text,
+							Passed: false,
+							Reason: "reviewer failed to return a vote after 3 attempts",
+						})
+					}
+				}
 			}
 		} else {
 			// Legacy parser path (no checks)
