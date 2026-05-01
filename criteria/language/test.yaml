@@ -1,6 +1,13 @@
+# Test-language criteria — exercises every supported grader type and every
+# available check field. Paired with prompts/test/hello-markdown.prompt.md
+# (writes a small hello.md using the markdown-headings + markdown-lists skills).
 when:
   language: test
 graders:
+  # ---------------------------------------------------------------------------
+  # 1. prompt — LLM-judged checks. Uses both `prompt` (preamble) and `checks`
+  #    (each becomes one pass/fail point).
+  # ---------------------------------------------------------------------------
   - name: Markdown Structure
     type: prompt
     weight: 1.0
@@ -10,15 +17,33 @@ graders:
       - File contains exactly three bullet list items.
       # Intentionally failing — demonstrates failed-check rendering.
       - File hello.md contains a fenced code block tagged with the language `rust`.
-  - name: Output Files Exist
+
+  # ---------------------------------------------------------------------------
+  # 2. output_check — workspace-delta boolean checks. Exercises every knob
+  #    (min_files, max_files, require_files, forbid_files, require_updated,
+  #    min_bytes_per_file, max_bytes_per_file).
+  # ---------------------------------------------------------------------------
+  - name: Output Files
     type: output_check
     weight: 1.0
     details:
       min_files: 1
-      max_files: 1
+      max_files: 5
       require_files:
         - hello.md
+      forbid_files:
+        - .env
+        - secrets.txt
+      # Intentionally fails — the prompt creates hello.md, never updates an
+      # existing file. Demonstrates the require_updated sub-check.
+      require_updated:
+        - README.md
       min_bytes_per_file: 10
+      max_bytes_per_file: 10000
+
+  # ---------------------------------------------------------------------------
+  # 3. file — single-file existence + regex content match.
+  # ---------------------------------------------------------------------------
   - name: Hello.md File Check
     type: file
     weight: 0.5
@@ -26,20 +51,82 @@ graders:
       path: hello.md
       pattern: "^# Hello"
       must_exist: true
+
+  # ---------------------------------------------------------------------------
+  # 4. behavior — turn cap + required/forbidden tool presence in the action log.
+  # ---------------------------------------------------------------------------
   - name: Efficient Behavior
     type: behavior
     weight: 0.5
     details:
+      required_tools:
+        - skill
+      forbidden_tools:
+        - bash
       max_turns: 3
-  # Skills (markdown-headings, markdown-lists) surface in the action log as a
-  # tool named "skill" (the specific skill name is an argument, not the tool
-  # name). Requiring at least 2 "skill" calls demonstrates that both loaded
-  # skills were exercised by the generator.
+
+  # ---------------------------------------------------------------------------
+  # 5. tool_constraint — per-tool call-count constraints.
+  #    Skills (markdown-headings, markdown-lists) surface in the action log as
+  #    a tool named "skill" — requiring 2 demonstrates both loaded skills ran.
+  # ---------------------------------------------------------------------------
   - name: Skill Usage
     type: tool_constraint
     weight: 0.5
     details:
       required:
         - skill
+      forbidden:
+        - shell
       min_calls:
         skill: 2
+      max_calls:
+        skill: 20
+
+  # ---------------------------------------------------------------------------
+  # 6. action_sequence — ordered prefix of expected action names.
+  # ---------------------------------------------------------------------------
+  - name: Markdown Action Sequence
+    type: action_sequence
+    weight: 0.3
+    details:
+      expected_actions:
+        - skill
+        - write
+
+  # ---------------------------------------------------------------------------
+  # 7. tool_usage — environment-aware. Each rule is silently skipped if its
+  #    referenced tool/skill isn't in the eval environment. Covers all three
+  #    rule types: mcp_server, skill_plugin, skill_repo.
+  # ---------------------------------------------------------------------------
+  - name: Markdown Skills Used
+    type: tool_usage
+    weight: 0.5
+    details:
+      rules:
+        - type: skill_plugin
+          name: markdown-headings
+          expect: any_skill_invoked
+        - type: skill_plugin
+          name: markdown-lists
+          expect: skill_invoked
+        - type: mcp_server
+          name: azure
+          expect: at_least_one_tool_call
+        - type: skill_repo
+          repo: mauromedda/agent-toolkit
+          skill: markdown
+          expect: skill_invoked
+
+  # ---------------------------------------------------------------------------
+  # 8. program — runs a command in the workspace; exit 0 = pass.
+  # ---------------------------------------------------------------------------
+  - name: Hello.md Exists (program)
+    type: program
+    weight: 0.3
+    details:
+      command: test
+      args:
+        - -f
+        - hello.md
+      timeout: 5

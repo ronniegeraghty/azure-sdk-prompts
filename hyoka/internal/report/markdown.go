@@ -245,24 +245,13 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		b.WriteString("\n")
 	}
 
-	// Review scores
-	if r.Review != nil {
-		b.WriteString("## Code Review (LLM-as-Judge)\n\n")
-		fmt.Fprintf(&b, "**Score: %d/%d criteria passed**\n\n", r.Review.OverallScore, r.Review.MaxScore)
-
-		if len(r.Review.Scores.Criteria) > 0 {
-			b.WriteString("### Criteria Results\n\n")
-			b.WriteString("| Criterion | Result | Reason |\n")
-			b.WriteString("|-----------|--------|--------|\n")
-			for _, c := range r.Review.Scores.Criteria {
-				icon := "❌"
-				if c.Passed {
-					icon = "✅"
-				}
-				fmt.Fprintf(&b, "| %s | %s | %s |\n", c.Name, icon, c.Reason)
-			}
-			b.WriteString("\n")
-		}
+	// Reviewer prose notes (Summary/Strengths/Issues from the LLM-as-Judge
+	// prompt_review grader). The pass/fail scoring for these criteria is
+	// rendered under "## Grader Results" — we intentionally do NOT repeat
+	// the criteria score here to avoid the confusing "X/Y criteria passed"
+	// line that double-counts the prompt_review grader.
+	if r.Review != nil && (r.Review.Summary != "" || len(r.Review.Strengths) > 0 || len(r.Review.Issues) > 0) {
+		b.WriteString("## Reviewer Notes (LLM-as-Judge)\n\n")
 
 		if r.Review.Summary != "" {
 			b.WriteString("### Summary\n\n")

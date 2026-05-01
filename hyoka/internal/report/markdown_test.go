@@ -70,13 +70,11 @@ func TestWriteMarkdownReport(t *testing.T) {
 		"# Evaluation Report: test-prompt",
 		"baseline",
 		"✅ PASSED",
-		"4/5",
-		"Code Builds",
-		"Good implementation",
 		"Program.cs",
 		"Write a dotnet storage auth sample",
 		"I need to create an auth sample",
-		"Code Review",
+		"Reviewer Notes",
+		"Good implementation",
 		"Clean code structure",
 		"Missing retry logic",
 		"Tool Calls",
@@ -95,6 +93,21 @@ func TestWriteMarkdownReport(t *testing.T) {
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
 			t.Errorf("Markdown report missing %q", check)
+		}
+	}
+	// The legacy "Code Review (LLM-as-Judge)" criteria-passed line and the
+	// per-criterion Criteria Results table are intentionally NOT rendered:
+	// the prompt_review grader is now displayed under "## Grader Results"
+	// and the duplicate "X/Y criteria passed" text was confusing.
+	for _, antiCheck := range []string{
+		"Code Review (LLM-as-Judge)",
+		"criteria passed",
+		"Criteria Results",
+		"4/5",
+		"Code Builds",
+	} {
+		if strings.Contains(content, antiCheck) {
+			t.Errorf("Markdown report unexpectedly contains %q", antiCheck)
 		}
 	}
 	// Graders use flat fallback (no SourceFile): grader name + pass/fail count rendered.
