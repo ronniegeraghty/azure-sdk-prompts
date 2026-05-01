@@ -1,25 +1,25 @@
 package eval
 
 import (
-"context"
-"fmt"
-"log/slog"
-"os"
-"path/filepath"
-"strings"
-"time"
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
-"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
 )
 
 func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string, sendPhase func(progress.Phase), sendEvent func(progress.EventType, string), sendRawEvent func(progress.ProgressEvent)) *report.EvalReport {
@@ -578,58 +578,58 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			if result.ActionTimeline != nil {
 				graderInput.ActionLog = result.ActionTimeline.ToGraderActionLog()
 			}
-		graderInput.AgentFinalResponse = result.FinalResponse
-	}
-
-	// --- Phase 1: Typed graders (file, program, output_check, ...) ---
-	if len(typedMatched) > 0 {
-		typedConfigs := make([]graders.GraderConfig, 0, len(typedMatched))
-		for _, m := range typedMatched {
-			typedConfigs = append(typedConfigs, m.Entry.ToRuntimeConfig())
+			graderInput.AgentFinalResponse = result.FinalResponse
 		}
-		glg.Debug("Typed graders matched", "count", len(typedConfigs))
-		instances, instErr := criteria.InstantiateGraders(typedConfigs)
-		if instErr != nil {
-			glg.Error("Failed to instantiate typed graders", "error", instErr)
-		} else {
-			hooks := buildGraderHooks(sendRawEvent)
-			typedResults := criteria.RunGradersWithHooks(ctx, instances, typedConfigs, graderInput, hooks)
-			allGraderResults = append(allGraderResults, typedResults...)
-			glg.Debug("Typed graders complete", "count", len(typedResults))
-		}
-	}
 
-	// --- Phase 2: AI review graders (one per bucket) ---
-	var lastReviewGrader *graders.PromptReviewGrader
-	if !e.opts.SkipReview {
-		sendPhase(progress.PhaseReviewing)
-
-		var reviewer review.Reviewer
-		var panelReviewer *review.PanelReviewer
-		if e.reviewerFactory != nil {
-			reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
-			if err != nil {
-				glg.Warn("Reviewer creation failed, skipping review", "error", err)
+		// --- Phase 1: Typed graders (file, program, output_check, ...) ---
+		if len(typedMatched) > 0 {
+			typedConfigs := make([]graders.GraderConfig, 0, len(typedMatched))
+			for _, m := range typedMatched {
+				typedConfigs = append(typedConfigs, m.Entry.ToRuntimeConfig())
+			}
+			glg.Debug("Typed graders matched", "count", len(typedConfigs))
+			instances, instErr := criteria.InstantiateGraders(typedConfigs)
+			if instErr != nil {
+				glg.Error("Failed to instantiate typed graders", "error", instErr)
+			} else {
+				hooks := buildGraderHooks(sendRawEvent)
+				typedResults := criteria.RunGradersWithHooks(ctx, instances, typedConfigs, graderInput, hooks)
+				allGraderResults = append(allGraderResults, typedResults...)
+				glg.Debug("Typed graders complete", "count", len(typedResults))
 			}
 		}
 
-		if panelReviewer != nil || reviewer != nil {
-			// Create one grader per ReviewBucket so each bucket's criteria
-			// render as a separate grader line in the display. This replaces
-			// the legacy single "ai_review" grader aggregating all buckets.
-			buckets := e.reviewBuckets(task.Prompt, props)
-			if len(buckets) == 0 {
-				// No buckets (no criteria or prompt frontmatter) — fall back to
-				// creating a single grader with empty criteria so the reviewer
-				// still runs. This preserves the behavior for tests/configs that
-				// expect review to run even without explicit criteria.
-				buckets = []graders.ReviewBucket{{Name: "ai_review", Criteria: ""}}
-				glg.Debug("No review buckets; falling back to single empty review grader")
+		// --- Phase 2: AI review graders (one per bucket) ---
+		var lastReviewGrader *graders.PromptReviewGrader
+		if !e.opts.SkipReview {
+			sendPhase(progress.PhaseReviewing)
+
+			var reviewer review.Reviewer
+			var panelReviewer *review.PanelReviewer
+			if e.reviewerFactory != nil {
+				reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
+				if err != nil {
+					glg.Warn("Reviewer creation failed, skipping review", "error", err)
+				}
 			}
-			if panelReviewer != nil {
-				glg.Debug("Review panel models", "models", panelReviewer.Models())
-			}
-			glg.Debug("Running AI review graders", "bucket_count", len(buckets))
+
+			if panelReviewer != nil || reviewer != nil {
+				// Create one grader per ReviewBucket so each bucket's criteria
+				// render as a separate grader line in the display. This replaces
+				// the legacy single "ai_review" grader aggregating all buckets.
+				buckets := e.reviewBuckets(task.Prompt, props)
+				if len(buckets) == 0 {
+					// No buckets (no criteria or prompt frontmatter) — fall back to
+					// creating a single grader with empty criteria so the reviewer
+					// still runs. This preserves the behavior for tests/configs that
+					// expect review to run even without explicit criteria.
+					buckets = []graders.ReviewBucket{{Name: "ai_review", Criteria: ""}}
+					glg.Debug("No review buckets; falling back to single empty review grader")
+				}
+				if panelReviewer != nil {
+					glg.Debug("Review panel models", "models", panelReviewer.Models())
+				}
+				glg.Debug("Running AI review graders", "bucket_count", len(buckets))
 
 				for i, bucket := range buckets {
 					reviewGrader := graders.NewPromptReviewGrader(bucket.Name, reviewer, panelReviewer)
@@ -672,56 +672,59 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 					if i == len(buckets)-1 {
 						evalReport.ReviewPanel = reviewGrader.LastPanel
 						evalReport.Review = reviewGrader.LastConsolidated
+						if reviewGrader.LastConsolidated != nil {
+							evalReport.SkippedReviewers = reviewGrader.LastConsolidated.SkippedReviewers
+						}
 					}
 				}
-		}
-	}
-
-	// --- Aggregate all results and update report ---
-	if len(allGraderResults) > 0 {
-		agg, aggErr := graders.AggregateResults(allGraderResults)
-		if aggErr != nil {
-			glg.Error("Failed to aggregate grader results", "error", aggErr)
-		} else {
-			reportResults := convertGraderResults(agg.Results)
-			evalReport.GraderResults = reportResults
-			evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
-			// Pre-computed roll-ups (#schema_v3): site reads these
-			// directly. Counts are taken off agg.Results, which
-			// is the authoritative pre-conversion grader set —
-			// one entry per grader, including prompt_review.
-			// Total is the sum of all grader points across all graders;
-			// graders with zero points count as 1 point for backward compat.
-			evalReport.GradersTotal = countTotalPoints(agg.Results)
-			evalReport.GradersPassed = countPassedPoints(agg.Results)
-
-			if !agg.Pass && !evalFailed {
-				evalReport.Success = false
-				if evalReport.FailureReason == "" {
-					evalReport.FailureReason = "one or more graders failed"
-				}
 			}
-
-			glg.Info("Grader execution complete",
-				"graders", len(allGraderResults),
-				"score", fmt.Sprintf("%.2f", agg.Score),
-				"passed", agg.Pass)
-			sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
-				agg.Score*100, countPassed(allGraderResults), len(allGraderResults)))
 		}
-	}
 
-	// Capture reviewed (annotated) files from the reviewer workspace.
-	if lastReviewGrader != nil && lastReviewGrader.LastReviewWorkDir != "" {
-		reviewedFiles, rfErr := readReviewedFiles(lastReviewGrader.LastReviewWorkDir)
-		if rfErr == nil && len(reviewedFiles) > 0 {
-			evalReport.ReviewedFiles = reviewedFiles
-			glg.Debug("Captured reviewed files", "count", len(reviewedFiles))
+		// --- Aggregate all results and update report ---
+		if len(allGraderResults) > 0 {
+			agg, aggErr := graders.AggregateResults(allGraderResults)
+			if aggErr != nil {
+				glg.Error("Failed to aggregate grader results", "error", aggErr)
+			} else {
+				reportResults := convertGraderResults(agg.Results)
+				evalReport.GraderResults = reportResults
+				evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
+				// Pre-computed roll-ups (#schema_v3): site reads these
+				// directly. Counts are taken off agg.Results, which
+				// is the authoritative pre-conversion grader set —
+				// one entry per grader, including prompt_review.
+				// Total is the sum of all grader points across all graders;
+				// graders with zero points count as 1 point for backward compat.
+				evalReport.GradersTotal = countTotalPoints(agg.Results)
+				evalReport.GradersPassed = countPassedPoints(agg.Results)
+
+				if !agg.Pass && !evalFailed {
+					evalReport.Success = false
+					if evalReport.FailureReason == "" {
+						evalReport.FailureReason = "one or more graders failed"
+					}
+				}
+
+				glg.Info("Grader execution complete",
+					"graders", len(allGraderResults),
+					"score", fmt.Sprintf("%.2f", agg.Score),
+					"passed", agg.Pass)
+				sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
+					agg.Score*100, countPassed(allGraderResults), len(allGraderResults)))
+			}
 		}
-		lastReviewGrader.CleanupWorkspace()
-	}
 
-	evalReport.ReviewDuration = time.Since(gradeStart).Seconds()
+		// Capture reviewed (annotated) files from the reviewer workspace.
+		if lastReviewGrader != nil && lastReviewGrader.LastReviewWorkDir != "" {
+			reviewedFiles, rfErr := readReviewedFiles(lastReviewGrader.LastReviewWorkDir)
+			if rfErr == nil && len(reviewedFiles) > 0 {
+				evalReport.ReviewedFiles = reviewedFiles
+				glg.Debug("Captured reviewed files", "count", len(reviewedFiles))
+			}
+			lastReviewGrader.CleanupWorkspace()
+		}
+
+		evalReport.ReviewDuration = time.Since(gradeStart).Seconds()
 	}
 
 	// Tool usage evaluation (compare expected vs actual tools)
@@ -1308,14 +1311,14 @@ func convertBehaviorExtras(be *graders.BehaviorExtras) *report.BehaviorExtras {
 		return nil
 	}
 	return &report.BehaviorExtras{
-		ToolsUsed:      be.ToolsUsed,
-		MissingTools:   be.MissingTools,
-		ForbiddenUsed:  be.ForbiddenUsed,
-		TurnCount:      be.TurnCount,
-		MaxTurns:       be.MaxTurns,
-		TotalActions:   be.TotalActions,
-		TurnLimitHit:   be.TurnLimitHit,
-		Violations:     be.Violations,
+		ToolsUsed:     be.ToolsUsed,
+		MissingTools:  be.MissingTools,
+		ForbiddenUsed: be.ForbiddenUsed,
+		TurnCount:     be.TurnCount,
+		MaxTurns:      be.MaxTurns,
+		TotalActions:  be.TotalActions,
+		TurnLimitHit:  be.TurnLimitHit,
+		Violations:    be.Violations,
 	}
 }
 
@@ -1401,30 +1404,30 @@ func convertReviewExtras(re *graders.ReviewExtras) *report.ReviewExtras {
 // events. A nil sendRawEvent means "no reporter wired" — in that case we
 // return zero-value hooks and RunGradersWithHooks will skip emission.
 func buildGraderHooks(sendRawEvent func(progress.ProgressEvent)) criteria.GraderHooks {
-if sendRawEvent == nil {
-return criteria.GraderHooks{}
-}
-return criteria.GraderHooks{
-OnStart: func(g graders.Grader) {
-emitGraderStart(sendRawEvent, g)
-},
-OnComplete: func(g graders.Grader, result graders.GraderResult) {
-emitGraderComplete(sendRawEvent, g, result)
-},
-}
+	if sendRawEvent == nil {
+		return criteria.GraderHooks{}
+	}
+	return criteria.GraderHooks{
+		OnStart: func(g graders.Grader) {
+			emitGraderStart(sendRawEvent, g)
+		},
+		OnComplete: func(g graders.Grader, result graders.GraderResult) {
+			emitGraderComplete(sendRawEvent, g, result)
+		},
+	}
 }
 
 // emitGraderStart sends a GraderStart progress event. Safe to call with a nil
 // sender (no-op) so callers in the review path don't need to guard.
 func emitGraderStart(sendRawEvent func(progress.ProgressEvent), g graders.Grader) {
-if sendRawEvent == nil || g == nil {
-return
-}
-sendRawEvent(progress.ProgressEvent{
-Type:       progress.EventGraderStart,
-GraderID:   g.Name(),
-GraderKind: g.Kind(),
-})
+	if sendRawEvent == nil || g == nil {
+		return
+	}
+	sendRawEvent(progress.ProgressEvent{
+		Type:       progress.EventGraderStart,
+		GraderID:   g.Name(),
+		GraderKind: g.Kind(),
+	})
 }
 
 // buildGeneratorArtifact constructs a GeneratorArtifact from eval state.
@@ -1442,7 +1445,7 @@ func buildGeneratorArtifact(
 	// Determine termination reason from result and evalReport state
 	terminatedBy := "completed"
 	errorMsg := ""
-	
+
 	if evalFailed {
 		if evalReport.ErrorCategory == "timeout" || evalReport.ActionLimitReached {
 			terminatedBy = "max_actions"
@@ -1455,37 +1458,37 @@ func buildGeneratorArtifact(
 		}
 		errorMsg = evalReport.Error
 	}
-	
+
 	// Extract final response from result
 	finalResponse := ""
 	if result != nil {
 		finalResponse = result.FinalResponse
 	}
-	
+
 	// Build workspace delta for artifact (converting from report's WorkspaceDelta)
 	wsDelta := artifact.ArtifactWorkspaceDelta{}
 	if evalReport.WorkspaceDelta != nil {
 		wsDelta = artifact.FromWorkspaceDelta(evalReport.WorkspaceDelta)
 	}
-	
-	// Count actions from session events
+
+	// Count actions from session events using correct SDK event type strings.
 	totalActions := 0
 	toolCalls := 0
 	reasoningSteps := 0
 	for _, ev := range evalReport.SessionEvents {
 		switch ev.Type {
-		case "tool.call", "tool.result":
+		case "tool.execution_start":
 			toolCalls++
 			totalActions++
-		case "assistant.message":
+		case "assistant.reasoning":
 			reasoningSteps++
 			totalActions++
 		}
 	}
-	
+
 	genEnd := time.Now()
 	durationMs := genEnd.Sub(genStart).Milliseconds()
-	
+
 	return &artifact.GeneratorArtifact{
 		PromptID:       prompt.ID,
 		EvalID:         "", // EvalID not available at this point; set by caller if needed
@@ -1514,33 +1517,33 @@ func buildGeneratorArtifact(
 // behavior graders are binary pass/fail, so Score stays nil for them to
 // avoid misleading renders like "pass (0/10)".
 func emitGraderComplete(sendRawEvent func(progress.ProgressEvent), g graders.Grader, result graders.GraderResult) {
-if sendRawEvent == nil || g == nil {
-return
-}
-outcome := progress.GraderResultFail
-if result.Pass {
-outcome = progress.GraderResultPass
-}
-var scorePtr *float64
-switch g.Kind() {
-case graders.KindPromptReview, graders.KindPrompt:
-s := result.Score
-scorePtr = &s
-}
-var points []progress.GraderPoint
-if len(result.Points) > 0 {
-points = make([]progress.GraderPoint, len(result.Points))
-for i, p := range result.Points {
-points[i] = progress.GraderPoint{Label: p.Label, Pass: p.Pass, Message: p.Message}
-}
-}
-sendRawEvent(progress.ProgressEvent{
-Type:       progress.EventGraderComplete,
-GraderID:   g.Name(),
-GraderKind: g.Kind(),
-Result:     outcome,
-Score:      scorePtr,
-Message:    result.Message,
-Points:     points,
-})
+	if sendRawEvent == nil || g == nil {
+		return
+	}
+	outcome := progress.GraderResultFail
+	if result.Pass {
+		outcome = progress.GraderResultPass
+	}
+	var scorePtr *float64
+	switch g.Kind() {
+	case graders.KindPromptReview, graders.KindPrompt:
+		s := result.Score
+		scorePtr = &s
+	}
+	var points []progress.GraderPoint
+	if len(result.Points) > 0 {
+		points = make([]progress.GraderPoint, len(result.Points))
+		for i, p := range result.Points {
+			points[i] = progress.GraderPoint{Label: p.Label, Pass: p.Pass, Message: p.Message}
+		}
+	}
+	sendRawEvent(progress.ProgressEvent{
+		Type:       progress.EventGraderComplete,
+		GraderID:   g.Name(),
+		GraderKind: g.Kind(),
+		Result:     outcome,
+		Score:      scorePtr,
+		Message:    result.Message,
+		Points:     points,
+	})
 }

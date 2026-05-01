@@ -298,6 +298,36 @@ func TestTakeSnapshot_HiddenFilesExcluded(t *testing.T) {
 	}
 }
 
+// TestTakeSnapshot_BuildArtifactDirsExcluded verifies that well-known build
+// artifact directories (target/, node_modules/, etc.) are skipped.
+func TestTakeSnapshot_BuildArtifactDirsExcluded(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, filepath.Join(dir, "main.rs"), "fn main() {}")
+	// Simulate Rust target/ and Node node_modules/ directories
+	os.MkdirAll(filepath.Join(dir, "target", "debug"), 0755)
+	writeFile(t, filepath.Join(dir, "target", "debug", "blob.exe"), "binary")
+	os.MkdirAll(filepath.Join(dir, "node_modules", "pkg"), 0755)
+	writeFile(t, filepath.Join(dir, "node_modules", "pkg", "index.js"), "module")
+
+	snap, err := TakeSnapshot(dir)
+	if err != nil {
+		t.Fatalf("TakeSnapshot failed: %v", err)
+	}
+
+	if len(snap.files) != 1 {
+		t.Errorf("expected 1 file, got %d: %+v", len(snap.files), snap.files)
+	}
+	if _, ok := snap.files["main.rs"]; !ok {
+		t.Errorf("main.rs not in snapshot")
+	}
+	for path := range snap.files {
+		if filepath.Base(filepath.Dir(path)) == "target" || filepath.Base(filepath.Dir(path)) == "node_modules" {
+			t.Errorf("build artifact file should be excluded: %s", path)
+		}
+	}
+}
+
 // contains is a helper to check if a string contains a substring.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsHelper(s, substr))

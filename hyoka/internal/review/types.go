@@ -65,12 +65,13 @@ type SkippedReviewer struct {
 
 // ReviewResult holds the full output from an LLM-as-judge code review.
 type ReviewResult struct {
-	Model        string        `json:"model,omitempty"`
-	Scores       ReviewScores  `json:"scores"`
-	OverallScore int           `json:"overall_score"` // count of passed criteria
-	MaxScore     int           `json:"max_score"`     // total criteria count
-	Summary      string        `json:"summary"`
-	Issues       []string      `json:"issues"`
-	Strengths    []string      `json:"strengths"`
-	Events       []ReviewEvent `json:"events,omitempty"`
+	Model            string            `json:"model,omitempty"`
+	Scores           ReviewScores      `json:"scores"`
+	OverallScore     int               `json:"overall_score"` // count of passed criteria
+	MaxScore         int               `json:"max_score"`     // total criteria count
+	Summary          string            `json:"summary"`
+	Issues           []string          `json:"issues"`
+	Strengths        []string          `json:"strengths"`
+	Events           []ReviewEvent     `json:"events,omitempty"`
+	SkippedReviewers []SkippedReviewer `json:"skipped_reviewers,omitempty"`
 }
