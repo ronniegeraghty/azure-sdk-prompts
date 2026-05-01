@@ -80,40 +80,41 @@ func TestComputeCheckDiffs(t *testing.T) {
 		t.Fatalf("expected 3 check diffs for variant1, got %d", len(v1Diffs))
 	}
 
-	// Test improved: baseline failed, variant passed
-	if v1Diffs[0].CheckLabel != "main.py exists" {
-		t.Errorf("expected check_0 to be 'main.py exists', got %q", v1Diffs[0].CheckLabel)
+	// Graders are sorted alphabetically: build_test comes before file_check
+	// check_0: build succeeds (regressed: baseline passed, variant failed)
+	if v1Diffs[0].CheckLabel != "build succeeds" {
+		t.Errorf("expected check_0 to be 'build succeeds', got %q", v1Diffs[0].CheckLabel)
 	}
-	if v1Diffs[0].Movement != "improved" {
-		t.Errorf("expected 'improved', got %q", v1Diffs[0].Movement)
+	if v1Diffs[0].Movement != "regressed" {
+		t.Errorf("expected 'regressed', got %q", v1Diffs[0].Movement)
 	}
-	if !v1Diffs[0].VariantPassed || v1Diffs[0].BaselinePassed {
+	if !v1Diffs[0].BaselinePassed || v1Diffs[0].VariantPassed {
+		t.Error("expected baseline=pass, variant=fail")
+	}
+	if v1Diffs[0].Reasoning != "build failed: syntax error" {
+		t.Errorf("expected reasoning to be captured, got %q", v1Diffs[0].Reasoning)
+	}
+
+	// check_1: main.py exists (improved: baseline failed, variant passed)
+	if v1Diffs[1].CheckLabel != "main.py exists" {
+		t.Errorf("expected check_1 to be 'main.py exists', got %q", v1Diffs[1].CheckLabel)
+	}
+	if v1Diffs[1].Movement != "improved" {
+		t.Errorf("expected 'improved', got %q", v1Diffs[1].Movement)
+	}
+	if v1Diffs[1].BaselinePassed || !v1Diffs[1].VariantPassed {
 		t.Error("expected baseline=fail, variant=pass")
 	}
 
-	// Test unchanged-pass: both passed
-	if v1Diffs[1].CheckLabel != "config.json exists" {
-		t.Errorf("expected check_1 to be 'config.json exists', got %q", v1Diffs[1].CheckLabel)
+	// check_2: config.json exists (unchanged: both passed)
+	if v1Diffs[2].CheckLabel != "config.json exists" {
+		t.Errorf("expected check_2 to be 'config.json exists', got %q", v1Diffs[2].CheckLabel)
 	}
-	if v1Diffs[1].Movement != "unchanged" {
-		t.Errorf("expected 'unchanged', got %q", v1Diffs[1].Movement)
+	if v1Diffs[2].Movement != "unchanged" {
+		t.Errorf("expected 'unchanged', got %q", v1Diffs[2].Movement)
 	}
-	if !v1Diffs[1].BaselinePassed || !v1Diffs[1].VariantPassed {
+	if !v1Diffs[2].BaselinePassed || !v1Diffs[2].VariantPassed {
 		t.Error("expected both to pass")
-	}
-
-	// Test regressed: baseline passed, variant failed
-	if v1Diffs[2].CheckLabel != "build succeeds" {
-		t.Errorf("expected check_2 to be 'build succeeds', got %q", v1Diffs[2].CheckLabel)
-	}
-	if v1Diffs[2].Movement != "regressed" {
-		t.Errorf("expected 'regressed', got %q", v1Diffs[2].Movement)
-	}
-	if v1Diffs[2].BaselinePassed && v1Diffs[2].VariantPassed {
-		t.Error("expected baseline=pass, variant=fail")
-	}
-	if v1Diffs[2].Reasoning != "build failed: syntax error" {
-		t.Errorf("expected reasoning to be captured, got %q", v1Diffs[2].Reasoning)
 	}
 
 	// Check variant2 diffs
@@ -122,20 +123,21 @@ func TestComputeCheckDiffs(t *testing.T) {
 		t.Fatalf("expected 3 check diffs for variant2, got %d", len(v2Diffs))
 	}
 
-	// Test unchanged-fail: both failed
-	if v2Diffs[0].Movement != "unchanged" {
-		t.Errorf("expected 'unchanged', got %q", v2Diffs[0].Movement)
+	// check_1: main.py exists (unchanged-fail: both failed)
+	if v2Diffs[1].Movement != "unchanged" {
+		t.Errorf("expected 'unchanged' for main.py, got %q", v2Diffs[1].Movement)
 	}
-	if v2Diffs[0].BaselinePassed || v2Diffs[0].VariantPassed {
-		t.Error("expected both to fail")
+	if v2Diffs[1].BaselinePassed || v2Diffs[1].VariantPassed {
+		t.Error("expected both to fail for main.py")
 	}
 
 	// Test grader type propagation
-	if v1Diffs[0].GraderType != "file" {
-		t.Errorf("expected grader_type='file', got %q", v1Diffs[0].GraderType)
+	// check_0 is build_test (program), checks 1-2 are file_check (file)
+	if v1Diffs[0].GraderType != "program" {
+		t.Errorf("expected grader_type='program' for check_0, got %q", v1Diffs[0].GraderType)
 	}
-	if v1Diffs[2].GraderType != "program" {
-		t.Errorf("expected grader_type='program', got %q", v1Diffs[2].GraderType)
+	if v1Diffs[1].GraderType != "file" {
+		t.Errorf("expected grader_type='file' for check_1, got %q", v1Diffs[1].GraderType)
 	}
 }
 

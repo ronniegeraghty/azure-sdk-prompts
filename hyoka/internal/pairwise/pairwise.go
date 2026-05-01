@@ -482,8 +482,16 @@ func ComputeCheckDiffs(baseline *EvalReportData, variants []*EvalReportData) map
 		variantChecks := indexPoints(variant)
 		var diffs []PairwiseCheckDiff
 		
-		// Compare each grader
-		for graderName, baselinePoints := range baselineChecks {
+		// Sort grader names for deterministic iteration order
+		var graderNames []string
+		for name := range baselineChecks {
+			graderNames = append(graderNames, name)
+		}
+		sort.Strings(graderNames)
+		
+		// Compare each grader in sorted order
+		for _, graderName := range graderNames {
+			baselinePoints := baselineChecks[graderName]
 			variantPoints, hasVariant := variantChecks[graderName]
 			
 			for checkIdx, basePoint := range baselinePoints {

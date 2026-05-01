@@ -2,14 +2,15 @@ package graders
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
-func TestToolGraderSpecificTool(t *testing.T) {
+func TestToolGraderToolUsed(t *testing.T) {
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "specific_tool", Name: "bash"},
-			{Kind: "specific_tool", Name: "edit"},
+			{Kind: "tool_used", Tool: "bash"},
+			{Kind: "tool_used", Tool: "edit"},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
@@ -47,7 +48,7 @@ func TestToolGraderSpecificTool(t *testing.T) {
 func TestToolGraderToolNotUsed(t *testing.T) {
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "tool_not_used", Name: "dangerous_tool"},
+			{Kind: "tool_not_used", Tool: "dangerous_tool"},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
@@ -93,10 +94,10 @@ func TestToolGraderToolNotUsed(t *testing.T) {
 	}
 }
 
-func TestToolGraderAnyOfGroup(t *testing.T) {
+func TestToolGraderAnyFromGroup(t *testing.T) {
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "any_of_group", Group: "mcp"},
+			{Kind: "any_from_group", Group: "mcp"},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
@@ -128,10 +129,10 @@ func TestToolGraderAnyOfGroup(t *testing.T) {
 	}
 }
 
-func TestToolGraderGroupNotUsed(t *testing.T) {
+func TestToolGraderNoneFromGroup(t *testing.T) {
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "group_not_used", Group: "mcp"},
+			{Kind: "none_from_group", Group: "mcp"},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
@@ -163,61 +164,11 @@ func TestToolGraderGroupNotUsed(t *testing.T) {
 	}
 }
 
-func TestToolGraderTurnLimit(t *testing.T) {
+func TestToolGraderToolUsedWithMinCalls(t *testing.T) {
+	minCalls := 3
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "turn_limit", N: 5},
-		},
-	}
-	g, err := NewToolGrader("test", cfg)
-	if err != nil {
-		t.Fatalf("NewToolGrader: %v", err)
-	}
-
-	// Within limit
-	input := GraderInput{
-		ActionLog: []ActionEvent{
-			{Tool: "bash", TurnNumber: 1},
-			{Tool: "bash", TurnNumber: 3},
-		},
-	}
-
-	res, err := g.Grade(context.Background(), input)
-	if err != nil {
-		t.Fatalf("Grade: %v", err)
-	}
-
-	if len(res.Checks) != 1 {
-		t.Fatalf("expected 1 check, got %d", len(res.Checks))
-	}
-
-	// Turn 3 <= 5 — should pass
-	if !res.Checks[0].Pass {
-		t.Errorf("check should pass (within limit)")
-	}
-
-	// Over limit
-	input2 := GraderInput{
-		ActionLog: []ActionEvent{
-			{Tool: "bash", TurnNumber: 6},
-		},
-	}
-
-	res2, err := g.Grade(context.Background(), input2)
-	if err != nil {
-		t.Fatalf("Grade2: %v", err)
-	}
-
-	// Turn 6 > 5 — should fail
-	if res2.Checks[0].Pass {
-		t.Errorf("check should fail (over limit)")
-	}
-}
-
-func TestToolGraderMinCalls(t *testing.T) {
-	cfg := &ToolConfig{
-		Checks: []ToolCheckRule{
-			{Kind: "min_calls", Name: "bash", N: 3},
+			{Kind: "tool_used", Tool: "bash", MinCalls: &minCalls},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
@@ -266,10 +217,11 @@ func TestToolGraderMinCalls(t *testing.T) {
 	}
 }
 
-func TestToolGraderMaxCalls(t *testing.T) {
+func TestToolGraderToolUsedWithMaxCalls(t *testing.T) {
+	maxCalls := 2
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "max_calls", Name: "bash", N: 2},
+			{Kind: "tool_used", Tool: "bash", MaxCalls: &maxCalls},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
@@ -322,7 +274,7 @@ func TestToolGraderMaxCalls(t *testing.T) {
 func TestToolGraderSkillRepoGroup(t *testing.T) {
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "any_of_group", Group: "skill_repo:github.com/org/repo"},
+			{Kind: "any_from_group", Group: "skill_repo:github.com/org/repo"},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
@@ -355,6 +307,7 @@ func TestToolGraderSkillRepoGroup(t *testing.T) {
 }
 
 func TestToolGraderValidation(t *testing.T) {
+	minNegative := -1
 	tests := []struct {
 		name        string
 		cfg         *ToolConfig
@@ -368,37 +321,28 @@ func TestToolGraderValidation(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "specific_tool missing name",
+			name: "tool_used missing tool",
 			cfg: &ToolConfig{
 				Checks: []ToolCheckRule{
-					{Kind: "specific_tool"},
+					{Kind: "tool_used"},
 				},
 			},
 			expectError: true,
 		},
 		{
-			name: "any_of_group missing group",
+			name: "any_from_group missing group",
 			cfg: &ToolConfig{
 				Checks: []ToolCheckRule{
-					{Kind: "any_of_group"},
+					{Kind: "any_from_group"},
 				},
 			},
 			expectError: true,
 		},
 		{
-			name: "turn_limit zero N",
+			name: "tool_used negative min_calls",
 			cfg: &ToolConfig{
 				Checks: []ToolCheckRule{
-					{Kind: "turn_limit", N: 0},
-				},
-			},
-			expectError: true,
-		},
-		{
-			name: "min_calls negative N",
-			cfg: &ToolConfig{
-				Checks: []ToolCheckRule{
-					{Kind: "min_calls", Name: "bash", N: -1},
+					{Kind: "tool_used", Tool: "bash", MinCalls: &minNegative},
 				},
 			},
 			expectError: true,
@@ -416,8 +360,8 @@ func TestToolGraderValidation(t *testing.T) {
 			name: "valid config",
 			cfg: &ToolConfig{
 				Checks: []ToolCheckRule{
-					{Kind: "specific_tool", Name: "bash"},
-					{Kind: "turn_limit", N: 5},
+					{Kind: "tool_used", Tool: "bash"},
+					{Kind: "tool_not_used", Tool: "edit"},
 				},
 			},
 			expectError: false,
@@ -437,10 +381,76 @@ func TestToolGraderValidation(t *testing.T) {
 	}
 }
 
+func TestToolGraderLegacyKindMigration(t *testing.T) {
+	tests := []struct {
+		name         string
+		kind         string
+		expectError  bool
+		errorContains string
+	}{
+		{
+			name:         "specific_tool",
+			kind:         "specific_tool",
+			expectError:  true,
+			errorContains: "tool_used",
+		},
+		{
+			name:         "any_of_group",
+			kind:         "any_of_group",
+			expectError:  true,
+			errorContains: "any_from_group",
+		},
+		{
+			name:         "group_not_used",
+			kind:         "group_not_used",
+			expectError:  true,
+			errorContains: "none_from_group",
+		},
+		{
+			name:         "turn_limit",
+			kind:         "turn_limit",
+			expectError:  true,
+			errorContains: "activity grader",
+		},
+		{
+			name:         "min_calls",
+			kind:         "min_calls",
+			expectError:  true,
+			errorContains: "tool_used",
+		},
+		{
+			name:         "max_calls",
+			kind:         "max_calls",
+			expectError:  true,
+			errorContains: "tool_used",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &ToolConfig{
+				Checks: []ToolCheckRule{
+					{Kind: tt.kind, Tool: "bash", Group: "mcp"},
+				},
+			}
+			_, err := NewToolGrader("test", cfg)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error for legacy kind %q, got none", tt.kind)
+				} else if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("expected error containing %q, got: %v", tt.errorContains, err)
+				}
+			} else if err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+		})
+	}
+}
+
 func TestToolGraderInterface(t *testing.T) {
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "specific_tool", Name: "bash"},
+			{Kind: "tool_used", Tool: "bash"},
 		},
 	}
 	g, _ := NewToolGrader("test", cfg)
@@ -458,7 +468,7 @@ func TestToolGraderInterface(t *testing.T) {
 func TestToolGraderToolNameGlob(t *testing.T) {
 	cfg := &ToolConfig{
 		Checks: []ToolCheckRule{
-			{Kind: "any_of_group", Group: "tool_name_glob:azure-*"},
+			{Kind: "any_from_group", Group: "tool_name_glob:azure-*"},
 		},
 	}
 	g, err := NewToolGrader("test", cfg)
