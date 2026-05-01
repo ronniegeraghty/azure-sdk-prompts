@@ -116,8 +116,8 @@ Size int64  `json:"size"`
 }
 
 // GraderResult is the single shape every grader returns. Pass and Score
-// are derived from Points at construction time — they are NOT independent
-// signals. Any field outside Points is render-only and may not influence
+// are derived from Checks at construction time — they are NOT independent
+// signals. Any field outside Checks is render-only and may not influence
 // pass/fail.
 //
 // This is the canonical report shape returned by all graders. All graders

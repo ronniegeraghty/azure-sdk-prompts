@@ -329,10 +329,10 @@ type EvalReportData struct {
 type GraderData struct {
 	Name   string
 	Type   string
-	Points []PointData
+	Checks []PointData
 }
 
-// PointData mirrors the essential fields from report.GraderPoint.
+// PointData mirrors the essential fields from report.GraderCheck.
 type PointData struct {
 	Label   string
 	Pass    bool
@@ -441,7 +441,7 @@ func indexPoints(data *EvalReportData) map[string]map[int]indexedPointData {
 			result[grader.Name] = make(map[int]indexedPointData)
 		}
 		
-		for i, point := range grader.Points {
+		for i, point := range grader.Checks {
 			result[grader.Name][i] = indexedPointData{
 				Label:   point.Label,
 				Pass:    point.Pass,

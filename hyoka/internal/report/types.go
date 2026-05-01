@@ -26,9 +26,9 @@ type GeneratorArtifact = artifact.GeneratorArtifact
 //	v1 = legacy monolithic ReviewResult.
 //	v2 = grader-based; one expanded GraderResult entry per panel member +
 //	     one consensus row for prompt_review graders.
-//	v3 = single-entry ai_review row carrying GraderPoints; ToolLoadResult
+//	v3 = single-entry ai_review row carrying GraderChecks; ToolLoadResult
 //	     and EnvironmentInfo carry parent linkage; pre-computed roll-ups.
-//	v4 = unified Points-first GraderResult; all graders emit Points; Extras
+//	v4 = unified Checks-first GraderResult; all graders emit Checks; Extras
 //	     discriminated union replaces per-kind detail fields.
 //
 // v4 is a hard cutover: v3 reports are rejected at load time (regenerate required).
@@ -1013,7 +1013,7 @@ func MigrateToV2(r *EvalReport) {
 // MigrateToV3 was the v2→v3 migration stub. As of v4, we enforce a hard cutover:
 // v3 and earlier reports are rejected at load time.
 //
-// v4 introduced unified Points-first GraderResult; all graders emit Points;
+// v4 introduced unified Checks-first GraderResult; all graders emit Checks;
 // Extras is a discriminated union replacing per-kind detail fields. The v3→v4
 // transformation is lossy in reverse (old detail fields cannot be reconstructed
 // from v4's Extras), and the only first-party consumer (site/) is versioned

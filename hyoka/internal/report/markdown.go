@@ -39,7 +39,7 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 	fmt.Fprintf(&b, "| Prompt ID | `%s` |\n", r.PromptID)
 	fmt.Fprintf(&b, "| Config | %s |\n", r.ConfigName)
 	fmt.Fprintf(&b, "| Result | %s |\n", result)
-	if passed, total := TotalGraderPoints(r.GraderResults); total > 0 {
+	if passed, total := TotalGraderChecks(r.GraderResults); total > 0 {
 		fmt.Fprintf(&b, "| Score | %d/%d |\n", passed, total)
 	}
 	fmt.Fprintf(&b, "| Duration | %.1fs |\n", r.Duration)
@@ -438,7 +438,7 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 			icon = "✅"
 		}
 		score := "—"
-		if passed, total := TotalGraderPoints(r.GraderResults); total > 0 {
+		if passed, total := TotalGraderChecks(r.GraderResults); total > 0 {
 			score = fmt.Sprintf("%d/%d", passed, total)
 		} else if r.FailureReason != "" {
 			score = r.FailureReason

@@ -19,13 +19,13 @@ import (
 //     regardless of which configs include the relevant tool.
 //   - Local skills under skills/generator/ are always treated as not
 //     present (the generator dir isn't tested by tool_usage rules).
-//   - If the rule IS applicable, one Point is emitted whose Pass flag is
+//   - If the rule IS applicable, one Check is emitted whose Pass flag is
 //     true iff the corresponding usage signal indicates the tool was
 //     actually invoked at least once.
 //
 // When zero rules are applicable for the eval, the grader emits a single
-// trivially-passing Point labeled "no_applicable_rules" so the result still
-// satisfies the "every grader emits ≥ 1 Point" invariant.
+// trivially-passing Check labeled "no_applicable_rules" so the result still
+// satisfies the "every grader emits ≥ 1 Check" invariant.
 type ToolUsageGrader struct {
 	name string
 	cfg  ToolUsageConfig
@@ -69,7 +69,7 @@ func (g *ToolUsageGrader) Kind() string { return KindToolUsage }
 func (g *ToolUsageGrader) Name() string { return g.name }
 
 // Grade evaluates each rule against the input's EnvironmentTools and usage
-// signals. Returns a GraderResult whose Points record applicable rules only.
+// signals. Returns a GraderResult whose Checks record applicable rules only.
 func (g *ToolUsageGrader) Grade(_ context.Context, input GraderInput) (GraderResult, error) {
 	skillSet := stringSet(input.SkillsInvoked)
 	mcpSet := stringSet(input.MCPServersUsed)
@@ -94,7 +94,7 @@ func (g *ToolUsageGrader) Grade(_ context.Context, input GraderInput) (GraderRes
 			Message: "no tool_usage rules were applicable to this environment",
 		}}
 	}
-	msg := summarizePoints(checks)
+	msg := summarizeChecks(checks)
 	return NewResult(KindToolUsage, g.name, input.Config, checks, msg, nil), nil
 }
 
@@ -148,7 +148,7 @@ func isGeneratorDirSkill(et EnvironmentTool) bool {
 		strings.Contains(et.Path, "/skills/generator/")
 }
 
-// evaluateRule produces a single GraderPoint for an applicable rule.
+// evaluateRule produces a single GraderCheck for an applicable rule.
 func evaluateRule(rule ToolUsageRule, et EnvironmentTool, skillSet, mcpSet map[string]bool) GraderPoint {
 	switch rule.Expect {
 	case "at_least_one_tool_call":
@@ -181,7 +181,7 @@ func tcMessage(pass bool, okMsg, failMsg string) string {
 	return failMsg
 }
 
-func summarizePoints(checks []GraderPoint) string {
+func summarizeChecks(checks []GraderCheck) string {
 	passed := 0
 	for _, p := range checks {
 		if p.Pass {

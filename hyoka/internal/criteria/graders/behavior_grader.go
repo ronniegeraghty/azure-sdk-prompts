@@ -66,7 +66,7 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 	var violations []string
 	var checks []GraderCheck
 	
-	// Per-tool Points for required tools
+	// Per-tool Checks for required tools
 	for _, tool := range g.requiredTools {
 		present := toolSet[tool]
 		label := fmt.Sprintf("tool required: %s", tool)
@@ -83,7 +83,7 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 		})
 	}
 	
-	// Per-tool Points for forbidden tools
+	// Per-tool Checks for forbidden tools
 	for _, tool := range g.forbiddenTools {
 		used := toolSet[tool]
 		label := fmt.Sprintf("tool forbidden: %s", tool)
@@ -100,7 +100,7 @@ func (g *BehaviorGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 		})
 	}
 	
-	// Turn limit Point (if configured)
+	// Turn limit Check (if configured)
 	if g.maxTurns > 0 {
 		within := maxTurn <= g.maxTurns
 		label := fmt.Sprintf("turn limit ≤ %d", g.maxTurns)

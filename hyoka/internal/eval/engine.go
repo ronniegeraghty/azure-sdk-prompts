@@ -776,9 +776,9 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			} else if !evalReport.Success {
 				evtType = progress.EventFailed
 				if graderChecksTotal > 0 {
-					msg = fmt.Sprintf("%d/%d points", graderChecksPassed, graderChecksTotal)
+					msg = fmt.Sprintf("%d/%d checks", graderChecksPassed, graderChecksTotal)
 				} else if evalReport.Review != nil {
-					msg = fmt.Sprintf("%d/%d points", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
+					msg = fmt.Sprintf("%d/%d checks", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
 				}
 			}
 			display.HandleEvent(progress.ProgressEvent{
@@ -1067,7 +1067,7 @@ func evalReportToData(r *report.EvalReport) *pairwise.EvalReportData {
 		data.Graders = append(data.Graders, pairwise.GraderData{
 			Name:   grader.GraderName,
 			Type:   grader.GraderType,
-			Points: points,
+			Checks: points,
 		})
 	}
 	

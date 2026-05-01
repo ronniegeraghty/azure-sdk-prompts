@@ -152,7 +152,7 @@ func validateEntry(e UnifiedGraderEntry) error {
 			return fmt.Errorf("grader %q: type=prompt requires non-empty prompt or checks", tag)
 		}
 		if hasPrompt && !hasChecks {
-			slog.Warn("grader type=prompt has prompt but no checks: will synthesize a single pass/fail point at runtime; prefer adding explicit checks",
+			slog.Warn("grader type=prompt has prompt but no checks: will synthesize a single pass/fail check at runtime; prefer adding explicit checks",
 				"grader", tag)
 		}
 		if hasChecks {

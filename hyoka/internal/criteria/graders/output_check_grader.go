@@ -78,9 +78,9 @@ type producedFile struct {
 
 // Grade evaluates every configured knob against input.WorkspaceDelta and
 // returns a GraderResult whose Pass is the AND of every sub-check.
-// Per v4 spec: one Point per configured knob, OutputCheckExtras carries ProducedFiles.
+// Per v4 spec: one Check per configured knob, OutputCheckExtras carries ProducedFiles.
 //
-// Phase 3 (2026-04-25) invariant: every grader emits ≥ 1 Point. When no knobs
+// Phase 3 (2026-04-25) invariant: every grader emits ≥ 1 Check. When no knobs
 // are configured, a single trivially-passing "no_knobs" Point is emitted so
 // the site never falls back to its "PASS"/"100%" header. Labels are stable
 // snake_case identifiers so reports are aggregable across runs; Messages
@@ -138,7 +138,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		})
 	}
 
-	// require_files: aggregate into a single Point per knob.
+	// require_files: aggregate into a single Check per knob.
 	if len(g.cfg.RequireFiles) > 0 {
 		var missing []string
 		for _, p := range g.cfg.RequireFiles {
@@ -161,7 +161,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		})
 	}
 
-	// forbid_files: aggregate into a single Point per knob.
+	// forbid_files: aggregate into a single Check per knob.
 	if len(g.cfg.ForbidFiles) > 0 {
 		var found []string
 		for _, p := range g.cfg.ForbidFiles {
@@ -183,7 +183,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 		})
 	}
 
-	// require_updated: aggregate into a single Point per knob.
+	// require_updated: aggregate into a single Check per knob.
 	if len(g.cfg.RequireUpdated) > 0 {
 		var notUpdated []string
 		for _, p := range g.cfg.RequireUpdated {
@@ -256,7 +256,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 	}
 
 	// --- Aggregate. ---
-	// Phase 3 invariant: every grader emits ≥ 1 Point. When no knobs are
+	// Phase 3 invariant: every grader emits ≥ 1 Check. When no knobs are
 	// configured the grader still emits a single trivially-passing Point so
 	// the site never falls back to its legacy "PASS"/"100%" header.
 	if len(checks) == 0 {

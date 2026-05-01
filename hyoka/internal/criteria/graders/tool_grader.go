@@ -240,7 +240,7 @@ func resolveGroup(group string, envTools []EnvironmentTool) []string {
 	return nil
 }
 
-func summarizeToolChecks(checks []GraderPoint) string {
+func summarizeToolChecks(checks []GraderCheck) string {
 	passed := 0
 	for _, c := range checks {
 		if c.Pass {

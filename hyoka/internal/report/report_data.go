@@ -59,7 +59,7 @@ func buildMatrix(s *RunSummary) *MatrixData {
 			FileCount: len(r.GeneratedFiles),
 			ToolCalls: r.ToolCalls,
 		}
-		if passed, total := TotalGraderPoints(r.GraderResults); total > 0 {
+		if passed, total := TotalGraderChecks(r.GraderResults); total > 0 {
 			cell.Score = passed
 			cell.MaxScore = total
 			cell.HasReview = true

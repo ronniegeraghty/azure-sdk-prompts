@@ -108,7 +108,7 @@ func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, 
 
 	logCriteriaCountMismatch(g.name, input, len(consolidated.Scores.Criteria))
 
-	// Per v4 spec: one Point per criterion, Weight = criterion max
+	// Per v4 spec: one Check per criterion, Weight = criterion max
 	var checks []GraderCheck
 	for i, c := range consolidated.Scores.Criteria {
 		label := c.Name
@@ -205,7 +205,7 @@ func (g *PromptReviewGrader) gradeSingle(ctx context.Context, input GraderInput,
 
 	logCriteriaCountMismatch(g.name, input, len(reviewResult.Scores.Criteria))
 
-	// Per v4 spec: one Point per criterion, Weight = criterion max
+	// Per v4 spec: one Check per criterion, Weight = criterion max
 	var checks []GraderCheck
 	for i, c := range reviewResult.Scores.Criteria {
 		label := c.Name
