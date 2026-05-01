@@ -13,6 +13,11 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 		return nil, fmt.Errorf("decoding config for grader %q: %w", gc.Name, err)
 	}
 
+	// Emit deprecation warning if gate is set.
+	if gc.Gate {
+		slog.Warn("grader field 'gate' is deprecated; gate semantics are no longer enforced — use 'tool' grader check kinds or separate explicit graders instead", "name", gc.Name)
+	}
+
 	switch gc.Kind {
 	case KindFile:
 		slog.Warn("grader kind 'file' is deprecated; use 'output_check' with require_files instead", "name", gc.Name, "kind", gc.Kind)

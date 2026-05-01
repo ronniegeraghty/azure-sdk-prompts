@@ -147,6 +147,10 @@ type GraderResult struct {
 	Kind    string  `json:"kind"`              // one of KindXxx
 	Name    string  `json:"name"`              // YAML instance name
 	Weight  float64 `json:"weight"`            // aggregation weight (from config)
+	
+	// Deprecated: Gate semantics are no longer enforced. All graders run and contribute
+	// their score to the weighted aggregate. Use the consolidated 'tool' grader's check
+	// kinds or separate explicit graders to express pass/fail requirements instead.
 	Gate    bool    `json:"gate"`              // gate flag (from config)
 
 	// Derived from Checks — see NewResult helper.

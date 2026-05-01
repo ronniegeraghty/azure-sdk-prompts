@@ -58,6 +58,10 @@ type GraderConfig struct {
 	Name   string    `yaml:"name" json:"name"`
 	Config yaml.Node `yaml:"config" json:"config"`
 	Weight float64   `yaml:"weight,omitempty" json:"weight,omitempty"`
+	
+	// Deprecated: Gate semantics are no longer enforced. All graders run and contribute
+	// their score to the weighted aggregate. Use the consolidated 'tool' grader's check
+	// kinds or separate explicit graders to express pass/fail requirements instead.
 	Gate   bool      `yaml:"gate,omitempty" json:"gate,omitempty"`
 	When   WhenMap   `yaml:"when,omitempty" json:"when,omitempty"`
 }
