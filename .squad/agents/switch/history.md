@@ -840,3 +840,63 @@ Neo shipped determinism fix with comprehensive test coverage:
 
 **Lesson:** Test fixture rebuild + attempting actual eval runs before committing test changes caught two registration bugs in KindTool. Neo had registered in registry.go and types.go but missed config.go validTypedKinds map. Hotfixes 8c0c1d1c (registry) and 8b51cc36 (config) committed after verification. **Pattern:** Always verify test fixtures against production code paths, not just static inspection.
 
+
+## 2026-05-01 — Track 1: Pairwise Deep Skills_Loaded Integration Test (SHIPPED ✅)
+
+**Assignment:** Two-track grader redesign testing coordinated with Neo + Tank.
+
+### Track 1: Pairwise Deep Bug Test (Complete)
+
+**Mission:** Lock the semantics so future regressions of the pairwise/skill-load split-brain bug fail loudly.
+
+**Context:** Per Morpheus Section A item 4, the bug is:
+- `validateSkillDirEntry` (validate.go:838) does NOT consult `entry.ExcludedSkills`
+- All subdirs end up in `SessionConfig.SkillDirectories` (the session-truth)
+- Legacy `ResolveSkills` honors exclusions but only populates report metadata, NOT session args
+- Result: `report.skillDirectories` shows filtered single path, but SDK's `skills_loaded` event reports both skills
+
+**Test Created:** `hyoka/internal/config/tool/pairwise_skill_filter_test.go`
+- Go-level unit test, NO real Copilot sessions needed (fast, deterministic)
+- Uses test skills: `skills/test/markdown-headings` and `skills/test/markdown-lists`
+- Three scenarios:
+  1. Baseline (no exclusions): expects BOTH skills loaded ✅
+  2. Exclude markdown-headings: expects ONLY markdown-lists ❌ (currently fails)
+  3. Exclude markdown-lists: expects ONLY markdown-headings ❌ (currently fails)
+
+**Test Results (pre-fix):**
+```
+=== RUN   TestPairwiseDeepVariantSkillsLoadedFilter/exclude_markdown-headings
+    Expected 1 skills loaded, got 2: [markdown-headings markdown-lists]
+    Expected skill "markdown-headings" to be excluded, but it was loaded
+```
+
+✅ **Test successfully demonstrates the bug.** After Neo fixes validateSkillDirEntry (line 838) to check `entry.ExcludedSkills`, this test will pass.
+
+**Commit:** 56ebf63d
+```
+test(pairwise): assert skills_loaded matches deep variant exclusions
+```
+
+**Pushed to:** origin/ronniegeraghty/dev
+
+### Track 2: Test Criteria Fixture Update (WAITING)
+
+**Status:** Neo and Tank have NOT yet landed their grader rewrites. Waiting for:
+- `.squad/decisions/inbox/neo-pairwise-tool-grader-shipped.md`
+- `.squad/decisions/inbox/tank-workspace-activity-graders-shipped.md`
+
+**Next steps:** Once those files appear:
+1. Update `criteria/language/test.yaml` with one of EACH new grader type:
+   - Tool grader: tool_used, tool_not_used, any_from_group, none_from_group
+   - Workspace grader: require_to_create, forbidden_to_create, required_to_update, file with state/min_bytes/contains
+   - Activity grader: turn_limit, action_count, tool_call_count, contains_action, not_truncated, terminated_by
+2. Run test scenario 3+ times to verify consistency
+3. Document any inconsistencies (non-blocker) in new decision file
+
+**Uncommitted changes in tree:**
+- Neo's work in progress: entry.go (ExcludedTools field), validate.go (plugin exclusion logic, contains() helper)
+- Tank's workspace_grader.go
+- Switch's test file (now committed)
+
+**Branch state:** Clean for Track 1 commit. Neo/Tank will commit their work separately.
+

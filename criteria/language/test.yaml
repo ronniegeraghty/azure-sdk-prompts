@@ -2,7 +2,7 @@
 # Paired with prompts/test/hello-markdown.prompt.md (writes a small hello.md
 # using the markdown-headings + markdown-lists skills).
 #
-# Uses only canonical kinds: prompt, output_check, tool, program, action_sequence.
+# Uses only canonical kinds: prompt, workspace, tool, activity, program.
 when:
   language: test
 graders:
@@ -21,68 +21,62 @@ graders:
       - File hello.md contains a fenced code block tagged with the language `rust`.
 
   # ---------------------------------------------------------------------------
-  # 2. output_check — workspace-delta boolean checks. Exercises every knob
-  #    (min_files, max_files, require_files, forbid_files, require_updated,
-  #    min_bytes_per_file, max_bytes_per_file).
+  # 2. workspace — workspace-delta boolean checks. Exercises all six check kinds.
   # ---------------------------------------------------------------------------
-  - name: Output Files
-    type: output_check
+  - name: Workspace Check
+    type: workspace
     weight: 1.0
     details:
-      min_files: 1
-      max_files: 5
-      require_files:
-        - hello.md
-      forbid_files:
-        - .env
-        - secrets.txt
-      # Intentionally fails — the prompt creates hello.md, never updates an
-      # existing file. Demonstrates the require_updated sub-check.
-      require_updated:
-        - README.md
-      min_bytes_per_file: 10
-      max_bytes_per_file: 10000
+      checks:
+        - kind: require_to_create
+          files: [hello.md]
+        - kind: forbidden_to_create
+          files: [.env, secrets.txt]
+        - kind: forbidden_to_delete
+          files: ["*"]
+        - kind: file
+          name: hello.md
+          state: present
+          min_bytes: 10
+          contains: "#"
 
   # ---------------------------------------------------------------------------
-  # 3. tool — unified tool checks. Consolidates behavior/tool_constraint/tool_usage.
-  #    Each check: one pass/fail point.
+  # 3. tool — unified tool checks. Exercises all four canonical check kinds.
   # ---------------------------------------------------------------------------
-  - name: Tool Checks
+  - name: Tool Usage
     type: tool
     weight: 1.0
     details:
       checks:
-        # Turn limit check (formerly behavior grader).
-        - kind: turn_limit
-          n: 3
-        # Required tool (formerly behavior grader).
-        - kind: specific_tool
-          name: skill
-        # Forbidden tool (formerly behavior grader).
+        - kind: tool_used
+          tool: skill
+          min_calls: 1
         - kind: tool_not_used
-          name: bash
-        # Min calls constraint (formerly tool_constraint grader).
-        - kind: min_calls
-          name: skill
-          n: 2
-        # Max calls constraint (formerly tool_constraint grader).
-        - kind: max_calls
-          name: skill
-          n: 20
-        # Group check: any skill plugin used (formerly tool_usage grader).
-        - kind: any_of_group
-          group: skill_plugin
+          tool: bash
+        - kind: any_from_group
+          group: test-skills
+        - kind: none_from_group
+          group: test-skills
+          except: [markdown-headings, markdown-lists]
 
   # ---------------------------------------------------------------------------
-  # 4. action_sequence — ordered prefix of expected action names.
+  # 4. activity — action log and session activity checks. Exercises multiple check kinds.
   # ---------------------------------------------------------------------------
-  - name: Markdown Action Sequence
-    type: action_sequence
-    weight: 0.3
+  - name: Activity Check
+    type: activity
+    weight: 1.0
     details:
-      expected_actions:
-        - skill
-        - write
+      checks:
+        - kind: turn_limit
+          max: 25
+        - kind: action_count
+          min: 1
+          max: 100
+        - kind: tool_call_count
+          min: 1
+        - kind: not_truncated
+        - kind: terminated_by
+          equals: completed
 
   # ---------------------------------------------------------------------------
   # 5. program — runs a command in the workspace; exit 0 = pass.

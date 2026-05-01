@@ -21,16 +21,18 @@ import (
 
 // Supported grader kinds.
 const (
-	KindFile           = "file"            // DEPRECATED: use KindOutputCheck
+	KindFile           = "file"            // DEPRECATED: use KindWorkspace
 	KindProgram        = "program"
 	KindPrompt         = "prompt"
-	KindBehavior       = "behavior"       // DEPRECATED: use KindTool
-	KindActionSequence = "action_sequence"
+	KindBehavior       = "behavior"       // DEPRECATED: use KindTool or KindActivity
+	KindActionSequence = "action_sequence" // DEPRECATED: use KindActivity
 	KindToolConstraint = "tool_constraint" // DEPRECATED: use KindTool
 	KindPromptReview   = "prompt_review"
-	KindOutputCheck    = "output_check"
-	KindToolUsage      = "tool_usage" // DEPRECATED: use KindTool
-	KindTool           = "tool"       // Canonical tool-perspective grader
+	KindOutputCheck    = "output_check"    // DEPRECATED: use KindWorkspace
+	KindToolUsage      = "tool_usage"      // DEPRECATED: use KindTool
+	KindTool           = "tool"            // Canonical tool-perspective grader
+	KindWorkspace      = "workspace"       // Canonical workspace-delta grader
+	KindActivity       = "activity"        // Canonical session-activity grader
 )
 
 // validKinds is the set of recognized grader kind values.
@@ -45,6 +47,8 @@ var validKinds = map[string]bool{
 	KindOutputCheck:    true,
 	KindToolUsage:      true, // deprecated
 	KindTool:           true,
+	KindWorkspace:      true,
+	KindActivity:       true,
 }
 
 // GraderConfigFile is the top-level YAML structure containing a list of graders.
