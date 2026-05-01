@@ -196,17 +196,21 @@ func NewDisplay(cfg DisplayConfig) *Display {
 	return d
 }
 
-// WriteEvalBreakdown emits a per-eval grader breakdown immediately after a
-// single evaluation finishes. It is a no-op when:
-//   - the display is fully disabled (ModeOff), or
+// WriteEvalBreakdown emits a per-eval grader breakdown to STDERR immediately
+// after a single evaluation finishes. Stderr is used so the breakdown survives
+// regardless of the stdout progress mode (ANSI region redraws on stdout cannot
+// wipe stderr output).
+//
+// No-op when:
 //   - the interactive renderer is in use, since interactive already renders
 //     graders inline grouped by source file as they complete.
 //
-// In CI/log/ANSI modes the breakdown is written to the display's writer with
-// a leading "Graders:" header. The text is expected to be the output of
-// report.RenderGraderBreakdown so the format matches the markdown report.
+// Output goes to stderr in ALL other modes (off, log, ci, ansi/live, auto)
+// because the breakdown is result content, not transient progress chrome.
+// The text is expected to be the output of report.RenderGraderBreakdown so
+// the format matches the markdown report.
 func (d *Display) WriteEvalBreakdown(promptID, configName, text string) {
-	if d == nil || d.disabled || d.interactive != nil {
+	if d == nil || d.interactive != nil {
 		return
 	}
 	if text == "" {
@@ -215,8 +219,8 @@ func (d *Display) WriteEvalBreakdown(promptID, configName, text string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	header := fmt.Sprintf("\nGraders for %s / %s:\n", promptID, configName)
-	fmt.Fprint(d.w, header)
-	fmt.Fprint(d.w, text)
+	fmt.Fprint(os.Stderr, header)
+	fmt.Fprint(os.Stderr, text)
 }
 
 // --- ANSI fixed-region rendering (terminal only) ---
