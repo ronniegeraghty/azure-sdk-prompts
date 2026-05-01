@@ -460,7 +460,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		} else {
 			defer os.RemoveAll(modelWorkDir)
 		}
-		result, reviewErr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir)
+		result, reviewErr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir, checks)
 		if result != nil {
 			result.Model = model
 		}
@@ -493,7 +493,8 @@ func (p *PanelReviewer) Review(ctx context.Context, originalPrompt string, workD
 }
 
 // runSingleReview creates a Copilot client, runs a review session, and returns the result.
-func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, reviewPrompt string, workDir string) (*ReviewResult, error) {
+// If checks are provided, uses id-aware parser with retry-on-validation-error.
+func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, reviewPrompt string, workDir string, checks []ReviewCheck) (*ReviewResult, error) {
 	slog.Debug("Starting single review", "model", model)
 	opts := *p.clientOpts
 	client := copilot.NewClient(&opts)
@@ -585,13 +586,77 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		}
 
 		responseText, _ := collector.response()
-		result, err = parseReviewResponse(responseText)
-		if err != nil {
-			if attempt < maxRetries {
-				currentPrompt = fmt.Sprintf("Your previous response was not valid JSON. Error: %v\n\nPlease respond again with ONLY a valid JSON object matching the required schema.", err)
-				continue
+		
+		// Use id-aware parser if checks provided, otherwise fall back to legacy
+		if len(checks) > 0 {
+			var validationErrors []string
+			result, validationErrors = parseReviewResponseV2(responseText, checks)
+			if len(validationErrors) > 0 {
+				if attempt < maxRetries {
+					// Build precise retry prompt with missing/extra id details
+					missing := []string{}
+					extra := []string{}
+					expectedIDs := make(map[string]bool)
+					for _, c := range checks {
+						expectedIDs[c.ID] = true
+					}
+					
+					// Parse to extract returned IDs for better error message
+					jsonStr := utils.ExtractJSON(responseText)
+					if jsonStr != "" {
+						var resp struct {
+							Criteria []struct {
+								ID string `json:"id"`
+							} `json:"criteria"`
+						}
+						if json.Unmarshal([]byte(jsonStr), &resp) == nil {
+							returnedIDs := make(map[string]bool)
+							for _, c := range resp.Criteria {
+								returnedIDs[c.ID] = true
+								if !expectedIDs[c.ID] {
+									extra = append(extra, c.ID)
+								}
+							}
+							for id := range expectedIDs {
+								if !returnedIDs[id] {
+									missing = append(missing, id)
+								}
+							}
+						}
+					}
+					
+					var retryMsg strings.Builder
+					retryMsg.WriteString("Your response has validation errors:\n")
+					for _, e := range validationErrors {
+						fmt.Fprintf(&retryMsg, "- %s\n", e)
+					}
+					if len(missing) > 0 {
+						fmt.Fprintf(&retryMsg, "\nMissing ids: %v\n", missing)
+					}
+					if len(extra) > 0 {
+						fmt.Fprintf(&retryMsg, "Extra ids: %v\n", extra)
+					}
+					fmt.Fprintf(&retryMsg, "\nPlease return exactly: %s\n", formatIDList(checks))
+					currentPrompt = retryMsg.String()
+					slog.Debug("Retry prompt prepared", "model", model, "attempt", attempt, "missing", missing, "extra", extra)
+					continue
+				}
+				// Max retries exceeded: drop reviewer
+				slog.Warn("reviewer dropped: invalid criteria ids after retries",
+					"model", model,
+					"validation_errors", validationErrors)
+				return nil, fmt.Errorf("reviewer %s dropped after %d retries: %v", model, maxRetries, validationErrors)
 			}
-			return nil, err
+		} else {
+			// Legacy parser path (no checks)
+			result, err = parseReviewResponse(responseText)
+			if err != nil {
+				if attempt < maxRetries {
+					currentPrompt = fmt.Sprintf("Your previous response was not valid JSON. Error: %v\n\nPlease respond again with ONLY a valid JSON object matching the required schema.", err)
+					continue
+				}
+				return nil, err
+			}
 		}
 
 		if errs := validateReviewerResponse(result); len(errs) > 0 {
@@ -617,7 +682,7 @@ func (p *PanelReviewer) consolidate(ctx context.Context, originalPrompt string, 
 	prompt := buildConsolidationPrompt(originalPrompt, panel)
 
 	slog.Debug("Sending consolidation prompt", "consolidator_model", consolidatorModel)
-	result, err := p.runSingleReview(ctx, consolidatorModel, prompt, "")
+	result, err := p.runSingleReview(ctx, consolidatorModel, prompt, "", nil)
 	if err != nil {
 		return nil, fmt.Errorf("consolidation failed: %w", err)
 	}

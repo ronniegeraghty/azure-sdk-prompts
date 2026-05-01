@@ -1,0 +1,15 @@
+feat(review): switch reviewer + bucket paths to id-aware variants
+
+Update runSingleReview to accept []ReviewCheck and call parseReviewResponseV2
+when checks are provided. Retry loop validates id-set and provides precise
+feedback: "Your response is missing ids: [check_2]. Extra ids: [check_99].
+Please return exactly: [check_1, check_2, check_3]."
+
+After max retries, drop the reviewer with slog.Warn and return error (existing
+"all reviewers failed" path handles empty panel). Bucket paths already build
+checks, so now flow through id-aware parser + validator.
+
+All call sites updated: ReviewPanel, ReviewPanelBuckets flow checks through.
+Consolidation path passes nil checks (legacy parser branch).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

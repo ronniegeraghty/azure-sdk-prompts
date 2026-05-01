@@ -126,7 +126,7 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 				checks = criteriaStringToChecks(b.Criteria)
 			}
 			reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
-			res, rerr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir)
+			res, rerr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir, checks)
 			if rerr != nil {
 				slog.Warn("Bucket review failed", "model", model, "bucket", b.Name, "error", rerr)
 				continue
