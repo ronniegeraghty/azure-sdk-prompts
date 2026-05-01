@@ -24,7 +24,8 @@ type ReviewerResponse struct {
 
 // CriterionJudgment holds a single criterion evaluation from one reviewer.
 type CriterionJudgment struct {
-	Criterion string `json:"criterion"` // original criteria text
+	ID        string `json:"id"`        // stable check id (e.g., "check_1")
+	Criterion string `json:"criterion"` // DEPRECATED: original criteria text (v1 only)
 	Passed    bool   `json:"passed"`
 	Reasoning string `json:"reasoning"`
 }

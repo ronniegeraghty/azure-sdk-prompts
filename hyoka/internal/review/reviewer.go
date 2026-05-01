@@ -275,6 +275,85 @@ func parseReviewResponse(text string) (*ReviewResult, error) {
 	return &result, nil
 }
 
+// parseReviewResponseV2 parses an id-aware review response and validates against expected checks.
+// Returns the populated ReviewResult with canonical labels from expected, plus any validation errors.
+// The Name field of each CriterionResult is set to the canonical text from expected (indexed by ID).
+func parseReviewResponseV2(text string, expected []ReviewCheck) (*ReviewResult, []string) {
+	jsonStr := utils.ExtractJSON(text)
+	if jsonStr == "" {
+		return nil, []string{fmt.Sprintf("no JSON found in review response: %.200s", text)}
+	}
+
+	var resp struct {
+		Criteria  []CriterionJudgment `json:"criteria"`
+		Summary   string              `json:"summary"`
+		Issues    []string            `json:"issues"`
+		Strengths []string            `json:"strengths"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &resp); err != nil {
+		return nil, []string{fmt.Sprintf("parsing review JSON: %v (response: %.200s)", err, jsonStr)}
+	}
+
+	// Build expected id → text lookup
+	expectedIDs := make(map[string]string)
+	for _, c := range expected {
+		expectedIDs[c.ID] = c.Text
+	}
+
+	// Validate: returned IDs must match expected IDs exactly
+	returnedIDs := make(map[string]bool)
+	var validationErrors []string
+	for _, c := range resp.Criteria {
+		if c.ID == "" {
+			validationErrors = append(validationErrors, "found criterion with empty id")
+			continue
+		}
+		returnedIDs[c.ID] = true
+		if _, ok := expectedIDs[c.ID]; !ok {
+			validationErrors = append(validationErrors, fmt.Sprintf("unexpected id: %s", c.ID))
+		}
+		if c.Reasoning == "" {
+			validationErrors = append(validationErrors, fmt.Sprintf("id %s has empty reasoning", c.ID))
+		}
+	}
+
+	// Check for missing IDs
+	var missing []string
+	for id := range expectedIDs {
+		if !returnedIDs[id] {
+			missing = append(missing, id)
+		}
+	}
+	if len(missing) > 0 {
+		validationErrors = append(validationErrors, fmt.Sprintf("missing ids: %v", missing))
+	}
+
+	// If validation failed, return errors
+	if len(validationErrors) > 0 {
+		return nil, validationErrors
+	}
+
+	// Populate criteria with canonical labels
+	criteria := make([]CriterionResult, len(resp.Criteria))
+	for i, c := range resp.Criteria {
+		criteria[i] = CriterionResult{
+			Name:   expectedIDs[c.ID], // canonical label from YAML
+			Passed: c.Passed,
+			Reason: c.Reasoning,
+		}
+	}
+
+	scores := ReviewScores{Criteria: criteria}
+	return &ReviewResult{
+		Scores:       scores,
+		OverallScore: scores.PassedCount(),
+		MaxScore:     scores.TotalCount(),
+		Summary:      resp.Summary,
+		Issues:       resp.Issues,
+		Strengths:    resp.Strengths,
+	}, nil
+}
+
 // validateReviewerResponse checks that a parsed response contains valid criteria.
 // Returns a list of validation errors; nil means valid.
 func validateReviewerResponse(result *ReviewResult) []string {
