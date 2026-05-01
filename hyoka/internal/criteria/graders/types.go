@@ -263,6 +263,12 @@ func (g *GraderConfig) DecodeConfig() (any, error) {
 			return nil, fmt.Errorf("decoding tool_usage config for %q: %w", g.Name, err)
 		}
 		return &c, nil
+	case KindTool:
+		var c ToolConfig
+		if err := g.Config.Decode(&c); err != nil {
+			return nil, fmt.Errorf("decoding tool config for %q: %w", g.Name, err)
+		}
+		return &c, nil
 	default:
 		return nil, fmt.Errorf("unknown grader kind %q for %q", g.Kind, g.Name)
 	}
