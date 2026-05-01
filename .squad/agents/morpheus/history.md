@@ -968,3 +968,20 @@ Defined four-part redesign with full implementation details, migration impact, a
 - **The dead-code path is genuinely dead:** `PanelReviewer.consolidate` only refers to itself; `buildConsolidationPrompt` is only called by that dead method. Three `TestBuildConsolidationPrompt*` tests in `review_test.go` go with it. Deterministic vote replaced LLM consolidation a while back but the corpse was left in place.
 - **Existing retry pattern in `runSingleReview` (lines 509-522) is the right hook for new ID validation** — it already retries on parse failure and validation failure with model-specific re-prompts. Adding "missing/extra ids" to the validation set is a tiny extension, not new infrastructure.
 - **Pattern worth capturing as a skill:** "deterministic LLM panel via stable IDs" — any place where multiple LLMs vote on the same items needs server-controlled IDs flowing through the prompt → response → vote chain. Free-text echo is unreliable. Capture this as a reusable pattern.
+
+## Completion Update (Determinism Shipped — 2026-05-01)
+
+Morpheus scoping proposal approved and shipped by Neo. Pipeline completed:
+
+- **Morpheus proposal:** `.squad/decisions/inbox/morpheus-prompt-grader-schema.md` (scoping doc with 11-commit rollout sequence)
+- **Neo implementation:** 11 commits spanning foundation (types/parser/builder) → integration (reviewer switch/vote keying) → cleanup (dead consolidation) → verification (determinism regression tests)
+- **Verification:** Two-run byte-identical smoke test ✅ — same point counts per grader, no label drift, no bucket splits
+- **Merged:** Both decisions consolidated into `.squad/decisions.md`; inbox files deleted
+- **Status:** Ready for merge to main
+
+### Team Updates
+
+- **Neo:** Shipped determinism implementation; all commits on ronniegeraghty/dev (99d32205..120d0db8)
+- **Switch:** Testing implications documented in determinism regression tests + unit coverage
+- **Scribe:** Merged decisions, updated orchestration logs, cross-agent history
+

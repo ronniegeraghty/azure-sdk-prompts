@@ -782,3 +782,24 @@ No regressions introduced. Test suite is ready for Trinity's implementation.
 
 **Flagged by Tank:** Pre-existing build failure in `hyoka/cmd/compare_test.go` — `*bool` vs `bool` type mismatch. Needs investigation and fix. Not part of Tank's trends flag work; flagged during verification pass.
 
+
+## Determinism Regression Test Coverage (2026-05-01)
+
+Neo shipped determinism fix with comprehensive test coverage:
+
+- **Unit tests:** 8 new tests for id-aware response parsing, vote keying, validator
+  - `TestParseReviewResponseV2_*` — validator coverage (good IDs, missing/extra, malformed)
+  - `TestAverageReview_KeysByID_NotName` — vote keys by id, not paraphrased name
+  - `TestAverageReview_BucketScoping` — bucket::id scoping across buckets
+  - `TestBuildReviewPrompt_RendersIDs` — check_N rendering
+  - `TestParseReviewResponseV2_RejectsLegacyText` — v1 rejection in v2 path
+
+- **Integration test:** Determinism regression test
+  - Runs test eval twice with deterministic stub reviewers that return paraphrased names
+  - Asserts: identical `OverallScore`, identical `MaxScore`, identical ordered list of `(label, passed)` pairs
+  - Smoke test verified: `test-dp-test-hello-markdown` × `test/baseline` config (2 models) → byte-identical grader breakdowns
+
+- **Test discipline:** All review tests pass with `-race` flag; backward compat paths (V1 text-keyed parser) retained for legacy callers
+
+**Impact:** Determinism now has provable, reproducible coverage. Site fallbacks remain (belt-and-braces).
+

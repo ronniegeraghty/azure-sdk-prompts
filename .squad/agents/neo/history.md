@@ -1366,3 +1366,26 @@ Before this change: same prompt + config produced 25 vs 26 points (reviewer para
 
 All review package tests pass (`-race`). 8 new unit tests. Smoke test confirms determinism (identical grader breakdowns across runs).
 
+
+## Shipping Summary (2026-05-01)
+
+- **Branch:** ronniegeraghty/dev
+- **Commits:** 11 total (99d32205..120d0db8), including final docs update
+- **Decision merged:** Both Morpheus scoping + Neo implementation shipped summaries in `.squad/decisions.md`
+- **Inbox deleted:** morpheus-prompt-grader-schema.md, neo-prompt-grader-determinism.md
+- **Orchestration logs:** 3 entries created (Morpheus fix, Neo phase 1-2, Neo phase 2-completion)
+- **Status:** Ready for merge to main
+
+### Contracts Established
+
+- **ID stability:** `check_<n>` assigned at criteria-bundling time, immutable through pipeline
+- **Canonical labels:** From YAML source text via `ReviewCheck.Text`, never from LLM echo
+- **Vote keying:** `bucket::check_id` (non-combined) or `check_id` (combined) — no paraphrased names
+- **Backward compat:** V1 text-keyed parser retained; full migration requires updating all call sites
+
+### Next Steps
+
+- Merge ronniegeraghty/dev to main
+- Archive old decisions if decisions.md > 20KB (currently ~60KB, compression not needed yet)
+- Team-wide charter update: determinism as reusable skill for multi-model LLM voting
+

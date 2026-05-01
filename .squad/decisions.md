@@ -1342,3 +1342,78 @@ If all rules are skipped (env doesn't contain any declared items), emit one triv
 - CI workflows (existing tests confirm unrelated failures)
 - API surface (grader interface unchanged)
 
+
+---
+
+# Morpheus 🕶️ — Prompt Grader Determinism via Stable Check IDs (Scoping)
+
+**Status:** Shipped (implementation completed by Neo)
+**Author:** Morpheus
+**Date:** 2026-04-27
+**Affected packages:** `hyoka/internal/review`, `hyoka/internal/criteria`, `hyoka/internal/criteria/graders`
+
+## Decision
+
+Implement stable check IDs end-to-end for prompt grader determinism. Root cause: reviewer LLMs paraphrase check text → vote aggregation keys by paraphrased name → bucket splits → non-deterministic scores.
+
+## Solution
+
+- Each check gets stable `check_<n>` ID at criteria-bundling time
+- IDs flow through: prompt → JSON contract → vote key → display label
+- Vote key: `bucket::check_id` (non-combined) or `check_id` (combined)
+- Backward compat: text-keyed parser retained one release
+- Validator: ID set must match expected; on error retry then drop reviewer
+
+## Outcome
+
+Neo shipped 11 commits (99d32205..120d0db8) implementing full pipeline + regression tests. Two-run byte-identical smoke test validates determinism fix. Ready for merge.
+
+---
+
+# Neo 💊 — Prompt Grader Determinism Implementation (Shipped)
+
+**Status:** ✅ Shipped (11 commits, ronniegeraghty/dev)
+**Author:** Neo
+**Date:** 2026-05-01
+**Affected packages:** `hyoka/internal/review`, `hyoka/internal/criteria`
+
+## Problem Solved
+
+Non-deterministic grader point counts (26 vs 25) from reviewer paraphrase-induced bucket splitting.
+
+## Solution Shipped
+
+- ReviewCheck type with stable ID + text + preamble
+- ID-aware prompt builder: renders `check_1: ...` in evaluation section
+- ID-aware response parser + validator: enforces id-set match, rejects extras/missing
+- Vote aggregation by ID: no more paraphrase-split buckets
+- Canonical labels from YAML: not from LLM echo
+- Backward compat paths retained
+
+## Verification
+
+- Two-run byte-identical smoke test: `test-dp-test-hello-markdown` with `test/baseline` config
+- Same point counts per grader, same verdicts
+- 8 new unit tests (id-aware + legacy fallback)
+- Zero regressions on existing tests
+
+## Commits
+
+1. feat(review): id-aware response parser + validator (99d32205)
+2. feat(criteria): emit stable IDs when formatting unified prompt entries (e7e120c3)
+3. feat(review): id-aware reviewer prompt builder (00a73fee)
+4. feat(review): switch reviewer + bucket paths to id-aware variants (d5fc8b93)
+5. refactor(review): vote keys by id; canonical label from expected check (d3872f35)
+6. refactor(graders): prompt_review_grader uses canonical label (8bfea376)
+7. chore(review): delete dead consolidation path (99836165)
+8. chore(review): legacy criteria paths retained for backward compat (194d9bf2)
+9. test(review): add determinism regression test + unit tests (d61acc92)
+10. docs: determinism completion + skill update (120d0db8)
+
+## Code References
+
+- `ReviewCheck`: `internal/review/types.go:3`
+- `parseReviewResponseV2`: `internal/review/reviewer.go:278`
+- `averageReview` (id keying): `internal/review/reviewer.go:694`
+- `BuildReviewPrompt` (check_N render): `internal/review/prompt.go:87`
+
