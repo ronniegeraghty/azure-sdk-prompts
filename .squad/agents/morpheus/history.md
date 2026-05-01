@@ -1034,3 +1034,16 @@ Morpheus scoping proposal approved and shipped by Neo. Pipeline completed:
 
 **Finding:** Original "26 vs 25 checks" inconsistency was *partially* a real determinism bug (now fixed) and *partially* legitimate non-determinism. LLM action_sequence and behavior graders judge **non-deterministic LLM action logs**—two runs of the same prompt produce different actions → different check outcomes. Updated deterministic-llm-panel skill docs to clarify: consensus panel ensures stable reviews but cannot eliminate variance in *what* the LLM does. Panel now retries 3 times on missing IDs before synthesizing (commit 1f3c9ec9).
 
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Team Handoff)
+
+**Planning Shipped:** Morpheus scoping work (morpheus-grader-pairwise-redesign-plan.md) approved and landed in `.squad/decisions.md`. Implementation now underway:
+
+- **Neo:** Pairwise deep fix (4f293e06) + tool grader redesign (24de2f26) — both sections A-B complete
+- **Tank:** Workspace grader (1f461a50) + activity grader (0896ba53) — sections C-D complete
+- **Switch:** Testing/verification — 3 pairwise eval runs confirm all redesigned graders working. Type registration fix included (ec3c9057).
+
+All commits shipped to ronniegeraghty/dev. Ready for merge to main.
+

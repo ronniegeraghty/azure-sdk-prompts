@@ -1466,3 +1466,18 @@ Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught t
 - Oracle: Update docs/graders.md with new tool grader kind names and schema.
 - Decision file: `.squad/decisions/inbox/neo-pairwise-tool-grader-shipped.md`
 
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Morpheus)
+
+**Planning Complete:** Morpheus scoped comprehensive grader/pairwise redesign covering pairwise deep bug fix, tool grader consolidation, workspace/activity grader introduction. Plan in `.squad/decisions.md`. Your tool grader redesign (24de2f26) and pairwise fix (4f293e06) implement Sections A–B of the plan. Switch will verify integration.
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Tank)
+
+**Workspace/Activity Graders Shipped:** Tank delivered workspace grader (1f461a50) and activity grader (0896ba53) per Morpheus's Sections C–D plan. All new graders registered in registry.go. **Note:** Type constants were initially missing from types.go (KindWorkspace, KindActivity) — Switch fixed this in ec3c9057. Your commits are verified working in 3 real pairwise eval runs.
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Switch)
+
+**Integration Verified:** Switch ran 3 pairwise eval runs on test fixture, confirmed all redesigned grader types (tool, workspace, activity) produce check-level results. Pairwise deep skill exclusion verified — your pairwise fix (4f293e06) is working correctly in live sessions. Test criteria updated to exercise all new graders.
+

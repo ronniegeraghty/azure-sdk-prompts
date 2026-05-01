@@ -963,3 +963,18 @@ Also fixed missing KindWorkspace and KindActivity registration in types.go
 
 **Status:** Track 2 complete. All grader redesign changes verified in production-like conditions. Ready for Oracle to update docs.
 
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Morpheus)
+
+**Planning Complete:** Morpheus scoped comprehensive grader/pairwise redesign. Your testing work (Tracks 1–2) validates this plan against real eval runs. Session log: `.squad/log/2026-05-01-grader-redesign.md`
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Neo)
+
+**Pairwise Deep Bug Fixed:** Neo shipped pairwise deep fix (4f293e06) + tool grader redesign (24de2f26). Your Track 1 test (56ebf63d) demonstrates the bug and passes after Neo's fix. Real eval runs in Track 2 verify the fix working in live sessions.
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Tank)
+
+**Workspace/Activity Graders Shipped:** Tank shipped workspace grader (1f461a50) and activity grader (0896ba53). Your Track 2 verification runs (3 pairwise evals) confirmed both graders working correctly end-to-end. **Note:** You fixed missing type registration (KindWorkspace, KindActivity) in ec3c9057 — this was Tank's oversight but your fix ensures all grader kinds are properly registered.
+

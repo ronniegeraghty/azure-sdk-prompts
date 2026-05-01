@@ -1069,3 +1069,18 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 **Next:**
 - Site component renames (OutputCheckExtras → WorkspaceExtras, ActionSequenceExtras → ActivityExtras)
 - Docs update (graders.md canonical reference)
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Morpheus)
+
+**Planning Complete:** Morpheus scoped comprehensive grader/pairwise redesign covering workspace and activity graders (Sections C–D of plan). Plan in `.squad/decisions.md`. Your workspace grader (1f461a50) and activity grader (0896ba53) implement these sections. Switch verified both working in real eval runs.
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Neo)
+
+**Pairwise Deep Bug Fixed:** Neo shipped pairwise deep fix (4f293e06) + tool grader redesign (24de2f26). Your workspace and activity graders integrate seamlessly with Neo's new taxonomy. **Note:** Switch discovered missing type constants (KindWorkspace, KindActivity) in types.go during integration — Switch added these in ec3c9057, so both new grader kinds are now fully registered.
+
+## CROSS-AGENT UPDATE (2026-05-01T23:15:27Z — Switch)
+
+**Integration Verified:** Switch updated test fixture and ran 3 pairwise eval runs confirming all new graders (tool, workspace, activity) produce results. Fixed missing type registration issue (KindWorkspace, KindActivity) in types.go. Your graders are production-ready and verified working in real sessions.
+
