@@ -121,6 +121,13 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 		}
 		return NewWorkspaceGrader(gc.Name, cfg)
 
+	case "activity":
+		cfg, ok := decoded.(*ActivityConfig)
+		if !ok {
+			return nil, fmt.Errorf("grader %q: expected *ActivityConfig, got %T", gc.Name, decoded)
+		}
+		return NewActivityGrader(gc.Name, cfg)
+
 	default:
 		return nil, fmt.Errorf("unknown grader kind %q for %q", gc.Kind, gc.Name)
 	}

@@ -187,8 +187,9 @@ type GraderExtras struct {
 	File           *FileExtras           `json:"file,omitempty"`
 	Program        *ProgramExtras        `json:"program,omitempty"`
 	Prompt         *PromptExtras         `json:"prompt,omitempty"`
-	Behavior       *BehaviorExtras       `json:"behavior,omitempty"`
-	ActionSequence *ActionSequenceExtras `json:"action_sequence,omitempty"`
+	Behavior       *BehaviorExtras       `json:"behavior,omitempty"`       // DEPRECATED: use Activity
+	ActionSequence *ActionSequenceExtras `json:"action_sequence,omitempty"` // DEPRECATED: use Activity
+	Activity       *ActivityExtras       `json:"activity,omitempty"`       // Canonical activity grader
 	ToolConstraint *ToolConstraintExtras `json:"tool_constraint,omitempty"`
 	OutputCheck    *OutputCheckExtras    `json:"output_check,omitempty"` // DEPRECATED: use Workspace
 	Workspace      *WorkspaceExtras      `json:"workspace,omitempty"`
@@ -229,6 +230,7 @@ type PromptExtras struct {
 }
 
 // BehaviorExtras holds behavior grader render-only data.
+// DEPRECATED: Use ActivityExtras instead.
 type BehaviorExtras struct {
 	ToolsUsed      []string `json:"tools_used,omitempty"`
 	MissingTools   []string `json:"missing_tools,omitempty"`
@@ -241,12 +243,23 @@ type BehaviorExtras struct {
 }
 
 // ActionSequenceExtras holds action_sequence grader render-only data.
+// DEPRECATED: Use ActivityExtras instead.
 type ActionSequenceExtras struct {
 	ExpectedSequence []string `json:"expected_sequence"`
 	ActualSequence   []string `json:"actual_sequence"`
 	MatchedActions   int      `json:"matched_actions"`
 	ToolsUsed        []string `json:"tools_used,omitempty"`
 	TotalActions     int      `json:"total_actions"`
+}
+
+// ActivityExtras holds activity grader render-only data.
+type ActivityExtras struct {
+	TotalActions int      `json:"total_actions"`
+	ToolCalls    int      `json:"tool_calls"`
+	TurnCount    int      `json:"turn_count"`
+	Truncated    bool     `json:"truncated"`
+	TerminatedBy string   `json:"terminated_by"`
+	ToolsUsed    []string `json:"tools_used,omitempty"`
 }
 
 // ToolConstraintExtras holds tool_constraint grader render-only data.

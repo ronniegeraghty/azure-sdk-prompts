@@ -92,13 +92,14 @@ type UnifiedGraderConfig struct {
 var validTypedKinds = map[string]bool{
 	graders.KindFile:           true,
 	graders.KindProgram:        true,
-	graders.KindBehavior:       true,
-	graders.KindActionSequence: true,
+	// graders.KindBehavior removed — replaced by "activity"
+	// graders.KindActionSequence removed — replaced by "activity"
 	graders.KindToolConstraint: true,
 	// graders.KindOutputCheck removed — replaced by "workspace"
 	graders.KindToolUsage:      true,
 	graders.KindTool:           true,
 	"workspace":                true, // Canonical workspace grader
+	"activity":                 true, // Canonical activity grader
 }
 
 // IsValidUnifiedType returns true if t is a recognized unified-schema type
@@ -145,6 +146,12 @@ func validateEntry(e UnifiedGraderEntry) error {
 	// Loud migration error for renamed types
 	if e.Type == graders.KindOutputCheck {
 		return fmt.Errorf("grader %q: type %q has been renamed to \"workspace\" with new check kinds; see docs/graders.md for migration guide", tag, e.Type)
+	}
+	if e.Type == graders.KindActionSequence {
+		return fmt.Errorf("grader %q: type %q has been renamed to \"activity\" with new check kinds (contains_subsequence); see docs/graders.md for migration guide", tag, e.Type)
+	}
+	if e.Type == graders.KindBehavior {
+		return fmt.Errorf("grader %q: type %q has been replaced by \"tool\" (for tool constraints) or \"activity\" (for turn limits); see docs/graders.md for migration guide", tag, e.Type)
 	}
 	
 	if !IsValidUnifiedType(e.Type) {
