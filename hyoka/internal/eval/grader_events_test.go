@@ -31,7 +31,7 @@ func (f *fakeGrader) Grade(_ context.Context, _ graders.GraderInput) (graders.Gr
 func TestEmitGraderStart_PopulatesIDAndKind(t *testing.T) {
 	var r reporter
 	g := &fakeGrader{kind: graders.KindFile, name: "my-file-check"}
-	emitGraderStart(r.emit, g)
+	emitGraderStart(r.emit, g, "", "")
 	if len(r.events) != 1 {
 		t.Fatalf("want 1 event, got %d", len(r.events))
 	}
@@ -50,8 +50,8 @@ func TestEmitGraderStart_PopulatesIDAndKind(t *testing.T) {
 func TestEmitGraderStart_NilSenderNoPanic(t *testing.T) {
 	g := &fakeGrader{kind: graders.KindFile, name: "x"}
 	// Must not panic on nil sender or nil grader.
-	emitGraderStart(nil, g)
-	emitGraderStart(func(progress.ProgressEvent) { t.Fatal("called with nil grader") }, nil)
+	emitGraderStart(nil, g, "", "")
+	emitGraderStart(func(progress.ProgressEvent) { t.Fatal("called with nil grader") }, nil, "", "")
 }
 
 func TestEmitGraderComplete_ScorePolicy(t *testing.T) {

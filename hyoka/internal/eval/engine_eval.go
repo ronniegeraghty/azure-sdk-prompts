@@ -729,7 +729,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{item.bucket}
 			bucketInput.EvalCriteria = ""
 
-			emitGraderStart(sendRawEvent, reviewGrader)
+			emitGraderStart(sendRawEvent, reviewGrader, item.srcFile, item.srcType)
 			reviewResult, reviewErr := reviewGrader.Grade(ctx, bucketInput)
 			if reviewErr != nil {
 				glg.Error("Review grader failed", "bucket", item.bucket.Name, "error", reviewErr)
@@ -764,7 +764,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			}
 			typedInput := graderInput
 			typedInput.Config = item.gc
-			emitGraderStart(sendRawEvent, g)
+			emitGraderStart(sendRawEvent, g, item.srcFile, item.srcType)
 			typedResult, typedErr := func() (r graders.GraderResult, e error) {
 				defer func() {
 					if rec := recover(); rec != nil {
@@ -1555,7 +1555,7 @@ return criteria.GraderHooks{}
 }
 return criteria.GraderHooks{
 OnStart: func(g graders.Grader) {
-emitGraderStart(sendRawEvent, g)
+emitGraderStart(sendRawEvent, g, "", "")
 },
 OnComplete: func(g graders.Grader, result graders.GraderResult) {
 emitGraderComplete(sendRawEvent, g, result)
@@ -1565,14 +1565,16 @@ emitGraderComplete(sendRawEvent, g, result)
 
 // emitGraderStart sends a GraderStart progress event. Safe to call with a nil
 // sender (no-op) so callers in the review path don't need to guard.
-func emitGraderStart(sendRawEvent func(progress.ProgressEvent), g graders.Grader) {
+func emitGraderStart(sendRawEvent func(progress.ProgressEvent), g graders.Grader, srcFile, srcType string) {
 if sendRawEvent == nil || g == nil {
 return
 }
 sendRawEvent(progress.ProgressEvent{
-Type:       progress.EventGraderStart,
-GraderID:   g.Name(),
-GraderKind: g.Kind(),
+Type:             progress.EventGraderStart,
+GraderID:         g.Name(),
+GraderKind:       g.Kind(),
+GraderSourceFile: srcFile,
+GraderSourceType: srcType,
 })
 }
 
@@ -1684,12 +1686,14 @@ points[i] = progress.GraderPoint{Label: p.Label, Pass: p.Pass, Message: p.Messag
 }
 }
 sendRawEvent(progress.ProgressEvent{
-Type:       progress.EventGraderComplete,
-GraderID:   g.Name(),
-GraderKind: g.Kind(),
-Result:     outcome,
-Score:      scorePtr,
-Message:    result.Message,
-Points:     points,
+Type:             progress.EventGraderComplete,
+GraderID:         g.Name(),
+GraderKind:       g.Kind(),
+Result:           outcome,
+Score:            scorePtr,
+Message:          result.Message,
+Points:           points,
+GraderSourceFile: result.SourceFile,
+GraderSourceType: result.SourceType,
 })
 }
