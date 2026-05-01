@@ -1,0 +1,18 @@
+feat(pairwise): expose per-check diff between baseline and variants
+
+Adds PairwiseCheckDiff type to capture granular differences between
+baseline and variant grader points. Each variant now includes a
+check_diffs map keyed by variant config name, showing which checks
+improved, regressed, or remained unchanged.
+
+The diff computation:
+- Compares each grader point between baseline and variants by index
+- Classifies movement as "improved", "regressed", or "unchanged"
+- Captures variant reasoning for failed checks
+- Handles missing or extra checks gracefully
+
+This enables the site (via Trinity) to render per-check impact
+analysis in pairwise runs, surfacing which tool removals affected
+which specific checks.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

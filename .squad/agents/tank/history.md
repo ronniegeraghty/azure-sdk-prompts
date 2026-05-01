@@ -955,3 +955,22 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 - Orchestration log: `.squad/orchestration-log/2026-04-30T18-29-54Z-tank.md`
 - Session log: `.squad/log/2026-04-30T18-29-54Z-grader-redesign.md`
 - Decisions merged into `.squad/decisions.md`
+
+## 2026-05-01 — Per-eval total checks line
+
+**Commit:** 64f653d2
+
+**Task:** Add "Total checks that passed across all graders: X/Y" line after every eval (both pass and fail).
+
+**Changes:**
+- Added `GraderPointsPassed` and `GraderPointsTotal` fields to `ProgressEvent`
+- Updated `engine.go` to populate these fields for both `EventPassed` and `EventFailed`
+- Modified `display_interactive.go` to print blank line + total checks line on both outcomes
+- Modified `display.go` (non-ANSI mode) to print blank line + total checks line on both outcomes
+- Kept legacy message display for graders without points (backward compatibility)
+
+**Outcome:**
+- New line displays correctly in both interactive and non-ANSI modes
+- Shows on passing evals (previously silent) and failing evals (replacing terse "12/26 points")
+- All progress tests pass
+- Live run verification confirms correct display: `❌ Total checks that passed across all graders: 23/26`

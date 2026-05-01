@@ -166,15 +166,10 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 
 	responseText, capturedEvents := collector.response()
 
-	result, err := parseReviewResponse(responseText)
-	if err != nil {
-		slog.Error("Failed to parse review response", "model", r.model, "error", err)
-		return nil, err
-	}
-
-	// Validate response; if invalid, retry up to 2 times
-	if errs := validateReviewerResponse(result); len(errs) > 0 {
-		slog.Warn("Review response validation failed", "model", r.model, "errors", errs)
+	result, validationErrors := parseReviewResponseV2(responseText, checks)
+	if len(validationErrors) > 0 {
+		slog.Error("Failed to parse review response", "model", r.model, "errors", validationErrors)
+		return nil, fmt.Errorf("parsing review response: %s", strings.Join(validationErrors, "; "))
 	}
 
 	result.Events = capturedEvents
@@ -221,58 +216,6 @@ func (s *StubReviewer) ReviewBuckets(_ context.Context, _ string, _ string, _ st
 		Issues:       []string{},
 		Strengths:    []string{},
 	}, nil
-}
-
-// parseReviewResponse extracts the JSON ReviewResult from the LLM response.
-// It supports both the new ReviewerResponse schema (flat criteria array) and
-// the legacy nested scores.criteria format for backward compatibility.
-func parseReviewResponse(text string) (*ReviewResult, error) {
-	// Try to find JSON in the response (LLM may wrap it in markdown fences)
-	jsonStr := utils.ExtractJSON(text)
-	if jsonStr == "" {
-		return nil, fmt.Errorf("no JSON found in review response: %.200s", text)
-	}
-
-	// First, try the new ReviewerResponse schema (flat criteria array)
-	var newResp struct {
-		Criteria  []CriterionJudgment `json:"criteria"`
-		Summary   string              `json:"summary"`
-		Issues    []string            `json:"issues"`
-		Strengths []string            `json:"strengths"`
-	}
-	if err := json.Unmarshal([]byte(jsonStr), &newResp); err == nil && len(newResp.Criteria) > 0 {
-		criteria := make([]CriterionResult, len(newResp.Criteria))
-		for i, c := range newResp.Criteria {
-			criteria[i] = CriterionResult{
-				Name:   c.Criterion,
-				Passed: c.Passed,
-				Reason: c.Reasoning,
-			}
-		}
-		scores := ReviewScores{Criteria: criteria}
-		return &ReviewResult{
-			Scores:       scores,
-			OverallScore: scores.PassedCount(),
-			MaxScore:     scores.TotalCount(),
-			Summary:      newResp.Summary,
-			Issues:       newResp.Issues,
-			Strengths:    newResp.Strengths,
-		}, nil
-	}
-
-	// Fall back to legacy format
-	var result ReviewResult
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return nil, fmt.Errorf("parsing review JSON: %w (response: %.200s)", err, jsonStr)
-	}
-	// Ensure MaxScore and OverallScore are consistent with criteria
-	if result.MaxScore == 0 && len(result.Scores.Criteria) > 0 {
-		result.MaxScore = result.Scores.TotalCount()
-	}
-	if result.OverallScore == 0 && len(result.Scores.Criteria) > 0 {
-		result.OverallScore = result.Scores.PassedCount()
-	}
-	return &result, nil
 }
 
 // parseReviewResponseV2 parses an id-aware review response and validates against expected checks.
@@ -678,16 +621,6 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 						})
 					}
 				}
-			}
-		} else {
-			// Legacy parser path (no checks)
-			result, err = parseReviewResponse(responseText)
-			if err != nil {
-				if attempt < maxRetries {
-					currentPrompt = fmt.Sprintf("Your previous response was not valid JSON. Error: %v\n\nPlease respond again with ONLY a valid JSON object matching the required schema.", err)
-					continue
-				}
-				return nil, err
 			}
 		}
 

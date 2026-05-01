@@ -237,12 +237,25 @@ type ToolImpact struct {
 	WithoutPass   bool    `json:"without_pass"`
 }
 
+// PairwiseCheckDiff represents a single check comparison between baseline and variant.
+type PairwiseCheckDiff struct {
+	GraderName     string `json:"grader_name"`  // grader the check belongs to
+	GraderType     string `json:"grader_type"`  // kind of grader
+	CheckID        string `json:"check_id"`     // stable id (e.g., check_1)
+	CheckLabel     string `json:"check_label"`  // human label
+	BaselinePassed bool   `json:"baseline_passed"`
+	VariantPassed  bool   `json:"variant_passed"`
+	Movement       string `json:"movement"`     // "improved" | "regressed" | "unchanged"
+	Reasoning      string `json:"reasoning,omitempty"` // optional — variant reviewer's reasoning if it failed
+}
+
 // PairwiseReport holds the complete pairwise comparison results for a prompt.
 type PairwiseReport struct {
-	PromptID string          `json:"prompt_id"`
-	Baseline VariantResult   `json:"baseline"`
-	Variants []VariantResult `json:"variants"`
-	Impacts  []ToolImpact    `json:"impacts"`
+	PromptID   string                       `json:"prompt_id"`
+	Baseline   VariantResult                `json:"baseline"`
+	Variants   []VariantResult              `json:"variants"`
+	Impacts    []ToolImpact                 `json:"impacts"`
+	CheckDiffs map[string][]PairwiseCheckDiff `json:"check_diffs,omitempty"` // keyed by variant config name
 }
 
 // normalizeScore converts a raw score/maxScore pair to a 0-100 scale.
@@ -303,6 +316,142 @@ func SortByImpact(impacts []ToolImpact) {
 		}
 		return impacts[i].ToolName < impacts[j].ToolName
 	})
+}
+
+// EvalReportData is the minimal data needed from an EvalReport to compute check diffs.
+// This avoids an import cycle (pairwise → report → pairwise).
+type EvalReportData struct {
+	ConfigName string
+	Graders    []GraderData
+}
+
+// GraderData mirrors the essential fields from report.GraderResult.
+type GraderData struct {
+	Name   string
+	Type   string
+	Points []PointData
+}
+
+// PointData mirrors the essential fields from report.GraderPoint.
+type PointData struct {
+	Label   string
+	Pass    bool
+	Message string
+}
+
+// ComputeCheckDiffs compares grader points between baseline and variants.
+// Returns a map keyed by variant config name, each containing per-check diffs.
+func ComputeCheckDiffs(baseline *EvalReportData, variants []*EvalReportData) map[string][]PairwiseCheckDiff {
+	if baseline == nil || len(variants) == 0 {
+		return nil
+	}
+
+	// Build baseline check index: graderName → checkIndex → point
+	baselineChecks := indexPoints(baseline)
+	
+	result := make(map[string][]PairwiseCheckDiff)
+	
+	for _, variant := range variants {
+		variantChecks := indexPoints(variant)
+		var diffs []PairwiseCheckDiff
+		
+		// Compare each grader
+		for graderName, baselinePoints := range baselineChecks {
+			variantPoints, hasVariant := variantChecks[graderName]
+			
+			for checkIdx, basePoint := range baselinePoints {
+				varPoint, hasCheck := variantPoints[checkIdx]
+				
+				var movement string
+				varPassed := false
+				varReasoning := ""
+				
+				if hasCheck {
+					varPassed = varPoint.Pass
+					varReasoning = varPoint.Message
+					
+					// Determine movement
+					if !basePoint.Pass && varPassed {
+						movement = "improved"
+					} else if basePoint.Pass && !varPassed {
+						movement = "regressed"
+					} else {
+						movement = "unchanged"
+					}
+				} else {
+					// Missing check in variant — treat as unchanged
+					movement = "unchanged"
+				}
+				
+				diffs = append(diffs, PairwiseCheckDiff{
+					GraderName:     graderName,
+					GraderType:     basePoint.Type,
+					CheckID:        fmt.Sprintf("check_%d", checkIdx),
+					CheckLabel:     basePoint.Label,
+					BaselinePassed: basePoint.Pass,
+					VariantPassed:  varPassed,
+					Movement:       movement,
+					Reasoning:      varReasoning,
+				})
+			}
+			
+			// Handle checks that exist in variant but not in baseline (rare)
+			if hasVariant {
+				for checkIdx, varPoint := range variantPoints {
+					if _, exists := baselinePoints[checkIdx]; !exists {
+						diffs = append(diffs, PairwiseCheckDiff{
+							GraderName:     graderName,
+							GraderType:     varPoint.Type,
+							CheckID:        fmt.Sprintf("check_%d", checkIdx),
+							CheckLabel:     varPoint.Label,
+							BaselinePassed: false,
+							VariantPassed:  varPoint.Pass,
+							Movement:       "unchanged", // New check, treat as unchanged
+							Reasoning:      varPoint.Message,
+						})
+					}
+				}
+			}
+		}
+		
+		result[variant.ConfigName] = diffs
+	}
+	
+	return result
+}
+
+// indexedPointData holds point data for comparison.
+type indexedPointData struct {
+	Label   string
+	Pass    bool
+	Message string
+	Type    string
+}
+
+// indexPoints builds a map of graderName → checkIndex → point data.
+func indexPoints(data *EvalReportData) map[string]map[int]indexedPointData {
+	if data == nil {
+		return nil
+	}
+	
+	result := make(map[string]map[int]indexedPointData)
+	
+	for _, grader := range data.Graders {
+		if _, exists := result[grader.Name]; !exists {
+			result[grader.Name] = make(map[int]indexedPointData)
+		}
+		
+		for i, point := range grader.Points {
+			result[grader.Name][i] = indexedPointData{
+				Label:   point.Label,
+				Pass:    point.Pass,
+				Message: point.Message,
+				Type:    grader.Type,
+			}
+		}
+	}
+	
+	return result
 }
 
 // AggregateImpacts merges impacts from multiple prompts into a single per-tool summary.

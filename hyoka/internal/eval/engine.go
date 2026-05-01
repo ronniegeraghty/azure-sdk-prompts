@@ -974,6 +974,7 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 	}
 
 	byKey := make(map[key][]pairwise.VariantResult)
+	reportsByKey := make(map[key][]*report.EvalReport)
 
 	for _, r := range results {
 		model := ""
@@ -995,6 +996,7 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 			MaxScore:    maxScore,
 			Success:     r.Success,
 		})
+		reportsByKey[k] = append(reportsByKey[k], r)
 	}
 
 	if len(byKey) == 0 {
@@ -1008,6 +1010,26 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 			slog.Warn("Pairwise impact computation failed", "prompt", k.promptID, "config", k.baseName, "error", err)
 			continue
 		}
+		
+		// Compute per-check diffs
+		evalReports := reportsByKey[k]
+		var baseline *pairwise.EvalReportData
+		var variantReports []*pairwise.EvalReportData
+		
+		for _, r := range evalReports {
+			_, removedTool, _ := parsePairwiseConfigName(r.ConfigName, "")
+			data := evalReportToData(r)
+			if removedTool == "" {
+				baseline = data
+			} else {
+				variantReports = append(variantReports, data)
+			}
+		}
+		
+		if baseline != nil && len(variantReports) > 0 {
+			report.CheckDiffs = pairwise.ComputeCheckDiffs(baseline, variantReports)
+		}
+		
 		reports = append(reports, report)
 	}
 
@@ -1024,6 +1046,32 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 
 	impacts := pairwise.AggregateImpacts(reports)
 	return reports, impacts
+}
+
+// evalReportToData converts an EvalReport to the minimal EvalReportData needed for check diffs.
+func evalReportToData(r *report.EvalReport) *pairwise.EvalReportData {
+	data := &pairwise.EvalReportData{
+		ConfigName: r.ConfigName,
+		Graders:    make([]pairwise.GraderData, 0, len(r.GraderResults)),
+	}
+	
+	for _, grader := range r.GraderResults {
+		points := make([]pairwise.PointData, 0, len(grader.Points))
+		for _, point := range grader.Points {
+			points = append(points, pairwise.PointData{
+				Label:   point.Label,
+				Pass:    point.Pass,
+				Message: point.Message,
+			})
+		}
+		data.Graders = append(data.Graders, pairwise.GraderData{
+			Name:   grader.GraderName,
+			Type:   grader.GraderType,
+			Points: points,
+		})
+	}
+	
+	return data
 }
 func parsePairwiseConfigName(configName, model string) (string, string, bool) {
 	suffix := ""

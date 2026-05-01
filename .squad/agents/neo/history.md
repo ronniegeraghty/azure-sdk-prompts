@@ -1389,3 +1389,36 @@ All review package tests pass (`-race`). 8 new unit tests. Smoke test confirms d
 - Archive old decisions if decisions.md > 20KB (currently ~60KB, compression not needed yet)
 - Team-wide charter update: determinism as reusable skill for multi-model LLM voting
 
+
+## 2025-05-01 — Determinism completion (Bugs A & B)
+
+**Context:** Morpheus's static analysis found two surviving drift bugs after the initial determinism fix:
+- Bug A: `averageReview` built criteriaOrder from observed votes → checks with no votes disappeared from MaxScore
+- Bug B: Reviewer/bucket failures dropped entire reviewers/buckets → panel size mutated between runs
+
+**Solution:**
+
+Commit 1 (7e110b02): `fix(review): anchor consensus vote to expected check IDs`
+- Changed `averageReview` to iterate over `expected[]` instead of `observedOrder`
+- Missing votes now marked as failed with "no reviewer returned a vote for this check"
+- MaxScore = len(expected) deterministically, even when reviewers skip checks
+- Legacy path (expected[] empty) preserved for backward compatibility
+
+Commit 2 (1f3c9ec9): `fix(review): retry 3 times then synthesize failing checks for missing IDs`
+- Increased maxRetries from 2 to 3
+- Retry prompts now explicitly list missing check IDs and demand complete responses
+- After 3 strikes, synthesize CriterionResult{Passed: false} for missing IDs instead of returning error
+- Bucket failures synthesize failed checks for that bucket's IDs instead of dropping bucket
+- Ensures panel size and MaxScore remain stable even when reviewers/buckets fail validation
+
+**Verification:** 5-run smoke test on `test-dp-test-hello-markdown` with `test/baseline`:
+- Prompt grader scores IDENTICAL across all 5 runs: Pass (3/3), Fail (2/3), Fail (0/3)
+- Behavior/tool graders vary as expected (judge non-deterministic action logs)
+- Determinism fix COMPLETE
+
+**Files touched:**
+- hyoka/internal/review/reviewer.go (averageReview, runSingleReview)
+- hyoka/internal/review/buckets.go (ReviewPanelBuckets)
+- hyoka/internal/review/review_test.go (new test: TestAverageReview_AnchoredToExpectedCheckIDs)
+
+**Outcome:** Review pipeline now produces deterministic MaxScore and panel size. No more drift.
