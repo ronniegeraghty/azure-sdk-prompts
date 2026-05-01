@@ -105,6 +105,7 @@ type PromptConfig struct {
 }
 
 // BehaviorConfig holds configuration for the "behavior" grader kind.
+// DEPRECATED: Use ToolConfig or ActivityConfig instead.
 type BehaviorConfig struct {
 	RequiredTools  []string `yaml:"required_tools,omitempty" json:"required_tools,omitempty"`
 	ForbiddenTools []string `yaml:"forbidden_tools,omitempty" json:"forbidden_tools,omitempty"`
@@ -112,8 +113,38 @@ type BehaviorConfig struct {
 }
 
 // ActionSequenceConfig holds configuration for the "action_sequence" grader kind.
+// DEPRECATED: Use ActivityConfig with contains_subsequence instead.
 type ActionSequenceConfig struct {
 	ExpectedActions []string `yaml:"expected_actions" json:"expected_actions"`
+}
+
+// ActivityConfig holds configuration for the "activity" grader kind.
+// This grader evaluates session activity using ActionLog, ActionsSummary, and TerminatedBy.
+type ActivityConfig struct {
+	Checks []ActivityCheck `yaml:"checks" json:"checks"`
+}
+
+// ActivityCheck defines a single check within an activity grader.
+type ActivityCheck struct {
+	Kind string `yaml:"kind" json:"kind"` // One of: turn_limit, action_count, tool_call_count, contains_subsequence, contains_action, not_truncated, terminated_by
+
+	// For turn_limit
+	Max *int `yaml:"max,omitempty" json:"max,omitempty"`
+
+	// For action_count, tool_call_count
+	Min *int `yaml:"min,omitempty" json:"min,omitempty"`
+
+	// For contains_subsequence
+	Tools []string `yaml:"tools,omitempty" json:"tools,omitempty"`
+
+	// For contains_action
+	Tool     string `yaml:"tool,omitempty" json:"tool,omitempty"`
+	MinCalls *int   `yaml:"min_calls,omitempty" json:"min_calls,omitempty"`
+	MaxCalls *int   `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
+
+	// For terminated_by
+	Equals string   `yaml:"equals,omitempty" json:"equals,omitempty"` // completed | max_actions | max_turns | guardrail | timeout | error
+	NotIn  []string `yaml:"not_in,omitempty" json:"not_in,omitempty"` // array of forbidden values
 }
 
 // OutputCheckConfig holds configuration for the "output_check" grader kind.
@@ -200,10 +231,12 @@ type ToolConfig struct {
 
 // ToolCheckRule defines one check within a ToolConfig. See tool_grader.go for semantics.
 type ToolCheckRule struct {
-	Kind  string `yaml:"kind" json:"kind"`
-	Name  string `yaml:"name,omitempty" json:"name,omitempty"`
-	Group string `yaml:"group,omitempty" json:"group,omitempty"`
-	N     int    `yaml:"n,omitempty" json:"n,omitempty"`
+	Kind     string   `yaml:"kind" json:"kind"`
+	Tool     string   `yaml:"tool,omitempty" json:"tool,omitempty"`           // For tool_used, tool_not_used
+	Group    string   `yaml:"group,omitempty" json:"group,omitempty"`         // For any_from_group, none_from_group
+	Except   []string `yaml:"except,omitempty" json:"except,omitempty"`       // Optional exclusion list for group checks
+	MinCalls *int     `yaml:"min_calls,omitempty" json:"min_calls,omitempty"` // Optional for tool_used
+	MaxCalls *int     `yaml:"max_calls,omitempty" json:"max_calls,omitempty"` // Optional for tool_used
 }
 
 // EffectiveWeight returns the grader's weight, defaulting to 1.0 if unset.
@@ -247,6 +280,12 @@ func (g *GraderConfig) DecodeConfig() (any, error) {
 		var c ActionSequenceConfig
 		if err := g.Config.Decode(&c); err != nil {
 			return nil, fmt.Errorf("decoding action_sequence config for %q: %w", g.Name, err)
+		}
+		return &c, nil
+	case "activity":
+		var c ActivityConfig
+		if err := g.Config.Decode(&c); err != nil {
+			return nil, fmt.Errorf("decoding activity config for %q: %w", g.Name, err)
 		}
 		return &c, nil
 	case KindToolConstraint:
