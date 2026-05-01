@@ -1434,3 +1434,35 @@ Commit 2 (1f3c9ec9): `fix(review): retry 3 times then synthesize failing checks 
 
 Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught two registration misses before production. Commit 8c0c1d1c added KindTool to registry; 8b51cc36 added to validTypedKinds.
 
+
+## 2026-05-01 — Pairwise Deep Mode + Tool Grader Redesign (Neo)
+
+**Branch:** `ronniegeraghty/dev` (2 commits: 4f293e06, 24de2f26)
+
+**What shipped:**
+
+**Commit 1 (4f293e06): fix(pairwise): honor ExcludedSkills/ExcludedTools at session-spawn time**
+- **Root cause:** `validateSkillDirEntry` walked skill_dir children but didn't consult `entry.ExcludedSkills`, so pairwise deep variants excluded skills from the report but the Copilot SDK loaded them all anyway.
+- **Fix:** Added exclusion check before appending child rows (line 833: `if contains(entry.ExcludedSkills, e.Name()) { continue }`).
+- **Plugin deep mode:** Added `ExcludedTools []string` field to `Entry` struct and wired it through `validatePluginEntry` and `emitPluginLoadedWithChildren`.
+- **Pairwise support:** Updated `pairwise.go` to enumerate plugin tools and add `ExcludedTools` to variants (new `enumeratePluginTools` function + plugin deep mode in `collectTogglable`).
+- **Tests:** `TestPairwiseDeepVariantSkillsLoadedFilter` now passes (was failing before fix, demonstrating the bug existed).
+
+**Commit 2 (24de2f26): feat(graders): redesign tool grader around tool/group framing**
+- Replaced ad-hoc tool grader with **exactly four canonical kinds**: `tool_used`, `tool_not_used`, `any_from_group`, `none_from_group`.
+- **Field reshaping:** `ToolCheckRule` now has `Tool string`, `Except []string`, `MinCalls *int`, `MaxCalls *int` (dropped `Name`, `Group`, `N`).
+- **Group resolution:** Groups resolve by entry Name from tool topology (skill_dir → child skills, plugin → plugin tools, mcp_server → server tools). Dropped magic strings (`mcp`, `skill_plugin`, `skill_repo:*`, `tool_name_glob:*`).
+- **Migration errors:** Loud parse errors for legacy kind names with migration messages (e.g., `specific_tool → tool_used`, `turn_limit → REMOVED: now belongs to activity grader`).
+- **Min/max calls:** Folded into `tool_used` as optional fields instead of separate check kinds.
+- **Except support:** `any_from_group` and `none_from_group` support optional exclusion lists.
+- **Tests:** Rewrote `tool_grader_test.go` with table-driven tests covering all four kinds and legacy migration errors.
+
+**Known limitation:**
+- Group resolution is currently a placeholder (returns all tools) because `EnvironmentTool` lacks `Parent` linkage. TODO: Add Parent/ParentKind fields to `EnvironmentTool` (from `ToolLoadItem`) to enable proper group filtering.
+
+**Handoff:**
+- Tank: workspace grader already shipped (commit 1f461a50), no conflict.
+- Switch: integration test for skillsLoaded should now pass with commit 4f293e06.
+- Oracle: Update docs/graders.md with new tool grader kind names and schema.
+- Decision file: `.squad/decisions/inbox/neo-pairwise-tool-grader-shipped.md`
+
