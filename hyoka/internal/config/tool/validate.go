@@ -428,7 +428,7 @@ func validatePluginEntry(ctx context.Context, report *ToolLoadReport, entry Entr
 	// Try local registry first when source == local (or unset -> inferred local).
 	if src == SourceLocal {
 		if p, ok := registryLookup(reg, name); ok {
-			emitPluginLoadedWithChildren(report, emit, p, name, role, configDir)
+			emitPluginLoadedWithChildren(report, emit, p, name, role, configDir, entry.ExcludedTools)
 			return
 		}
 	}
@@ -452,6 +452,10 @@ func validatePluginEntry(ctx context.Context, report *ToolLoadReport, entry Entr
 				// from each child's ParentName/ParentKind.
 				for _, childPath := range children {
 					childName := filepath.Base(childPath)
+					// Skip if excluded (pairwise deep mode)
+					if contains(entry.ExcludedTools, childName) {
+						continue
+					}
 					report.Items = append(report.Items, ToolLoadItem{
 						Kind:       progress.ToolKindSkill,
 						Name:       childName,
@@ -486,7 +490,7 @@ func validatePluginEntry(ctx context.Context, report *ToolLoadReport, entry Entr
 		// If source was explicitly remote, try local as a last-ditch fallback.
 		if src == SourceRemote {
 			if p, ok := registryLookup(reg, name); ok {
-				emitPluginLoadedWithChildren(report, emit, p, name, role, configDir)
+				emitPluginLoadedWithChildren(report, emit, p, name, role, configDir, entry.ExcludedTools)
 				return
 			}
 		}
@@ -514,6 +518,10 @@ func validatePluginEntry(ctx context.Context, report *ToolLoadReport, entry Entr
 					if children := plugin.EnumerateChildSkills(dir); len(children) > 0 {
 						for _, childPath := range children {
 							childName := filepath.Base(childPath)
+							// Skip if excluded (pairwise deep mode)
+							if contains(entry.ExcludedTools, childName) {
+								continue
+							}
 							report.Items = append(report.Items, ToolLoadItem{
 								Kind:       progress.ToolKindSkill,
 								Name:       childName,
@@ -577,9 +585,14 @@ func validatePluginEntry(ctx context.Context, report *ToolLoadReport, entry Entr
 // Loaded result — it is a container, and emitting Loaded for it would be
 // flipped to Failed by display_interactive.onToolsVerified (SDK never
 // reports the plugin, only its children). Role is inherited from the
-// parent entry's list.
-func emitPluginLoadedWithChildren(report *ToolLoadReport, emit ProgressEmitter, p *plugin.Plugin, name, role, configDir string) {
+// parent entry's list. ExcludedTools can filter out specific children
+// (pairwise deep mode).
+func emitPluginLoadedWithChildren(report *ToolLoadReport, emit ProgressEmitter, p *plugin.Plugin, name, role, configDir string, excludedTools []string) {
 	for _, child := range p.ToToolEntries() {
+		// Skip if excluded (pairwise deep mode)
+		if contains(excludedTools, child.Name) {
+			continue
+		}
 		childItem := ToolLoadItem{
 			Kind:       child.Type,
 			Name:       child.Name,
@@ -817,6 +830,10 @@ func validateSkillDirEntry(report *ToolLoadReport, entry Entry, role, configDir 
 		if _, err := os.Stat(filepath.Join(subDir, "SKILL.md")); err != nil {
 			continue
 		}
+		// Skip if excluded (pairwise deep mode)
+		if contains(entry.ExcludedSkills, e.Name()) {
+			continue
+		}
 		// Parent is the config-file `name:` value (e.g. "generator-skills"),
 		// NOT the on-disk directory path. The interactive renderer builds the
 		// parent header from this field; using the path would surface the
@@ -927,4 +944,14 @@ func readSkillFrontmatterName(skillDir string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// contains checks if a string is in a slice of strings.
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

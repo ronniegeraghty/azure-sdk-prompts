@@ -21,11 +21,12 @@ type Entry struct {
 	MCPType  string   `yaml:"mcp_type,omitempty" json:"mcp_type,omitempty"` // "local" (default) or "remote"
 	URL      string   `yaml:"url,omitempty" json:"url,omitempty"`           // for remote MCP servers
 	// Skill-specific fields
-	Source        string   `yaml:"source,omitempty" json:"source,omitempty"` // "local" or "remote"
-	Path          string   `yaml:"path,omitempty" json:"path,omitempty"`
-	Repo          string   `yaml:"repo,omitempty" json:"repo,omitempty"`
-	SkillDir      bool     `yaml:"skill_dir,omitempty" json:"skill_dir,omitempty"`        // true = path is a directory of skills, false = path is a single skill
-	ExcludedSkills []string `yaml:"excluded_skills,omitempty" json:"excluded_skills,omitempty"` // for pairwise deep: skills to exclude from skill_dir
+	Source         string   `yaml:"source,omitempty" json:"source,omitempty"` // "local" or "remote"
+	Path           string   `yaml:"path,omitempty" json:"path,omitempty"`
+	Repo           string   `yaml:"repo,omitempty" json:"repo,omitempty"`
+	SkillDir       bool     `yaml:"skill_dir,omitempty" json:"skill_dir,omitempty"`               // true = path is a directory of skills, false = path is a single skill
+	ExcludedSkills []string `yaml:"excluded_skills,omitempty" json:"excluded_skills,omitempty"`    // for pairwise deep: skills to exclude from skill_dir
+	ExcludedTools  []string `yaml:"excluded_tools,omitempty" json:"excluded_tools,omitempty"`      // for pairwise deep: plugin child tools to exclude
 	// Version pins a remote skill or plugin to a specific git ref (branch,
 	// tag, or commit). Empty means "default" (whatever the fetcher's default
 	// is — for the git fetcher, that's the repo's default branch). Can be

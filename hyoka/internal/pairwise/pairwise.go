@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 )
 
 // ExpandPairwise generates N+1 config variants from a base config.
@@ -93,6 +94,19 @@ func collectTogglable(cfg config.ToolConfig, baseDir string) []string {
 			}
 			continue
 		}
+		// Plugin deep mode: enumerate plugin tools (skills and MCP servers)
+		if te.ResolvedPairwise() == "deep" && te.ResolvedType() == "tool" {
+			pluginTools := enumeratePluginTools(te, baseDir)
+			for _, toolName := range pluginTools {
+				name := fmt.Sprintf("%s/%s", te.Name, toolName)
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				tools = append(tools, name)
+			}
+			continue
+		}
 		// Shallow mode (default): toggle the entire entry
 		if !seen[te.Name] {
 			seen[te.Name] = true
@@ -138,6 +152,34 @@ func enumerateSkillDir(entry config.ToolEntry, baseDir string) []string {
 	return skills
 }
 
+// enumeratePluginTools returns the list of tool names (skills + MCP servers)
+// exposed by a plugin. Each tool is returned as its bare name (e.g., "azure-search").
+// Resolution silently skips missing plugins.
+func enumeratePluginTools(entry config.ToolEntry, baseDir string) []string {
+	// Try loading the plugin from the registry
+	reg := plugin.NewRegistry()
+	if entry.Path != "" {
+		path := entry.Path
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(baseDir, path)
+		}
+		if err := reg.LoadDir(path); err != nil {
+			return nil
+		}
+	}
+	
+	p, err := reg.Get(entry.Name)
+	if err != nil || p == nil {
+		return nil
+	}
+	
+	var tools []string
+	for _, toolEntry := range p.ToToolEntries() {
+		tools = append(tools, toolEntry.Name)
+	}
+	return tools
+}
+
 // removeTool removes a named tool from Generator.Tools in the given config.
 // For skill_dir deep variants ("{entry}/{skill}"), it adds the skill to the
 // entry's ExcludedSkills list instead of removing the entire entry.
@@ -164,6 +206,15 @@ func removeTool(cfg *config.ToolConfig, name string) {
 			if te.ResolvedType() == "skill" && te.SkillDir && te.Name == entryName {
 				// Add to exclusion list
 				te.ExcludedSkills = append(te.ExcludedSkills, subName)
+				cfg.Generator.Tools[i] = te
+				return
+			}
+		}
+		// Check if this is a plugin deep variant
+		for i, te := range cfg.Generator.Tools {
+			if te.ResolvedType() == "tool" && te.Name == entryName {
+				// Add to exclusion list
+				te.ExcludedTools = append(te.ExcludedTools, subName)
 				cfg.Generator.Tools[i] = te
 				return
 			}
