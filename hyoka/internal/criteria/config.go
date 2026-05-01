@@ -97,6 +97,7 @@ var validTypedKinds = map[string]bool{
 	graders.KindToolConstraint: true,
 	graders.KindOutputCheck:    true,
 	graders.KindToolUsage:      true,
+	graders.KindTool:           true,
 }
 
 // IsValidUnifiedType returns true if t is a recognized unified-schema type
