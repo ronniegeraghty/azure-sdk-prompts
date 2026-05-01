@@ -6,18 +6,15 @@ configs:
       models:
         - "claude-haiku-4.5"
         - "claude-sonnet-4.6"
-      # Each skill is registered as its own tool entry so `--pairwise` produces
-      # one variant per skill (baseline, without-markdown-headings,
-      # without-markdown-lists). Using individual paths instead of skill_dir.
+      # Skill dir with `pairwise: deep` so each individual skill becomes its
+      # own variant (baseline + without-{skill-name} per skill in the dir).
       tools:
-        - name: markdown-headings
+        - name: test-skills
           type: skill
           source: local
-          path: "./skills/test/markdown-headings"
-        - name: markdown-lists
-          type: skill
-          source: local
-          path: "./skills/test/markdown-lists"
+          skill_dir: true
+          path: "./skills/test"
+          pairwise: deep
     reviewer:
       models:
         - "claude-haiku-4.5"

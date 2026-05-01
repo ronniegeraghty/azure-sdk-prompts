@@ -206,6 +206,9 @@ func resolveLocal(entry Entry, baseDir string) ([]string, error) {
 	}
 
 	if entry.SkillDir {
+		if len(entry.ExcludedSkills) > 0 {
+			return resolveSkillDirWithExclusions(resolved, entry.ExcludedSkills)
+		}
 		return resolveSkillDir(resolved)
 	}
 
@@ -249,6 +252,38 @@ func resolveSkillDir(dir string) ([]string, error) {
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
+		}
+		subDir := filepath.Join(dir, e.Name())
+		if _, err := os.Stat(filepath.Join(subDir, "SKILL.md")); err == nil {
+			dirs = append(dirs, subDir)
+		}
+	}
+	if len(dirs) == 0 {
+		slog.Warn("Skills directory contains no skills (no subdirectories with SKILL.md)",
+			"path", dir)
+	}
+	return dirs, nil
+}
+
+// resolveSkillDirWithExclusions is like resolveSkillDir but filters out
+// subdirectories whose basenames are in the excluded list.
+func resolveSkillDirWithExclusions(dir string, excluded []string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		slog.Warn("Failed to read skill directory", "path", dir, "error", err)
+		return nil, nil
+	}
+	excludedSet := make(map[string]bool, len(excluded))
+	for _, e := range excluded {
+		excludedSet[e] = true
+	}
+	var dirs []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if excludedSet[e.Name()] {
+			continue // skip excluded skills
 		}
 		subDir := filepath.Join(dir, e.Name())
 		if _, err := os.Stat(filepath.Join(subDir, "SKILL.md")); err == nil {

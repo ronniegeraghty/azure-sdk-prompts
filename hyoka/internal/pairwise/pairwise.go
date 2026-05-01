@@ -6,6 +6,8 @@ package pairwise
 import (
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -19,8 +21,12 @@ import (
 // Tools with AlwaysOn: true in Generator.Tools are never toggled.
 // Entries marked pairwise: off are excluded. MCP entries can opt into deep
 // toggling, which expands their mcp_tools list into individual variants.
-func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
-	togglable := collectTogglable(base)
+// Skill_dir entries with pairwise: deep expand each subdirectory skill into
+// its own variant.
+//
+// The baseDir parameter is used to resolve relative paths in skill_dir entries.
+func ExpandPairwise(base config.ToolConfig, baseDir string) []config.ToolConfig {
+	togglable := collectTogglable(base, baseDir)
 
 	variants := make([]config.ToolConfig, 0, len(togglable)+1)
 
@@ -41,7 +47,9 @@ func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
 }
 
 // collectTogglable returns deduplicated tool names eligible for toggling.
-func collectTogglable(cfg config.ToolConfig) []string {
+// For skill_dir entries with pairwise: deep, each subdirectory skill is
+// enumerated and returned as "{entry-name}/{skill-name}".
+func collectTogglable(cfg config.ToolConfig, baseDir string) []string {
 	if cfg.Generator == nil {
 		return nil
 	}
@@ -53,6 +61,7 @@ func collectTogglable(cfg config.ToolConfig) []string {
 		if te.ResolvedPairwise() == "off" {
 			continue
 		}
+		// MCP deep mode: enumerate mcp_tools
 		if te.ResolvedPairwise() == "deep" && te.ResolvedType() == "mcp" {
 			if len(te.MCPTools) == 0 || containsWildcard(te.MCPTools) {
 				if !seen[te.Name] {
@@ -71,6 +80,20 @@ func collectTogglable(cfg config.ToolConfig) []string {
 			}
 			continue
 		}
+		// Skill_dir deep mode: enumerate subdirectory skills
+		if te.ResolvedPairwise() == "deep" && te.ResolvedType() == "skill" && te.SkillDir {
+			skills := enumerateSkillDir(te, baseDir)
+			for _, skill := range skills {
+				name := fmt.Sprintf("%s/%s", te.Name, skill)
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				tools = append(tools, name)
+			}
+			continue
+		}
+		// Shallow mode (default): toggle the entire entry
 		if !seen[te.Name] {
 			seen[te.Name] = true
 			tools = append(tools, te.Name)
@@ -80,26 +103,74 @@ func collectTogglable(cfg config.ToolConfig) []string {
 	return tools
 }
 
+// enumerateSkillDir returns the list of skill subdirectory names in the given
+// skill_dir entry. Each subdirectory containing SKILL.md is treated as a skill.
+// The returned names are subdirectory basenames (e.g., "markdown-headings").
+func enumerateSkillDir(entry config.ToolEntry, baseDir string) []string {
+	if entry.Path == "" {
+		return nil
+	}
+
+	// Resolve path relative to baseDir
+	path := entry.Path
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(baseDir, path)
+	}
+
+	// Read directory
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		// Silently skip — resolution failures are handled elsewhere
+		return nil
+	}
+
+	var skills []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		subDir := filepath.Join(path, e.Name())
+		if _, err := os.Stat(filepath.Join(subDir, "SKILL.md")); err == nil {
+			skills = append(skills, e.Name())
+		}
+	}
+
+	return skills
+}
+
 // removeTool removes a named tool from Generator.Tools in the given config.
+// For skill_dir deep variants ("{entry}/{skill}"), it adds the skill to the
+// entry's ExcludedSkills list instead of removing the entire entry.
 func removeTool(cfg *config.ToolConfig, name string) {
 	if cfg.Generator == nil {
 		return
 	}
 
 	if strings.Contains(name, "/") {
-		mcpName, toolName, ok := strings.Cut(name, "/")
-		if ok {
-			for i, te := range cfg.Generator.Tools {
-				if te.ResolvedType() != "mcp" || te.Name != mcpName {
-					continue
-				}
-				te.MCPTools = removeMCPTool(te.MCPTools, toolName)
+		entryName, subName, ok := strings.Cut(name, "/")
+		if !ok {
+			return
+		}
+		// Check if this is an MCP deep variant
+		for i, te := range cfg.Generator.Tools {
+			if te.ResolvedType() == "mcp" && te.Name == entryName {
+				te.MCPTools = removeMCPTool(te.MCPTools, subName)
+				cfg.Generator.Tools[i] = te
+				return
+			}
+		}
+		// Check if this is a skill_dir deep variant
+		for i, te := range cfg.Generator.Tools {
+			if te.ResolvedType() == "skill" && te.SkillDir && te.Name == entryName {
+				// Add to exclusion list
+				te.ExcludedSkills = append(te.ExcludedSkills, subName)
 				cfg.Generator.Tools[i] = te
 				return
 			}
 		}
 	}
 
+	// Shallow removal: remove the entire entry
 	var tools []config.ToolEntry
 	for _, te := range cfg.Generator.Tools {
 		if te.Name != name {
@@ -137,6 +208,11 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 					tools := make([]string, len(te.MCPTools))
 					copy(tools, te.MCPTools)
 					gen.Tools[i].MCPTools = tools
+				}
+				if te.ExcludedSkills != nil {
+					excluded := make([]string, len(te.ExcludedSkills))
+					copy(excluded, te.ExcludedSkills)
+					gen.Tools[i].ExcludedSkills = excluded
 				}
 			}
 		}

@@ -2,6 +2,7 @@ package pairwise
 
 import (
 	"math"
+	"sort"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
@@ -68,7 +69,7 @@ func TestExpandPairwise_ShallowMCP(t *testing.T) {
 		},
 	}
 
-	variants := ExpandPairwise(cfg)
+	variants := ExpandPairwise(cfg, ".")
 	if len(variants) != 2 {
 		t.Fatalf("expected 2 variants, got %d", len(variants))
 	}
@@ -100,7 +101,7 @@ func TestExpandPairwise_DeepMCPTools(t *testing.T) {
 		},
 	}
 
-	variants := ExpandPairwise(cfg)
+	variants := ExpandPairwise(cfg, ".")
 	if len(variants) != 3 {
 		t.Fatalf("expected 3 variants, got %d", len(variants))
 	}
@@ -296,5 +297,128 @@ func TestAggregateImpactsEmpty(t *testing.T) {
 	agg := AggregateImpacts(nil)
 	if len(agg) != 0 {
 		t.Errorf("expected empty result, got %d", len(agg))
+	}
+}
+
+func TestExpandPairwise_DeepSkillDir(t *testing.T) {
+	// Use the test skills directory (absolute path from repo root)
+	cfg := config.ToolConfig{
+		Name: "test/baseline",
+		Generator: &config.GeneratorConfig{
+			Models: []string{"gpt-4"},
+			Tools: []config.ToolEntry{
+				{
+					Name:     "test-skills",
+					Type:     "skill",
+					Source:   "local",
+					Path:     "skills/test",
+					SkillDir: true,
+					Pairwise: "deep",
+				},
+			},
+		},
+	}
+
+	// Use repo root as baseDir
+	variants := ExpandPairwise(cfg, "/home/rgeraghty/projects/hyoka")
+	if len(variants) != 3 {
+		t.Fatalf("expected 3 variants (baseline + 2 skills), got %d", len(variants))
+	}
+
+	// Check baseline
+	if variants[0].Name != "test/baseline/baseline" {
+		t.Errorf("expected baseline variant, got %q", variants[0].Name)
+	}
+	if len(variants[0].Generator.Tools) != 1 {
+		t.Errorf("baseline should have 1 tool entry, got %d", len(variants[0].Generator.Tools))
+	}
+
+	// Check that we have the two skill ablation variants
+	names := []string{variants[1].Name, variants[2].Name}
+	sort.Strings(names)
+	expectedNames := []string{
+		"test/baseline/without-test-skills/markdown-headings",
+		"test/baseline/without-test-skills/markdown-lists",
+	}
+	for i, name := range expectedNames {
+		if names[i] != name {
+			t.Errorf("expected variant %q, got %q", name, names[i])
+		}
+	}
+
+	// Verify that each variant has the skill excluded
+	for _, v := range variants[1:] {
+		if len(v.Generator.Tools) != 1 {
+			t.Fatalf("variant %s should have 1 tool entry, got %d", v.Name, len(v.Generator.Tools))
+		}
+		entry := v.Generator.Tools[0]
+		if entry.Name != "test-skills" {
+			t.Errorf("expected test-skills entry, got %q", entry.Name)
+		}
+		if len(entry.ExcludedSkills) != 1 {
+			t.Fatalf("variant %s should exclude 1 skill, got %d", v.Name, len(entry.ExcludedSkills))
+		}
+	}
+}
+
+func TestExpandPairwise_DeepSkillDirEmpty(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "baseline",
+		Generator: &config.GeneratorConfig{
+			Models: []string{"gpt-4"},
+			Tools: []config.ToolEntry{
+				{
+					Name:     "empty-skills",
+					Type:     "skill",
+					Source:   "local",
+					Path:     "/nonexistent",
+					SkillDir: true,
+					Pairwise: "deep",
+				},
+			},
+		},
+	}
+
+	variants := ExpandPairwise(cfg, ".")
+	// Empty skill_dir produces only baseline (no skills to ablate)
+	if len(variants) != 1 {
+		t.Fatalf("expected 1 variant (baseline only), got %d", len(variants))
+	}
+	if variants[0].Name != "baseline/baseline" {
+		t.Errorf("expected baseline variant, got %q", variants[0].Name)
+	}
+}
+
+func TestExpandPairwise_ShallowSkillDir(t *testing.T) {
+	cfg := config.ToolConfig{
+		Name: "baseline",
+		Generator: &config.GeneratorConfig{
+			Models: []string{"gpt-4"},
+			Tools: []config.ToolEntry{
+				{
+					Name:     "test-skills",
+					Type:     "skill",
+					Source:   "local",
+					Path:     "skills/test",
+					SkillDir: true,
+					// Pairwise defaults to "shallow"
+				},
+			},
+		},
+	}
+
+	variants := ExpandPairwise(cfg, "/home/rgeraghty/projects/hyoka")
+	// Shallow mode: baseline + remove entire entry
+	if len(variants) != 2 {
+		t.Fatalf("expected 2 variants (baseline + without-entry), got %d", len(variants))
+	}
+	if variants[0].Name != "baseline/baseline" {
+		t.Errorf("expected baseline variant, got %q", variants[0].Name)
+	}
+	if variants[1].Name != "baseline/without-test-skills" {
+		t.Errorf("expected without-test-skills variant, got %q", variants[1].Name)
+	}
+	if len(variants[1].Generator.Tools) != 0 {
+		t.Errorf("shallow removal should remove entire entry, got %d tools", len(variants[1].Generator.Tools))
 	}
 }

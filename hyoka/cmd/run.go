@@ -291,10 +291,12 @@ func runCmd() *cobra.Command {
 			}
 
 			// Pairwise tool-ablation expansion (#121)
+			// Use parent of configDir (repo root) for skill path resolution
+			repoRoot := filepath.Dir(configDir)
 			if f.pairwiseMode {
 				var expanded []config.ToolConfig
 				for _, c := range configs {
-					variants := pairwise.ExpandPairwise(c)
+					variants := pairwise.ExpandPairwise(c, repoRoot)
 					slog.Info("Expanded config into pairwise variants", "config", c.Name, "variants", len(variants))
 					fmt.Printf("Expanded config %q into %d pairwise variants\n", c.Name, len(variants))
 					expanded = append(expanded, variants...)
@@ -306,7 +308,7 @@ func runCmd() *cobra.Command {
 			if f.pairwiseVariant != "" {
 				var selected []config.ToolConfig
 				for _, c := range configs {
-					variants := pairwise.ExpandPairwise(c)
+					variants := pairwise.ExpandPairwise(c, repoRoot)
 					// Look for the variant whose name ends with "/{pairwiseVariant}"
 					targetSuffix := "/" + f.pairwiseVariant
 					var found *config.ToolConfig
