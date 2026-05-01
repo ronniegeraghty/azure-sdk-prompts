@@ -1,9 +1,0 @@
-refactor(graders): prompt_review_grader uses canonical label
-
-Verified that gradePanel and gradeSingle build GraderPoint.Label from c.Name.
-Since c.Name is now canonical (set in commit 6), no code change needed.
-
-This commit documents that the grader label wiring is correct and benefits
-from the id-aware vote pipeline.
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

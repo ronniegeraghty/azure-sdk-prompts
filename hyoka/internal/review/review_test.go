@@ -1636,79 +1636,8 @@ func TestEventCollectorResponseCopiesEvents(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// buildConsolidationPrompt tests
-// ---------------------------------------------------------------------------
 
-func TestBuildConsolidationPrompt(t *testing.T) {
-	panel := []ReviewResult{
-		{
-			Model:        "model-a",
-			OverallScore: 2,
-			MaxScore:     3,
-			Summary:      "Good overall",
-			Scores: ReviewScores{Criteria: []CriterionResult{
-				{Name: "Build", Passed: true},
-				{Name: "Style", Passed: true},
-				{Name: "Errors", Passed: false},
-			}},
-		},
-		{
-			Model:        "model-b",
-			OverallScore: 1,
-			MaxScore:     3,
-			Summary:      "Needs work",
-			Scores: ReviewScores{Criteria: []CriterionResult{
-				{Name: "Build", Passed: true},
-				{Name: "Style", Passed: false},
-				{Name: "Errors", Passed: false},
-			}},
-		},
-	}
 
-	prompt := buildConsolidationPrompt("Write Azure code", panel)
-
-	checks := []string{
-		"senior review consolidator",
-		"Original Prompt",
-		"Write Azure code",
-		"Individual Reviews",
-		"Reviewer 1 (model-a)",
-		"Reviewer 2 (model-b)",
-		"Instructions",
-		"consensus review",
-		"majority",
-		"JSON object",
-	}
-
-	for _, check := range checks {
-		if !strings.Contains(prompt, check) {
-			t.Errorf("consolidation prompt missing %q", check)
-		}
-	}
-}
-
-func TestBuildConsolidationPromptSingleReviewer(t *testing.T) {
-	panel := []ReviewResult{{
-		Model:   "model-a",
-		Summary: "Test",
-		Scores:  ReviewScores{Criteria: []CriterionResult{{Name: "A", Passed: true}}},
-	}}
-
-	prompt := buildConsolidationPrompt("prompt", panel)
-	if !strings.Contains(prompt, "Reviewer 1 (model-a)") {
-		t.Error("should contain reviewer label")
-	}
-}
-
-func TestBuildConsolidationPromptEmpty(t *testing.T) {
-	prompt := buildConsolidationPrompt("prompt", nil)
-	if !strings.Contains(prompt, "Original Prompt") {
-		t.Error("should contain prompt section even with empty panel")
-	}
-	if !strings.Contains(prompt, "Individual Reviews") {
-		t.Error("should contain reviews section even with empty panel")
-	}
-}
 
 // helper
 func strPtr(s string) *string { return &s }

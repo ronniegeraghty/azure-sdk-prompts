@@ -675,21 +675,6 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 	return result, nil
 }
 
-// consolidate uses the first model to synthesize all individual reviews into a consensus.
-func (p *PanelReviewer) consolidate(ctx context.Context, originalPrompt string, generatedFiles map[string]string, panel []ReviewResult) (*ReviewResult, error) {
-	consolidatorModel := p.models[0]
-	slog.Debug("Starting consolidation", "consolidator_model", consolidatorModel, "panel_size", len(panel))
-
-	prompt := buildConsolidationPrompt(originalPrompt, panel)
-
-	slog.Debug("Sending consolidation prompt", "consolidator_model", consolidatorModel)
-	result, err := p.runSingleReview(ctx, consolidatorModel, prompt, "", nil)
-	if err != nil {
-		return nil, fmt.Errorf("consolidation failed: %w", err)
-	}
-	slog.Debug("Consolidation complete", "overall_score", result.OverallScore, "max_score", result.MaxScore)
-	return result, nil
-}
 
 // averageReview computes deterministic voting across a panel.
 // For each criterion, it FAILS if ANY reviewer marked it failed (strict voting).
