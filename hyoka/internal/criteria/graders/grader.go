@@ -2,10 +2,10 @@ package graders
 
 import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
-"context"
-"fmt"
-
-"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/workspace"
+	"context"
+	"fmt"
 )
 
 // WorkspaceDelta is a type alias for the workspace delta type.
@@ -88,7 +88,8 @@ type GraderInput struct {
 // criteria (which would create a layering issue) or review (cycle).
 type ReviewBucket struct {
 	Name     string
-	Criteria string
+	Criteria string               // Legacy string-based criteria (deprecated)
+	Checks   []review.ReviewCheck // Id-aware checks (new path)
 }
 
 // ActionEvent represents a single agent action from the session log.

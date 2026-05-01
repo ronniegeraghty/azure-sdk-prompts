@@ -24,6 +24,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 )
 
 // ReviewMode constants used by the engine to select bucket construction.
@@ -166,6 +167,49 @@ func FormatUnifiedPromptEntries(entries []UnifiedGraderEntry) string {
 	return strings.Join(blocks, "\n\n")
 }
 
+// FormatUnifiedPromptEntriesToChecks converts prompt-type entries into a slice
+// of ReviewCheck with stable check_N IDs. Each check within each entry gets
+// a sequential ID starting from check_1. The preamble (entry name + optional
+// prompt text) is carried in the Preamble field for the first check of each
+// entry.
+func FormatUnifiedPromptEntriesToChecks(entries []UnifiedGraderEntry) []review.ReviewCheck {
+	if len(entries) == 0 {
+		return nil
+	}
+	var checks []review.ReviewCheck
+	checkNum := 1
+	for _, e := range entries {
+		if len(e.Checks) == 0 {
+			continue
+		}
+		preamble := ""
+		if e.Name != "" {
+			preamble = "**" + e.Name + "**"
+		}
+		if prompt := strings.TrimSpace(e.Prompt); prompt != "" {
+			if preamble != "" {
+				preamble += "\n"
+			}
+			preamble += prompt
+		}
+		for _, c := range e.Checks {
+			c = strings.TrimSpace(c)
+			if c == "" {
+				continue
+			}
+			checks = append(checks, review.ReviewCheck{
+				ID:       fmt.Sprintf("check_%d", checkNum),
+				Text:     c,
+				Preamble: preamble,
+			})
+			checkNum++
+			// Only the first check carries the preamble
+			preamble = ""
+		}
+	}
+	return checks
+}
+
 // MergeUnifiedCriteria combines rendered prompt entries with a prompt's own
 // evaluation criteria text. Mirrors criteria.MergeCriteria's output.
 func MergeUnifiedCriteria(entries []UnifiedGraderEntry, promptCriteria string) string {
@@ -178,6 +222,73 @@ func MergeUnifiedCriteria(entries []UnifiedGraderEntry, promptCriteria string) s
 		parts = append(parts, "### Prompt-Specific Criteria\n\n"+promptCriteria)
 	}
 	return strings.Join(parts, "\n")
+}
+
+// MergeUnifiedCriteriaToChecks combines prompt entries with prompt-frontmatter
+// criteria into a single []ReviewCheck slice with stable check_N IDs. IDs are
+// sequential across both sources (attribute-matched entries first, then
+// prompt-specific checks).
+func MergeUnifiedCriteriaToChecks(entries []UnifiedGraderEntry, promptCriteria string) []review.ReviewCheck {
+	var checks []review.ReviewCheck
+	// Attribute-matched entries first
+	checks = append(checks, FormatUnifiedPromptEntriesToChecks(entries)...)
+	// Prompt-specific criteria (parsed into checks)
+	if strings.TrimSpace(promptCriteria) != "" {
+		promptChecks := parsedTextToChecks(promptCriteria, len(checks)+1)
+		checks = append(checks, promptChecks...)
+	}
+	return checks
+}
+
+// parsedTextToChecks converts a criteria text block (with bullet points) into
+// []ReviewCheck with sequential IDs starting from startNum. Preamble text
+// (non-bullet lines) is carried in the first check's Preamble field.
+func parsedTextToChecks(text string, startNum int) []review.ReviewCheck {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	var preambleLines []string
+	var checkTexts []string
+	sawBullet := false
+	for _, line := range strings.Split(text, "\n") {
+		trimmedRight := strings.TrimRight(line, " \t\r")
+		stripped := strings.TrimLeft(trimmedRight, " \t")
+		if strings.HasPrefix(stripped, "- ") {
+			sawBullet = true
+			c := strings.TrimSpace(strings.TrimPrefix(stripped, "- "))
+			if c != "" {
+				checkTexts = append(checkTexts, c)
+			}
+			continue
+		}
+		if !sawBullet {
+			preambleLines = append(preambleLines, trimmedRight)
+		}
+	}
+	if !sawBullet {
+		// No bullets — treat entire text as one check
+		return []review.ReviewCheck{{
+			ID:   fmt.Sprintf("check_%d", startNum),
+			Text: text,
+		}}
+	}
+	preamble := strings.TrimSpace(strings.Join(preambleLines, "\n"))
+	if len(checkTexts) == 0 {
+		return nil
+	}
+	var checks []review.ReviewCheck
+	for i, c := range checkTexts {
+		check := review.ReviewCheck{
+			ID:   fmt.Sprintf("check_%d", startNum+i),
+			Text: c,
+		}
+		if i == 0 && preamble != "" {
+			check.Preamble = preamble
+		}
+		checks = append(checks, check)
+	}
+	return checks
 }
 
 // BuildUnifiedReviewBuckets constructs review buckets from the prompt-type
@@ -210,9 +321,12 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 	// Prompt-frontmatter criteria always get their own bucket, regardless of mode.
 	promptCriteria = strings.TrimSpace(promptCriteria)
 	if promptCriteria != "" {
+		criteria := MergeUnifiedCriteria(nil, promptCriteria)
+		checks := MergeUnifiedCriteriaToChecks(nil, promptCriteria)
 		buckets = append(buckets, graders.ReviewBucket{
 			Name:     "Criteria from prompt file",
-			Criteria: MergeUnifiedCriteria(nil, promptCriteria),
+			Criteria: criteria,
+			Checks:   checks,
 		})
 	}
 
@@ -220,9 +334,12 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 	if mode != ReviewModeIsolated || !HasUnifiedIsolation(matched) {
 		// Combined mode (default): each matched entry gets its own bucket.
 		for _, m := range matched {
+			criteria := MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, "")
+			checks := MergeUnifiedCriteriaToChecks([]UnifiedGraderEntry{m.Entry}, "")
 			buckets = append(buckets, graders.ReviewBucket{
 				Name:     bucketName(m.Entry.Name, len(buckets)),
-				Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, ""),
+				Criteria: criteria,
+				Checks:   checks,
 			})
 		}
 		return buckets
@@ -243,9 +360,12 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 	for _, m := range matched {
 		if m.GroupName == "" && !m.GroupIsolate {
 			if m.Entry.Isolate {
+				criteria := MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, "")
+				checks := MergeUnifiedCriteriaToChecks([]UnifiedGraderEntry{m.Entry}, "")
 				buckets = append(buckets, graders.ReviewBucket{
 					Name:     bucketName(m.Entry.Name, len(buckets)),
-					Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{m.Entry}, ""),
+					Criteria: criteria,
+					Checks:   checks,
 				})
 			} else {
 				leftover = append(leftover, m.Entry)
@@ -273,32 +393,27 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 			if name == "" {
 				name = fmt.Sprintf("group-%d", len(buckets))
 			}
+			criteria := MergeUnifiedCriteria(append([]UnifiedGraderEntry(nil), bag.entries...), "")
+			checks := MergeUnifiedCriteriaToChecks(append([]UnifiedGraderEntry(nil), bag.entries...), "")
 			buckets = append(buckets, graders.ReviewBucket{
 				Name:     bucketName(name, len(buckets)),
-				Criteria: MergeUnifiedCriteria(append([]UnifiedGraderEntry(nil), bag.entries...), ""),
+				Criteria: criteria,
+				Checks:   checks,
 			})
 			continue
 		}
-		for _, e := range bag.entries {
-			if e.Isolate {
-				buckets = append(buckets, graders.ReviewBucket{
-					Name:     bucketName(e.Name, len(buckets)),
-					Criteria: MergeUnifiedCriteria([]UnifiedGraderEntry{e}, ""),
-				})
-			} else {
-				leftover = append(leftover, e)
-			}
-		}
+		leftover = append(leftover, bag.entries...)
 	}
 
-	// Leftover criteria-file entries go into a "combined" bucket.
 	if len(leftover) > 0 {
+		criteria := MergeUnifiedCriteria(leftover, "")
+		checks := MergeUnifiedCriteriaToChecks(leftover, "")
 		buckets = append(buckets, graders.ReviewBucket{
-			Name:     "combined",
-			Criteria: MergeUnifiedCriteria(leftover, ""),
+			Name:     bucketName("combined", len(buckets)),
+			Criteria: criteria,
+			Checks:   checks,
 		})
 	}
-
 	return buckets
 }
 
