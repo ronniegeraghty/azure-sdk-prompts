@@ -7,8 +7,9 @@ graders:
     prompt: >
       Uses DefaultAzureCredential or another azure-identity credential.
   - name: Output Files Exist
-    type: output_check
+    type: workspace
     weight: 0.5
-    details:
-      min_files: 1
-      min_bytes_per_file: 1
+    checks:
+      - kind: require_to_create
+        files:
+          - main.py

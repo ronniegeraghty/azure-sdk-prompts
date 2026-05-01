@@ -25,11 +25,16 @@ g, err := NewWorkspaceGrader("ws", cfg)
 if err != nil {
 t.Fatalf("NewWorkspaceGrader: %v", err)
 }
+tmpDir := t.TempDir()
+if err := os.WriteFile(tmpDir+"/present.go", []byte("package main\n"), 0644); err != nil {
+t.Fatalf("WriteFile: %v", err)
+}
 delta := &WorkspaceDelta{
 NewFiles: []workspace.NewFile{{Path: "present.go", Size: 100}},
 }
 res, err := g.Grade(context.Background(), GraderInput{
 WorkspaceDelta: delta,
+WorkspacePath:  tmpDir,
 Config:         GraderConfig{Weight: 1.0},
 })
 if err != nil {

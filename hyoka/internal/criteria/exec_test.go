@@ -25,8 +25,8 @@ func makeYAMLNode(t *testing.T, data string) yaml.Node {
 
 func TestInstantiateGraders(t *testing.T) {
 	configs := []graders.GraderConfig{
-		{Kind: graders.KindFile, Name: "f1", Config: makeYAMLNode(t, `path: "main.py"`)},
-		{Kind: graders.KindBehavior, Name: "b1", Config: makeYAMLNode(t, `required_tools: ["mcp"]`)},
+		{Kind: graders.KindWorkspace, Name: "f1", Config: makeYAMLNode(t, "checks:\n  - kind: file\n    name: main.py\n    state: present")},
+		{Kind: graders.KindTool, Name: "b1", Config: makeYAMLNode(t, "checks:\n  - kind: tool_used\n    tool: mcp")},
 	}
 	instances, err := InstantiateGraders(configs)
 	if err != nil {
@@ -35,14 +35,14 @@ func TestInstantiateGraders(t *testing.T) {
 	if len(instances) != 2 {
 		t.Fatalf("expected 2 instances, got %d", len(instances))
 	}
-	if instances[0].Kind() != graders.KindFile || instances[1].Kind() != graders.KindBehavior {
+	if instances[0].Kind() != graders.KindWorkspace || instances[1].Kind() != graders.KindTool {
 		t.Errorf("unexpected kinds: %q, %q", instances[0].Kind(), instances[1].Kind())
 	}
 }
 
 func TestRunGradersAppliesWeightAndGate(t *testing.T) {
 	configs := []graders.GraderConfig{
-		{Kind: graders.KindFile, Name: "f1", Config: makeYAMLNode(t, `path: "main.py"`), Weight: 0.5, Gate: true},
+		{Kind: graders.KindWorkspace, Name: "f1", Config: makeYAMLNode(t, "checks:\n  - kind: file\n    name: main.py\n    state: present"), Weight: 0.5, Gate: true},
 	}
 	instances, err := InstantiateGraders(configs)
 	if err != nil {
@@ -54,7 +54,8 @@ func TestRunGradersAppliesWeightAndGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	input := graders.GraderInput{
-		WorkspacePath: tmpDir,
+		WorkspacePath:  tmpDir,
+		WorkspaceDelta: &graders.WorkspaceDelta{},
 	}
 	results := RunGraders(context.Background(), instances, configs, input)
 	if len(results) != 1 {
@@ -67,13 +68,13 @@ func TestRunGradersAppliesWeightAndGate(t *testing.T) {
 		t.Error("expected gate=true")
 	}
 	if !results[0].Pass {
-		t.Error("expected pass")
+		t.Errorf("expected pass, got: %s", results[0].Message)
 	}
 }
 
 func TestRunGradersWithSessionEvents(t *testing.T) {
 	configs := []graders.GraderConfig{
-		{Kind: graders.KindBehavior, Name: "b1", Config: makeYAMLNode(t, "required_tools: [\"azure-mcp\"]\nforbidden_tools: [\"rm\"]")},
+		{Kind: graders.KindTool, Name: "b1", Config: makeYAMLNode(t, "checks:\n  - kind: tool_used\n    tool: azure-mcp\n  - kind: tool_not_used\n    tool: rm")},
 	}
 	instances, err := InstantiateGraders(configs)
 	if err != nil {
@@ -97,8 +98,8 @@ func TestRunGradersWithSessionEvents(t *testing.T) {
 
 func TestRunGradersWithHooksInvokesCallbacks(t *testing.T) {
 configs := []graders.GraderConfig{
-{Kind: graders.KindFile, Name: "f1", Config: makeYAMLNode(t, `path: "main.py"`)},
-{Kind: graders.KindFile, Name: "f2", Config: makeYAMLNode(t, `path: "missing.py"`)},
+{Kind: graders.KindWorkspace, Name: "f1", Config: makeYAMLNode(t, "checks:\n  - kind: file\n    name: main.py\n    state: present")},
+{Kind: graders.KindWorkspace, Name: "f2", Config: makeYAMLNode(t, "checks:\n  - kind: file\n    name: missing.py\n    state: present")},
 }
 instances, err := InstantiateGraders(configs)
 if err != nil {
@@ -122,7 +123,7 @@ completePasses = append(completePasses, r.Pass)
 },
 }
 
-results := RunGradersWithHooks(context.Background(), instances, configs, graders.GraderInput{WorkspacePath: tmpDir}, hooks)
+results := RunGradersWithHooks(context.Background(), instances, configs, graders.GraderInput{WorkspacePath: tmpDir, WorkspaceDelta: &graders.WorkspaceDelta{}}, hooks)
 if len(results) != 2 {
 t.Fatalf("expected 2 results, got %d", len(results))
 }
@@ -140,7 +141,7 @@ completePasses, results[0].Pass, results[1].Pass)
 
 func TestRunGradersNilHooksStillWorks(t *testing.T) {
 configs := []graders.GraderConfig{
-{Kind: graders.KindFile, Name: "f1", Config: makeYAMLNode(t, `path: "main.py"`)},
+{Kind: graders.KindWorkspace, Name: "f1", Config: makeYAMLNode(t, "checks:\n  - kind: file\n    name: main.py\n    state: present")},
 }
 instances, err := InstantiateGraders(configs)
 if err != nil {
@@ -151,7 +152,7 @@ if err := os.WriteFile(filepath.Join(tmpDir, "main.py"), []byte("pass"), 0644); 
 t.Fatal(err)
 }
 // Zero-value hooks — both fields nil. Must not panic.
-results := RunGradersWithHooks(context.Background(), instances, configs, graders.GraderInput{WorkspacePath: tmpDir}, GraderHooks{})
+results := RunGradersWithHooks(context.Background(), instances, configs, graders.GraderInput{WorkspacePath: tmpDir, WorkspaceDelta: &graders.WorkspaceDelta{}}, GraderHooks{})
 if len(results) != 1 {
 t.Fatalf("expected 1 result, got %d", len(results))
 }

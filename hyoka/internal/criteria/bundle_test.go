@@ -57,8 +57,8 @@ func TestPhase1Loader_MixedPromptAndTyped(t *testing.T) {
 	if gc.Graders[0].Prompt == "" {
 		t.Error("prompt grader missing Prompt body")
 	}
-	if gc.Graders[1].Type != "output_check" {
-		t.Errorf("graders[1].Type: got %q, want %q", gc.Graders[1].Type, "output_check")
+	if gc.Graders[1].Type != "workspace" {
+		t.Errorf("graders[1].Type: got %q, want %q", gc.Graders[1].Type, "workspace")
 	}
 	// File-level when preserved.
 	if gc.When["language"] != "python" {

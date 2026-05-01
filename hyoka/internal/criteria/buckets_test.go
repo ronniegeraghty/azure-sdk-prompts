@@ -40,7 +40,8 @@ func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 			When: map[string]string{"plane": "data-plane"},
 			Graders: []UnifiedGraderEntry{
 				promptEntry("b", "B", false),
-				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}},,
+				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}},
+			},
 		}},
 	}}}
 
@@ -293,7 +294,8 @@ want:    "",
 {
 name: "legacy single-prompt no checks",
 entries: []UnifiedGraderEntry{
-{Type: graders.KindPrompt, Name: "Auth", Prompt: "Uses managed identity"}),
+{Type: graders.KindPrompt, Name: "Auth", Prompt: "Uses managed identity"},
+},
 want: "**Auth**: Uses managed identity",
 },
 {
@@ -305,8 +307,10 @@ Name:   "Markdown Structure",
 Prompt: "Check the following criteria:",
 Checks: stringSliceToYAMLNode([]string{
 "File hello.md exists and contains a level-1 heading.",
-"File contains exactly three bullet list items.", }),
+"File contains exactly three bullet list items.",
 }),
+},
+},
 want: "**Markdown Structure**\n" +
 "Check the following criteria:\n" +
 "1. File hello.md exists and contains a level-1 heading.\n" +
@@ -320,6 +324,7 @@ Type:   graders.KindPrompt,
 Name:   "X",
 Checks: stringSliceToYAMLNode([]string{"a", "b"}),
 },
+},
 want: "**X**\n" +
 "1. a\n" +
 "2. b",
@@ -328,7 +333,8 @@ want: "**X**\n" +
 name: "mixed legacy + checks",
 entries: []UnifiedGraderEntry{
 {Type: graders.KindPrompt, Name: "Old", Prompt: "p"},
-{Type: graders.KindPrompt, Name: "New", Prompt: "preamble", Checks: stringSliceToYAMLNode([]string{"one"}}),
+{Type: graders.KindPrompt, Name: "New", Prompt: "preamble", Checks: stringSliceToYAMLNode([]string{"one"})},
+},
 want: "**Old**: p\n\n" +
 "**New**\n" +
 "preamble\n" +

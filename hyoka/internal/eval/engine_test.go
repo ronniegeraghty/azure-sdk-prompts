@@ -1378,11 +1378,12 @@ func TestReviewResultsAppendedNotOverwritten(t *testing.T) {
 	// Set up a file grader that will pass (stub_output.txt exists).
 	gradersDir := t.TempDir()
 	graderYAML := `graders:
-  - type: file
+  - type: workspace
     name: "stub_exists"
-    details:
-      path: "stub_output.txt"
     weight: 1.0
+    checks:
+      - kind: require_to_create
+        files: [stub_output.txt]
 `
 	os.WriteFile(filepath.Join(gradersDir, "test.yaml"), []byte(graderYAML), 0644)
 
@@ -1427,7 +1428,7 @@ func TestReviewResultsAppendedNotOverwritten(t *testing.T) {
 	hasFile := false
 	hasReview := false
 	for _, gr := range r.GraderResults {
-		if gr.GraderType == "file" {
+		if gr.GraderType == "workspace" {
 			hasFile = true
 		}
 		// v3 schema collapses panel-member expansion into a single
@@ -1437,7 +1438,7 @@ func TestReviewResultsAppendedNotOverwritten(t *testing.T) {
 		}
 	}
 	if !hasFile {
-		t.Error("expected file grader result to be present")
+		t.Error("expected workspace grader result to be present")
 	}
 	if !hasReview {
 		t.Error("expected review grader result to be present")
@@ -1457,11 +1458,10 @@ func TestUnifiedGraderSuccessIncludesReview(t *testing.T) {
 	// Overall should pass.
 	gradersDir := t.TempDir()
 	graderYAML := `graders:
-  - type: file
+  - type: prompt
     name: "stub_check"
-    details:
-      path: "stub_output.txt"
     weight: 1.0
+    prompt: "stub criterion"
 `
 	os.WriteFile(filepath.Join(gradersDir, "test.yaml"), []byte(graderYAML), 0644)
 

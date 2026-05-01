@@ -2,5 +2,3 @@ graders:
   - name: Bogus Type Grader
     type: definitely_not_a_real_type
     weight: 1.0
-    details:
-      foo: bar

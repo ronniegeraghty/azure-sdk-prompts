@@ -19,10 +19,11 @@ func TestValidateEntry_PromptOK(t *testing.T) {
 
 func TestValidateEntry_TypedOK(t *testing.T) {
 	gc, err := ParseUnified([]byte(`graders:
-  - type: output_check
+  - type: workspace
     name: must_have_files
-    details:
-      min_files: 1
+    checks:
+      - kind: require_to_create
+        files: [main.py]
 `))
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -36,7 +37,9 @@ func TestValidateEntry_MissingType(t *testing.T) {
 	// No type, no prompt → cannot infer; should error.
 	_, err := ParseUnified([]byte(`graders:
   - name: nope
-    details: { min_files: 1 }
+    checks:
+      - kind: require_to_create
+        files: [main.py]
 `))
 	if err == nil || !strings.Contains(err.Error(), "type is required") {
 		t.Fatalf("want 'type is required', got %v", err)
@@ -47,44 +50,46 @@ func TestValidateEntry_UnknownType(t *testing.T) {
 	_, err := ParseUnified([]byte(`graders:
   - type: telepathy
     name: woo
-    details: { x: 1 }
+    checks:
+      - foo: bar
 `))
 	if err == nil || !strings.Contains(err.Error(), "unknown type") {
 		t.Fatalf("want unknown type error, got %v", err)
 	}
 }
 
-func TestValidateEntry_PromptWithDetails(t *testing.T) {
+func TestValidateEntry_DeprecatedTypeRejected(t *testing.T) {
 	_, err := ParseUnified([]byte(`graders:
-  - type: prompt
+  - type: output_check
     name: bad
-    prompt: "do it"
-    details: { min_files: 1 }
+    checks: []
 `))
-	if err == nil || !strings.Contains(err.Error(), "must not set details") {
-		t.Fatalf("want details-on-prompt error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "no longer supported") {
+		t.Fatalf("want deprecated-type error, got %v", err)
 	}
 }
 
 func TestValidateEntry_TypedWithPrompt(t *testing.T) {
 	_, err := ParseUnified([]byte(`graders:
-  - type: output_check
+  - type: workspace
     name: bad
     prompt: "do it"
-    details: { min_files: 1 }
+    checks:
+      - kind: require_to_create
+        files: [main.py]
 `))
 	if err == nil || !strings.Contains(err.Error(), "must not set prompt") {
 		t.Fatalf("want prompt-on-typed error, got %v", err)
 	}
 }
 
-func TestValidateEntry_TypedMissingDetails(t *testing.T) {
+func TestValidateEntry_TypedMissingChecks(t *testing.T) {
 	_, err := ParseUnified([]byte(`graders:
-  - type: output_check
+  - type: workspace
     name: bad
 `))
-	if err == nil || !strings.Contains(err.Error(), "requires non-empty details") {
-		t.Fatalf("want missing-details error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "requires non-empty checks") {
+		t.Fatalf("want missing-checks error, got %v", err)
 	}
 }
 
@@ -156,16 +161,14 @@ func TestValidateEntry_PromptChecks(t *testing.T) {
 			wantErr: "checks[0] must be a non-empty string",
 		},
 		{
-			name: "checks on non-prompt type",
+			name: "checks on typed grader is allowed (workspace)",
 			yaml: `graders:
-  - type: output_check
+  - type: workspace
     name: x
     checks:
-      - nope
-    details:
-      min_files: 1
+      - kind: require_to_create
+        files: [main.py]
 `,
-			wantErr: "must not set checks",
 		},
 	}
 	for _, tc := range cases {
@@ -303,11 +306,11 @@ graders:
   - type: prompt
     name: review-1
     prompt: "Code is idiomatic Python."
-  - type: output_check
+  - type: workspace
     name: produced-files
-    details:
-      min_files: 1
-      min_bytes_per_file: 1
+    checks:
+      - kind: require_to_create
+        files: [main.py]
 `))
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
