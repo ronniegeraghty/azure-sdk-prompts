@@ -623,7 +623,7 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 		},
 		OverallScore: passedCount,
 		MaxScore:     len(criteria),
-		Summary:      fmt.Sprintf("Strict consensus from %d reviewers: %d/%d criteria passed (any-fail voting)", len(panel), passedCount, len(criteria)),
+		Summary:      fmt.Sprintf("Strict consensus from %d reviewers: %d/%d reviewer checks passed (any-fail voting)", len(panel), passedCount, len(criteria)),
 		Issues:       issues,
 		Strengths:    strengths,
 	}

@@ -39,8 +39,8 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 	fmt.Fprintf(&b, "| Prompt ID | `%s` |\n", r.PromptID)
 	fmt.Fprintf(&b, "| Config | %s |\n", r.ConfigName)
 	fmt.Fprintf(&b, "| Result | %s |\n", result)
-	if r.Review != nil {
-		fmt.Fprintf(&b, "| Score | %d/10 |\n", r.Review.OverallScore)
+	if passed, total := TotalGraderPoints(r.GraderResults); total > 0 {
+		fmt.Fprintf(&b, "| Score | %d/%d |\n", passed, total)
 	}
 	fmt.Fprintf(&b, "| Duration | %.1fs |\n", r.Duration)
 	fmt.Fprintf(&b, "| Timestamp | %s |\n", r.Timestamp)
@@ -438,8 +438,8 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 			icon = "✅"
 		}
 		score := "—"
-		if r.Review != nil {
-			score = fmt.Sprintf("%d/%d", r.Review.OverallScore, r.Review.MaxScore)
+		if passed, total := TotalGraderPoints(r.GraderResults); total > 0 {
+			score = fmt.Sprintf("%d/%d", passed, total)
 		} else if r.FailureReason != "" {
 			score = r.FailureReason
 		}
@@ -640,9 +640,9 @@ func groupGradersBySource(results []GraderResult) []graderFileGroup {
 
 // writeGraderResults renders the grader section in the 3-level grouped format:
 //
-//	- {basename} ({source type}):
-//	  - {grader name} ({type}): Pass/Fail ({passed}/{total})
-//	      - {point label}: Pass/Fail
+//   - {basename} ({source type}):
+//   - {grader name} ({type}): Pass/Fail ({passed}/{total})
+//   - {point label}: Pass/Fail
 //
 // Falls back to flat ungrouped list when all results lack SourceFile.
 func writeGraderResults(b *strings.Builder, results []GraderResult) {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"log/slog"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -97,8 +97,8 @@ func (s *StubRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.Tool
 
 // EngineOptions configures the evaluation engine.
 type EngineOptions struct {
-	Workers   int
-	OutputDir string
+	Workers      int
+	OutputDir    string
 	SkipReview   bool
 	DryRun       bool
 	ProgressMode string // "auto", "live", "log", "off"
@@ -342,7 +342,7 @@ func extractPairwiseVariant(configName string) string {
 	// First, we need to identify if this follows pairwise naming.
 	// Pairwise names are: {base}/baseline[/{model}] or {base}/without-{tool}[/{model}]
 	// The challenge is the model suffix can contain slashes too (e.g., "claude-opus-4.6").
-	
+
 	// Check for baseline variant
 	if idx := strings.LastIndex(configName, "/baseline"); idx != -1 {
 		// Verify this is actually /baseline and not just a substring
@@ -351,7 +351,7 @@ func extractPairwiseVariant(configName string) string {
 			return "baseline"
 		}
 	}
-	
+
 	// Check for without- variant
 	if idx := strings.Index(configName, "/without-"); idx != -1 {
 		// Extract everything after the leading slash, including "without-"
@@ -359,14 +359,14 @@ func extractPairwiseVariant(configName string) string {
 		// The variant continues until we hit a model-like suffix
 		// Models typically look like "claude-opus-4.6" or "gpt-5.3-codex"
 		// Deep MCP variants look like "without-azure/storage_blob_list/claude-opus-4.6"
-		
+
 		// Strategy: look for the last slash-delimited segment that looks like a model name
 		// (contains hyphens and dots or numbers)
 		parts := strings.Split(variant, "/")
 		if len(parts) == 0 {
 			return ""
 		}
-		
+
 		// Check if the last part looks like a model name (has . or multiple -)
 		lastPart := parts[len(parts)-1]
 		if strings.Contains(lastPart, ".") || strings.Count(lastPart, "-") >= 2 {
@@ -377,10 +377,10 @@ func extractPairwiseVariant(configName string) string {
 			}
 			variant = strings.Join(parts[:len(parts)-1], "/")
 		}
-		
+
 		return variant
 	}
-	
+
 	return ""
 }
 
@@ -773,8 +773,10 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				msg = "ERROR"
 			} else if !evalReport.Success {
 				evtType = progress.EventFailed
-				if evalReport.Review != nil {
-					msg = fmt.Sprintf("%d/%d criteria", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
+				if passed, total := report.TotalGraderPoints(evalReport.GraderResults); total > 0 {
+					msg = fmt.Sprintf("%d/%d points", passed, total)
+				} else if evalReport.Review != nil {
+					msg = fmt.Sprintf("%d/%d points", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
 				}
 			}
 			display.HandleEvent(progress.ProgressEvent{
@@ -946,6 +948,7 @@ func (e *Engine) dryRun(ctx context.Context, tasks []EvalTask) (*report.RunSumma
 
 	return summary, nil
 }
+
 // countSkillEntries counts how many ToolEntries in the list are skills.
 func countSkillEntries(entries []config.ToolEntry) int {
 	n := 0

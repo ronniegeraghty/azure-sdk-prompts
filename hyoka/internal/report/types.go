@@ -56,11 +56,11 @@ type GraderResult struct {
 
 // GraderPoint is one binary pass/fail check inside a grader.
 type GraderPoint struct {
-	Label    string             `json:"label"`              // what was checked
-	Pass     bool               `json:"pass"`
-	Message  string             `json:"message,omitempty"`  // why it passed/failed
-	Weight   float64            `json:"weight,omitempty"`   // for Score weighting; defaults to 1.0
-	Evidence map[string]string  `json:"evidence,omitempty"` // optional string-only KV
+	Label    string            `json:"label"` // what was checked
+	Pass     bool              `json:"pass"`
+	Message  string            `json:"message,omitempty"`  // why it passed/failed
+	Weight   float64           `json:"weight,omitempty"`   // for Score weighting; defaults to 1.0
+	Evidence map[string]string `json:"evidence,omitempty"` // optional string-only KV
 }
 
 // GraderExtras is a discriminated union carrying kind-specific render-only data.
@@ -110,14 +110,14 @@ type PromptExtras struct {
 
 // BehaviorExtras holds behavior grader render-only data.
 type BehaviorExtras struct {
-	ToolsUsed      []string `json:"tools_used,omitempty"`
-	MissingTools   []string `json:"missing_tools,omitempty"`
-	ForbiddenUsed  []string `json:"forbidden_used,omitempty"`
-	TurnCount      int      `json:"turn_count,omitempty"`
-	MaxTurns       int      `json:"max_turns,omitempty"`
-	TotalActions   int      `json:"total_actions,omitempty"`
-	TurnLimitHit   bool     `json:"turn_limit_hit,omitempty"`
-	Violations     []string `json:"violations,omitempty"`
+	ToolsUsed     []string `json:"tools_used,omitempty"`
+	MissingTools  []string `json:"missing_tools,omitempty"`
+	ForbiddenUsed []string `json:"forbidden_used,omitempty"`
+	TurnCount     int      `json:"turn_count,omitempty"`
+	MaxTurns      int      `json:"max_turns,omitempty"`
+	TotalActions  int      `json:"total_actions,omitempty"`
+	TurnLimitHit  bool     `json:"turn_limit_hit,omitempty"`
+	Violations    []string `json:"violations,omitempty"`
 }
 
 // ActionSequenceExtras holds action_sequence grader render-only data.
@@ -163,12 +163,12 @@ type ReviewExtras struct {
 
 // ReviewPanelResult holds one panel member's review result.
 type ReviewPanelResult struct {
-	Model     string                   `json:"model"`
-	Score     int                      `json:"score"`
-	Pass      bool                     `json:"pass"`
-	Issues    []string                 `json:"issues,omitempty"`
-	Strengths []string                 `json:"strengths,omitempty"`
-	Criteria  []ReviewCriterionResult  `json:"criteria"`
+	Model     string                  `json:"model"`
+	Score     int                     `json:"score"`
+	Pass      bool                    `json:"pass"`
+	Issues    []string                `json:"issues,omitempty"`
+	Strengths []string                `json:"strengths,omitempty"`
+	Criteria  []ReviewCriterionResult `json:"criteria"`
 }
 
 // ReviewCriterionResult holds one criterion's outcome.
@@ -237,14 +237,14 @@ type BehaviorGraderDetail struct {
 
 // ReviewGraderDetail holds AI review grader specifics (WI-023).
 type ReviewGraderDetail struct {
-	Model        string                      `json:"model,omitempty"`
-	OverallScore int                         `json:"overall_score"`
-	MaxScore     int                         `json:"max_score"`
-	Issues       []string                    `json:"issues,omitempty"`
-	Strengths    []string                    `json:"strengths,omitempty"`
-	IsConsensus  bool                        `json:"is_consensus,omitempty"`
-	Criteria     []ReviewGraderCriterion     `json:"criteria,omitempty"`
-	PanelResults []ReviewGraderPanelEntry    `json:"panel_results,omitempty"`
+	Model        string                   `json:"model,omitempty"`
+	OverallScore int                      `json:"overall_score"`
+	MaxScore     int                      `json:"max_score"`
+	Issues       []string                 `json:"issues,omitempty"`
+	Strengths    []string                 `json:"strengths,omitempty"`
+	IsConsensus  bool                     `json:"is_consensus,omitempty"`
+	Criteria     []ReviewGraderCriterion  `json:"criteria,omitempty"`
+	PanelResults []ReviewGraderPanelEntry `json:"panel_results,omitempty"`
 }
 
 // ReviewGraderCriterion holds a single criterion result from an AI review grader.
@@ -330,7 +330,7 @@ type ToolUsageResult struct {
 // was available to the agent and whether it was actually used during the session.
 type ToolAvailabilityEntry struct {
 	Name      string `json:"name"`
-	Type      string `json:"type"`      // "tool", "skill", "mcp"
+	Type      string `json:"type"` // "tool", "skill", "mcp"
 	Available bool   `json:"available"`
 	Used      bool   `json:"used"`
 }
@@ -343,10 +343,10 @@ type ReviewedFile struct {
 
 // EnvironmentInfo captures session environment and configuration metadata.
 type EnvironmentInfo struct {
-	Model             string   `json:"model"`
-	SkillDirectories  []string `json:"skillDirectories,omitempty"`
-	SkillsInvoked     []string `json:"skillsInvoked,omitempty"`
-	SkillsLoaded      []string `json:"skillsLoaded,omitempty"`
+	Model            string   `json:"model"`
+	SkillDirectories []string `json:"skillDirectories,omitempty"`
+	SkillsInvoked    []string `json:"skillsInvoked,omitempty"`
+	SkillsLoaded     []string `json:"skillsLoaded,omitempty"`
 	// SkillGroups carries the structured view of loaded skills with parent
 	// linkage (Phase 5, schema v3). It is a sibling to SkillsLoaded rather
 	// than a replacement (Plan 5.5 Option B): SkillsLoaded stays as the
@@ -431,50 +431,50 @@ type ActionSummaryReport struct {
 
 // EvalReport contains the results of a single prompt evaluation.
 type EvalReport struct {
-	SchemaVersion      int                   `json:"schema_version"`
-	PromptID           string                `json:"prompt_id"`
-	ConfigName         string                `json:"config_name"`
-	Timestamp          string                `json:"timestamp"`
-	Duration           float64               `json:"duration_seconds"`
-	GenerationDuration float64               `json:"generation_duration_seconds,omitempty"`
-	ReviewDuration     float64               `json:"review_duration_seconds,omitempty"`
-	PromptMeta         map[string]any        `json:"prompt_metadata"`
-	ConfigUsed         map[string]any        `json:"config_used"`
-	GeneratedFiles     []string              `json:"generated_files"`
-	StarterFiles       []string              `json:"starter_files,omitempty"`
-	ReviewedFiles      []ReviewedFile           `json:"reviewed_files,omitempty"`
+	SchemaVersion      int            `json:"schema_version"`
+	PromptID           string         `json:"prompt_id"`
+	ConfigName         string         `json:"config_name"`
+	Timestamp          string         `json:"timestamp"`
+	Duration           float64        `json:"duration_seconds"`
+	GenerationDuration float64        `json:"generation_duration_seconds,omitempty"`
+	ReviewDuration     float64        `json:"review_duration_seconds,omitempty"`
+	PromptMeta         map[string]any `json:"prompt_metadata"`
+	ConfigUsed         map[string]any `json:"config_used"`
+	GeneratedFiles     []string       `json:"generated_files"`
+	StarterFiles       []string       `json:"starter_files,omitempty"`
+	ReviewedFiles      []ReviewedFile `json:"reviewed_files,omitempty"`
 	// FileContents maps file paths to their contents for site display.
 	// Populated at report-build time from the workspace directory. Files
 	// exceeding 1MB are capped with a truncation marker.
-	FileContents       map[string]string     `json:"file_contents,omitempty"`
+	FileContents map[string]string `json:"file_contents,omitempty"`
 	// GeneratorArtifact captures the complete state of the generator session.
 	// Populated at report-build time from generator.json if it exists.
-	GeneratorArtifact  *GeneratorArtifact    `json:"generator_artifact,omitempty"`
-	Review             *review.ReviewResult     `json:"review,omitempty"`
-	ReviewPanel        []review.ReviewResult    `json:"review_panel,omitempty"`
-	SkippedReviewers   []review.SkippedReviewer `json:"skipped_reviewers,omitempty"`
-	GraderResults      []GraderResult           `json:"grader_results,omitempty"`
-	ToolUsage          *ToolUsageResult        `json:"tool_usage,omitempty"`
-	ToolAvailability   []ToolAvailabilityEntry `json:"tool_availability,omitempty"` // Tools available vs used (#348)
-	SessionEvents      []SessionEventRecord  `json:"session_events,omitempty"`
-	ActionTimeline     *ActionTimelineReport `json:"action_timeline,omitempty"` // Structured action log (#139)
-	EventCount         int                   `json:"event_count"`
-	ToolCalls          []string              `json:"tool_calls"`
-	Environment        *EnvironmentInfo      `json:"environment,omitempty"`
-	ResourceUsage      *ResourceStats        `json:"resource_usage,omitempty"`  // Per-eval resource stats (#45)
-	ScoreBreakdown     *ScoreBreakdown       `json:"score_breakdown,omitempty"` // Weighted aggregation breakdown (#143)
-	SessionSetup       *SessionSetupEvent    `json:"session_setup,omitempty"`   // Tool/skill/MCP loading status (#219)
-	WorkspaceDelta     *WorkspaceDelta       `json:"workspace_delta,omitempty"` // File-level changes agent made (#566)
-	Success            bool                  `json:"success"`
-	Error              string                `json:"error,omitempty"`
-	ErrorDetails       string                `json:"error_details,omitempty"`
-	ErrorCategory      string                `json:"error_category,omitempty"` // timeout, sdk_error, generation_failure, review_failure
-	FailureReason      string                `json:"failure_reason,omitempty"` // human-readable explanation of failure
-	IsStub             bool                  `json:"is_stub,omitempty"`
-	RerunCommand       string                `json:"rerunCommand,omitempty"`
-	BaseConfigName     string                `json:"baseConfigName,omitempty"`  // Config name before fan-out (e.g., "python-pairwise")
-	GeneratorModel     string                `json:"generatorModel,omitempty"`  // Specific model used (e.g., "claude-opus-4.6")
-	PairwiseVariant    string                `json:"pairwiseVariant,omitempty"` // Pairwise variant suffix (e.g., "baseline", "without-azure", "without-azure/storage_blob_list")
+	GeneratorArtifact *GeneratorArtifact       `json:"generator_artifact,omitempty"`
+	Review            *review.ReviewResult     `json:"review,omitempty"`
+	ReviewPanel       []review.ReviewResult    `json:"review_panel,omitempty"`
+	SkippedReviewers  []review.SkippedReviewer `json:"skipped_reviewers,omitempty"`
+	GraderResults     []GraderResult           `json:"grader_results,omitempty"`
+	ToolUsage         *ToolUsageResult         `json:"tool_usage,omitempty"`
+	ToolAvailability  []ToolAvailabilityEntry  `json:"tool_availability,omitempty"` // Tools available vs used (#348)
+	SessionEvents     []SessionEventRecord     `json:"session_events,omitempty"`
+	ActionTimeline    *ActionTimelineReport    `json:"action_timeline,omitempty"` // Structured action log (#139)
+	EventCount        int                      `json:"event_count"`
+	ToolCalls         []string                 `json:"tool_calls"`
+	Environment       *EnvironmentInfo         `json:"environment,omitempty"`
+	ResourceUsage     *ResourceStats           `json:"resource_usage,omitempty"`  // Per-eval resource stats (#45)
+	ScoreBreakdown    *ScoreBreakdown          `json:"score_breakdown,omitempty"` // Weighted aggregation breakdown (#143)
+	SessionSetup      *SessionSetupEvent       `json:"session_setup,omitempty"`   // Tool/skill/MCP loading status (#219)
+	WorkspaceDelta    *WorkspaceDelta          `json:"workspace_delta,omitempty"` // File-level changes agent made (#566)
+	Success           bool                     `json:"success"`
+	Error             string                   `json:"error,omitempty"`
+	ErrorDetails      string                   `json:"error_details,omitempty"`
+	ErrorCategory     string                   `json:"error_category,omitempty"` // timeout, sdk_error, generation_failure, review_failure
+	FailureReason     string                   `json:"failure_reason,omitempty"` // human-readable explanation of failure
+	IsStub            bool                     `json:"is_stub,omitempty"`
+	RerunCommand      string                   `json:"rerunCommand,omitempty"`
+	BaseConfigName    string                   `json:"baseConfigName,omitempty"`  // Config name before fan-out (e.g., "python-pairwise")
+	GeneratorModel    string                   `json:"generatorModel,omitempty"`  // Specific model used (e.g., "claude-opus-4.6")
+	PairwiseVariant   string                   `json:"pairwiseVariant,omitempty"` // Pairwise variant suffix (e.g., "baseline", "without-azure", "without-azure/storage_blob_list")
 	// Generator guardrails (#35) — Phase 3.5 (#566) dropped the byte-size
 	// cap entirely; MaxFiles, MaxTurns, and MaxSessionActions remain as hard
 	// fails that set GuardrailAbortReason.
@@ -506,7 +506,7 @@ type EvalReport struct {
 // and v3 reports without parent info round-trip identically.
 type ToolLoadResult struct {
 	Name       string `json:"name"`
-	Status     string `json:"status,omitempty"`      // omitempty: parents omit
+	Status     string `json:"status,omitempty"` // omitempty: parents omit
 	Error      string `json:"error,omitempty"`
 	Details    string `json:"details,omitempty"`     // e.g., command string for MCP servers
 	Kind       string `json:"kind,omitempty"`        // "skill" | "mcp" | "plugin" | "skill_dir"
@@ -762,6 +762,24 @@ type RunSummary struct {
 
 // BuildScoreBreakdown computes a ScoreBreakdown from the grader results on a report.
 // It mirrors the AggregateResults logic from the graders package to show users
+// TotalGraderPoints returns the sum of (passed, total) GraderPoint counts across
+// all GraderResults. This is the headline "score" for an eval — every individual
+// pass/fail check across every grader (prompt, file, output_check, etc.).
+//
+// Use this instead of Review.OverallScore/MaxScore (which only counts the LLM
+// judge's prompt-review criteria, often a small subset of the full grader set).
+func TotalGraderPoints(results []GraderResult) (passed, total int) {
+	for _, r := range results {
+		for _, p := range r.Points {
+			total++
+			if p.Pass {
+				passed++
+			}
+		}
+	}
+	return passed, total
+}
+
 // exactly how the final score was derived.
 func BuildScoreBreakdown(results []GraderResult) *ScoreBreakdown {
 	if len(results) == 0 {
