@@ -114,6 +114,13 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 		}
 		return NewToolGrader(gc.Name, cfg)
 
+	case "workspace":
+		cfg, ok := decoded.(*WorkspaceConfig)
+		if !ok {
+			return nil, fmt.Errorf("grader %q: expected *WorkspaceConfig, got %T", gc.Name, decoded)
+		}
+		return NewWorkspaceGrader(gc.Name, cfg)
+
 	default:
 		return nil, fmt.Errorf("unknown grader kind %q for %q", gc.Kind, gc.Name)
 	}

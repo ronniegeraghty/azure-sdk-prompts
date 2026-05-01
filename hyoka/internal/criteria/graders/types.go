@@ -117,38 +117,42 @@ type ActionSequenceConfig struct {
 }
 
 // OutputCheckConfig holds configuration for the "output_check" grader kind.
-//
-// This is a boolean grader that operates on the run's WorkspaceDelta (files
-// created or modified by the agent, not starter files). Each configured knob
-// produces one pass/fail sub-check with a human-readable reason. The overall
-// grader result is the AND of every configured sub-check; unconfigured knobs
-// are skipped (no implicit defaults apply).
-//
-// v1 knobs (Q7, locked 2026-04-22): min_files, max_files, require_files,
-// forbid_files, require_updated, min_bytes_per_file, max_bytes_per_file.
-// Globs/regex deferred beyond v1.
+// DEPRECATED: Use WorkspaceConfig with type: workspace instead.
+// This type is kept for backwards compatibility but will emit a parse error.
 type OutputCheckConfig struct {
-	// MinFiles is the minimum number of files the agent must have created
-	// or modified. 0 disables the check.
-	MinFiles int `yaml:"min_files,omitempty" json:"min_files,omitempty"`
-	// MaxFiles is the maximum number of files the agent may have created
-	// or modified. 0 disables the check.
-	MaxFiles int `yaml:"max_files,omitempty" json:"max_files,omitempty"`
-	// RequireFiles lists workspace-relative paths that MUST appear among
-	// files the agent created or modified.
-	RequireFiles []string `yaml:"require_files,omitempty" json:"require_files,omitempty"`
-	// ForbidFiles lists workspace-relative paths that MUST NOT appear among
-	// files the agent created or modified.
-	ForbidFiles []string `yaml:"forbid_files,omitempty" json:"forbid_files,omitempty"`
-	// RequireUpdated lists workspace-relative paths that MUST appear in the
-	// delta's modified set (the agent changed an existing file's content).
-	RequireUpdated []string `yaml:"require_updated,omitempty" json:"require_updated,omitempty"`
-	// MinBytesPerFile is the minimum size (in bytes) each created-or-modified
-	// file must meet. 0 disables the check.
-	MinBytesPerFile int64 `yaml:"min_bytes_per_file,omitempty" json:"min_bytes_per_file,omitempty"`
-	// MaxBytesPerFile is the maximum size (in bytes) any created-or-modified
-	// file may reach. 0 disables the check.
-	MaxBytesPerFile int64 `yaml:"max_bytes_per_file,omitempty" json:"max_bytes_per_file,omitempty"`
+	MinFiles        int      `yaml:"min_files,omitempty" json:"min_files,omitempty"`
+	MaxFiles        int      `yaml:"max_files,omitempty" json:"max_files,omitempty"`
+	RequireFiles    []string `yaml:"require_files,omitempty" json:"require_files,omitempty"`
+	ForbidFiles     []string `yaml:"forbid_files,omitempty" json:"forbid_files,omitempty"`
+	RequireUpdated  []string `yaml:"require_updated,omitempty" json:"require_updated,omitempty"`
+	MinBytesPerFile int64    `yaml:"min_bytes_per_file,omitempty" json:"min_bytes_per_file,omitempty"`
+	MaxBytesPerFile int64    `yaml:"max_bytes_per_file,omitempty" json:"max_bytes_per_file,omitempty"`
+}
+
+// WorkspaceConfig holds configuration for the "workspace" grader kind.
+//
+// This grader operates on WorkspaceDelta (NewFiles, ModifiedFiles, DeletedFiles)
+// and validates workspace state against configured checks. Six check kinds:
+//   - require_to_create: path must be in NewFiles
+//   - forbidden_to_create: path must NOT be in NewFiles
+//   - required_to_update: path must be in ModifiedFiles
+//   - required_to_delete: path must be in DeletedFiles
+//   - forbidden_to_delete: if files:["*"], no deletions; else specific paths must not be deleted
+//   - file: state present (exists on disk + optional size/content checks) or absent (not on disk)
+type WorkspaceConfig struct {
+	Checks []WorkspaceCheck `yaml:"checks" json:"checks"`
+}
+
+// WorkspaceCheck defines a single check within a workspace grader.
+type WorkspaceCheck struct {
+	Kind     string   `yaml:"kind" json:"kind"`               // One of: require_to_create, forbidden_to_create, required_to_update, required_to_delete, forbidden_to_delete, file
+	Files    []string `yaml:"files,omitempty" json:"files,omitempty"` // For kinds other than "file"
+	Name     string   `yaml:"name,omitempty" json:"name,omitempty"`   // For kind: file
+	State    string   `yaml:"state,omitempty" json:"state,omitempty"` // For kind: file; "present" or "absent"
+	MinBytes *int64   `yaml:"min_bytes,omitempty" json:"min_bytes,omitempty"` // For kind: file, state: present
+	MaxBytes *int64   `yaml:"max_bytes,omitempty" json:"max_bytes,omitempty"` // For kind: file, state: present
+	Contains string   `yaml:"contains,omitempty" json:"contains,omitempty"`   // For kind: file, state: present
+	Excludes string   `yaml:"excludes,omitempty" json:"excludes,omitempty"`   // For kind: file, state: present
 }
 
 // ToolConstraintConfig holds configuration for the "tool_constraint" grader kind.
@@ -255,6 +259,12 @@ func (g *GraderConfig) DecodeConfig() (any, error) {
 		var c OutputCheckConfig
 		if err := g.Config.Decode(&c); err != nil {
 			return nil, fmt.Errorf("decoding output_check config for %q: %w", g.Name, err)
+		}
+		return &c, nil
+	case "workspace":
+		var c WorkspaceConfig
+		if err := g.Config.Decode(&c); err != nil {
+			return nil, fmt.Errorf("decoding workspace config for %q: %w", g.Name, err)
 		}
 		return &c, nil
 	case KindToolUsage:

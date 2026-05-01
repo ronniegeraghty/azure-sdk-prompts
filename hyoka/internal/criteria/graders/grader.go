@@ -190,7 +190,8 @@ type GraderExtras struct {
 	Behavior       *BehaviorExtras       `json:"behavior,omitempty"`
 	ActionSequence *ActionSequenceExtras `json:"action_sequence,omitempty"`
 	ToolConstraint *ToolConstraintExtras `json:"tool_constraint,omitempty"`
-	OutputCheck    *OutputCheckExtras    `json:"output_check,omitempty"`
+	OutputCheck    *OutputCheckExtras    `json:"output_check,omitempty"` // DEPRECATED: use Workspace
+	Workspace      *WorkspaceExtras      `json:"workspace,omitempty"`
 	Review         *ReviewExtras         `json:"review,omitempty"`
 }
 
@@ -259,8 +260,14 @@ type ToolConstraintExtras struct {
 }
 
 // OutputCheckExtras holds output_check grader render-only data.
+// DEPRECATED: Use WorkspaceExtras instead.
 type OutputCheckExtras struct {
 	ProducedFiles []FileEntry `json:"produced_files"`
+}
+
+// WorkspaceExtras holds workspace grader render-only data.
+type WorkspaceExtras struct {
+	ProducedFiles []FileEntry `json:"produced_files"` // NewFiles ∪ ModifiedFiles
 }
 
 // ReviewExtras holds prompt_review grader render-only data.

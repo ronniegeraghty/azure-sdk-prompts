@@ -95,9 +95,10 @@ var validTypedKinds = map[string]bool{
 	graders.KindBehavior:       true,
 	graders.KindActionSequence: true,
 	graders.KindToolConstraint: true,
-	graders.KindOutputCheck:    true,
+	// graders.KindOutputCheck removed — replaced by "workspace"
 	graders.KindToolUsage:      true,
 	graders.KindTool:           true,
+	"workspace":                true, // Canonical workspace grader
 }
 
 // IsValidUnifiedType returns true if t is a recognized unified-schema type
@@ -140,6 +141,12 @@ func validateEntry(e UnifiedGraderEntry) error {
 	if e.Type == "" {
 		return fmt.Errorf("grader %q: type is required", tag)
 	}
+	
+	// Loud migration error for renamed types
+	if e.Type == graders.KindOutputCheck {
+		return fmt.Errorf("grader %q: type %q has been renamed to \"workspace\" with new check kinds; see docs/graders.md for migration guide", tag, e.Type)
+	}
+	
 	if !IsValidUnifiedType(e.Type) {
 		return fmt.Errorf("grader %q: unknown type %q", tag, e.Type)
 	}
