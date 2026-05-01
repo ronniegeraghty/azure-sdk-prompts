@@ -4,6 +4,7 @@ description: Stable id-based voting for multi-model review panels
 created: 2026-04-27
 updated: 2026-05-01
 status: shipped
+confidence: high
 ---
 
 # Deterministic LLM Panel Pattern
@@ -48,7 +49,7 @@ Multi-model review panels produce non-deterministic results when each reviewer L
 
 **Dropped from contract:** `criterion` text field (LLM no longer trusted to echo label).
 
-### 3. Validator Retry-Then-Drop
+### 3. Validator Retry-Then-Synthesize
 
 On validation error, re-prompt with precise feedback:
 ```
@@ -56,11 +57,24 @@ Your response is missing ids: [check_2]. Extra ids: [check_99].
 Please return exactly: [check_1, check_2, check_3].
 ```
 
-After max retries (2), drop reviewer with `slog.Warn`:
+After **3 retries**, synthesize a **failing CriterionResult** for each missing ID:
 ```go
-slog.Warn("reviewer dropped: invalid criteria ids after retries",
-    "model", model, "validation_errors", validationErrors)
+for _, check := range checks {
+    if !returnedIDs[check.ID] {
+        result.Scores.Criteria = append(result.Scores.Criteria, CriterionResult{
+            ID:     check.ID,
+            Name:   check.Text,
+            Passed: false,
+            Reason: "reviewer failed to return a vote after 3 attempts",
+        })
+    }
+}
 ```
+
+**Critically:** The reviewer is **not dropped**. MaxScore = `len(expected)` always. This ensures:
+- Stable point counts across runs (no variable MaxScore due to dropped reviewers)
+- Panel size remains constant (all reviewers contribute to consensus)
+- Failures are explicit (visible as failed checks with reason "no vote after N attempts")
 
 ### 4. Bucket::ID Vote Keying
 
