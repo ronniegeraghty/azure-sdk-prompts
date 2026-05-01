@@ -1,6 +1,8 @@
-# Test-language criteria — exercises every supported grader type and every
-# available check field. Paired with prompts/test/hello-markdown.prompt.md
-# (writes a small hello.md using the markdown-headings + markdown-lists skills).
+# Test-language criteria — exercises all canonical grader kinds.
+# Paired with prompts/test/hello-markdown.prompt.md (writes a small hello.md
+# using the markdown-headings + markdown-lists skills).
+#
+# Uses only canonical kinds: prompt, output_check, tool, program, action_sequence.
 when:
   language: test
 graders:
@@ -42,49 +44,37 @@ graders:
       max_bytes_per_file: 10000
 
   # ---------------------------------------------------------------------------
-  # 3. file — single-file existence + regex content match.
+  # 3. tool — unified tool checks. Consolidates behavior/tool_constraint/tool_usage.
+  #    Each check: one pass/fail point.
   # ---------------------------------------------------------------------------
-  - name: Hello.md File Check
-    type: file
-    weight: 0.5
+  - name: Tool Checks
+    type: tool
+    weight: 1.0
     details:
-      path: hello.md
-      pattern: "^# Hello"
-      must_exist: true
+      checks:
+        # Turn limit check (formerly behavior grader).
+        - kind: turn_limit
+          n: 3
+        # Required tool (formerly behavior grader).
+        - kind: specific_tool
+          name: skill
+        # Forbidden tool (formerly behavior grader).
+        - kind: tool_not_used
+          name: bash
+        # Min calls constraint (formerly tool_constraint grader).
+        - kind: min_calls
+          name: skill
+          n: 2
+        # Max calls constraint (formerly tool_constraint grader).
+        - kind: max_calls
+          name: skill
+          n: 20
+        # Group check: any skill plugin used (formerly tool_usage grader).
+        - kind: any_of_group
+          group: skill_plugin
 
   # ---------------------------------------------------------------------------
-  # 4. behavior — turn cap + required/forbidden tool presence in the action log.
-  # ---------------------------------------------------------------------------
-  - name: Efficient Behavior
-    type: behavior
-    weight: 0.5
-    details:
-      required_tools:
-        - skill
-      forbidden_tools:
-        - bash
-      max_turns: 3
-
-  # ---------------------------------------------------------------------------
-  # 5. tool_constraint — per-tool call-count constraints.
-  #    Skills (markdown-headings, markdown-lists) surface in the action log as
-  #    a tool named "skill" — requiring 2 demonstrates both loaded skills ran.
-  # ---------------------------------------------------------------------------
-  - name: Skill Usage
-    type: tool_constraint
-    weight: 0.5
-    details:
-      required:
-        - skill
-      forbidden:
-        - shell
-      min_calls:
-        skill: 2
-      max_calls:
-        skill: 20
-
-  # ---------------------------------------------------------------------------
-  # 6. action_sequence — ordered prefix of expected action names.
+  # 4. action_sequence — ordered prefix of expected action names.
   # ---------------------------------------------------------------------------
   - name: Markdown Action Sequence
     type: action_sequence
@@ -95,31 +85,7 @@ graders:
         - write
 
   # ---------------------------------------------------------------------------
-  # 7. tool_usage — environment-aware. Each rule is silently skipped if its
-  #    referenced tool/skill isn't in the eval environment. Covers all three
-  #    rule types: mcp_server, skill_plugin, skill_repo.
-  # ---------------------------------------------------------------------------
-  - name: Markdown Skills Used
-    type: tool_usage
-    weight: 0.5
-    details:
-      rules:
-        - type: skill_plugin
-          name: markdown-headings
-          expect: any_skill_invoked
-        - type: skill_plugin
-          name: markdown-lists
-          expect: skill_invoked
-        - type: mcp_server
-          name: azure
-          expect: at_least_one_tool_call
-        - type: skill_repo
-          repo: mauromedda/agent-toolkit
-          skill: markdown
-          expect: skill_invoked
-
-  # ---------------------------------------------------------------------------
-  # 8. program — runs a command in the workspace; exit 0 = pass.
+  # 5. program — runs a command in the workspace; exit 0 = pass.
   # ---------------------------------------------------------------------------
   - name: Hello.md Exists (program)
     type: program
