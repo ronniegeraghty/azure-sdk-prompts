@@ -1031,3 +1031,41 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 
 **Pattern:** Tank implemented dual-emit JSON marshaling using custom Marshal/Unmarshal methods on `EvalReport` and related types. Both `checks` and `points` fields emitted; site (display layer) prefers `checks` while report JSON supports both for back-compat. **Value:** Enables graceful migration; consumers can upgrade independently without breaking cross-version compatibility. No schema bump required; no migration code needed at boundaries.
 
+
+## 2026-05-01 — Workspace and Activity Graders (Commits A & B)
+
+**Context:** Grader taxonomy redesign (Morpheus plan). Neo handling pairwise + tool grader in parallel.
+
+**Commit A (1f461a50): Workspace Grader**
+- Renamed `output_check` → `workspace` with six canonical check kinds
+- All checks driven from WorkspaceDelta (NewFiles / ModifiedFiles / DeletedFiles)
+- Check kinds: require_to_create, forbidden_to_create, required_to_update, required_to_delete, forbidden_to_delete, file
+- `file` kind supports state present|absent with optional min_bytes, max_bytes, contains, excludes
+- Loud parse error on legacy `type: output_check` pointing to migration
+- Added WorkspaceConfig, WorkspaceCheck, WorkspaceExtras types
+- Created workspace_grader.go + workspace_grader_test.go (17 test cases)
+- Files: config.go, grader.go, registry.go, types.go
+
+**Commit B (0896ba53): Activity Grader**
+- Renamed `action_sequence` + dropped `behavior` → single `activity` grader
+- Powered by ActionLog, ActionsSummary, TerminatedBy (from GeneratorArtifact)
+- Seven canonical check kinds: turn_limit, action_count, tool_call_count, contains_subsequence, contains_action, not_truncated, terminated_by
+- `turn_limit` migrated from tool grader (semantically correct home)
+- Loud parse errors on `type: action_sequence` and `type: behavior`
+- Added ActivityConfig, ActivityCheck, ActivityExtras types
+- Created activity_grader.go + activity_grader_test.go (7 test cases)
+- Files: config.go, grader.go, registry.go, types.go
+
+**Verification:**
+- `go build ./hyoka/...` ✅
+- `go test -race ./hyoka/internal/criteria/graders/... -run TestWorkspace` ✅
+- `go test -race ./hyoka/internal/criteria/graders/... -run TestActivity` ✅
+
+**Coordination:**
+- Neo's pairwise fix (4f293e06) and tool grader redesign (24de2f26) landed between commits
+- Neo's tool_grader_test.go has pre-existing build failures (uses old ToolCheckRule field names)
+- Switch updating criteria fixtures in parallel
+
+**Next:**
+- Site component renames (OutputCheckExtras → WorkspaceExtras, ActionSequenceExtras → ActivityExtras)
+- Docs update (graders.md canonical reference)
