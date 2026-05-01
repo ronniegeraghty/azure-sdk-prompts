@@ -219,8 +219,28 @@ func (d *Display) WriteEvalBreakdown(promptID, configName, text string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	header := fmt.Sprintf("\nGraders for %s / %s:\n", promptID, configName)
-	fmt.Fprint(os.Stderr, header)
-	fmt.Fprint(os.Stderr, text)
+	if d.ansi {
+		// Restore cursor to top of live region, clear it, print breakdown
+		// (which scrolls into permanent history), then re-save cursor so the
+		// live region floats below the breakdown on subsequent redraws.
+		var buf bytes.Buffer
+		buf.WriteString("\0338\033[J")
+		buf.WriteString(header)
+		buf.WriteString(text)
+		if !endsWithNewline(text) {
+			buf.WriteByte('\n')
+		}
+		buf.WriteString("\0337")
+		buf.Write(d.buildRegion())
+		d.w.Write(buf.Bytes())
+		return
+	}
+	fmt.Fprint(d.w, header)
+	fmt.Fprint(d.w, text)
+}
+
+func endsWithNewline(s string) bool {
+	return len(s) > 0 && s[len(s)-1] == '\n'
 }
 
 // --- ANSI fixed-region rendering (terminal only) ---
