@@ -921,3 +921,10 @@ GeneratorModel  string  // Actual generator model used for this eval
 ---
 
 **2026-04-29:** EvalReport now carries `PairwiseVariant` field; `buildRerunCommand()` emits `--pairwise-variant` flag. Trinity may want to verify site-side rerun-command builder uses this field rather than parsing config name string.
+
+## 2026-05-01 — Pairwise UI Back-Compat for check_diffs Field (Grader Overhaul Part 5)
+
+**Commits:** 63d47bb6 (pairwise page + per-check diff), 8a584f17 (expose per-check diff backend)
+
+**Pattern:** Pairwise diff page renders per-check diffs for each variant. Must handle old reports lacking `check_diffs` field. Implemented optional field handling in React + defensive JSON unmarshaling so UI doesn't crash on legacy eval results. **Back-compat note:** Old reports without check_diffs still render (pairwise view shows high-level diffs only); new evaluations get full per-check breakdown.
+

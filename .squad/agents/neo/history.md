@@ -1422,3 +1422,15 @@ Commit 2 (1f3c9ec9): `fix(review): retry 3 times then synthesize failing checks 
 - hyoka/internal/review/review_test.go (new test: TestAverageReview_AnchoredToExpectedCheckIDs)
 
 **Outcome:** Review pipeline now produces deterministic MaxScore and panel size. No more drift.
+
+## 2026-05-01 — Grader Overhaul Part 5: Tool Consolidation & Registration Bug Pattern
+
+**Commits:** 1f3c9ec9, 1f3c9ec9, 8c0c1d1c, 8b51cc36, 1df6ac05 (Neo; hotfix assist from Switch C15)
+
+**Key Lesson:** When adding a new grader `Kind`, **must register in 3 places**:
+1. `registry.go` — `NewGrader()` switch statement
+2. `types.go` — config decode switch for `GraderConfig.Kind`
+3. `config.go` — `validTypedKinds` map
+
+Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught two registration misses before production. Commit 8c0c1d1c added KindTool to registry; 8b51cc36 added to validTypedKinds.
+

@@ -1027,3 +1027,10 @@ Morpheus scoping proposal approved and shipped by Neo. Pipeline completed:
 
 - Plan: `.squad/decisions/inbox/morpheus-grader-overhaul-plan.md`
   (15 commits, owners assigned, sequencing graph, verification matrix)
+
+## 2026-05-01 — Determinism Overhaul: Real Bug + Legitimate Non-Determinism (Grader Overhaul Part 5)
+
+**Commits:** 40307c40 (docs skill), 64f653d2 (progress), 7e110b02, 1f3c9ec9 (review retry logic)
+
+**Finding:** Original "26 vs 25 checks" inconsistency was *partially* a real determinism bug (now fixed) and *partially* legitimate non-determinism. LLM action_sequence and behavior graders judge **non-deterministic LLM action logs**—two runs of the same prompt produce different actions → different check outcomes. Updated deterministic-llm-panel skill docs to clarify: consensus panel ensures stable reviews but cannot eliminate variance in *what* the LLM does. Panel now retries 3 times on missing IDs before synthesizing (commit 1f3c9ec9).
+

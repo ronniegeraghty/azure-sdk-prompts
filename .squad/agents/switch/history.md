@@ -833,3 +833,10 @@ Neo shipped determinism fix with comprehensive test coverage:
 **Recommendation:** If user reports further drift, need exact prompt ID + config name + grader type. Test fixture may not exhibit same behavior as complex multi-turn prompts.
 
 **Artifacts:** `.squad/decisions/inbox/switch-determinism-repro.md` (full analysis with tables)
+
+## 2026-05-01 — Pre-Commit Verification Catches Mid-Flight Bugs (Grader Overhaul C15)
+
+**Commit:** 1df6ac05 (test fixture rebuild + live eval verify)
+
+**Lesson:** Test fixture rebuild + attempting actual eval runs before committing test changes caught two registration bugs in KindTool. Neo had registered in registry.go and types.go but missed config.go validTypedKinds map. Hotfixes 8c0c1d1c (registry) and 8b51cc36 (config) committed after verification. **Pattern:** Always verify test fixtures against production code paths, not just static inspection.
+

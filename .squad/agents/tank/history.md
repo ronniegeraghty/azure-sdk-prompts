@@ -1024,3 +1024,10 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 - **The `getChecks()` helper centralizes the fallback logic.** All site components now call one function instead of repeating `?? []` everywhere.
 
 **Decision:** Created `.squad/decisions/inbox/tank-json-dual-emit.md` documenting the migration horizon and next-release cleanup plan.
+
+## 2026-05-01 — Dual-Emit JSON as Graceful Migration Pattern (Grader Overhaul Part 5)
+
+**Commits:** d955565e (dual-emit reports/site), 64f653d2 (progress line), 360a45c8 (docs)
+
+**Pattern:** Tank implemented dual-emit JSON marshaling using custom Marshal/Unmarshal methods on `EvalReport` and related types. Both `checks` and `points` fields emitted; site (display layer) prefers `checks` while report JSON supports both for back-compat. **Value:** Enables graceful migration; consumers can upgrade independently without breaking cross-version compatibility. No schema bump required; no migration code needed at boundaries.
+
