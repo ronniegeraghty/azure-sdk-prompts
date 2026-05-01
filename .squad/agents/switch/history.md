@@ -900,3 +900,66 @@ test(pairwise): assert skills_loaded matches deep variant exclusions
 
 **Branch state:** Clean for Track 1 commit. Neo/Tank will commit their work separately.
 
+
+## 2026-05-01 — Track 2: Grader Integration Test + types.go Fix (SHIPPED ✅)
+
+**Mission:** Verify Neo's and Tank's shipped graders work in real eval runs. Update test criteria fixture.
+
+**Context:** After Neo shipped pairwise deep fix + tool grader redesign (commits 4f293e06, 24de2f26) and Tank shipped workspace/activity graders (commits 1f461a50, 0896ba53), needed to verify all new grader kinds produce results in production-like conditions.
+
+**Changes Made:**
+
+1. **Updated test.yaml criteria:**
+   - Tool grader: 4 checks (tool_used, tool_not_used, any_from_group, none_from_group)
+   - Workspace grader: 4 checks (require_to_create, forbidden_to_create, forbidden_to_delete, file with state/min_bytes/contains)
+   - Activity grader: 5 checks (turn_limit, action_count, tool_call_count, not_truncated, terminated_by)
+   - Retained program grader and prompt graders from prompt file
+
+2. **Fixed types.go registration:**
+   - Tank added workspace/activity graders in registry.go but forgot to add `KindWorkspace` and `KindActivity` constants to types.go
+   - Added both constants and registered them in `validKinds` map
+   - Without this fix, all evals errored with "unknown type \"workspace\""
+
+**Verification Runs:**
+
+Ran 3 identical test evals with `--pairwise`:
+- Prompt: `test-dp-test-hello-markdown`
+- Config: `test/baseline` (pairwise deep on test-skills)
+- All 3 runs: 6 variants (2 models × 3 skill configs)
+
+**Findings:**
+
+✅ **Pairwise deep exclusion works:** Verified `environment.skillsLoaded` in reports:
+- Baseline variant shows `["markdown-headings", "markdown-lists", "customize-cloud-agent"]`
+- `without-markdown-lists` variant shows `["markdown-headings", "customize-cloud-agent"]`
+- Neo's fix (commit 4f293e06) confirmed working in real runs
+
+✅ **All new grader kinds produce results:**
+- Tool grader: 4 check-level pass/fail results per eval
+- Workspace grader: 4-5 checks (depends on whether file exists)
+- Activity grader: 5 checks per eval
+- Each produces granular check-level feedback in logs + reports
+
+⚠️ **Check count variance observed:** Run 1 showed 27 checks for baseline/haiku while runs 2-3 showed 44. Root cause: LLM nondeterminism — Haiku failed to generate hello.md in run 1, causing workspace checks to fail early. This is expected behavior, not a grader bug. Grader-level check counts (number of grader points) are stable; prompt grader sub-checks vary with LLM success.
+
+**Artifacts:**
+- Findings doc: `.squad/decisions/inbox/switch-test-findings-20260501T231144Z.md`
+- Commit: ec3c9057
+
+**Commit message:**
+```
+test(criteria): exercise tool/workspace/activity graders in test.yaml
+
+Updated test criteria to use the redesigned grader shapes (tool, workspace,
+activity) per Neo's and Tank's shipped changes. Verified across 3 pairwise
+runs that all new grader kinds produce check-level results and that pairwise
+deep skill exclusion now works correctly in real eval runs.
+
+Also fixed missing KindWorkspace and KindActivity registration in types.go
+(Tank's commits added graders but not the type constants/validKinds entries).
+```
+
+**Pushed to:** origin/ronniegeraghty/dev
+
+**Status:** Track 2 complete. All grader redesign changes verified in production-like conditions. Ready for Oracle to update docs.
+
