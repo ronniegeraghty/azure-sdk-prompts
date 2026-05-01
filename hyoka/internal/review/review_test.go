@@ -1910,3 +1910,216 @@ if !strings.Contains(err.Error(), "no generated files") && !strings.Contains(err
 t.Errorf("error should mention missing files or response, got: %v", err)
 }
 }
+
+// ---------------------------------------------------------------------------
+// ID-aware parser and validator tests
+// ---------------------------------------------------------------------------
+
+func TestParseReviewResponseV2_GoodIDs(t *testing.T) {
+expected := []ReviewCheck{
+{ID: "check_1", Text: "Build succeeds"},
+{ID: "check_2", Text: "Tests pass"},
+}
+response := `{
+"criteria": [
+{"id": "check_1", "passed": true, "reasoning": "builds"},
+{"id": "check_2", "passed": false, "reasoning": "1 test failed"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+result, errs := parseReviewResponseV2(response, expected)
+if len(errs) > 0 {
+t.Fatalf("unexpected errors: %v", errs)
+}
+if result == nil {
+t.Fatal("result is nil")
+}
+if len(result.Scores.Criteria) != 2 {
+t.Fatalf("expected 2 criteria, got %d", len(result.Scores.Criteria))
+}
+if result.Scores.Criteria[0].ID != "check_1" {
+t.Errorf("criterion 0 id = %q, want check_1", result.Scores.Criteria[0].ID)
+}
+if result.Scores.Criteria[0].Name != "Build succeeds" {
+t.Errorf("criterion 0 name = %q, want canonical label", result.Scores.Criteria[0].Name)
+}
+if !result.Scores.Criteria[0].Passed {
+t.Error("criterion 0 should be passed")
+}
+}
+
+func TestParseReviewResponseV2_MissingID(t *testing.T) {
+expected := []ReviewCheck{
+{ID: "check_1", Text: "A"},
+{ID: "check_2", Text: "B"},
+}
+response := `{
+"criteria": [
+{"id": "check_1", "passed": true, "reasoning": "ok"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+_, errs := parseReviewResponseV2(response, expected)
+if len(errs) == 0 {
+t.Fatal("expected validation errors for missing id")
+}
+found := false
+for _, e := range errs {
+if strings.Contains(e, "missing") && strings.Contains(e, "check_2") {
+found = true
+break
+}
+}
+if !found {
+t.Errorf("expected 'missing ids' error, got %v", errs)
+}
+}
+
+func TestParseReviewResponseV2_ExtraID(t *testing.T) {
+expected := []ReviewCheck{
+{ID: "check_1", Text: "A"},
+}
+response := `{
+"criteria": [
+{"id": "check_1", "passed": true, "reasoning": "ok"},
+{"id": "check_99", "passed": false, "reasoning": "extra"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+_, errs := parseReviewResponseV2(response, expected)
+if len(errs) == 0 {
+t.Fatal("expected validation errors for extra id")
+}
+found := false
+for _, e := range errs {
+if strings.Contains(e, "unexpected") && strings.Contains(e, "check_99") {
+found = true
+break
+}
+}
+if !found {
+t.Errorf("expected 'unexpected id' error, got %v", errs)
+}
+}
+
+func TestParseReviewResponseV2_MalformedShape(t *testing.T) {
+expected := []ReviewCheck{{ID: "check_1", Text: "A"}}
+response := `{"criteria": "not an array"}`
+_, errs := parseReviewResponseV2(response, expected)
+if len(errs) == 0 {
+t.Fatal("expected validation errors for malformed response")
+}
+}
+
+func TestAverageReview_KeysByID_NotName(t *testing.T) {
+expected := []ReviewCheck{
+{ID: "check_1", Text: "Build succeeds"},
+}
+panel := []ReviewResult{
+{
+Model: "m1",
+Scores: ReviewScores{Criteria: []CriterionResult{
+{ID: "check_1", Name: "Build succeeds", Passed: true, Reason: "compiles fine"},
+}},
+},
+{
+Model: "m2",
+Scores: ReviewScores{Criteria: []CriterionResult{
+{ID: "check_1", Name: "Build succeeds", Passed: true, Reason: "no errors"},
+}},
+},
+}
+result := averageReview(panel, expected)
+if len(result.Scores.Criteria) != 1 {
+t.Fatalf("expected 1 criterion, got %d", len(result.Scores.Criteria))
+}
+c := result.Scores.Criteria[0]
+if c.Name != "Build succeeds" {
+t.Errorf("name = %q, want canonical label", c.Name)
+}
+if !strings.Contains(c.Reason, "2/2") {
+t.Errorf("reason = %q, want 2/2 reviewers", c.Reason)
+}
+}
+
+func TestAverageReview_BucketScoping(t *testing.T) {
+expected := []ReviewCheck{
+{ID: "check_1", Text: "A"},
+}
+panel := []ReviewResult{
+{
+Model: "m1",
+Scores: ReviewScores{Criteria: []CriterionResult{
+{ID: "check_1", Name: "[bucketA] A", Passed: true},
+{ID: "check_1", Name: "[bucketB] A", Passed: false},
+}},
+},
+}
+result := averageReview(panel, expected)
+if len(result.Scores.Criteria) != 2 {
+t.Fatalf("expected 2 criteria (bucket-scoped), got %d", len(result.Scores.Criteria))
+}
+names := make(map[string]bool)
+for _, c := range result.Scores.Criteria {
+names[c.Name] = true
+}
+if !names["[bucketA] A"] || !names["[bucketB] A"] {
+t.Errorf("expected both bucket-prefixed entries, got %v", names)
+}
+}
+
+func TestBuildReviewPrompt_RendersIDs(t *testing.T) {
+checks := []ReviewCheck{
+{ID: "check_1", Text: "File exists"},
+{ID: "check_2", Text: "Tests pass"},
+}
+prompt := BuildReviewPrompt("Write code", nil, nil, checks, nil)
+if !strings.Contains(prompt, "check_1:") {
+t.Error("prompt missing 'check_1:' id rendering")
+}
+if !strings.Contains(prompt, "check_2:") {
+t.Error("prompt missing 'check_2:' id rendering")
+}
+if !strings.Contains(prompt, "File exists") {
+t.Error("prompt missing check text")
+}
+if !strings.Contains(prompt, "Do NOT") {
+t.Error("prompt missing id-contract rule")
+}
+if !strings.Contains(prompt, `"id"`) {
+t.Error("prompt missing schema example with id field")
+}
+}
+
+func TestParseReviewResponseV2_RejectsLegacyText(t *testing.T) {
+expected := []ReviewCheck{{ID: "check_1", Text: "A"}}
+// Response with only "criterion" field (no "id")
+response := `{
+"criteria": [
+{"criterion": "A", "passed": true, "reasoning": "ok"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+_, errs := parseReviewResponseV2(response, expected)
+if len(errs) == 0 {
+t.Fatal("expected validation errors for legacy criterion-only response")
+}
+found := false
+for _, e := range errs {
+if strings.Contains(e, "empty id") || strings.Contains(e, "missing") {
+found = true
+break
+}
+}
+if !found {
+t.Errorf("expected empty/missing id error, got %v", errs)
+}
+}

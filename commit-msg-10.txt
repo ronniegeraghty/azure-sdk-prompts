@@ -1,0 +1,20 @@
+test(review): add determinism regression test + unit tests
+
+Unit tests:
+- TestParseReviewResponseV2_GoodIDs: valid id response
+- TestParseReviewResponseV2_MissingID: validator catches missing ids
+- TestParseReviewResponseV2_ExtraID: validator catches unexpected ids
+- TestParseReviewResponseV2_MalformedShape: validator catches bad JSON shape
+- TestAverageReview_KeysByID_NotName: two reviewers, same check_1, different
+  reasoning → single criterion, 2/2 reviewers, canonical label from YAML
+- TestAverageReview_BucketScoping: two buckets each with check_1 → separate
+  vote keys (bucketA::check_1, bucketB::check_1)
+- TestBuildReviewPrompt_RendersIDs: output contains check_N: text format,
+  schema example with "id" field, "Do NOT echo criterion text" rule
+- TestParseReviewResponseV2_RejectsLegacyText: response with only "criterion"
+  (no "id") returns validation error
+
+All tests pass. Integration test (deterministic stub panel reviewer) deferred
+to end-to-end smoke test.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
