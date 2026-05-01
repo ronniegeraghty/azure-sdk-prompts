@@ -1,0 +1,18 @@
+fix(review): retry 3 times then synthesize failing checks for missing IDs
+
+Previously, runSingleReview would drop reviewers after 2 retries if they
+failed to return valid check IDs. ReviewPanelBuckets would silently drop
+bucket results on error. Both caused panel size drift between runs.
+
+Now:
+- maxRetries increased from 2 to 3
+- Retry prompts explicitly list missing check IDs and demand complete responses
+- After 3 strikes, synthesize CriterionResult{Passed: false} for missing IDs
+  instead of returning error (keeps reviewer in panel)
+- Bucket failures synthesize failed checks for that bucket's IDs instead of
+  dropping the bucket (keeps bucket in merged result)
+
+This ensures panel size and MaxScore remain stable even when reviewers/buckets
+fail validation, eliminating drift.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

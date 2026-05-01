@@ -985,3 +985,45 @@ Morpheus scoping proposal approved and shipped by Neo. Pipeline completed:
 - **Switch:** Testing implications documented in determinism regression tests + unit coverage
 - **Scribe:** Merged decisions, updated orchestration logs, cross-agent history
 
+
+## Session — Grader Overhaul Scoping (2026-05-01)
+
+**Tasked by:** Ronnie  
+**Deliverable:** `.squad/decisions/inbox/morpheus-grader-overhaul-plan.md` (15-commit phased plan covering Asks 1–6)  
+**Status:** ✓ Scoped
+
+### Learnings
+
+- **Determinism fix shipped 2026-05-01 is incomplete.** Two surviving
+  bugs cause X/Y drift even after stable IDs landed:
+  1. `averageReview` (`reviewer.go:683`) seeds `criteriaOrder` from the
+     UNION of observed reviewer votes, not from `expected []ReviewCheck`.
+     Any check no reviewer voted on disappears from `MaxScore`.
+  2. `runSingleReview` drops a whole reviewer after 2 validation failures
+     (`reviewer.go:646`); `ReviewPanelBuckets` silently drops a
+     (model, bucket) result on session error (`buckets.go:140`). Either
+     path mutates panel size between runs → strict any-fail flips.
+- The "byte-identical smoke test" Neo ran proved the simple-case ID flow,
+  but never exercised the reviewer-drop or bucket-failure paths. **A
+  determinism smoke must include a fault-injection variant** (mock
+  reviewer that fails IDs N times) before any future "shipped" claim.
+- **Ronnie's "uniform grader report shape" already exists** as
+  `graders.GraderResult{ Kind, Name, Weight, Gate, Score, Pass, Message,
+  Points[], Extras, SourceFile, SourceType }` — the work for Ask 2 is
+  consolidating *kinds*, not introducing a new struct.
+- **Three workspace-output graders** (`file`, `output_check`, `program`)
+  and **four tool-perspective graders** (`behavior`, `tool_constraint`,
+  `tool_usage`, `action_sequence`) overlap in scope. `output_check` and
+  a new consolidated `tool` grader can absorb most of them; keep
+  `program` and `action_sequence` standalone.
+- **`gate` is a phantom field** since Phase 2 removed gate
+  short-circuiting (`grader.go:347-353`). Should deprecate explicitly.
+- **YAML `checks:` field already exists for prompt graders** — typed
+  graders DON'T need it because their config IS the check spec
+  (e.g. `output_check.require_files` produces one check per path).
+  Renaming is mainly a *result-shape* concern, not a schema change.
+
+### Output
+
+- Plan: `.squad/decisions/inbox/morpheus-grader-overhaul-plan.md`
+  (15 commits, owners assigned, sequencing graph, verification matrix)

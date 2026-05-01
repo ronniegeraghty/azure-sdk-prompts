@@ -142,6 +142,10 @@ type ProgressEvent struct {
 
 	// Guardrail fields (EventFailed, EventError).
 	GuardrailReason string // Populated when a guardrail terminated the run (e.g., "turn limit (25)")
+
+	// Grader point totals (EventPassed, EventFailed). Zero values mean no graders were run.
+	GraderPointsPassed int // Number of checks that passed across all graders
+	GraderPointsTotal  int // Total number of checks across all graders
 }
 
 // ProgressFunc receives progress events from evaluators.

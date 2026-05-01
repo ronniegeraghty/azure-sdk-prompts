@@ -1,0 +1,14 @@
+fix(review): anchor consensus vote to expected check IDs
+
+Previously, averageReview built criteriaOrder by walking observed votes
+from the panel. If a reviewer failed to return a vote for a check, that
+check simply disappeared from MaxScore, causing drift between runs.
+
+Now, when expected[] is non-empty, averageReview anchors to the expected
+check list (in expected order). Missing votes are marked as failed with
+"no reviewer returned a vote for this check". This ensures MaxScore equals
+len(expected) deterministically, even when reviewers skip checks.
+
+Legacy path (expected[] empty) preserved for backward compatibility.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

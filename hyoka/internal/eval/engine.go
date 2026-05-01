@@ -768,26 +768,30 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 				// We want to show: "turn limit (25)"
 				guardrailReason = extractGuardrailShortReason(evalReport.GuardrailAbortReason)
 			}
+			// Compute grader points totals for both pass and fail events
+			graderPointsPassed, graderPointsTotal := report.TotalGraderPoints(evalReport.GraderResults)
 			if evalReport.Error != "" {
 				evtType = progress.EventError
 				msg = "ERROR"
 			} else if !evalReport.Success {
 				evtType = progress.EventFailed
-				if passed, total := report.TotalGraderPoints(evalReport.GraderResults); total > 0 {
-					msg = fmt.Sprintf("%d/%d points", passed, total)
+				if graderPointsTotal > 0 {
+					msg = fmt.Sprintf("%d/%d points", graderPointsPassed, graderPointsTotal)
 				} else if evalReport.Review != nil {
 					msg = fmt.Sprintf("%d/%d points", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
 				}
 			}
 			display.HandleEvent(progress.ProgressEvent{
-				EvalID:          taskName,
-				PromptID:        t.Prompt.ID,
-				ConfigName:      t.Config.Name,
-				Type:            evtType,
-				Message:         msg,
-				FileCount:       len(evalReport.GeneratedFiles),
-				ReviewScore:     reviewScore,
-				GuardrailReason: guardrailReason,
+				EvalID:             taskName,
+				PromptID:           t.Prompt.ID,
+				ConfigName:         t.Config.Name,
+				Type:               evtType,
+				Message:            msg,
+				FileCount:          len(evalReport.GeneratedFiles),
+				ReviewScore:        reviewScore,
+				GuardrailReason:    guardrailReason,
+				GraderPointsPassed: graderPointsPassed,
+				GraderPointsTotal:  graderPointsTotal,
 			})
 			terminalEventSent = true
 

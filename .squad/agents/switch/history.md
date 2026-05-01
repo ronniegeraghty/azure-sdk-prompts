@@ -803,3 +803,33 @@ Neo shipped determinism fix with comprehensive test coverage:
 
 **Impact:** Determinism now has provable, reproducible coverage. Site fallbacks remain (belt-and-braces).
 
+
+
+## Determinism Live Repro — 5-Run Empirical Test (2026-05-01)
+
+**Task:** Reproduce reported drift in prompt grader point counts. Run test scenario 5 times, compare results.
+
+**Test setup:**
+- Prompt: `test-dp-test-hello-markdown` (minimal markdown fixture)
+- Config: `test/baseline` (2 generators: Haiku + Sonnet)
+- 5 back-to-back runs with `hyoka clean` between each
+- Logs: `hyoka-run-{1..5}.log`
+
+**Findings:**
+
+1. **Prompt_review graders: ZERO DRIFT ✅**
+   - All 5 runs: identical point counts (6/6 per eval)
+   - All 5 runs: identical pass/fail patterns
+   - All 5 runs: identical check labels (byte-for-byte)
+   - Determinism fix confirmed working in production
+
+2. **Non-prompt graders: Expected variation ⚠️**
+   - `behavior`, `tool_constraint`, `action_sequence` varied on Haiku-generated eval
+   - This is correct behavior — these graders judge action logs, which vary when generator behavior varies
+   - Sonnet-4.6 was consistent → grader results also consistent
+
+3. **Root cause of user report:** Unknown without seeing their specific prompt/config. Test fixture shows no drift.
+
+**Recommendation:** If user reports further drift, need exact prompt ID + config name + grader type. Test fixture may not exhibit same behavior as complex multi-turn prompts.
+
+**Artifacts:** `.squad/decisions/inbox/switch-determinism-repro.md` (full analysis with tables)

@@ -1143,6 +1143,11 @@ func (r *interactiveRenderer) onPassed(evt ProgressEvent) {
 	r.completed++
 	r.passed++
 	r.cur.terminalStatus = evalPassed
+	// Print blank line + total checks line when grader points are available
+	if evt.GraderPointsTotal > 0 {
+		r.writeLine("")
+		r.writeLine(fmt.Sprintf("  %s", r.sty.OK(fmt.Sprintf("✅ Total checks that passed across all graders: %d/%d", evt.GraderPointsPassed, evt.GraderPointsTotal))))
+	}
 	r.finalizeCurrentEval()
 }
 
@@ -1162,11 +1167,18 @@ func (r *interactiveRenderer) onFailed(evt ProgressEvent) {
 	r.cur.terminalStatus = evalFailed
 	r.cur.terminalMsg = evt.Message
 	r.freezeTail()
-	msg := evt.Message
-	if msg == "" {
-		msg = "failed"
+	// Print blank line + total checks line when grader points are available
+	if evt.GraderPointsTotal > 0 {
+		r.writeLine("")
+		r.writeLine(fmt.Sprintf("  %s", r.sty.Fail(fmt.Sprintf("❌ Total checks that passed across all graders: %d/%d", evt.GraderPointsPassed, evt.GraderPointsTotal))))
+	} else if evt.Message != "" {
+		// Fallback: print the message when no grader points are available (legacy behavior)
+		msg := evt.Message
+		if msg == "" {
+			msg = "failed"
+		}
+		r.writeLine(fmt.Sprintf("  %s", r.sty.Fail("❌ "+msg)))
 	}
-	r.writeLine(fmt.Sprintf("  %s", r.sty.Fail("❌ "+msg)))
 	r.finalizeCurrentEval()
 }
 

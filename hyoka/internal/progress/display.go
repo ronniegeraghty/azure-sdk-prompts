@@ -521,8 +521,11 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 				if evt.ReviewScore > 0 {
 					score = fmt.Sprintf("  %d/10", evt.ReviewScore)
 				}
-				fmt.Fprintf(d.w, "  ✅ Passed  %d files%s  (%s)\n\n",
-					evt.FileCount, score, fmtDuration(s.duration))
+				fmt.Fprintf(d.w, "  ✅ Passed  %d files%s  (%s)\n", evt.FileCount, score, fmtDuration(s.duration))
+				if evt.GraderPointsTotal > 0 {
+					fmt.Fprintf(d.w, "\n  ✅ Total checks that passed across all graders: %d/%d\n", evt.GraderPointsPassed, evt.GraderPointsTotal)
+				}
+				fmt.Fprintln(d.w)
 			}
 		}
 
@@ -538,8 +541,11 @@ func (d *Display) HandleEvent(evt ProgressEvent) {
 				s.message = "failed"
 			}
 			if !d.ansi {
-				fmt.Fprintf(d.w, "  ❌ %s  (%s)\n\n",
-					s.message, fmtDuration(s.duration))
+				fmt.Fprintf(d.w, "  ❌ %s  (%s)\n", s.message, fmtDuration(s.duration))
+				if evt.GraderPointsTotal > 0 {
+					fmt.Fprintf(d.w, "\n  ❌ Total checks that passed across all graders: %d/%d\n", evt.GraderPointsPassed, evt.GraderPointsTotal)
+				}
+				fmt.Fprintln(d.w)
 			}
 		}
 
