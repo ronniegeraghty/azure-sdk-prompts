@@ -153,73 +153,115 @@ return nil, fmt.Errorf("prompt missing required 'id' field: %s", filePath)
 return p, nil
 }
 
-// ParseEvaluationCriteria parses a raw evaluation criteria text into
-// structured CriterionEntry values. Top-level bullet points (lines starting
-// with "- ") become individual entries. Sub-points (lines starting with
-// "  - " under a parent) are grouped with the parent entry.
+// ParseEvaluationCriteria parses an evaluation-criteria text block into a
+// single CriterionEntry. All non-bullet leading lines become the entry's
+// Prompt field (preamble shown to the LLM judge). All "- " bullet lines
+// (top-level or nested) become individual entries in the Checks slice —
+// each check is one pass/fail criterion the judge must score.
+//
+// When the input contains no bullets at all, the entire trimmed text is
+// used as a single Check so the judge still has something to score against.
+// Empty input returns nil.
+//
+// Returns []CriterionEntry (length 0 or 1) for API symmetry with the
+// previous one-entry-per-bullet shape.
 func ParseEvaluationCriteria(text string) []CriterionEntry {
 if strings.TrimSpace(text) == "" {
 return nil
 }
 
-var entries []CriterionEntry
-var current *CriterionEntry
+var preambleLines []string
+var checks []string
+sawBullet := false
 
 for _, line := range strings.Split(text, "\n") {
-trimmed := strings.TrimRight(line, " \t\r")
+trimmedRight := strings.TrimRight(line, " \t\r")
+stripped := strings.TrimLeft(trimmedRight, " \t")
 
-// Sub-point: starts with two+ spaces then "- "
-if (strings.HasPrefix(trimmed, "  - ") || strings.HasPrefix(trimmed, "\t- ")) && current != nil {
-sub := strings.TrimSpace(trimmed)
-sub = strings.TrimPrefix(sub, "- ")
-if sub != "" {
-current.SubPoints = append(current.SubPoints, sub)
+if strings.HasPrefix(stripped, "- ") {
+sawBullet = true
+c := strings.TrimSpace(strings.TrimPrefix(stripped, "- "))
+if c != "" {
+checks = append(checks, c)
 }
 continue
 }
 
-// Top-level bullet: starts with "- "
-if strings.HasPrefix(trimmed, "- ") {
-if current != nil {
-entries = append(entries, *current)
-}
-prompt := strings.TrimPrefix(trimmed, "- ")
-current = &CriterionEntry{Prompt: prompt}
-continue
+// Non-bullet line. If we haven't seen a bullet yet, treat as preamble.
+// Lines after the first bullet are ignored under the new flat-checks model.
+if !sawBullet {
+preambleLines = append(preambleLines, trimmedRight)
 }
 }
 
-if current != nil {
-entries = append(entries, *current)
+if !sawBullet {
+whole := strings.TrimSpace(text)
+if whole == "" {
+return nil
+}
+return []CriterionEntry{{Checks: []string{whole}}}
 }
 
-return entries
+preamble := strings.TrimSpace(strings.Join(preambleLines, "\n"))
+if preamble == "" && len(checks) == 0 {
+return nil
+}
+return []CriterionEntry{{Prompt: preamble, Checks: checks}}
 }
 
-// FormatParsedCriteria formats parsed criterion entries into a deterministic
-// numbered list matching the style used for YAML-defined checks. Each top-level
-// bullet becomes a numbered check; sub-points become indented hints.
+// FormatParsedCriteria renders parsed criterion entries into a deterministic
+// text block for injection into the LLM-judge prompt. Output shape:
 //
-// This ensures the LLM review panel sees a consistent numbered structure
-// regardless of whether criteria come from YAML checks or markdown bullets.
+//	<preamble>
+//	1. check1
+//	2. check2
+//
+// The preamble (if non-empty) is rendered unnumbered, followed by each check
+// as a numbered top-level item. When the input contains multiple entries
+// (legacy callers), they are concatenated with blank-line separators, with
+// numbering reset within each entry.
+//
+// For back-compat: if an entry has no Checks but legacy SubPoints, the
+// SubPoints are rendered as the numbered checks under the entry's Prompt.
 func FormatParsedCriteria(entries []CriterionEntry) string {
 if len(entries) == 0 {
 return ""
 }
-var b strings.Builder
-for i, e := range entries {
-prompt := strings.TrimSpace(e.Prompt)
-if prompt == "" {
-// Skip empty entries
+var blocks []string
+for _, e := range entries {
+preamble := strings.TrimSpace(e.Prompt)
+var checks []string
+for _, c := range e.Checks {
+c = strings.TrimSpace(c)
+if c != "" {
+checks = append(checks, c)
+}
+}
+if len(checks) == 0 && len(e.SubPoints) > 0 {
+for _, s := range e.SubPoints {
+s = strings.TrimSpace(s)
+if s != "" {
+checks = append(checks, s)
+}
+}
+}
+if preamble == "" && len(checks) == 0 {
 continue
 }
-fmt.Fprintf(&b, "%d. %s\n", i+1, prompt)
-for _, sub := range e.SubPoints {
-sub = strings.TrimSpace(sub)
-if sub != "" {
-fmt.Fprintf(&b, "   - %s\n", sub)
+var b strings.Builder
+if preamble != "" {
+b.WriteString(preamble)
+if len(checks) > 0 {
+b.WriteString("\n")
 }
 }
+for i, c := range checks {
+fmt.Fprintf(&b, "%d. %s", i+1, c)
+if i < len(checks)-1 {
+b.WriteString("\n")
 }
-return strings.TrimRight(b.String(), "\n")
+}
+blocks = append(blocks, b.String())
+}
+return strings.Join(blocks, "\n\n")
 }

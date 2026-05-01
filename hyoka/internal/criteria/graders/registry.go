@@ -90,6 +90,13 @@ func NewGrader(gc GraderConfig) (Grader, error) {
 		}
 		return g, nil
 
+	case KindToolUsage:
+		cfg, ok := decoded.(*ToolUsageConfig)
+		if !ok {
+			return nil, fmt.Errorf("grader %q: expected *ToolUsageConfig, got %T", gc.Name, decoded)
+		}
+		return NewToolUsageGrader(gc.Name, cfg)
+
 	default:
 		return nil, fmt.Errorf("unknown grader kind %q for %q", gc.Kind, gc.Name)
 	}

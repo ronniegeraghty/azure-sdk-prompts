@@ -70,13 +70,11 @@ func TestWriteMarkdownReport(t *testing.T) {
 		"# Evaluation Report: test-prompt",
 		"baseline",
 		"✅ PASSED",
-		"4/5",
-		"Code Builds",
-		"Good implementation",
 		"Program.cs",
 		"Write a dotnet storage auth sample",
 		"I need to create an auth sample",
-		"Code Review",
+		"Reviewer Notes",
+		"Good implementation",
 		"Clean code structure",
 		"Missing retry logic",
 		"Tool Calls",
@@ -90,13 +88,31 @@ func TestWriteMarkdownReport(t *testing.T) {
 		"3.1s",
 		"Grader Results",
 		"md-grader",
-		"Grader output for MD",
-		"MD consensus",
+		"consensus",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
 			t.Errorf("Markdown report missing %q", check)
 		}
+	}
+	// The legacy "Code Review (LLM-as-Judge)" criteria-passed line and the
+	// per-criterion Criteria Results table are intentionally NOT rendered:
+	// the prompt_review grader is now displayed under "## Grader Results"
+	// and the duplicate "X/Y criteria passed" text was confusing.
+	for _, antiCheck := range []string{
+		"Code Review (LLM-as-Judge)",
+		"criteria passed",
+		"Criteria Results",
+		"4/5",
+		"Code Builds",
+	} {
+		if strings.Contains(content, antiCheck) {
+			t.Errorf("Markdown report unexpectedly contains %q", antiCheck)
+		}
+	}
+	// Graders use flat fallback (no SourceFile): grader name + pass/fail count rendered.
+	if !strings.Contains(content, "md-grader (review): Pass (1/1)") {
+		t.Errorf("Markdown report missing grader pass/fail line")
 	}
 
 	expectedDir := filepath.Join(dir, "20240115-100000", "results", "storage", "data-plane", "dotnet", "authentication", "test-prompt", "baseline")
@@ -273,5 +289,108 @@ func TestTruncateStr(t *testing.T) {
 	}
 	if !strings.Contains(result, "truncated") {
 		t.Error("truncated string should contain truncation marker")
+	}
+}
+
+func TestWriteGraderResults_GroupedBySourceFile(t *testing.T) {
+	results := []GraderResult{
+		{
+			GraderName: "Eval Criteria",
+			GraderType: "prompt",
+			Pass:       true,
+			SourceFile: "/prompts/crud-secrets.prompt.md",
+			SourceType: "prompt_file",
+			Points: []GraderPoint{
+				{Label: "check 1", Pass: true},
+				{Label: "check 2", Pass: true},
+			},
+		},
+		{
+			GraderName: "DefaultAzureCredential Authentication",
+			GraderType: "prompt",
+			Pass:       false,
+			SourceFile: "/criteria/python.yaml",
+			SourceType: "criteria_file",
+			Points: []GraderPoint{
+				{Label: "Uses DefaultAzureCredential", Pass: true},
+				{Label: "Uses async/await patterns", Pass: false},
+			},
+		},
+		{
+			GraderName: "Output Files Exist",
+			GraderType: "output_check",
+			Pass:       true,
+			SourceFile: "/criteria/python.yaml",
+			SourceType: "criteria_file",
+			Points: []GraderPoint{
+				{Label: "min_files (1)", Pass: true},
+				{Label: "min_bytes_per_file (1)", Pass: true},
+			},
+		},
+	}
+
+	var b strings.Builder
+	writeGraderResults(&b, results)
+	out := b.String()
+
+	// Level-1 file headers
+	if !strings.Contains(out, "crud-secrets.prompt.md (prompt file):") {
+		t.Errorf("missing prompt file header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "python.yaml (criteria file):") {
+		t.Errorf("missing criteria file header, got:\n%s", out)
+	}
+
+	// Level-2 grader lines (indented 2 spaces under file header)
+	if !strings.Contains(out, "  - Eval Criteria (prompt): Pass (2/2)") {
+		t.Errorf("missing Eval Criteria grader line, got:\n%s", out)
+	}
+	if !strings.Contains(out, "  - DefaultAzureCredential Authentication (prompt): Fail (1/2)") {
+		t.Errorf("missing DefaultAzureCredential grader line, got:\n%s", out)
+	}
+	if !strings.Contains(out, "  - Output Files Exist (output_check): Pass (2/2)") {
+		t.Errorf("missing Output Files Exist grader line, got:\n%s", out)
+	}
+
+	// Level-3 point lines (indented 6 spaces under grader)
+	if !strings.Contains(out, "      - check 1: Pass") {
+		t.Errorf("missing check 1 point, got:\n%s", out)
+	}
+	if !strings.Contains(out, "      - Uses async/await patterns: Fail") {
+		t.Errorf("missing async/await point, got:\n%s", out)
+	}
+	if !strings.Contains(out, "      - min_files (1): Pass") {
+		t.Errorf("missing min_files point, got:\n%s", out)
+	}
+}
+
+func TestWriteGraderResults_FlatFallbackWhenNoSourceFile(t *testing.T) {
+	results := []GraderResult{
+		{
+			GraderName: "my-grader",
+			GraderType: "output_check",
+			Pass:       true,
+			// SourceFile intentionally empty
+			Points: []GraderPoint{
+				{Label: "file exists", Pass: true},
+			},
+		},
+	}
+
+	var b strings.Builder
+	writeGraderResults(&b, results)
+	out := b.String()
+
+	// No file header
+	if strings.Contains(out, "(prompt file)") || strings.Contains(out, "(criteria file)") {
+		t.Errorf("unexpected file header in flat fallback, got:\n%s", out)
+	}
+
+	// Grader at top level (no leading spaces for file group)
+	if !strings.Contains(out, "- my-grader (output_check): Pass (1/1)") {
+		t.Errorf("expected flat grader line, got:\n%s", out)
+	}
+	if !strings.Contains(out, "    - file exists: Pass") {
+		t.Errorf("expected flat point line, got:\n%s", out)
 	}
 }

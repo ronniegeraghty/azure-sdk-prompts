@@ -281,7 +281,7 @@ name: "legacy single-prompt no checks",
 entries: []UnifiedGraderEntry{
 {Type: graders.KindPrompt, Name: "Auth", Prompt: "Uses managed identity"},
 },
-want: "1. **Auth** — Uses managed identity\n",
+want: "**Auth**: Uses managed identity",
 },
 {
 name: "checks with preamble",
@@ -296,10 +296,10 @@ Checks: []string{
 },
 },
 },
-want: "1. **Markdown Structure**\n" +
-"   Check the following criteria:\n" +
-"   1. File hello.md exists and contains a level-1 heading.\n" +
-"   2. File contains exactly three bullet list items.\n",
+want: "**Markdown Structure**\n" +
+"Check the following criteria:\n" +
+"1. File hello.md exists and contains a level-1 heading.\n" +
+"2. File contains exactly three bullet list items.",
 },
 {
 name: "checks without preamble",
@@ -310,9 +310,9 @@ Name:   "X",
 Checks: []string{"a", "b"},
 },
 },
-want: "1. **X**\n" +
-"   1. a\n" +
-"   2. b\n",
+want: "**X**\n" +
+"1. a\n" +
+"2. b",
 },
 {
 name: "mixed legacy + checks",
@@ -320,10 +320,10 @@ entries: []UnifiedGraderEntry{
 {Type: graders.KindPrompt, Name: "Old", Prompt: "p"},
 {Type: graders.KindPrompt, Name: "New", Prompt: "preamble", Checks: []string{"one"}},
 },
-want: "1. **Old** — p\n" +
-"2. **New**\n" +
-"   preamble\n" +
-"   1. one\n",
+want: "**Old**: p\n\n" +
+"**New**\n" +
+"preamble\n" +
+"1. one",
 },
 }
 for _, tc := range cases {

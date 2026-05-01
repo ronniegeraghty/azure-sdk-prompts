@@ -923,3 +923,39 @@ Output: `.squad/decisions.md` (merged) — Bug description and fix strategy
 ### Status
 
 ✅ Both diagnoses landed clean. All handoff decisions recorded in `.squad/decisions.md`.
+
+---
+
+## Session — Grader Redesign Scope (2026-04-30)
+
+**Tasked by:** Ronnie  
+**Deliverable:** Comprehensive scope for multi-part grader redesign  
+**Status:** ✓ Complete
+
+### Work
+
+Defined four-part redesign with full implementation details, migration impact, and design decisions:
+
+1. **Part 1 — Prompt Grader Semantics:** BREAKING CHANGE — only `checks:` entries are scorable (breaking for YAML files using only `prompt:`). `name` and `prompt` are LLM judge context only.
+
+2. **Part 2 — Execution Order:** Prompt-file eval criteria runs first, then criteria-file graders in YAML file order. Typed graders no longer partition separately; all graders execute in unified order.
+
+3. **Part 3 — Output Format:** Reports group graders by source file (3 indentation levels). New fields: `SourceFile` and `SourceType` on both `graders.GraderResult` and `report.GraderResult`. Engine populates `SourceType = "prompt_file"` or `"criteria_file"` and `SourceFile = absolute path`.
+
+4. **Part 4 — Tool Usage Grader:** New `tool_usage` grader type. Verifies declared MCP servers and skills were actually used during session. One point per rule. Skips rules silently where env doesn't contain the tool. Edge case: if all rules skipped, emit trivial "no_applicable_rules" point.
+
+### Scope Doc
+
+- **File:** `.squad/decisions/inbox/morpheus-grader-redesign-scope.md` (251 lines)
+- **Content:** All file changes, code patterns, validation logic, and migration paths
+- **Assigned:** Neo (engine/graders), Tank (CLI output/report/site)
+
+### Decision
+
+✅ Ready for implementation immediately. All design patterns clear, no blockers.
+
+### Output
+
+- Orchestration log: `.squad/orchestration-log/2026-04-30T18-29-54Z-morpheus.md`
+- Session log: `.squad/log/2026-04-30T18-29-54Z-grader-redesign.md`
+- Decisions merged into `.squad/decisions.md`

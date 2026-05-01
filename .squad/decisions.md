@@ -1128,3 +1128,217 @@ If a developer skips the hook with `git commit --no-verify`, the existing CI wor
 ### Commit
 
 `0de4468b` — Add pre-commit hook to enforce site bundle freshness
+
+---
+
+## Grader Redesign — Multi-Part Initiative
+
+**Date:** 2026-04-26 (scope), 2026-04-30 (completion)  
+**Initiated by:** Ronnie  
+**Lead:** Morpheus (design), Neo (engine), Tank (rendering)  
+**Status:** ✓ Delivered (PR ready)  
+**Branch:** `neo/issue-grader-redesign`
+
+This is a comprehensive redesign of the grader system across four parts: semantics, execution order, output format, and tool verification.
+
+### Part 1 — Prompt Grader Semantics (BREAKING CHANGE)
+
+**Rule:** For `type: prompt` graders, ONLY `checks:` entries are scorable points. `name` and `prompt` are LLM judge context — never counted in the X/X tally, never reported as scored items.
+
+#### Current Behavior (Removed)
+
+- `FormatUnifiedPromptEntries()` rendered grader Name and Prompt as numbered criteria items
+- Review grader created one GraderPoint per criterion (including name/prompt text)
+- No separation between context and scorable items
+
+#### Changes Required
+
+| File | Change |
+|------|--------|
+| `internal/criteria/buckets.go` | `FormatUnifiedPromptEntries()` — render `prompt:` as preamble context only. Only `checks:` items become numbered criteria. Grader `name:` becomes section heading. |
+| `internal/criteria/config.go` | `validateEntry()` — YAML graders with `type: prompt` but no `checks:` log soft deprecation warning |
+| `internal/prompt/parser.go` | `ParseEvaluationCriteria()` — rewrite to separate lead text (Prompt field) from bullet items (Checks slice) |
+| `internal/prompt/types.go` | `CriterionEntry` struct — add `Checks []string` alongside existing fields |
+| `internal/criteria/buckets.go` | `BuildUnifiedReviewBuckets()` — render only checks as numbered criteria, lead text as preamble |
+
+#### Migration Impact
+
+- **YAML criteria using `checks:`** — no change (already correct)
+- **YAML criteria using only `prompt:` (no `checks:`)** — become zero-scorable graders (context only)
+- **Prompt files' `## Evaluation Criteria`** — parser rewrite normalizes into `{prompt, checks}` shape (backward-compatible)
+
+### Part 2 — Grader Execution Order
+
+**Rule:** Prompt-file eval criteria runs FIRST, then criteria-file graders in YAML file order.
+
+#### Current Behavior
+
+- Typed graders ran first, then AI review graders
+- Prompt-file criteria ran first among review graders, but after typed graders
+- No unified ordering across typed and AI review partitions
+
+#### Changes Required
+
+| File | Change |
+|------|--------|
+| `internal/eval/engine_eval.go` | Reorder execution: (1) prompt-file eval criteria grader, (2) criteria-file graders in YAML file order (typed and prompt interleaved per declaration) |
+| `internal/criteria/buckets.go` | `MatchingUnifiedEntries()` — ensure stable file-walk order when re-interleaving partitions |
+
+#### Key Constraint
+
+- Prompt-file grader is synthetic (not from YAML)
+- Must be injected at position 0 before any criteria-file graders
+
+### Part 3 — Output Format Redesign
+
+**Rule:** Reports group graders by source file at three indentation levels.
+
+#### Target Format
+
+```
+Graders:
+- crud-secrets.prompt.md (prompt file):
+  - Eval Criteria (prompt): Pass/Fail (x/x)
+      - check 1: Pass/Fail
+      - check 2: Pass/Fail
+- python.yaml (criteria file):
+  - DefaultAzureCredential Authentication (prompt): Pass/Fail (x/x)
+      - Uses DefaultAzureCredential ...: Pass/Fail
+      - Uses async/await patterns ...: Pass/Fail
+  - Output Files Exist (output_check): Pass/Fail (x/x)
+      - min_files (1): Pass/Fail
+      - min_bytes_per_file (1): Pass/Fail
+```
+
+#### Data Model Changes
+
+| Struct | Field to Add | Purpose |
+|--------|-------------|---------|
+| `graders.GraderResult` | `SourceFile string` | Absolute path to originating file |
+| `graders.GraderResult` | `SourceType string` | `"prompt_file"` or `"criteria_file"` |
+| `report.GraderResult` | `SourceFile string` (JSON: `source_file`) | Persisted in report |
+| `report.GraderResult` | `SourceType string` (JSON: `source_type`) | Persisted in report |
+
+#### Files to Change
+
+| File | Change |
+|------|--------|
+| `internal/criteria/graders/grader.go` | Add `SourceFile`, `SourceType` fields |
+| `internal/report/types.go` | Add `SourceFile`, `SourceType` (JSON mapped) |
+| `internal/eval/engine_eval.go` | `convertGraderResults()` — copy SourceFile/SourceType; thread source file from MatchedUnifiedEntry.Source |
+| `internal/report/markdown.go` | Rewrite grader section to group by SourceFile, render 3-level indentation |
+| `internal/progress/display_interactive.go` | Add source file suffixes to grader name lines |
+| `site/src/app/data/types.ts` | Add `source_file?`, `source_type?` to GraderResult interface |
+| `site/src/app/components/GraderResultRow.tsx` | Group GraderResult[] by source_file at outer level |
+| `site/src/app/components/eval-detail-page.tsx` | File-level grouping wrapper |
+| `site/src/app/lib/graderScore.ts` | No change (operates per-grader) |
+
+#### Display Rules
+
+- Markdown: use `filepath.Base(sourceFile)` (absolute paths too verbose)
+- CLI: add source suffix `(prompt file)` / `(criteria_file.yaml)`; keep lines flat
+- Site: group by source_file at outer level using source_type for label
+- Graceful degradation when SourceFile/SourceType are empty strings
+
+### Part 4 — Tool Usage Grader
+
+**Rule:** Verify declared tools/skills were actually used during the session.
+
+#### Design: New `tool_usage` Grader Type
+
+Rationale: Semantically distinct from `output_check` (workspace files) and `tool_constraint` (tool call counts). New type keeps concern clean.
+
+#### Config Shape (YAML)
+
+```yaml
+- name: Tool Usage Verification
+  type: tool_usage
+  weight: 1.0
+  details:
+    rules:
+      - type: mcp_server
+        name: azure-mcp
+        expect: at_least_one_tool_call
+      - type: skill_plugin
+        name: azure-sdk-python
+        expect: any_skill_invoked
+      - type: skill_repo
+        repo: mauromedda/agent-toolkit
+        skill: python
+        expect: skill_invoked
+```
+
+#### Detection Logic
+
+Input data available on `GraderInput`:
+- `GeneratorArtifact.MCPToolCalls` — MCP tool calls from session events
+- `GeneratorArtifact.SkillsInvoked` — skills actually invoked
+- `GeneratorArtifact.ToolCalls` — all tool calls
+- `EnvironmentTools []EnvironmentTool` — configured MCP servers + skills (NEW)
+
+**Detection rule:** For each declared rule, check if tool was used. Skip rules where env item isn't in config.
+
+#### Per-Point Output
+
+Each rule → one `GraderPoint`:
+- Label: `"azure-mcp tool used"`, `"azure-sdk-python skill invoked"`, etc.
+- Pass: whether condition met
+- Evidence: `{"tool_calls": "3", "expected": "≥1"}` (example)
+- Rules where env item isn't present → **skipped silently** (not emitted)
+
+#### Edge Case: Zero Applicable Rules
+
+If all rules are skipped (env doesn't contain any declared items), emit one trivially-passing point `"no_applicable_rules"` to satisfy the ≥1 Point invariant.
+
+#### Files to Change
+
+| File | Change |
+|------|--------|
+| `internal/criteria/graders/types.go` | Add `KindToolUsage = "tool_usage"`, `ToolUsageConfig` struct, register in `validKinds` and `DecodeConfig` |
+| `internal/criteria/graders/tool_usage_grader.go` | **New file** — implements Grader interface |
+| `internal/criteria/graders/tool_usage_grader_test.go` | **New file** — table-driven tests |
+| `internal/criteria/graders/registry.go` | Register `tool_usage` in NewGrader factory |
+| `internal/criteria/graders/grader.go` | Add `EnvironmentTools []EnvironmentTool` to GraderInput |
+
+### Implementation Status
+
+✅ **Complete** — All four parts implemented and live-verified
+
+- **Morpheus:** Comprehensive scope doc with all implementation details
+- **Neo:** Engine implementation (Parts 1-4) + data model wiring
+- **Tank:** Rendering redesign (markdown, CLI, site) with graceful degradation
+- **Live Verification:** Tested on key-vault-dp-python-crud × azure-mcp/claude-opus-4.6 (twice)
+- **Test Status:** 3 pre-existing failures confirmed unrelated
+
+### Deliverables
+
+- **Branch:** `neo/issue-grader-redesign`
+- **Commits:** 5 (scope + 4-part engine impl + render merge + follow-up fixes)
+- **PR:** Ready at https://github.com/ronniegeraghty/hyoka/pull/new/neo/issue-grader-redesign
+
+### Follow-up Fixes (Neo)
+
+- Fixed tool_usage env detection: `azure-mcp` → `azure` name mismatch resolved
+- Added threshold values to output_check labels: `min_files (1)`, `min_bytes_per_file (1)`
+
+### Handoffs
+
+**Neo → Tank (2026-04-26):**
+- Data model ready for render-side integration
+- Provided exact field names, struct locations, and wiring instructions
+- Tank implemented 3-level rendering with graceful degradation
+
+**Tank → Neo (2026-04-30):**
+- Render code complete and data-contract stable
+- Tank's render changes merged into neo/issue-grader-redesign
+- Consolidated on single branch for unified PR
+
+### Decision
+
+✅ **Implement all four parts as designed** — shipping in PR neo/issue-grader-redesign
+
+**No changes to:**
+- Backward compatibility (prompt files normalize automatically)
+- CI workflows (existing tests confirm unrelated failures)
+- API surface (grader interface unchanged)
+

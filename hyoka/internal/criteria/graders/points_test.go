@@ -42,7 +42,7 @@ func TestOutputCheckGraderPoints(t *testing.T) {
 	for _, p := range res.Points {
 		pointByLabel[p.Label] = p
 	}
-	if p, ok := pointByLabel["min_files"]; !ok || !p.Pass {
+	if p, ok := pointByLabel["min_files (1)"]; !ok || !p.Pass {
 		t.Errorf("min_files point: got %+v, want present and Pass=true", p)
 	}
 	if p, ok := pointByLabel["require_files"]; !ok || !p.Pass {

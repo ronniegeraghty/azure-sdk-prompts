@@ -115,7 +115,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 			msg = fmt.Sprintf("produced %d file(s), need >= %d", len(produced), g.cfg.MinFiles)
 		}
 		points = append(points, GraderPoint{
-			Label:    "min_files",
+			Label:    fmt.Sprintf("min_files (%d)", g.cfg.MinFiles),
 			Pass:     pass,
 			Message:  msg,
 			Evidence: map[string]string{"actual": fmt.Sprintf("%d", len(produced)), "expected": fmt.Sprintf(">=%d", g.cfg.MinFiles)},
@@ -131,7 +131,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 			msg = fmt.Sprintf("produced %d file(s), exceeds max of %d", len(produced), g.cfg.MaxFiles)
 		}
 		points = append(points, GraderPoint{
-			Label:    "max_files",
+			Label:    fmt.Sprintf("max_files (%d)", g.cfg.MaxFiles),
 			Pass:     pass,
 			Message:  msg,
 			Evidence: map[string]string{"actual": fmt.Sprintf("%d", len(produced)), "expected": fmt.Sprintf("<=%d", g.cfg.MaxFiles)},
@@ -227,7 +227,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 				len(offenders), g.cfg.MinBytesPerFile, strings.Join(offenders, ", "))
 		}
 		points = append(points, GraderPoint{
-			Label:   "min_bytes_per_file",
+			Label:   fmt.Sprintf("min_bytes_per_file (%d)", g.cfg.MinBytesPerFile),
 			Pass:    pass,
 			Message: msg,
 		})
@@ -249,7 +249,7 @@ func (g *OutputCheckGrader) Grade(_ context.Context, input GraderInput) (GraderR
 				len(offenders), g.cfg.MaxBytesPerFile, strings.Join(offenders, ", "))
 		}
 		points = append(points, GraderPoint{
-			Label:   "max_bytes_per_file",
+			Label:   fmt.Sprintf("max_bytes_per_file (%d)", g.cfg.MaxBytesPerFile),
 			Pass:    pass,
 			Message: msg,
 		})

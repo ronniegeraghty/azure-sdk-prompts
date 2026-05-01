@@ -112,43 +112,58 @@ func HasUnifiedIsolation(matched []MatchedUnifiedEntry) bool {
 	return false
 }
 
-// FormatUnifiedPromptEntries renders prompt-type entries as a numbered text
-// block suitable for injection into a review prompt. Mirrors
-// criteria.FormatGraders output so combined-mode criteria text remains
-// byte-compatible with the legacy path.
+// FormatUnifiedPromptEntries renders prompt-type entries as a text block
+// suitable for injection into a review prompt.
 //
-// When an entry's Checks field is non-empty, the entry is rendered as a
-// parent line carrying the grader name, an optional preamble line (the
-// entry's Prompt field, treated as judge-only guidance), and a nested
-// numbered list — one line per check. Each nested check becomes its own
-// criterion the LLM judge must score, producing one GraderPoint per check.
+// The output uses the entry name as a bolded section heading (NOT a numbered
+// outer item). When Checks is non-empty, the optional Prompt acts as
+// preamble and each check is rendered as a numbered top-level item:
 //
-// When Checks is empty the legacy single-criterion shape is used:
+//	**Name**
+//	preamble text
+//	1. check1
+//	2. check2
 //
-//	1. **Name** — Prompt
+// When Checks is empty, the entry is rendered as context only:
+//
+//	**Name**: Prompt text
+//
+// (or just `**Name**` when no Prompt). Multiple entries are separated by a
+// blank line.
+//
+// Why no outer numbering: the LLM judge counts numbered items as scorable
+// criteria. A leading `1. **Name**` line caused the judge to treat the
+// section heading itself as a check, producing the intermittent
+// "3 points returned instead of 2" off-by-one bug.
 func FormatUnifiedPromptEntries(entries []UnifiedGraderEntry) string {
 	if len(entries) == 0 {
 		return ""
 	}
-	var b strings.Builder
-	for i, e := range entries {
+	var blocks []string
+	for _, e := range entries {
+		var b strings.Builder
 		if len(e.Checks) > 0 {
-			fmt.Fprintf(&b, "%d. **%s**\n", i+1, e.Name)
+			fmt.Fprintf(&b, "**%s**\n", e.Name)
 			if preamble := strings.TrimSpace(e.Prompt); preamble != "" {
-				fmt.Fprintf(&b, "   %s\n", preamble)
+				fmt.Fprintf(&b, "%s\n", preamble)
 			}
 			for j, c := range e.Checks {
-				fmt.Fprintf(&b, "   %d. %s\n", j+1, strings.TrimSpace(c))
+				fmt.Fprintf(&b, "%d. %s", j+1, strings.TrimSpace(c))
+				if j < len(e.Checks)-1 {
+					b.WriteString("\n")
+				}
 			}
+			blocks = append(blocks, b.String())
 			continue
 		}
-		fmt.Fprintf(&b, "%d. **%s**", i+1, e.Name)
-		if e.Prompt != "" {
-			fmt.Fprintf(&b, " — %s", strings.TrimSpace(e.Prompt))
+		// No checks — render as context only.
+		fmt.Fprintf(&b, "**%s**", e.Name)
+		if p := strings.TrimSpace(e.Prompt); p != "" {
+			fmt.Fprintf(&b, ": %s", p)
 		}
-		b.WriteString("\n")
+		blocks = append(blocks, b.String())
 	}
-	return b.String()
+	return strings.Join(blocks, "\n\n")
 }
 
 // MergeUnifiedCriteria combines rendered prompt entries with a prompt's own

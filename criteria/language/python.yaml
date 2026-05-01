@@ -14,3 +14,18 @@ graders:
     details:
       min_files: 1
       min_bytes_per_file: 1
+  - name: Tool Usage Verification
+    type: tool_usage
+    weight: 1.0
+    details:
+      rules:
+        - type: mcp_server
+          name: azure
+          expect: at_least_one_tool_call
+        - type: skill_plugin
+          name: azure-sdk-python
+          expect: any_skill_invoked
+        - type: skill_repo
+          repo: mauromedda/agent-toolkit
+          skill: python
+          expect: skill_invoked
