@@ -40,16 +40,42 @@ graders:
         contains: "#"
 
   # ---------------------------------------------------------------------------
-  # 3. tool — unified tool checks. Exercises all four canonical check kinds.
+  # 3. tool — unified tool checks.
+  #
+  # Per-skill `tool_used` graders are gated with `when:` on the matching
+  # `skill:<name>` config-prop so they only run on variants that actually load
+  # the skill. With `pairwise: deep` on test-skills, the without-{skill}
+  # variants strip a skill from the loadout — without gating, those variants
+  # would always fail the per-skill check. (See decisions.md
+  # 2026-05-02 "Config-Aware Grader `when:` Phase 1".)
   # ---------------------------------------------------------------------------
-  - name: Tool Usage
+  - name: Markdown Headings Tool Usage
     type: tool
     weight: 1.0
+    when:
+      "skill:markdown-headings": "true"
     checks:
       - kind: tool_used
         tool: markdown-headings
         source: skill
         min_calls: 1
+
+  - name: Markdown Lists Tool Usage
+    type: tool
+    weight: 1.0
+    when:
+      "skill:markdown-lists": "true"
+    checks:
+      - kind: tool_used
+        tool: markdown-lists
+        source: skill
+        min_calls: 1
+
+  # Skill-agnostic tool checks — apply to every variant.
+  - name: Tool Usage
+    type: tool
+    weight: 1.0
+    checks:
       - kind: tool_not_used
         tool: bash
         source: builtin
