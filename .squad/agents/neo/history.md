@@ -1573,3 +1573,15 @@ Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught t
 - `hyoka/internal/eval/copilot.go` — session config building (line 950 uses toolReport, line 962 fallback)
 - `hyoka/internal/config/tool/entry.go` — Entry struct with ExcludedSkills/ExcludedTools fields
 
+
+## Learnings
+
+**Skill name propagation through eval→timeline→grader pipeline:**
+- SessionEventRecord has SkillName field (line 312 in report/types.go)
+- BuildActionTimeline (action.go:184-186) sets ev.Tool = rec.SkillName when actionType=="skill" AND ToolName is empty
+- ToGraderActionLog (action.go:351-359) copies ev.Tool to graders.ActionEvent.Tool
+- countTools (activity_grader.go:407-415) keys by e.Tool
+- evaluateToolCheck (tool_grader.go:114) looks up toolCounts[rule.Tool]
+- **BUG FOUND:** tool.execution_start events for the "skill" tool created Type=tool_call, Tool="skill" entries that were ALSO counted, causing double-counting and masking individual skill names
+- **FIX:** Filter out tool_call events with Tool="skill" in ToGraderActionLog since individual skill names appear in subsequent skill.invoked events
+
