@@ -8,7 +8,7 @@ source: earned (Kobayashi v0.6.0 incident, team intervention)
 
 ## Context
 
-History files (.md files tracking decisions, spawns, outcomes) are read cold by future agents. Stale or incorrect entries poison decision-making downstream. The Kobayashi incident proved this: history said "Brady decided v0.6.0" when Brady had reversed that to v0.8.17. Future spawns read the wrong truth and repeated the mistake.
+History files (.md files tracking decisions, spawns, outcomes) are read cold by future agents. Stale or incorrect entries poison decision-making downstream. The Kobayashi incident proved this: history said "the user decided v0.6.0" when the user had reversed that to v0.8.17. Future spawns read the wrong truth and repeated the mistake.
 
 ## Patterns
 
@@ -20,11 +20,11 @@ History files (.md files tracking decisions, spawns, outcomes) are read cold by 
 ## Examples
 
 ✓ **Correct:**
-- "Migration target: v0.8.17 (initially discussed as v0.6.0, corrected by Brady)"
-- "Reverted to Node 18 per Brady's explicit request on 2024-01-15"
+- "Migration target: v0.8.17 (initially discussed as v0.6.0, corrected by the user)"
+- "Reverted to Node 18 per the user's explicit request on 2024-01-15"
 
 ✗ **Incorrect:**
-- "Brady directed v0.6.0" (when later reversed)
+- "the user directed v0.6.0" (when later reversed)
 - Recording what was *requested* instead of what *actually happened*
 - Logging entries before outcome is confirmed
 

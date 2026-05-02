@@ -18,7 +18,7 @@ Two anti-patterns confirmed in real production skills and fixed:
 
 **Status:** PROPOSED · awaiting Neo to execute
 **Author:** Morpheus
-**Trigger:** Brady pushed back on the flat string-key form shipped in Phase 1 (commit `6493894`). The flat form (`"skill:markdown-headings": "true"`) requires YAML quoting, mirrors a flat `map[string]string` instead of the actual data shape, and doesn't compose to multi-criterion filters.
+**Trigger:** Ronnie pushed back on the flat string-key form shipped in Phase 1 (commit `6493894`). The flat form (`"skill:markdown-headings": "true"`) requires YAML quoting, mirrors a flat `map[string]string` instead of the actual data shape, and doesn't compose to multi-criterion filters.
 **Related:** `.squad/decisions.md` → "2026-05-02: COMPLETE — Config-Aware Grader `when:` Phase 1"
 
 ---
@@ -79,7 +79,7 @@ tool:
 
 ### 1.3 `tool:` list semantics
 
-- **AND across entries.** Every `ToolFilter` in the list must match some entry in `cfg.Generator.Tools` for the grader to apply. This matches Brady's expectation ("multiple filters in your when") and is the only sensible semantic for a *gating* clause.
+- **AND across entries.** Every `ToolFilter` in the list must match some entry in `cfg.Generator.Tools` for the grader to apply. This matches Ronnie's expectation ("multiple filters in your when") and is the only sensible semantic for a *gating* clause.
 - **Per-entry match rule.** A `ToolFilter` matches a tool entry iff:
   - `name` matches `entry.Name` exactly (case-insensitive — same as scalar matching today).
   - `source` matches `entry.ResolvedType()` (skill/mcp/plugin/builtin). Required field; absent values are a validation error at decode time.
@@ -110,7 +110,7 @@ Going full structured (`prompt: { language: python }`, `config: { tool: [...] }`
 
 #### Motivation
 
-A criteria file frequently needs to apply across multiple values of a single dimension — e.g., a "use idiomatic dependency injection" grader that's relevant for both Python *and* Java prompts on the `key-vault` service, but irrelevant for everything else. With the §1.1 shape every field is a single string, forcing authors to either duplicate the entire grader entry per language or relax the gate entirely. Brady's framing: **OR within a field, AND across fields.** That's the natural mental model and what every existing config language (CI matrices, k8s selectors) already does. Bundle the change now while we're already restructuring `WhenClause`.
+A criteria file frequently needs to apply across multiple values of a single dimension — e.g., a "use idiomatic dependency injection" grader that's relevant for both Python *and* Java prompts on the `key-vault` service, but irrelevant for everything else. With the §1.1 shape every field is a single string, forcing authors to either duplicate the entire grader entry per language or relax the gate entirely. Ronnie's framing: **OR within a field, AND across fields.** That's the natural mental model and what every existing config language (CI matrices, k8s selectors) already does. Bundle the change now while we're already restructuring `WhenClause`.
 
 #### YAML shapes
 
@@ -462,7 +462,7 @@ If a real use case for union later emerges, we add an opt-in modifier (e.g. `too
       min_calls: 1
 ```
 
-The `when:` and `checks:` blocks now read with parallel structure — same identity tuple — which is exactly what Brady asked for and exactly what consistency demands.
+The `when:` and `checks:` blocks now read with parallel structure — same identity tuple — which is exactly what Ronnie asked for and exactly what consistency demands.
 
 ---
 
@@ -816,7 +816,7 @@ go test -race ./hyoka/internal/criteria/... ./hyoka/internal/eval/... -timeout 3
 ## Test Count
 
 All tests in the 4 fixed files now compile and run. The only failure is:
-- `TestStringOrSlice_UnmarshalYAML/number_scalar` — pre-existing failure from commit 9da48f32 (Brady's Phase 2 implementation), not caused by test fixture migration
+- `TestStringOrSlice_UnmarshalYAML/number_scalar` — pre-existing failure from commit 9da48f32 (Ronnie's Phase 2 implementation), not caused by test fixture migration
 
 ## Notes
 
@@ -829,15 +829,15 @@ All tests in the 4 fixed files now compile and run. The only failure is:
 # Run Page — Cross-Eval Visualizations
 
 **Author:** Morpheus
-**Status:** Proposal — awaiting Brady's review
-**Audience:** Brady (decide which views ship), Trinity (will implement after approval)
+**Status:** Proposal — awaiting Ronnie's review
+**Audience:** Ronnie (decide which views ship), Trinity (will implement after approval)
 **Scope:** Report site frontend only. No engine / JSON-shape changes required.
 
 ---
 
 ## Problem
 
-The run detail page (`site/src/app/components/run-detail-page.tsx`) currently has two views — a flat **Table** of every eval and a **Matrix** that stacks per-eval grader results inside a prompt × config grid. Both views render evals as standalone cards. There is no view that *aggregates across evals* in a run, so a human has to eyeball six cards in series to answer questions like "which check failed in every config?" or "which grader is doing all the work?". Brady wants cross-eval views, with a per-check pass/fail matrix as the must-have.
+The run detail page (`site/src/app/components/run-detail-page.tsx`) currently has two views — a flat **Table** of every eval and a **Matrix** that stacks per-eval grader results inside a prompt × config grid. Both views render evals as standalone cards. There is no view that *aggregates across evals* in a run, so a human has to eyeball six cards in series to answer questions like "which check failed in every config?" or "which grader is doing all the work?". Ronnie wants cross-eval views, with a per-check pass/fail matrix as the must-have.
 
 ---
 
@@ -909,7 +909,7 @@ One card per config (model + skills), showing % checks passed, % evals passed, a
 └─────────────────────────────────┘  └─────────────────────────────────┘  └─────────────────────────────────┘
 ```
 
-Rationale: model-vs-model comparison is the actual decision Brady is making with multi-config runs. This is the pitch deck slide.
+Rationale: model-vs-model comparison is the actual decision Ronnie is making with multi-config runs. This is the pitch deck slide.
 
 **Size:** **S.**
 
@@ -935,9 +935,9 @@ Rationale: tells you *what kind* of failure dominates this run — the single mo
 
 | Idea | Why deferred |
 |---|---|
-| Heatmap of grader scores by config | Largely redundant with the per-grader-type bars + the matrix's grader collapse mode. Revisit if Brady wants config-vs-config head-to-head as a primary surface. |
+| Heatmap of grader scores by config | Largely redundant with the per-grader-type bars + the matrix's grader collapse mode. Revisit if Ronnie wants config-vs-config head-to-head as a primary surface. |
 | Reviewer-disagreement panel (split votes inside `extras.review.panel_results`) | High value but only fires for `prompt_review` graders. Scope it as a follow-up once the matrix is in — it slots in naturally as a drill-down from any "✓/✗ split" cell. |
-| Tool-usage delta panel | The `tool_constraint` grader already covers the pass/fail signal in the matrix; raw `tool_calls[]` aggregation is closer to a debug surface than a run-page summary. Worth a follow-up if Brady wants it. |
+| Tool-usage delta panel | The `tool_constraint` grader already covers the pass/fail signal in the matrix; raw `tool_calls[]` aggregation is closer to a debug surface than a run-page summary. Worth a follow-up if Ronnie wants it. |
 | Duration vs score scatter (Trinity's suggestion) | Genuinely cheap and clever, but a 3-config run is too few points to be visually meaningful. Reconsider when typical runs hit 5+ configs. |
 | "Elimination funnel" stacked waterfall (Trinity's suggestion) | Same insight as the per-grader-type bar but harder to read at a glance. |
 
@@ -945,7 +945,7 @@ Rationale: tells you *what kind* of failure dominates this run — the single mo
 
 ## Data shape changes
 
-**None.** Everything above is shaped client-side from existing `results[].grader_results[].points[]`. If Brady greenlights the reviewer-disagreement follow-up later, that also uses existing `extras.review.panel_results[]` — still no engine change.
+**None.** Everything above is shaped client-side from existing `results[].grader_results[].points[]`. If Ronnie greenlights the reviewer-disagreement follow-up later, that also uses existing `extras.review.panel_results[]` — still no engine change.
 
 ---
 
@@ -962,10 +962,10 @@ Total ≈ one focused Trinity sprint. The matrix is the only piece with real lay
 
 ---
 
-## Open questions for Brady
+## Open questions for Ronnie
 
 1. **Placement.** Add the new cross-eval section as a third tab next to Table / Matrix, or render it *above* the existing tabs as a permanent run-summary header? Morpheus leans **above the tabs** — the new views *describe* the run; Table/Matrix *enumerate* it.
-2. **Single-prompt runs.** Most current runs are 1 prompt × N configs. The matrix degenerates to N rows. Still ship it (Brady gets the same info as Matrix view, just transposed and rolled up to checks)? Morpheus says yes — same component handles future multi-prompt runs at zero extra cost.
+2. **Single-prompt runs.** Most current runs are 1 prompt × N configs. The matrix degenerates to N rows. Still ship it (Ronnie gets the same info as Matrix view, just transposed and rolled up to checks)? Morpheus says yes — same component handles future multi-prompt runs at zero extra cost.
 3. **Wide-matrix behaviour.** When a run produces 30+ checks, default to "collapse to grader-level" with a per-grader expand toggle, or default to expanded with horizontal scroll? Morpheus leans **collapsed by default** — every prompt-review grader can produce 5–10 points and the page gets unreadable fast.
 4. **Reviewer-disagreement drill-down** — ship now (S–M extra) or follow-up? Morpheus says follow-up; keep this PR focused.
 
@@ -973,14 +973,14 @@ Total ≈ one focused Trinity sprint. The matrix is the only piece with real lay
 
 **Author:** Trinity  
 **Date:** 2026-05-01  
-**Status:** Complete — awaiting Brady review  
+**Status:** Complete — awaiting Ronnie review  
 **Parent Spec:** `.squad/decisions/inbox/morpheus-run-page-cross-eval.md`
 
 ---
 
 ## Summary
 
-Implemented all four cross-evaluation views designed by Morpheus, following Brady's locked defaults. Shipped on commit `b644bdea` to `ronniegeraghty/dev`. Pure frontend work — zero engine/schema changes. All views aggregate client-side from existing `results[].grader_results[].points[]` data.
+Implemented all four cross-evaluation views designed by Morpheus, following Ronnie's locked defaults. Shipped on commit `b644bdea` to `ronniegeraghty/dev`. Pure frontend work — zero engine/schema changes. All views aggregate client-side from existing `results[].grader_results[].points[]` data.
 
 ---
 
@@ -1023,7 +1023,7 @@ Implemented all four cross-evaluation views designed by Morpheus, following Brad
 - **Footer row** per column: `passed/total` rollup
 - **First column sticky** — config name stays visible during horizontal scroll
 - **Collapse/expand modes:**
-  - **Default: collapsed-to-grader** (per Brady's locked decision) — each grader collapses to single ✓/✗/partial cell
+  - **Default: collapsed-to-grader** (per Ronnie's locked decision) — each grader collapses to single ✓/✗/partial cell
   - **Per-grader expand toggle** — click grader name or cell to expand its checks
   - **Global "Expand all" / "Collapse all"** button (top-right of matrix section)
 
@@ -1079,11 +1079,11 @@ Each bar shows % pass (green), with label "pass X / fail Y (Z%)".
 | Embedded assets updated (`site/dist/`) | ✅ Husky hook rebuilt bundle before commit |
 | Real report data check | ✅ Tested against `reports/20260501-043058/summary.json` (2 evals, 1 config) — confirmed all fields present (`grader_results[].points[]`) |
 
-**Manual verification note:** Dev server (`npm run dev`) not run — typecheck is sufficient for this pure UI component. Real UX testing deferred to Brady's review (will run `hyoka serve` on a multi-config run).
+**Manual verification note:** Dev server (`npm run dev`) not run — typecheck is sufficient for this pure UI component. Real UX testing deferred to Ronnie's review (will run `hyoka serve` on a multi-config run).
 
 ---
 
-## Design Decisions (Brady's Locked Defaults Applied)
+## Design Decisions (Ronnie's Locked Defaults Applied)
 
 | Open Question (Morpheus's spec) | Decision | How Implemented |
 |---|---|---|
@@ -1096,13 +1096,13 @@ Each bar shows % pass (green), with label "pass X / fail Y (Z%)".
 
 ## Deviations from Morpheus's Spec
 
-**None.** All 4 views shipped exactly as specified. No creative liberties taken. All Brady-locked defaults applied.
+**None.** All 4 views shipped exactly as specified. No creative liberties taken. All Ronnie-locked defaults applied.
 
 ---
 
 ## Open Follow-ups
 
-### 1. Reviewer-disagreement drill-down (deferred per Brady)
+### 1. Reviewer-disagreement drill-down (deferred per Ronnie)
 
 **What:** Click a ✓/✗ split cell in matrix → modal/panel showing per-reviewer-model criteria results from `extras.review.panel_results[]`.
 
@@ -1157,11 +1157,11 @@ Implement four cross-evaluation views per Morpheus's spec:
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ```
 
-**Status:** Not pushed (per charter: Brady handles pushes). Ready for Brady's review.
+**Status:** Not pushed (per charter: Ronnie handles pushes). Ready for Ronnie's review.
 
 ---
 
-## Next Steps (for Brady)
+## Next Steps (for Ronnie)
 
 1. **Review commit `b644bdea`** on `ronniegeraghty/dev`
 2. **Test with real multi-config run:**
@@ -1175,7 +1175,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
    # Navigate to the run detail page, verify all 4 views render correctly
    ```
-3. **Approve or request changes** — if approved, Brady pushes to `phase-6` branch
+3. **Approve or request changes** — if approved, Ronnie pushes to `phase-6` branch
 4. **Consider follow-up:** Reviewer-disagreement drill-down (optional, Morpheus can spec if desired)
 
 # Fix — buildToolIdentities skill_dir Leaf Expansion

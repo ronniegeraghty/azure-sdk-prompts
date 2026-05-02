@@ -1188,13 +1188,13 @@ When the property surface for a gating clause is small and homogeneous (just pro
 
 The right shape is a struct with named scalar fields plus typed lists for structured filters. Ship the structured form before more files adopt the flat form — migration cost grows linearly with consumer count.
 
-### 2026-05-02 — Brady prefers tool-identity-aligned syntax across `when:` and `tool_used`
+### 2026-05-02 — Ronnie prefers tool-identity-aligned syntax across `when:` and `tool_used`
 
-Brady's pushback on the Phase 1 form was specifically that `when:` should mirror the structure that `tool_used` checks already use: `{name|tool, source, mcp_server}`. Consistency between gating and checking is a hard preference. When designing any future filter/matcher pair, **align the field names with the canonical identity tuple** (in this codebase: `internal/criteria/graders/tool_grader.go` is the source of truth for tool identity). Don't invent parallel vocabularies for the same concept across gate vs. check surfaces.
+Ronnie's pushback on the Phase 1 form was specifically that `when:` should mirror the structure that `tool_used` checks already use: `{name|tool, source, mcp_server}`. Consistency between gating and checking is a hard preference. When designing any future filter/matcher pair, **align the field names with the canonical identity tuple** (in this codebase: `internal/criteria/graders/tool_grader.go` is the source of truth for tool identity). Don't invent parallel vocabularies for the same concept across gate vs. check surfaces.
 
 ### 2026-05-02 — Scalar-or-list polymorphism: "OR within field, AND across fields"
 
-Brady flagged a gap in the §1 `WhenClause` redesign: every scalar field was pinned as a single string, but real criteria need OR-across-values for the same key (e.g., one grader applying to both Python and Java prompts). His framing nails the mental model: **OR within a field, AND across fields**. That's the same shape every CI matrix and k8s selector uses, and it's worth memorizing as the default for any future gating clause we design.
+Ronnie flagged a gap in the §1 `WhenClause` redesign: every scalar field was pinned as a single string, but real criteria need OR-across-values for the same key (e.g., one grader applying to both Python and Java prompts). His framing nails the mental model: **OR within a field, AND across fields**. That's the same shape every CI matrix and k8s selector uses, and it's worth memorizing as the default for any future gating clause we design.
 
 The Go implementation idiom is a custom `StringOrSlice []string` type with a polymorphic `UnmarshalYAML(node *yaml.Node)` that switches on `node.Kind` (`yaml.ScalarNode` vs `yaml.SequenceNode`) and normalizes both to `[]string`. Both YAML authoring forms — flow `[a, b]` and block `- a\n- b` — decode identically because that's a YAML primitive, not a design choice. Always serialize back as a list (don't try to round-trip single-element slices to scalars) — a single shape downstream beats minor YAML cosmetics.
 

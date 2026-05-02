@@ -1206,7 +1206,7 @@ These are unrelated to pairwise:deep and can be addressed separately.
 ## Learnings (skill authoring — from agentskills.io audit)
 
 - **agentskills.io spec required fields are only `name` and `description`.** Optional: `license`, `compatibility`, `metadata`, `allowed-tools`. Anything else (like `applyTo: "**/*.md"`) is non-spec — it's VS Code / Copilot-Chat-specific and does nothing for activation. If a client needs vendor data, nest it under `metadata:`.
-- **Activation is description-only (progressive disclosure).** Agents see only `name` + `description` at discovery time and decide whether to load the body. A vague description = the skill body is never loaded, which exactly matches Brady's "never used" symptom.
+- **Activation is description-only (progressive disclosure).** Agents see only `name` + `description` at discovery time and decide whether to load the body. A vague description = the skill body is never loaded, which exactly matches Ronnie's "never used" symptom.
 - **What makes a description "activatable":**
   1. Imperative voice — "Use this skill when …", not "This skill provides guidance on …".
   2. States both *what* and *when* — capability + explicit trigger contexts.

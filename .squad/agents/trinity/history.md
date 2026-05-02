@@ -934,7 +934,7 @@ GeneratorModel  string  // Actual generator model used for this eval
 
 **Task:** Implement four cross-evaluation views on the run-detail page per Morpheus's proposal (`.squad/decisions/inbox/morpheus-run-page-cross-eval.md`).
 
-**Context:** Existing run page showed only per-eval cards (Table/Matrix views). No aggregation across evals. Brady wanted cross-eval views to answer "which check failed in every config?" and "which grader is doing all the work?". Morpheus designed 4 views; Brady locked in defaults (placement: above tabs, collapsed grader mode by default, defer reviewer-disagreement drill-down).
+**Context:** Existing run page showed only per-eval cards (Table/Matrix views). No aggregation across evals. Ronnie wanted cross-eval views to answer "which check failed in every config?" and "which grader is doing all the work?". Morpheus designed 4 views; Ronnie locked in defaults (placement: above tabs, collapsed grader mode by default, defer reviewer-disagreement drill-down).
 
 **Shipped (Commit b644bdea):**
 
@@ -960,7 +960,7 @@ GeneratorModel  string  // Actual generator model used for this eval
 - Client-side aggregation only — every field already in `summary.json`. No engine changes.
 - Memoized with `useMemo` to keep re-renders cheap.
 - Accessibility: ✓/✗ cells include `aria-label` (color not sole signal).
-- Default to collapsed grader view for wide matrices (30+ checks) — per Brady's locked decision.
+- Default to collapsed grader view for wide matrices (30+ checks) — per Ronnie's locked decision.
 - Reuses existing design tokens (mono font, white/emerald palette, border-white/8 cards).
 - Section heading + border separator between summary header and existing tabs for clear visual hierarchy.
 
@@ -968,7 +968,7 @@ GeneratorModel  string  // Actual generator model used for this eval
 - None. Shipped all 4 views exactly as specified. All locked defaults applied (placement above tabs, collapsed-to-grader default, reviewer-disagreement deferred).
 
 **Open Follow-ups:**
-- Reviewer-disagreement drill-down (per Brady's decision: defer to follow-up PR) — Morpheus noted this as "S–M extra" that slots in naturally as a drill-down from ✓/✗ split cells in matrix. Would use existing `extras.review.panel_results[]` data (no engine change).
+- Reviewer-disagreement drill-down (per Ronnie's decision: defer to follow-up PR) — Morpheus noted this as "S–M extra" that slots in naturally as a drill-down from ✓/✗ split cells in matrix. Would use existing `extras.review.panel_results[]` data (no engine change).
 - Multi-prompt grouping refinement — current matrix uses one block per prompt; if future runs have 10+ prompts, may want accordion collapse.
 
 **Commit Message:**

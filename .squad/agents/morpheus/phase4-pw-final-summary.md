@@ -149,7 +149,7 @@ playwright-cli close
 ---
 
 **Next Steps:**
-1. Brady closes epic #310
+1. Ronnie closes epic #310
 2. Promote `ronniegeraghty/dev` → `main`
 3. Tag v0.3.1
 4. Announce Phase 4 complete
