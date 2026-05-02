@@ -978,3 +978,52 @@ Also fixed missing KindWorkspace and KindActivity registration in types.go
 
 **Workspace/Activity Graders Shipped:** Tank shipped workspace grader (1f461a50) and activity grader (0896ba53). Your Track 2 verification runs (3 pairwise evals) confirmed both graders working correctly end-to-end. **Note:** You fixed missing type registration (KindWorkspace, KindActivity) in ec3c9057 — this was Tank's oversight but your fix ensures all grader kinds are properly registered.
 
+
+## 2026-05-02 — SDK Tool Naming Collision Research (SHIPPED ✅)
+
+**Tasked by:** Ronnie (for Morpheus Grader design)  
+**Deliverable:** Research on Copilot SDK tool naming collision enforcement  
+**Status:** ✓ Complete and forwarded to Morpheus
+
+### Scope
+
+**Research Q:** Does the Copilot SDK enforce tool name uniqueness across skills, MCP servers, and built-in tools?
+
+This is critical for Morpheus's multi-source tool loading design (Grader will consume tools from skills + MCP servers).
+
+### Finding
+
+**The Copilot SDK does NOT enforce tool name uniqueness across skills, MCP servers, or against built-ins.**
+
+The SDK only validates collisions for custom SDK tools (via `OverridesBuiltInTool` flag). All other cross-source collisions are unvalidated:
+
+| Source Pair | SDK Enforces? |
+|-------------|---|
+| Custom SDK tool vs built-in | ✅ Yes |
+| Skill vs built-in | ❌ No |
+| MCP server vs built-in | ❌ No |
+| Skill vs skill | ❌ No |
+| MCP server vs MCP server | ❌ No |
+| Skill vs MCP server | ❌ No |
+
+**Published documentation:** The SDK does not specify what happens when collisions occur (resolution order, scope, etc.).
+
+### Implication for Grader
+
+Morpheus cannot assume SDK-side safety. When designing multi-source tool loading, he must implement one of:
+1. **Namespacing** (e.g., `mcp:servername/toolname`, `skill:skillname/toolname`)
+2. **Load-time validation** (fail if collisions detected)
+3. **Scoped registry** (maintain separate tool namespaces per source)
+
+**Precedent:** GitHub CLI namespaces extensions (`gh ext:owner/repo/command`).
+
+### Output
+
+- Orchestration log: `.squad/orchestration-log/2026-05-02T02-59-28Z-switch.md`
+- Session log: `.squad/log/2026-05-02T02-59-28Z-sdk-tool-naming.md`
+- Decision recorded: `.squad/decisions/decisions.md` (D-2026-05-02-001)
+
+### Next Steps
+
+**Morpheus:** Incorporate namespacing requirements into Grader multi-source tool loading design.
+

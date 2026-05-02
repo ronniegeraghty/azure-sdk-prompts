@@ -1047,3 +1047,40 @@ Morpheus scoping proposal approved and shipped by Neo. Pipeline completed:
 
 All commits shipped to ronniegeraghty/dev. Ready for merge to main.
 
+
+## 2026-05-02 — SDK Tool Naming Collision Clarification (CROSS-AGENT UPDATE)
+
+**From:** Switch 🧪  
+**Topic:** Copilot SDK tool naming collision enforcement rules  
+**Relevance:** Multi-source tool loading design for Grader  
+
+### Key Finding
+
+The Copilot SDK **does not enforce tool name uniqueness** across:
+- Skills ↔ built-ins
+- MCP servers ↔ built-ins
+- Skills ↔ MCP servers
+- Skill ↔ skill
+- MCP server ↔ MCP server
+
+SDK only validates collisions for custom SDK tools (via `OverridesBuiltInTool` flag).
+
+### Implication for Your Grader Design
+
+When scoping how Grader loads tools from multiple sources (skills + MCP servers), you **must assume no SDK-side safety**. Implement one of:
+1. **Namespacing** — prefix by source (`mcp:server/tool`, `skill:name/tool`)
+2. **Load-time validation** — fail early if collisions detected
+3. **Scoped registry** — maintain separate tool namespaces per source
+
+**No published resolution rules** from the SDK on collision handling.
+
+### Documentation
+
+- Switch's research: `.squad/orchestration-log/2026-05-02T02-59-28Z-switch.md`
+- Session log: `.squad/log/2026-05-02T02-59-28Z-sdk-tool-naming.md`
+- Recorded decision: `.squad/decisions/decisions.md` (D-2026-05-02-001)
+
+### Your Next Steps
+
+Incorporate explicit namespacing rules into Grader multi-source tool loading specification. Recommend scoped registry pattern (matches GitHub CLI precedent).
+
