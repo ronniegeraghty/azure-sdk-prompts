@@ -250,6 +250,21 @@ type StringOrSlice []string
 func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
 	switch node.Kind {
 	case yaml.ScalarNode:
+		// Only accept string-typed scalars. Reject ints/bools/etc so a
+		// stray `language: 42` is a loud error rather than the silent
+		// string `"42"`. Untagged plain scalars resolve to !!str for
+		// text (yaml.v3 sets the tag during parsing); an empty/null
+		// scalar is treated as "no constraint".
+		switch node.Tag {
+		case "!!null":
+			*s = nil
+			return nil
+		case "", "!!str":
+			// fall through
+		default:
+			return fmt.Errorf("when: field at line %d must be a string or a list of strings, got scalar with tag %s",
+				node.Line, node.Tag)
+		}
 		var v string
 		if err := node.Decode(&v); err != nil {
 			return err
