@@ -459,16 +459,42 @@ func bucketName(raw string, index int) string {
 // in Checks; prompt entries are not expected to flow through NewGrader
 // under the Phase 2 design (they feed the review panel instead).
 //
-// The returned graders.GraderConfig has Kind=Type, Config=Checks, Weight and Name
-// copied, Gate=false (Phase 2 locked decision: no gating), and an empty
-// WhenMap — matching has already been resolved by MatchingUnifiedEntries.
+// The returned graders.GraderConfig has Kind=Type, Config=Checks wrapped
+// as `{checks: <node>}` so it decodes into the typed XxxConfig structs
+// (which expect a top-level `checks:` field). Weight and Name are copied,
+// Gate=false (Phase 2 locked decision: no gating), and an empty WhenMap —
+// matching has already been resolved by MatchingUnifiedEntries.
 func (e UnifiedGraderEntry) ToRuntimeConfig() graders.GraderConfig {
 	return graders.GraderConfig{
 		Kind:   e.Type,
 		Name:   e.Name,
-		Config: cloneYAMLNode(e.Checks),
+		Config: wrapChecksNode(e.Checks),
 		Weight: e.EffectiveWeight(),
 	}
+}
+
+// wrapChecksNode wraps a YAML sequence/mapping (the value of `checks:` in
+// the source YAML) inside a synthetic mapping node `{checks: <node>}` so
+// that decoding into a typed config struct (WorkspaceConfig, ToolConfig,
+// ActivityConfig, ProgramConfig) — each of which has a top-level
+// `Checks` field — succeeds. The wrap is no-op for already-mapping nodes
+// that contain a top-level `checks:` (defensive: support either shape).
+func wrapChecksNode(n yaml.Node) yaml.Node {
+	cloned := cloneYAMLNode(n)
+	// Empty / null node: emit empty mapping.
+	if cloned.Kind == 0 {
+		return yaml.Node{Kind: yaml.MappingNode}
+	}
+	keyNode := yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!str",
+		Value: "checks",
+	}
+	wrapped := yaml.Node{
+		Kind:    yaml.MappingNode,
+		Content: []*yaml.Node{&keyNode, &cloned},
+	}
+	return wrapped
 }
 
 // cloneYAMLNode returns a deep copy of n so the runtime config can be
