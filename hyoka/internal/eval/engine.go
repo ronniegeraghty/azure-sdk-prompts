@@ -257,10 +257,10 @@ func (e *Engine) loadBundle() {
 // matchedForEval returns the grader entries whose file/group/grader `when`
 // blocks match the eval's prompt properties and config. Thin wrapper kept for
 // call-site symmetry with reviewBuckets.
-func (e *Engine) matchedForEval(props map[string]string, cfg config.ToolConfig) []criteria.MatchedUnifiedEntry {
+func (e *Engine) matchedForEval(props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) []criteria.MatchedUnifiedEntry {
 	ctx := criteria.MatchContext{
 		Props: props,
-		Tools: buildToolIdentities(cfg),
+		Tools: buildToolIdentities(cfg, env),
 	}
 	return criteria.MatchingUnifiedEntries(e.graderBundle, ctx)
 }
@@ -271,12 +271,12 @@ func (e *Engine) matchedForEval(props map[string]string, cfg config.ToolConfig) 
 // In isolated mode it returns one bucket per isolated grader/group plus a
 // shared "combined" bucket for the rest. When isolated mode is requested but
 // nothing is marked isolate, it falls back to combined mode (per-entry buckets).
-func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig) []graders.ReviewBucket {
+func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) []graders.ReviewBucket {
 	mode := e.opts.ReviewMode
 	if mode == "" {
 		mode = criteria.ReviewModeCombined
 	}
-	matched := e.matchedForEval(props, cfg)
+	matched := e.matchedForEval(props, cfg, env)
 	promptMatched, _ := criteria.PartitionMatched(matched)
 	if mode == criteria.ReviewModeIsolated && !criteria.HasUnifiedIsolation(promptMatched) {
 		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
@@ -294,10 +294,10 @@ func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string, cfg co
 // evaluation criteria text, using only the prompt-type entries from the
 // Bundle. Kept on Engine for back-compat with the GraderInput.EvalCriteria
 // field consumed by review-aware graders in the single-bucket path.
-func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig) string {
+func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) string {
 	ctx := criteria.MatchContext{
 		Props: props,
-		Tools: buildToolIdentities(cfg),
+		Tools: buildToolIdentities(cfg, env),
 	}
 	matched := criteria.MatchingUnifiedEntries(e.graderBundle, ctx)
 	promptMatched, _ := criteria.PartitionMatched(matched)

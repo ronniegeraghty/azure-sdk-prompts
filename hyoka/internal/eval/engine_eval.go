@@ -535,7 +535,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	// its properties failed to load.
 	matchCtx := criteria.MatchContext{
 		Props: props,
-		Tools: buildToolIdentities(task.Config),
+		Tools: buildToolIdentities(task.Config, env),
 	}
 	if bundleErr := e.graderBundle.MatchingErrors(matchCtx); bundleErr != nil {
 		glg.Error("Grader bundle has errors matching this eval", "error", bundleErr)
@@ -554,7 +554,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		// iterates this list in YAML declaration order, treating
 		// type=prompt entries as review items and everything else as
 		// typed graders.
-		matched := e.matchedForEval(props, task.Config)
+		matched := e.matchedForEval(props, task.Config, env)
 
 		// Collect all grader results across typed graders and AI review.
 		var allGraderResults []graders.GraderResult
@@ -583,8 +583,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		graderInput := graders.GraderInput{
 			WorkspacePath:         genWs.Dir,
 			OriginalPrompt:        task.Prompt.PromptText,
-			EvalCriteria:          e.mergedCriteria(task.Prompt, props, task.Config),
-			EvalCriteriaBuckets:   e.reviewBuckets(task.Prompt, props, task.Config),
+			EvalCriteria:          e.mergedCriteria(task.Prompt, props, task.Config, env),
+			EvalCriteriaBuckets:   e.reviewBuckets(task.Prompt, props, task.Config, env),
 			WorkspaceDelta:        evalReport.WorkspaceDelta,
 			GeneratorArtifact:     genArtifact,
 			GeneratorArtifactPath: generatorArtifactPath,

@@ -47,7 +47,7 @@ func TestEngineReviewBuckets_Combined(t *testing.T) {
 	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "prompt-level criteria"}
-	buckets := e.reviewBuckets(p, nil, config.ToolConfig{})
+	buckets := e.reviewBuckets(p, nil, config.ToolConfig{}, nil)
 
 	if len(buckets) != 3 {
 		t.Fatalf("combined mode: expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
@@ -86,7 +86,7 @@ func TestEngineReviewBuckets_DefaultModeMatchesCombined(t *testing.T) {
 	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "pc"}
-	buckets := e.reviewBuckets(p, nil, config.ToolConfig{})
+	buckets := e.reviewBuckets(p, nil, config.ToolConfig{}, nil)
 	if len(buckets) != 3 {
 		t.Fatalf("default (empty) mode should behave like combined: expected 3 buckets, got %d", len(buckets))
 	}
@@ -106,7 +106,7 @@ func TestEngineReviewBuckets_IsolatedWithIsolation(t *testing.T) {
 	)
 
 	p := &prompt.Prompt{ID: "p1", EvaluationCriteria: "pc"}
-	buckets := e.reviewBuckets(p, nil, config.ToolConfig{})
+	buckets := e.reviewBuckets(p, nil, config.ToolConfig{}, nil)
 
 	if len(buckets) != 3 {
 		t.Fatalf("isolated mode expected 3 buckets (prompt + 1 isolated + 1 combined), got %d", len(buckets))
@@ -161,7 +161,7 @@ func TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation(t *testing.T) {
 	)
 
 	p := &prompt.Prompt{ID: "prompt-X", EvaluationCriteria: "pc"}
-	buckets := e.reviewBuckets(p, nil, config.ToolConfig{})
+	buckets := e.reviewBuckets(p, nil, config.ToolConfig{}, nil)
 
 	if len(buckets) != 3 {
 		t.Fatalf("degraded path expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
@@ -179,7 +179,7 @@ func TestEngineReviewBuckets_IsolatedDegradesWithoutIsolation(t *testing.T) {
 func TestEngineReviewBuckets_NoGraders(t *testing.T) {
 	e := NewEngine(&StubRunner{}, quietOpts(EngineOptions{}))
 	p := &prompt.Prompt{ID: "p", EvaluationCriteria: "just this"}
-	buckets := e.reviewBuckets(p, nil, config.ToolConfig{})
+	buckets := e.reviewBuckets(p, nil, config.ToolConfig{}, nil)
 	if len(buckets) != 1 {
 		t.Fatalf("expected 1 bucket from prompt criteria alone, got %d", len(buckets))
 	}

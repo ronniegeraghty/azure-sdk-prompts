@@ -6,6 +6,7 @@ import (
 "github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 "github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 )
 
 func TestInjectConfigProps(t *testing.T) {
@@ -110,11 +111,40 @@ want: []criteria.ToolIdentity{
 
 for _, tt := range tests {
 t.Run(tt.name, func(t *testing.T) {
-got := buildToolIdentities(tt.cfg)
+got := buildToolIdentities(tt.cfg, nil)
 if !toolIdentitiesEqual(got, tt.want) {
 t.Errorf("buildToolIdentities() mismatch:\ngot:  %+v\nwant: %+v", got, tt.want)
 }
 })
+}
+}
+
+func TestBuildToolIdentities_EnvDerivedSkills(t *testing.T) {
+// When env is provided, leaf skills come from env.SkillsLoaded
+// (the SDK-resolved set, with skill_dir expansion + pairwise
+// exclusions already applied). Top-level skill_dir entries on cfg
+// should NOT also appear as identities — env wins.
+cfg := config.ToolConfig{
+Generator: &config.GeneratorConfig{
+Tools: []config.ToolEntry{
+{Name: "test-skills", Type: tool.TypeSkill}, // skill_dir wrapper
+{Name: "filesystem", Type: tool.TypeTool},   // built-in passes through
+},
+},
+}
+env := &report.EnvironmentInfo{
+SkillsLoaded: []string{"markdown-headings", "markdown-lists"},
+MCPServers:   []string{"azure"},
+}
+got := buildToolIdentities(cfg, env)
+want := []criteria.ToolIdentity{
+{Name: "markdown-headings", Source: tool.TypeSkill},
+{Name: "markdown-lists", Source: tool.TypeSkill},
+{Name: "azure", Source: tool.TypeMCP, MCPServer: "azure"},
+{Name: "filesystem", Source: tool.TypeTool},
+}
+if !toolIdentitiesEqual(got, want) {
+t.Errorf("buildToolIdentities(cfg, env) mismatch:\ngot:  %+v\nwant: %+v", got, want)
 }
 }
 
