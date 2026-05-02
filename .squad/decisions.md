@@ -2483,3 +2483,56 @@ If future PRs touch activity grader, cross-reference this doc to ensure document
 
 Documentation is complete and accurate as of the latest code commit. Ready for merge.
 
+
+---
+
+## 2026-05-02: Tool Grader Skill Name Matching (Neo)
+
+**Status:** ✅ Implemented  
+**Date:** 2026-05-02  
+**Decider:** Neo (Core Eval Framework Developer)
+
+### Context
+
+The `tool_used` grader check was matching the literal actionType "skill" instead of individual skill names (e.g., "markdown-headings", "markdown-lists"). Users were forced to use `tool: skill` as a workaround because `tool: markdown-headings` did not work.
+
+### Investigation
+
+The pipeline for skill events:
+1. `tool.execution_start` with ToolName="skill" → creates Type=tool_call, Tool="skill" event
+2. `skill.invoked` with SkillName="markdown-headings" → creates Type=skill, Tool="markdown-headings" event
+3. `tool.execution_complete` with ToolName="skill" → filtered out by ToGraderActionLog
+
+The bug: both (1) and (2) were being counted in `toolCounts`, resulting in:
+- `toolCounts["skill"] = 2` (from tool.execution_start events)
+- `toolCounts["markdown-headings"] = 1` (from skill.invoked event)
+- `toolCounts["markdown-lists"] = 1` (from skill.invoked event)
+
+When user specified `tool: markdown-headings`, the grader couldn't find it because the count was under "skill", not the individual name.
+
+### Decision
+
+**Filter out tool_call events with Tool="skill" in `ToGraderActionLog()`** because they're redundant — the individual skill name appears in the subsequent skill.invoked event.
+
+This ensures:
+- Individual skill names are countable: `tool: markdown-headings` works
+- No double-counting: each skill invocation is counted once by its individual name
+- **Breaking change:** `tool: skill` (matching the actionType bucket) no longer works — use `any_from_group: <skill-group-name>` for catch-all matching
+
+### Implementation
+
+- **hyoka/internal/eval/action.go:** Added filter in ToGraderActionLog() to skip tool_call events with Tool="skill"
+- **criteria/language/test.yaml:** Updated example from `tool: skill` to `tool: markdown-headings`
+- **hyoka/internal/eval/action_test.go:** Added TestActionTimeline_ToGraderActionLog_SkillEvents to verify filtering
+
+### Verification
+
+- Unit test passes: skill events with individual names are preserved, tool_call "skill" events are filtered
+- Integration test passes: `tool_used: markdown-headings` now matches when the markdown-headings skill is invoked
+- All existing eval/criteria tests pass
+
+### Migration Notes
+
+Criteria using `tool: skill` must be updated to either:
+- Specify individual skill names: `tool: markdown-headings`
+- Use group matching: `any_from_group: <skill-group-name>` (requires group topology implementation)

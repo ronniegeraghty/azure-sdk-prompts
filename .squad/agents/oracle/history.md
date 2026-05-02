@@ -711,3 +711,27 @@ The 5 canonical graders are the authoritative types. Key code paths for future r
 ### Commit
 
 Ready for commit on `ronniegeraghty/dev` with standard Co-authored-by trailer.
+
+---
+
+### 2026-05-02 — Tool Grader Breaking Change: `tool: skill` No Longer Matches (Neo)
+
+**Sync:** Oracle must update docs/graders/tool.md in next iteration.
+
+**What Changed:**
+- Neo fixed tool_used grader double-counting bug
+- Filter: redundant tool_call events with Tool="skill" removed from action log
+- **Breaking:** Criteria using `tool: skill` (catch-all skill matching) no longer works
+
+**Migration Path:**
+- Replace `tool: skill` with individual skill name: `tool: markdown-headings`
+- OR use future group matching: `any_from_group: <skill-group-name>` (pending implementation)
+
+**Root Cause:**
+skill events landed twice in toolCounts:
+1. tool.execution_start → Tool="skill" (generic wrapper)
+2. skill.invoked → Tool="markdown-headings" (individual name)
+
+Removing (1) eliminates double-counting; (2) provides canonical match key.
+
+**Code Reference:** hyoka/internal/eval/action.go, TestActionTimeline_ToGraderActionLog_SkillEvents
