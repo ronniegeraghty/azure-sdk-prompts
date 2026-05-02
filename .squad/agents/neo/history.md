@@ -1511,3 +1511,65 @@ Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught t
 **Follow-up:**
 - Minor test syntax fixes in buckets_test.go (cosmetic, doesn't block usage)
 - Workspace test might need adjusted expectations (expects 1 failed check, gets 2)
+
+---
+
+## 2026-05-02 — Pairwise Deep Clone Fix (Neo)
+
+**Branch:** `ronniegeraghty/dev` (1 commit: a9366641)
+
+**Bug:** When pairwise expansion created config variants with `ExcludedSkills` or `ExcludedTools`, the `cloneToolConfig` function failed to deep-copy these fields, causing all variants to share the same underlying slice. This resulted in mutations affecting all clones, breaking the pairwise exclusion logic. User reported that pairwise runs loaded all skills in every variant despite correct variant naming.
+
+**Root cause:** `cloneToolConfig` in `hyoka/internal/pairwise/pairwise.go`:
+- Generator tools: copied `ExcludedSkills` but NOT `ExcludedTools`
+- Reviewer tools: copied neither `ExcludedSkills` nor `ExcludedTools`
+
+**Fix:**
+- Added deep-copy logic for `ExcludedTools` in generator tool cloning (lines 268-272)
+- Added deep-copy logic for both `ExcludedSkills` and `ExcludedTools` in reviewer tool cloning (lines 311-321)
+
+**Impact:**
+- `skill_dir + pairwise:deep` now correctly excludes individual skills in each `without-{skill}` variant
+- `plugin + pairwise:deep` now correctly excludes individual tools in each `without-{plugin}/{tool}` variant
+- Reviewer tools with exclusions (if used) are now properly cloned
+
+**Test coverage:**
+- `TestPairwiseDeepVariantSkillsLoadedFilter` validates skill exclusion at the `ValidateAndExpand` level (already existed, was passing before fix because it tested the lower-level exclusion logic)
+- `TestExpandPairwise_DeepSkillDir` validates config structure after pairwise expansion
+- All existing pairwise tests continue to pass
+
+**Key insight:** The low-level exclusion logic (`validateSkillDirEntry` checking `ExcludedSkills`, `resolveSkillDirWithExclusions`) was already correct. The bug was in the config cloning that happens during pairwise variant generation. Shallow slice copies caused shared state between variants.
+
+## Learnings
+
+**Pairwise expansion architecture:**
+- Entry point: `cmd/run.go` calls `pairwise.ExpandPairwise()` when `--pairwise` flag is set
+- Expansion logic: `pairwise.go` `ExpandPairwise()` → `collectTogglable()` → `removeTool()`
+- `collectTogglable()` enumerates toggleable tools:
+  - `shallow` mode (default): entire entry is toggled
+  - `deep` mode: for `skill_dir`, enumerates subdirectories; for plugins, enumerates plugin tools; for MCP, enumerates mcp_tools
+- `removeTool()` removes tools from variants:
+  - For deep variants (`{entry}/{sub}`), adds sub-name to `ExcludedSkills` or `ExcludedTools` list
+  - For shallow variants, removes entire entry from `Generator.Tools`
+- `cloneToolConfig()` creates deep copies of configs for each variant — MUST deep-copy slice fields to avoid shared state
+
+**Skill resolution model:**
+- Two code paths in `copilot.go` `buildSessionConfigForEval()`:
+  1. Pre-validation path (WU-1): uses `toolReport.GeneratorSkillDirs()` from `tool.ValidateAndExpand()`
+  2. Legacy path: calls `tool.ResolveSkillsWithReporter()` directly
+- `ValidateAndExpand()` → `validateEntries()` → `validateSkillDirEntry()` checks `entry.ExcludedSkills`
+- `ResolveSkills()` → `resolveSkillDirWithExclusions()` filters out excluded skills
+- Both paths respect `ExcludedSkills` correctly IF the field is set
+
+**Plugin vs skill_dir vs MCP expansion:**
+- Plugins: `enumeratePluginTools()` reads plugin manifest, returns list of child tool names
+- Skill_dir: `enumerateSkillDir()` reads filesystem, returns list of subdirectory names with SKILL.md
+- MCP: Uses `entry.MCPTools` list directly, or treats entire server as single toggle if wildcard
+
+**Key file paths:**
+- `hyoka/internal/pairwise/pairwise.go` — expansion logic
+- `hyoka/internal/config/tool/validate.go` — pre-validation with ExcludedSkills check (line 834)
+- `hyoka/internal/config/tool/resolve.go` — skill resolution with exclusions (line 209-210)
+- `hyoka/internal/eval/copilot.go` — session config building (line 950 uses toolReport, line 962 fallback)
+- `hyoka/internal/config/tool/entry.go` — Entry struct with ExcludedSkills/ExcludedTools fields
+
