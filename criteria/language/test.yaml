@@ -20,6 +20,22 @@ graders:
       # Intentionally failing — demonstrates failed-check rendering.
       - File hello.md contains a fenced code block tagged with the language `rust`.
 
+  # Differential check — only passes when the markdown-headings skill is loaded
+  # AND invoked. The skill instructs the agent to emit a provenance marker
+  # comment above the H1; a bare LLM would never add this on its own. This
+  # creates a visible pass/fail delta on the pairwise page across with/without
+  # markdown-headings variants.
+  - name: Markdown Headings Skill Marker
+    type: prompt
+    weight: 1.0
+    when:
+      tool:
+        - name: markdown-headings
+          source: skill
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md contains the literal HTML comment `<!-- markdown-headings-skill -->` on the line immediately before the level-1 heading (with a single blank line between them).
+
   # ---------------------------------------------------------------------------
   # 2. workspace — workspace-delta boolean checks. Exercises all six check kinds.
   # ---------------------------------------------------------------------------
