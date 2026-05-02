@@ -1089,3 +1089,93 @@ Skill collision disambiguation at runtime requires **building a lookup table** f
 - hyoka event capture: `hyoka/internal/eval/copilot.go:400-403` (skill.invoked), `L449-466` (skills_loaded)
 - hyoka types: `hyoka/internal/report/types.go:296-320`, `hyoka/internal/eval/action.go:12-25`
 
+
+---
+
+## 2026-05-02 — Pairwise:Deep Investigation + Test Suite Fix (COMPLETE)
+
+**Spawned by:** Ronnie Geraghty  
+**Task:** Investigate and fix outstanding pairwise:deep issue  
+**Duration:** ~90 minutes  
+**Outcome:** ✅ COMPLETE — No pairwise:deep bug exists; fixed 3 unrelated test failures  
+
+### Investigation
+
+**Pairwise:Deep Status: FULLY FUNCTIONAL**
+- All pairwise tests pass (22 tests in internal/pairwise, TestPairwiseDeepVariantSkillsLoadedFilter in tool)
+- Live expansion works correctly: `--pairwise --dry-run` produces expected variants
+- Neo's prior fixes (commits `4f293e06`, `a9366641`) resolved all known issues
+- Track 1 test (commit `56ebf63d`) validates the contract and passes
+- Track 2 verification (3 live evals) confirmed production readiness
+
+**Finding:** The task appeared to reference "pairwise:deep still unfixed" but no bug exists. The test suite had 3 **unrelated** failures that were blocking CI.
+
+### Test Failures Fixed (Commit 7a70676e)
+
+1. **TestReviewerFactory_MissingSkillFailsFast (cmd)**
+   - **Root cause:** Type assertion expected `*ToolLoadError`, got `*joinedToolLoadError`
+   - **Fix:** Use `errors.As()` to handle wrapped errors
+   - **Impact:** Test now correctly validates missing-skill fast-fail behavior
+
+2. **TestWriteReport_LargeReportWrittenCorrectly (report/bounds_test)**
+   - **Root cause:** Test constructed `EvalReport` without `SchemaVersion`, defaulting to 0; `MigrateToV3` panics on v < 4 (v4 hard cutover enforced)
+   - **Fix:** Set `SchemaVersion: CurrentSchemaVersion` on test report
+   - **Impact:** Test validates large report handling without migration panic
+
+3. **TestRerenderRun (rerender)**
+   - **Root cause:** Same as #2 — v0 schema triggers migration panic
+   - **Fix:** Set `SchemaVersion: CurrentSchemaVersion` on all 3 test reports
+   - **Impact:** Rerender tests now exercise v4 schema consistently
+
+4. **TestMigrateToV3 (report/generator_test)** — Bonus fix
+   - **Root cause:** Test expected v0 → v4 migration, but `MigrateToV3` now **panics by design** (v4 hard cutover)
+   - **Fix:** Rewrote as `TestMigrateToV3Panic` to verify panic behavior
+   - **Impact:** Test now validates v4 hard cutover enforcement
+
+### Files Changed
+
+- `hyoka/cmd/reviewerfactory_test.go`: Added `errors.As()` check
+- `hyoka/internal/report/bounds_test.go`: Set `SchemaVersion` on 2 reports
+- `hyoka/internal/report/generator_test.go`: Set `SchemaVersion` on 9 reports; rewrote migration test
+- `hyoka/internal/rerender/rerender_test.go`: Set `SchemaVersion` on 3 reports
+
+### Verification
+
+```bash
+# Full test suite
+go test -race ./... -timeout 3m
+# Result: 27/30 packages pass
+# Pairwise tests: ✅ ALL PASS
+# Fixed tests: ✅ ALL PASS (3/3)
+# Pre-existing failures: 3 (dual_emit, v2_report — unrelated to pairwise or this task)
+```
+
+### Remaining Work (Not Blocking)
+
+**3 pre-existing failures in `internal/report`** (existed before this session):
+- `TestGraderResultDualEmit` — dual-emit marshaling issue
+- `TestGraderResultMarshalDualEmit` — missing 'checks' key
+- `TestV2ReportReadByV3Code` — v2 fixture incompatible with v4 cutover
+
+These are unrelated to pairwise:deep and can be addressed separately.
+
+### Learnings
+
+1. **v4 schema hard cutover**: `MigrateToV3` now panics on v < 4 by design — old reports must be regenerated. Tests must explicitly set `SchemaVersion: CurrentSchemaVersion`.
+
+2. **Error wrapping evolution**: `joinedToolLoadError` wraps multiple `ToolLoadError` instances. Tests checking error types must use `errors.As()`, not direct type assertions.
+
+3. **Test fixture hygiene**: When schema versions change, audit all test constructions of domain types to ensure they match current expectations.
+
+4. **Diagnostic thoroughness**: Investigated comprehensively (pairwise tests, live expansion, orchestration logs, commit history) before concluding "no bug exists" — prevented wild goose chase.
+
+### Cross-Agent Updates
+
+- **Neo:** Your pairwise:deep fixes (4f293e06, a9366641) are fully verified and production-ready.
+- **Oracle:** v4 schema hard cutover is enforced in `MigrateToV3` — document migration rejection in relevant docs if not already covered.
+
+### Decision File
+
+`.squad/decisions/inbox/switch-pairwise-deep-diagnostic.md` → documents investigation findings + test fixes.
+
+**Status:** ✅ SHIPPED (Commit 7a70676e)
