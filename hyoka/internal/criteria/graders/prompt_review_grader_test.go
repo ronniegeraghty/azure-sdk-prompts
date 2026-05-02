@@ -61,11 +61,13 @@ if err == nil {
 }
 }
 
-func TestPromptReviewGraderCleanup(t *testing.T) {
+func TestPromptReviewGraderRecordsWorkspacePath(t *testing.T) {
+// Engine owns workspace lifecycle; the grader simply records the path
+// it was handed so the engine can read reviewed files from it.
 ws := t.TempDir()
 os.WriteFile(filepath.Join(ws, "f.txt"), []byte("data"), 0644)
 
-g := NewPromptReviewGrader("cleanup-test", &review.StubReviewer{}, nil)
+g := NewPromptReviewGrader("record-test", &review.StubReviewer{}, nil)
 _, err := g.Grade(context.Background(), GraderInput{
 	WorkspacePath:  ws,
 	OriginalPrompt: "test",
@@ -74,24 +76,19 @@ if err != nil {
 	t.Fatal(err)
 }
 
-reviewDir := g.LastReviewWorkDir
-if reviewDir == "" {
-	t.Fatal("expected LastReviewWorkDir to be set")
+if g.LastReviewWorkDir != ws {
+	t.Fatalf("LastReviewWorkDir = %q, want %q (grader must use engine-provided path)", g.LastReviewWorkDir, ws)
 }
 
-// Directory should exist before cleanup.
-if _, err := os.Stat(reviewDir); os.IsNotExist(err) {
-	t.Fatal("review workspace should exist before cleanup")
-}
-
+// CleanupWorkspace is now a no-op; the workspace must remain intact
+// for the engine to read reviewed files.
 g.CleanupWorkspace()
 
-// Directory should not exist after cleanup.
-if _, err := os.Stat(reviewDir); !os.IsNotExist(err) {
-	t.Error("review workspace should be removed after cleanup")
+if _, err := os.Stat(ws); os.IsNotExist(err) {
+	t.Error("CleanupWorkspace must not remove engine-owned workspace")
 }
 if g.LastReviewWorkDir != "" {
-	t.Error("LastReviewWorkDir should be empty after cleanup")
+	t.Error("CleanupWorkspace should clear LastReviewWorkDir")
 }
 }
 
@@ -113,26 +110,5 @@ for _, tt := range tests {
 			t.Errorf("criteriaScore() = %f, want %f", got, tt.want)
 		}
 	})
-}
-}
-
-func TestCopyDirContents(t *testing.T) {
-src := t.TempDir()
-os.MkdirAll(filepath.Join(src, "subdir"), 0755)
-os.WriteFile(filepath.Join(src, "top.txt"), []byte("top"), 0644)
-os.WriteFile(filepath.Join(src, "subdir", "nested.txt"), []byte("nested"), 0644)
-
-dst := t.TempDir()
-if err := copyDirContents(src, dst); err != nil {
-	t.Fatal(err)
-}
-
-data, err := os.ReadFile(filepath.Join(dst, "top.txt"))
-if err != nil || string(data) != "top" {
-	t.Error("top.txt not copied correctly")
-}
-data, err = os.ReadFile(filepath.Join(dst, "subdir", "nested.txt"))
-if err != nil || string(data) != "nested" {
-	t.Error("nested.txt not copied correctly")
 }
 }

@@ -1202,3 +1202,32 @@ These are unrelated to pairwise:deep and can be addressed separately.
 **Status:** Diagnostic complete, test suite improved, ready for production.
 
 ---
+
+## Learnings (skill authoring — from agentskills.io audit)
+
+- **agentskills.io spec required fields are only `name` and `description`.** Optional: `license`, `compatibility`, `metadata`, `allowed-tools`. Anything else (like `applyTo: "**/*.md"`) is non-spec — it's VS Code / Copilot-Chat-specific and does nothing for activation. If a client needs vendor data, nest it under `metadata:`.
+- **Activation is description-only (progressive disclosure).** Agents see only `name` + `description` at discovery time and decide whether to load the body. A vague description = the skill body is never loaded, which exactly matches Brady's "never used" symptom.
+- **What makes a description "activatable":**
+  1. Imperative voice — "Use this skill when …", not "This skill provides guidance on …".
+  2. States both *what* and *when* — capability + explicit trigger contexts.
+  3. Lists *indirect* triggers — phrases users use without naming the domain (e.g., "three items" instead of "bullet list").
+  4. **Pushy on simple tasks** — agents skip skills they think they don't need; for trivial tasks ("write hello.md with an H1 and a 3-item list") the description must explicitly say "apply this even for one-shot / single-element / short tasks".
+  5. Concise — few sentences, ≤1024 chars.
+- **Body should spend tokens on what the agent doesn't already know:** rules, correct examples, common-mistake anti-patterns. Skip background ("markdown is a format that…").
+- **Other repo skills with the same anti-pattern (out of scope this task, but flagged):**
+  - `skills/generator/azure-sdk-for-rust-bestpractices/SKILL.md` — has non-spec `applyTo:` field.
+  - `skills/reviewer/java-sdk-validation/SKILL.md` — has **no frontmatter at all**, so it can never be discovered/activated. Likely silently broken.
+- Recorded the reusable principles at `.squad/skills/skill-authoring/SKILL.md` so the rest of the team has one place to look before authoring or reviewing skills.
+
+## Learnings — 2025 skill frontmatter cleanup (post-test-skill audit)
+
+Confirmed two anti-patterns from prior audit also exist outside `skills/test/`:
+
+1. **Missing frontmatter = silently broken skill.** `skills/reviewer/java-sdk-validation/SKILL.md` had zero frontmatter. Per agentskills.io progressive disclosure (discovery scan only sees `name`+`description`), a SKILL.md with no frontmatter cannot be discovered or activated — the body never loads. Fixed by adding compliant frontmatter; body untouched.
+2. **Non-spec `applyTo` field is noise.** `skills/generator/azure-sdk-for-rust-bestpractices/SKILL.md` carried `applyTo: "**/*.rs,**/Cargo.toml"` — a Copilot-VSCode-only field, not in the agentskills.io spec. Stripped it; tightened the description to imperative + indirect triggers + "apply before first line" push.
+
+**Spot-check result:** no other skills under `skills/reviewer/` or `skills/generator/` had either anti-pattern. The remaining three reviewer skills (`code-review-comments`, `reviewer-build`, `sdk-version-check`) and the test skills (already fixed) are clean.
+
+**Skill-authoring SKILL.md already documents both anti-patterns** (lines 23–26 call out `applyTo` and the missing-frontmatter case by name with the exact path I just fixed). No update needed; the doc is accurate. No confidence bump required — the lifecycle rule is "bump when adding new principles," and these were already enumerated.
+
+`go build ./...` — clean (markdown-only changes, as expected).

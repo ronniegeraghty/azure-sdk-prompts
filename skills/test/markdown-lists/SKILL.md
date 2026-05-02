@@ -1,25 +1,28 @@
 ---
 name: markdown-lists
-description: "Guidance on bullet and numbered list formatting. Use when generating markdown files with lists."
-applyTo: "**/*.md"
+description: Authoritative rules for formatting markdown bullet lists and numbered lists, including marker choice, spacing, blank lines around lists, and nested-item indentation. Use this skill whenever you are about to write or edit a markdown (.md) file that contains any list — including short three-item lists, single-bullet lists, and tasks where the user says things like "a bullet list", "a list of items", "three items", or "numbered steps". Apply it before writing the file so the list formatting is correct on the first pass.
 ---
 
-# Markdown List Best Practices
+# Markdown List Rules
 
-When writing bullet lists:
+Apply these rules to every list you emit in any `.md` file.
 
-- Start each list item with a dash `-` or asterisk `*` followed by a space
-- Use consistent indentation (2 or 4 spaces for nested items)
-- Add a blank line before the list starts (after preceding text)
-- Keep list items concise and focused
+## Bullet lists
 
-For numbered lists:
+- Start each item with `-` followed by a single space (prefer `-` over `*` for consistency).
+- Put a blank line **before** the list (after any preceding paragraph) and **after** the list.
+- Indent nested items by exactly **2 spaces** relative to the parent item.
+- Keep each item concise and on a single line when possible.
 
-1. Start each item with a number followed by a period and space
-2. Markdown will auto-renumber if needed, so you can use `1.` for all items
-3. Use consistent indentation for nested numbered lists
+## Numbered lists
 
-Example bullet list:
+- Start each item with a number, a period, and a single space: `1. Item`.
+- Numbers may be written as `1.` for every item; renderers auto-renumber. Sequential numbering (`1.`, `2.`, `3.`) is also fine.
+- Same blank-line and indentation rules as bullet lists.
+
+## Correct examples
+
+Bullet list:
 
 ```markdown
 Some introductory text.
@@ -31,7 +34,7 @@ Some introductory text.
 - Third item
 ```
 
-Example numbered list:
+Numbered list:
 
 ```markdown
 Steps to follow:
@@ -40,3 +43,10 @@ Steps to follow:
 2. Second step
 3. Third step
 ```
+
+## Common mistakes to avoid
+
+- Missing blank line between the preceding paragraph and the first list item (some renderers won't recognize the list).
+- Mixing `-`, `*`, and `+` markers within the same list.
+- Inconsistent indentation for nested items (e.g., 3 spaces, or tabs mixed with spaces).
+- Using `•` or other non-markdown bullet characters.

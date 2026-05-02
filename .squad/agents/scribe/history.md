@@ -194,3 +194,23 @@ All 9 inbox decision files archived under `.squad/decisions/archive/`. Orchestra
 - **Stripping a test file via `cp` + `sed` then restoring is safer than `git add -p` for splitting tests.** Did this for `cacheroot_test.go` to land Tank's tests in commit 1 and Switch's tests in commit 6. Backup file lived in repo root with `.scribe-` prefix (NOT in `/tmp` — environment forbids `/tmp`).
 - **One section in `decisions.md`, not eight.** Charter is explicit: Scribe consolidates fan-out work into a single dated entry with sub-sections (cache layout / no-TTL / freshness / flock / fetcher / format contract / post-session gate / dedup / legacy fallback / open follow-ups). Eight separate entries for one logical refactor would be a charter violation.
 - **Open Ronnie-action items belong in the decisions section under "Open follow-ups", not in the orchestration log.** The legacy `~/.copilot/installed-plugins/` drop window is the only Ronnie-pending item from this session — surfaced in `decisions.md` so future contributors see it during normal decision review, not buried in a session-specific log.
+
+
+---
+
+## 2026-05-02: Two-inbox-drops + skill cleanup → single decisions section ✅
+
+**Session:** Config-aware `when:` Phase 1 + Switch skill audit cleanup
+**Status:** ✅ Complete
+
+Folded two inbox drops (`morpheus-config-aware-when.md` scope + `neo-config-aware-when-phase1.md` impl) into **one** dated decisions.md section with explicit Phase 1 SHIPPED / Phase 2 DEFERRED structure. Switch's skill audit cleanup got its own short section since it was an independent thread.
+
+Three orchestration log entries (morpheus / neo / switch) at `2026-05-02T07-30-00Z`. Session log appended to `.squad/sessions/log.md`. Cross-agent histories already self-updated by each agent — no scribe edits needed.
+
+### Learnings
+
+- **When scope-doc + impl-doc land in the same session, merge them into ONE dated decisions section, not two.** The reader's mental model is "what did we decide?" — they don't care that the scope landed at 2026-05-02T03:00 and the impl at 2026-05-02T07:00. Use a single header with sub-sections (What shipped / Implementation / Tests / Docs / Deferred). Mirrors the "one section in decisions.md, not eight" learning from 2026-04-28 tool-load consolidation, but applies even to a 2-doc fan-in.
+- **An independent thread that overlaps in time still gets its own section.** Switch's skill audit was ambient cleanup, not part of the `when:` design — folding it into the same section would imply causal connection that doesn't exist. Two sections, same dated stamp, different titles. Don't conflate threads just because they share a session.
+- **Working-tree code from a previously-logged thread can ride along in the same scribe commit.** This batch included Neo's grader-isolation code (`workspace.go`, `grader_isolation_test.go`, `prompt_review_grader*.go`) which had been *logged* at `26145607` but not *committed* (that commit was .squad-only). The brief explicitly said "this batch covers everything since" — meaning all working-tree changes ride together. Don't try to backfill into the prior commit; just sweep current state forward.
+- **Agents self-updating their own histories is the new normal.** Both Neo and Switch already wrote their own history entries before scribe spawned. Scribe's job in those cases is just to cross-reference (don't duplicate the content) and confirm via `tail` rather than re-write. Saves churn and prevents merge conflicts.
+- **`.squad/skills/skill-authoring/SKILL.md` was authored by Switch as a reusable artifact** — that's a domain-knowledge SKILL living under `.squad/skills/`, not under repo `skills/` (which is for generator/reviewer skills the eval engine loads). Two namespaces: agent-team skills (`.squad/skills/`) vs hyoka-runtime skills (`skills/`). When committing, both can ride in one commit but should be mentioned as separate concerns in the message body.

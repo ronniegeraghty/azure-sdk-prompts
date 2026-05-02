@@ -137,6 +137,38 @@ when:
 
 Property keys are not restricted to a fixed set—any prompt property can be used (language, service, plane, category, tags).
 
+#### Config-aware properties
+
+In addition to prompt-derived properties, the engine injects properties derived from the **eval config under test**, so a grader can gate itself to configs that actually load the tools it depends on. These are the keys available in `when:`:
+
+| Key                       | Value    | Source                                            |
+|---------------------------|----------|---------------------------------------------------|
+| `generator`               | model name | `generator.model` from the eval config          |
+| `config`                  | config name | `name:` field of the eval config               |
+| `skill:<name>`            | `"true"` | one entry per `generator.tools` with `type: skill` |
+| `mcp_server:<name>`       | `"true"` | one entry per `generator.tools` with `type: mcp`   |
+| `plugin:<name>`           | `"true"` | one entry per `generator.tools` with `type: plugin` |
+
+**Example — gate a `tool_used` grader to configs that load the `azure` MCP server:**
+
+```yaml
+graders:
+  - name: uses-azure-list-resources
+    kind: tool
+    when:
+      "mcp_server:azure": "true"   # quote keys containing ':' (YAML requirement)
+    config:
+      checks:
+        - kind: tool_used
+          tool: list-resources
+          source: mcp
+          mcp_server: azure
+```
+
+On a config that doesn't include the `azure` MCP server, this grader is silently skipped instead of failing every eval.
+
+> **YAML quoting.** Map keys containing `:` must be quoted (e.g. `"mcp_server:azure": "true"`). Unquoted, YAML parses `mcp_server:azure` as a nested mapping. The `:`-prefixed namespace is reserved for engine-injected config props; do not use it for prompt frontmatter.
+
 ## Canonical Grader Types
 
 hyoka defines five canonical grader types, each with a flat `checks:` list at the top level:

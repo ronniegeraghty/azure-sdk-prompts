@@ -48,6 +48,18 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			props[k] = v
 		}
 	}
+	// Inject eval-config-derived properties (Phase 1 of config-aware when:).
+	// These are grader-scope only — they are deliberately NOT fed back into
+	// internal/config/tool_filter.go's matchesWhen path, since that path
+	// decides which tool entries get loaded into the config in the first
+	// place; feeding the new keys back would be circular.
+	//
+	// Engine-injected config keys overwrite any prompt frontmatter that
+	// happened to use a colliding key (e.g. a prompt prop literally named
+	// "mcp_server:azure"). This is vanishingly unlikely in practice — the
+	// `:` namespace is reserved for engine-injected props — but documented
+	// here so the precedence is explicit.
+	injectConfigProps(props, task.Config)
 
 	evalReport := &report.EvalReport{
 		SchemaVersion:   report.CurrentSchemaVersion,
@@ -717,20 +729,47 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 
 	var lastReviewGrader *graders.PromptReviewGrader
+	// prevReviewIsolatedDir tracks the previous review iteration's
+	// isolated workspace so we can clean it up when a newer review
+	// iteration runs. The final review iteration's dir is kept alive
+	// for readReviewedFiles below and torn down after that read.
+	var prevReviewIsolatedDir string
 	for _, item := range execItems {
 		if item.isReview {
 			if e.opts.SkipReview || (reviewer == nil && panelReviewer == nil) {
 				continue
 			}
 			reviewGrader := graders.NewPromptReviewGrader(item.bucket.Name, reviewer, panelReviewer)
+
+			// Each grader gets its own isolated copy of the
+			// generated workspace so it cannot pollute other
+			// graders. The original genWs.Dir stays untouched.
+			isolatedDir, isoCleanup, isoErr := IsolateGraderWorkspace(genWs.Dir)
+			if isoErr != nil {
+				glg.Warn("Failed to isolate grader workspace; falling back to genWs.Dir", "error", isoErr)
+				isolatedDir = genWs.Dir
+				isoCleanup = func() {}
+			}
+
 			lastReviewGrader = reviewGrader
 
 			bucketInput := graderInput
+			bucketInput.WorkspacePath = isolatedDir
 			bucketInput.EvalCriteriaBuckets = []graders.ReviewBucket{item.bucket}
 			bucketInput.EvalCriteria = ""
 
 			emitGraderStart(sendRawEvent, reviewGrader, item.srcFile, item.srcType)
 			reviewResult, reviewErr := reviewGrader.Grade(ctx, bucketInput)
+			// Record the isolated dir for engine consumers
+			// (readReviewedFiles below). Clean up the prior
+			// review iteration's dir now that we have its
+			// successor.
+			reviewGrader.LastReviewWorkDir = isolatedDir
+			if prevReviewIsolatedDir != "" && prevReviewIsolatedDir != genWs.Dir {
+				_ = os.RemoveAll(prevReviewIsolatedDir)
+			}
+			prevReviewIsolatedDir = isolatedDir
+			_ = isoCleanup // tracked via prevReviewIsolatedDir; do not run yet
 			if reviewErr != nil {
 				glg.Error("Review grader failed", "bucket", item.bucket.Name, "error", reviewErr)
 				sendEvent(progress.EventReasoning, fmt.Sprintf("Review bucket %q failed: %v", item.bucket.Name, reviewErr))
@@ -762,10 +801,22 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				allGraderResults = append(allGraderResults, typedResult)
 				continue
 			}
+			// Per-grader workspace isolation: each typed grader
+			// gets a fresh copy so mutating graders (e.g. program
+			// graders running `make` or `npm install`) cannot
+			// pollute later graders or the canonical workspace.
+			isolatedDir, isoCleanup, isoErr := IsolateGraderWorkspace(genWs.Dir)
+			if isoErr != nil {
+				glg.Warn("Failed to isolate grader workspace; falling back to genWs.Dir", "error", isoErr)
+				isolatedDir = genWs.Dir
+				isoCleanup = func() {}
+			}
 			typedInput := graderInput
+			typedInput.WorkspacePath = isolatedDir
 			typedInput.Config = item.gc
 			emitGraderStart(sendRawEvent, g, item.srcFile, item.srcType)
 			typedResult, typedErr := func() (r graders.GraderResult, e error) {
+				defer isoCleanup()
 				defer func() {
 					if rec := recover(); rec != nil {
 						e = fmt.Errorf("grader panicked: %v", rec)
@@ -828,12 +879,17 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		}
 	}
 
-	// Capture reviewed (annotated) files from the reviewer workspace.
+	// Capture reviewed (annotated) files from the reviewer workspace,
+	// then tear down the isolated dir the engine kept alive past the
+	// grader loop for this exact purpose.
 	if lastReviewGrader != nil && lastReviewGrader.LastReviewWorkDir != "" {
 		reviewedFiles, rfErr := readReviewedFiles(lastReviewGrader.LastReviewWorkDir)
 		if rfErr == nil && len(reviewedFiles) > 0 {
 			evalReport.ReviewedFiles = reviewedFiles
 			glg.Debug("Captured reviewed files", "count", len(reviewedFiles))
+		}
+		if prevReviewIsolatedDir != "" && prevReviewIsolatedDir != genWs.Dir {
+			_ = os.RemoveAll(prevReviewIsolatedDir)
 		}
 		lastReviewGrader.CleanupWorkspace()
 	}

@@ -1790,3 +1790,45 @@ AFTER:  - Hello.md Exists (program): ❌ Fail (0/1)
 **Specifically for review graders that need to survive past Grade():** The reviewer panel writes annotated files into its workspace, and the engine reads them back AFTER Grade returns. Pattern used: track `prevReviewIsolatedDir` inside the loop; clean up the *previous* review iteration's dir at the start of each new review iteration; clean up the final one after `readReviewedFiles` runs post-loop. Typed graders are simpler — defer cleanup inside the existing recover IIFE.
 
 **Gotcha:** `CleanupWorkspace()` on PromptReviewGrader is now a no-op for back-compat. If the engine were to keep calling it AND also do `os.RemoveAll(prevReviewIsolatedDir)`, the os.RemoveAll on a non-existent path is harmless. But making CleanupWorkspace a no-op means tests that did `defer g.CleanupWorkspace()` no longer accidentally delete the engine-owned dir. Don't reintroduce real cleanup behavior to that method.
+
+
+---
+
+## 2026-05-02 — Config-Aware `when:` Phase 1 (Morpheus scope)
+
+**Branch:** working tree
+
+**What shipped:** Grader `when:` clauses can now match against eval-config-derived properties:
+- `generator` (model name), `config` (config name)
+- `skill:<name>` = "true" (one per `generator.tools` of type `skill`)
+- `mcp_server:<name>` = "true" (one per `generator.tools` of type `mcp`)
+- `plugin:<name>` = "true" (one per `generator.tools` of type `plugin`)
+
+Headline use case: gate a `tool_used` grader to configs that actually load its MCP server, so it doesn't false-fail on baseline configs.
+
+**Files:**
+- `hyoka/internal/eval/config_props.go` — NEW. Single helper `injectConfigProps(props, cfg)` (~25 LOC).
+- `hyoka/internal/eval/engine_eval.go` — calls `injectConfigProps` after prompt frontmatter merge; comment block explains tool_filter asymmetry + frontmatter precedence.
+- `hyoka/internal/eval/config_props_test.go` — NEW. 4 tests covering: all key types populated, zero-tools edge case, nil generator, frontmatter overwrite.
+- `hyoka/internal/criteria/graders/types_test.go` — NEW `TestWhenMapMatches` table covering both prompt and prefixed keys.
+- `hyoka/internal/criteria/buckets_config_aware_when_test.go` — NEW e2e: 3 bundle scenarios (azure-mcp loaded → grader runs; baseline → skipped; skill-only config).
+- `docs/graders/index.md` — added "Config-aware properties" subsection with table + tool_used example + YAML quoting callout.
+
+**Verification:**
+- `go build ./...` ✅
+- `go vet ./...` ✅
+- `go test -race ./hyoka/internal/eval/... ./hyoka/internal/criteria/... -timeout 3m` ✅ (all green)
+
+## Learnings
+
+### 2026-05-02: Where the props map is built (single source of truth)
+
+The grader-applicability props map is built **exactly once per eval** in `hyoka/internal/eval/engine_eval.go` around line 38, immediately after `runSingleEval` starts. It then flows downstream through `e.matchedForEval(props)` → `criteria.MatchingUnifiedEntries` → `WhenMap.Matches` (in `internal/criteria/graders/types.go:68`). If you ever need to expose a new property to grader `when:` clauses, this is the only place to inject it. There is no separate "criteria-time" props map — it's all this one.
+
+### 2026-05-02: Why `tool_filter.matchesWhen` is intentionally asymmetric
+
+`internal/config/tool_filter.go:matchesWhen` filters which tool entries get loaded INTO a config based on prompt props. The grader-side props map (above) now also exposes `mcp_server:<name>`, `skill:<name>`, etc. — but those keys are derived FROM the loaded tool entries. Feeding them back into `tool_filter` would be circular: a tool entry can't gate its own loading on its own presence. Keep config-derived prefixed keys grader-scope only. There's a comment in `engine_eval.go` near the `injectConfigProps` call documenting this.
+
+### 2026-05-02: YAML `:` in map keys requires quoting
+
+`mcp_server:azure: "true"` parses as a NESTED MAPPING in unquoted YAML (key `mcp_server`, value `{azure: "true"}`). To get a flat key literally named `mcp_server:azure`, the key must be quoted: `"mcp_server:azure": "true"`. This is the only ergonomic wart of the prefixed-key design — Morpheus picked it anyway for zero-schema-change. Document this in any new docs that introduce the feature; users WILL hit it.

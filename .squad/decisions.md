@@ -3104,3 +3104,88 @@ A new exported helper `eval.IsolateGraderWorkspace(sourceDir) (path, cleanup, er
 ### Naming
 
 Kept `NewReviewerWorkspace` (the underlying primitive) and added `IsolateGraderWorkspace` as the higher-level API used by the engine. Did not rename `NewReviewerWorkspace` to avoid touching unrelated callers; the more general-purpose name is exposed via the new helper.
+
+---
+
+## 2026-05-02: COMPLETE — Config-Aware Grader `when:` Phase 1 (Morpheus scope, Neo impl)
+
+**Status:** ✅ Phase 1 SHIPPED · Phase 2 DEFERRED
+**Authors:** Morpheus (scope) → Neo (impl)
+**Inbox sources:** `morpheus-config-aware-when.md`, `neo-config-aware-when-phase1.md` (archived)
+
+### What shipped (Phase 1)
+
+Grader `when:` clauses now match against eval-config-derived properties in addition to the prompt-derived ones. New keys exposed in the engine's props map:
+
+| Key | Source |
+|---|---|
+| `generator` | `task.Config.Generator.Model` |
+| `config` | `task.Config.Name` |
+| `skill:<name>` = `"true"` | per `generator.tools` entry of type `skill` |
+| `mcp_server:<name>` = `"true"` | per `generator.tools` entry of type `mcp` |
+| `plugin:<name>` = `"true"` | per `generator.tools` entry of type `plugin` |
+
+Headline use case: gate a `tool_used` grader to configs that load its MCP server / skill, so it skips on baseline configs instead of false-failing every eval.
+
+```yaml
+graders:
+  - name: uses-azure-list-resources
+    kind: tool
+    when:
+      "mcp_server:azure": "true"   # quote keys containing ':' (YAML requirement)
+    config:
+      checks:
+        - kind: tool_used
+          tool: list-resources
+          source: mcp
+          mcp_server: azure
+```
+
+### Implementation
+
+- New helper `injectConfigProps(props, cfg)` in `hyoka/internal/eval/config_props.go` (~25 LOC).
+- Wired into `runSingleEval` in `engine_eval.go` immediately after the prompt-frontmatter merge. Engine-injected keys overwrite prompt-frontmatter collisions (`:`-prefixed namespace is reserved).
+- **No** changes to the `WhenMap` type (keys with `:` are valid YAML when quoted).
+- **No** changes to grader-side matching code (`WhenMap.Matches` already supports any string key).
+- **Deliberately NOT extended:** `internal/config/tool_filter.go:matchesWhen`. That path filters tool entries themselves; feeding it the new keys would be circular. A comment in `engine_eval.go` documents this asymmetry.
+
+### Tests
+
+- `hyoka/internal/eval/config_props_test.go` — 4 unit tests (all key types, zero-tools, nil generator, frontmatter overwrite).
+- `hyoka/internal/criteria/graders/types_test.go` — `TestWhenMapMatches` table covers prompt + prefixed keys.
+- `hyoka/internal/criteria/buckets_config_aware_when_test.go` — e2e bundle: 3 graders behave differently across azure-mcp / baseline / skills-only configs.
+
+`go build ./... && go vet ./... && go test -race ./hyoka/internal/eval/... ./hyoka/internal/criteria/...` — all green.
+
+### Docs
+
+- `docs/graders/index.md` — added "Config-aware properties" subsection with key table, `tool_used` example, and YAML-quoting callout.
+
+### DEFERRED — Phase 2 (per Morpheus §6, no Phase 1 user blocker)
+
+Phase 2 keys / capabilities **not** in this ship; revisit only when a real user need surfaces:
+
+1. **`mcp_tool:<server>/<tool>` keys** — gating on individual MCP tools (vs whole servers). Blocked on SDK tool-discovery for wildcard configs (`mcp_tools: ["*"]`); Phase 2 will need a graceful-degradation story (warn + omit `mcp_tool:` keys for wildcard servers). Tracked in `internal/pairwise/pairwise.go:347-348`.
+2. **Value negation** — `"mcp_server:azure": "!true"` or a dedicated `when_not:` block for "skip when X is loaded" gating. Today's `tool_not_used` check kind covers most of this need at the grader level.
+3. **Wildcard MCP enumeration** — same blocker as (1).
+
+**Reviewer ask (still open):** sanity-check helper API (`injectConfigProps` signature, key prefix choices) and confirm the YAML quoting callout in `docs/graders/index.md` is enough.
+
+---
+
+## 2026-05-02: COMPLETE — Skill Audit Cleanup (Switch)
+
+**Status:** ✅ SHIPPED
+**Author:** Switch
+**Trigger:** Follow-up to the agentskills.io audit landed in `.squad/skills/skill-authoring/SKILL.md`.
+
+Two anti-patterns confirmed in real production skills and fixed:
+
+1. **`skills/reviewer/java-sdk-validation/SKILL.md`** had **no frontmatter at all** — silently invisible at discovery time (agents only see `name` + `description` during progressive-disclosure scan; missing frontmatter means the body never loads). Added compliant frontmatter; body untouched.
+2. **`skills/generator/azure-sdk-for-rust-bestpractices/SKILL.md`** carried non-spec `applyTo: "**/*.rs,**/Cargo.toml"` (Copilot-VSCode-only field, not in agentskills.io spec). Stripped it; rewrote description to imperative voice + indirect triggers + "apply before first line" push.
+
+**Spot-check:** the remaining `skills/reviewer/` and `skills/generator/` skills (`code-review-comments`, `reviewer-build`, `sdk-version-check`, plus the rest of generator/) are clean. Test skills (`skills/test/markdown-headings`, `skills/test/markdown-lists`) also tightened in the same pass.
+
+**Verification:** `go build ./...` clean (markdown-only).
+
+**Skill-authoring SKILL.md is already accurate** — both anti-patterns are enumerated by name (lines 23–26) with the exact path that was just fixed. No doc update needed.

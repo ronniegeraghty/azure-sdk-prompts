@@ -4,7 +4,6 @@ import (
 "context"
 "fmt"
 "log/slog"
-"os"
 "regexp"
 "strings"
 
@@ -42,40 +41,43 @@ return &PromptReviewGrader{
 func (g *PromptReviewGrader) Kind() string { return KindPromptReview }
 func (g *PromptReviewGrader) Name() string { return g.name }
 
-// Grade creates an isolated workspace copy, runs the review, and converts the
-// result into a GraderResult. The consolidated review score maps to the grader
-// score; panel member results are stored in ReviewDetails.PanelResults.
+// Grade runs the review and converts the result into a GraderResult. The
+// engine guarantees input.WorkspacePath is an isolated copy of the generated
+// workspace (see eval.IsolateGraderWorkspace), so the reviewer can write
+// annotated files into it without affecting the canonical workspace or other
+// graders. The consolidated review score maps to the grader score; panel
+// member results are stored in ReviewDetails.PanelResults.
 func (g *PromptReviewGrader) Grade(ctx context.Context, input GraderInput) (GraderResult, error) {
-result := GraderResult{
-	Kind: KindPromptReview,
-	Name: g.name,
-}
+	result := GraderResult{
+		Kind: KindPromptReview,
+		Name: g.name,
+	}
 
-// Create isolated reviewer workspace with a copy of the generated files.
-reviewWorkDir, err := copyDirToTemp(input.WorkspacePath)
-if err != nil {
-	slog.Warn("Reviewer workspace creation failed, using original", "error", err)
-	reviewWorkDir = input.WorkspacePath
-} else {
-	// Keep the directory alive — the engine reads reviewed files from it.
+	// Engine owns workspace isolation and lifecycle. Record the path so
+	// the engine can read the reviewer's annotated files after Grade
+	// returns.
+	reviewWorkDir := input.WorkspacePath
 	g.LastReviewWorkDir = reviewWorkDir
+
+	if g.panelReviewer != nil {
+		return g.gradePanel(ctx, input, reviewWorkDir, result, input.GeneratorArtifact)
+	}
+	if g.reviewer != nil {
+		return g.gradeSingle(ctx, input, reviewWorkDir, result, input.GeneratorArtifact)
+	}
+	return result, fmt.Errorf("no reviewer configured")
 }
 
-if g.panelReviewer != nil {
-	return g.gradePanel(ctx, input, reviewWorkDir, result, input.GeneratorArtifact)
-}
-if g.reviewer != nil {
-	return g.gradeSingle(ctx, input, reviewWorkDir, result, input.GeneratorArtifact)
-}
-return result, fmt.Errorf("no reviewer configured")
-}
-
-// CleanupWorkspace removes the temporary reviewer workspace.
+// CleanupWorkspace is retained for backward compatibility with existing
+// callers/tests. The engine now owns workspace lifecycle (see
+// eval.IsolateGraderWorkspace), so this method is a no-op. Callers that still
+// invoke it remain safe but no longer have any effect.
+//
+// Deprecated: workspace lifecycle is engine-owned. Do not call.
 func (g *PromptReviewGrader) CleanupWorkspace() {
-if g.LastReviewWorkDir != "" {
-	os.RemoveAll(g.LastReviewWorkDir)
+	// Intentionally a no-op. The engine isolates the workspace before
+	// calling Grade and removes it afterwards.
 	g.LastReviewWorkDir = ""
-}
 }
 
 func (g *PromptReviewGrader) gradePanel(ctx context.Context, input GraderInput, workDir string, result GraderResult, artifact *review.GeneratorArtifact) (GraderResult, error) {
@@ -332,46 +334,4 @@ func logCriteriaCountMismatch(graderName string, input GraderInput, returned int
 			"returned", returned,
 		)
 	}
-}
-
-// copyDirToTemp creates a temporary copy of the source directory.
-func copyDirToTemp(src string) (string, error) {
-dir, err := os.MkdirTemp("", "hyoka-review-*")
-if err != nil {
-	return "", fmt.Errorf("creating review workspace: %w", err)
-}
-if err := copyDirContents(src, dir); err != nil {
-	os.RemoveAll(dir)
-	return "", fmt.Errorf("copying files to review workspace: %w", err)
-}
-return dir, nil
-}
-
-// copyDirContents copies all files from src to dst recursively.
-func copyDirContents(src, dst string) error {
-entries, err := os.ReadDir(src)
-if err != nil {
-	return err
-}
-for _, entry := range entries {
-	srcPath := src + "/" + entry.Name()
-	dstPath := dst + "/" + entry.Name()
-	if entry.IsDir() {
-		if err := os.MkdirAll(dstPath, 0755); err != nil {
-			return err
-		}
-		if err := copyDirContents(srcPath, dstPath); err != nil {
-			return err
-		}
-	} else {
-		data, err := os.ReadFile(srcPath)
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(dstPath, data, 0644); err != nil {
-			return err
-		}
-	}
-}
-return nil
 }

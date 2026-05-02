@@ -293,6 +293,19 @@ func NewIsolatedConfigDir() (string, error) {
 	return dir, nil
 }
 
+// IsolateGraderWorkspace creates an ephemeral copy of sourceDir and returns
+// the path together with a cleanup function. Each grader is given its own
+// isolated copy so mutating graders (e.g. program graders running `make` or
+// `npm install`) cannot pollute the workspace seen by subsequent graders.
+// The original sourceDir is the canonical snapshot and remains untouched.
+func IsolateGraderWorkspace(sourceDir string) (string, func(), error) {
+	dir, err := NewReviewerWorkspace(sourceDir)
+	if err != nil {
+		return "", func() {}, err
+	}
+	return dir, func() { _ = os.RemoveAll(dir) }, nil
+}
+
 // NewReviewerWorkspace creates an ephemeral temporary workspace and copies
 // all files from sourceDir into it. Reviewers operate on this copy so they
 // cannot modify the original generated output (fixes #26).
