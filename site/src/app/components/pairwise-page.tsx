@@ -24,7 +24,7 @@ import {
   Activity,
 } from "lucide-react";
 import { fetchRuns } from "../data/api";
-import type { RunSummary, PairwiseReport, ToolImpact, PairwiseCheckDiff } from "../data/types";
+import type { RunSummary, PairwiseReport, ToolImpact, PairwiseCheckDiff, EvalResult, ToolAvailabilityEntry } from "../data/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -139,6 +139,9 @@ function ImpactSummaryCard({ impacts }: { impacts: ToolImpact[] }) {
             {neutral.length}
           </span>
         </div>
+        <p className="mb-2 text-white/30" style={{ fontSize: 11 }}>
+          Tools whose presence didn't move the score. May still be invoked — see Tool Usage Frequency below.
+        </p>
         {neutral.length === 0 ? (
           <p className="text-white/30" style={{ fontSize: 13 }}>All tools have measurable impact</p>
         ) : (
@@ -349,19 +352,17 @@ function MethodologyInfo() {
 // ── Tool Usage Frequency (R152) ──────────────────────────────────────
 //
 // For each tool in the run, count across all prompts:
-//   - "available and used"   — tool appears in the prompt's pairwise impacts
-//     AND the impact signal is measurable (|impact| > 0 or baseline_pass
-//     differs from without_pass)
-//   - "available but unused" — tool appears in impacts but showed no
-//     measurable effect when removed (likely loaded but never invoked, or
-//     redundant with another tool)
+//   - "available and used"   — tool appears in the prompt's baseline variant
+//     tool_availability with used=true (ground truth from the agent session)
+//   - "available but unused" — tool appears in impacts and was available on
+//     the baseline variant but tool_availability records used=false
 //   - "not available"        — tool appears in SOME prompts' impacts but
 //     not this one (not in this variant's togglable set)
 //
-// The signal is derived from the pairwise impact data already on this page;
-// it's a proxy for "did the agent actually invoke this tool?" rather than
-// ground truth. For exact invocation counts, see each eval's tool_availability
-// field on the eval detail page.
+// Source of truth: each baseline EvalResult.tool_availability. The pairwise
+// impact metric is symmetric for skills whose only contribution is a gated
+// check (impact=0 even when invoked), so we cannot use impact as a proxy
+// for invocation here.
 
 interface ToolFrequencyRow {
   tool_name: string;
@@ -371,8 +372,49 @@ interface ToolFrequencyRow {
   total_prompts: number;
 }
 
-function computeToolFrequency(reports: PairwiseReport[]): ToolFrequencyRow[] {
+// leafName extracts the trailing segment of a tool path so impact tool_names
+// like "test-skills/markdown-lists" can be matched against tool_availability
+// entries (which carry only the leaf "markdown-lists").
+function leafName(toolName: string): string {
+  const i = toolName.lastIndexOf("/");
+  return i >= 0 ? toolName.slice(i + 1) : toolName;
+}
+
+function computeToolFrequency(
+  reports: PairwiseReport[],
+  evalResults: EvalResult[]
+): ToolFrequencyRow[] {
   if (reports.length === 0) return [];
+
+  // Build a per-prompt "was this tool invoked in the baseline?" lookup.
+  // Use the baseline eval (one whose config_name lacks a `without-…` segment)
+  // for each prompt. Match against tool_availability by leaf name.
+  const usedByPrompt = new Map<string, Set<string>>(); // promptId -> set of leaf-name skills used
+  const availByPrompt = new Map<string, Set<string>>(); // promptId -> set of leaf-name skills available
+  for (const er of evalResults) {
+    // Skip pairwise variants — only the baseline reflects "default" tool set.
+    // Heuristic: pairwiseVariant is unset/empty/"baseline" on the unmodified config.
+    const variant = (er as EvalResult & { pairwiseVariant?: string }).pairwiseVariant;
+    if (variant && variant !== "baseline") continue;
+
+    const ta = (er as EvalResult & { tool_availability?: ToolAvailabilityEntry[] }).tool_availability;
+    if (!ta) continue;
+
+    let usedSet = usedByPrompt.get(er.prompt_id);
+    if (!usedSet) {
+      usedSet = new Set();
+      usedByPrompt.set(er.prompt_id, usedSet);
+    }
+    let availSet = availByPrompt.get(er.prompt_id);
+    if (!availSet) {
+      availSet = new Set();
+      availByPrompt.set(er.prompt_id, availSet);
+    }
+    for (const t of ta) {
+      if (t.available) availSet.add(t.name);
+      if (t.used) usedSet.add(t.name);
+    }
+  }
 
   // Union of every tool name seen across the run.
   const allTools = new Set<string>();
@@ -382,6 +424,7 @@ function computeToolFrequency(reports: PairwiseReport[]): ToolFrequencyRow[] {
 
   const rows: ToolFrequencyRow[] = [];
   for (const tool of allTools) {
+    const leaf = leafName(tool);
     let used = 0;
     let unused = 0;
     let absent = 0;
@@ -391,9 +434,22 @@ function computeToolFrequency(reports: PairwiseReport[]): ToolFrequencyRow[] {
         absent += 1;
         continue;
       }
-      const hadEffect = imp.impact !== 0 || imp.baseline_pass !== imp.without_pass;
-      if (hadEffect) used += 1;
-      else unused += 1;
+      const usedSet = usedByPrompt.get(r.prompt_id);
+      const availSet = availByPrompt.get(r.prompt_id);
+      // Prefer ground truth from tool_availability when present.
+      if (availSet && availSet.has(leaf)) {
+        if (usedSet && usedSet.has(leaf)) used += 1;
+        else unused += 1;
+      } else if (usedSet) {
+        // tool_availability data exists for this prompt but lacks this leaf —
+        // treat as unused (the impact signal alone can't disambiguate).
+        unused += 1;
+      } else {
+        // No tool_availability data — fall back to the old impact heuristic.
+        const hadEffect = imp.impact !== 0 || imp.baseline_pass !== imp.without_pass;
+        if (hadEffect) used += 1;
+        else unused += 1;
+      }
     }
     rows.push({
       tool_name: tool,
@@ -409,8 +465,8 @@ function computeToolFrequency(reports: PairwiseReport[]): ToolFrequencyRow[] {
   return rows;
 }
 
-function ToolUsageFrequencyChart({ reports }: { reports: PairwiseReport[] }) {
-  const rows = useMemo(() => computeToolFrequency(reports), [reports]);
+function ToolUsageFrequencyChart({ reports, evalResults }: { reports: PairwiseReport[]; evalResults: EvalResult[] }) {
+  const rows = useMemo(() => computeToolFrequency(reports, evalResults), [reports, evalResults]);
 
   if (rows.length === 0) {
     return <p className="py-8 text-center text-white/30" style={{ fontSize: 13 }}>No tool usage data</p>;
@@ -878,11 +934,13 @@ export function PairwisePage() {
                 </span>
               </div>
               <p className="mb-5 text-white/35" style={{ fontSize: 12 }}>
-                Derived from the pairwise impact signal — a tool is counted as "used" when its
-                presence changed the score or pass state on that prompt. For exact invocation
-                counts, see each eval's tool_availability on the detail page.
+                Derived from each baseline eval's <code className="rounded bg-white/5 px-1 text-white/55">tool_availability</code>
+                {" "}— ground truth for whether the agent actually invoked the tool. A tool can show
+                impact 0 yet still be "available and used" when its only contribution is a check
+                that's gated to that tool (gated checks add equal value when the tool is present
+                and are removed when it's absent).
               </p>
-              <ToolUsageFrequencyChart reports={pairwiseReports} />
+              <ToolUsageFrequencyChart reports={pairwiseReports} evalResults={selectedRun?.results ?? []} />
               <div className="mt-5 flex flex-wrap justify-center gap-4">
                 {[
                   { label: "Available and used", color: "rgba(16,185,129,0.7)" },
