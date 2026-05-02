@@ -7,13 +7,14 @@ import (
 )
 
 // ActivityGrader evaluates agent activity during a session using ActionLog,
-// ActionsSummary, and TerminatedBy. Seven canonical check kinds:
+// ActionsSummary, and TerminatedBy. Six canonical check kinds:
 //   - turn_limit: max turn number ≤ configured max
 //   - action_count: TotalActions in [min, max]
 //   - tool_call_count: ToolCalls in [min, max]
 //   - contains_subsequence: ordered subsequence of tool names
-//   - contains_action: specific tool appears with optional min/max call counts
-//   - not_truncated: ActionsSummary.Truncated == false
+//   - contains_action: events matching {type, tool, contains, excludes} appear
+//     within optional [min, max] count bounds (default min=1)
+//   - excludes_action: zero events may match {type, tool, contains, excludes}
 //   - terminated_by: TerminatedBy matches expectation (equals or not_in)
 type ActivityGrader struct {
 	name string
@@ -24,6 +25,18 @@ type ActivityGrader struct {
 func NewActivityGrader(name string, cfg *ActivityConfig) (*ActivityGrader, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("activity grader %q: config is required", name)
+	}
+	// Backwards compat: alias deprecated min_calls/max_calls onto min/max.
+	for i := range cfg.Checks {
+		c := &cfg.Checks[i]
+		if c.Kind == "contains_action" {
+			if c.MinCalls != nil && c.Min == nil {
+				c.Min = c.MinCalls
+			}
+			if c.MaxCalls != nil && c.Max == nil {
+				c.Max = c.MaxCalls
+			}
+		}
 	}
 	// Validate check structure
 	for i, check := range cfg.Checks {
@@ -65,20 +78,35 @@ func validateActivityCheck(check ActivityCheck) error {
 			return fmt.Errorf("contains_subsequence requires non-empty tools array")
 		}
 	case "contains_action":
-		if check.Tool == "" {
-			return fmt.Errorf("contains_action requires tool field")
+		// Backwards compat: alias min_calls/max_calls onto min/max.
+		if check.MinCalls != nil && check.Min == nil {
+			check.Min = check.MinCalls
 		}
-		if check.MinCalls != nil && *check.MinCalls < 0 {
-			return fmt.Errorf("contains_action: min_calls must be >= 0")
+		if check.MaxCalls != nil && check.Max == nil {
+			check.Max = check.MaxCalls
 		}
-		if check.MaxCalls != nil && *check.MaxCalls < 0 {
-			return fmt.Errorf("contains_action: max_calls must be >= 0")
+		if check.Type == "" && check.Tool == "" && check.Contains == "" && check.Excludes == "" {
+			return fmt.Errorf("contains_action: at least one of type, tool, contains, excludes is required")
 		}
-		if check.MinCalls != nil && check.MaxCalls != nil && *check.MinCalls > *check.MaxCalls {
-			return fmt.Errorf("contains_action: min_calls (%d) > max_calls (%d)", *check.MinCalls, *check.MaxCalls)
+		if check.Type != "" && !validActionType(check.Type) {
+			return fmt.Errorf("contains_action: invalid type %q", check.Type)
 		}
-	case "not_truncated":
-		// No validation needed
+		if check.Min != nil && *check.Min < 0 {
+			return fmt.Errorf("contains_action: min must be >= 0")
+		}
+		if check.Max != nil && *check.Max < 0 {
+			return fmt.Errorf("contains_action: max must be >= 0")
+		}
+		if check.Min != nil && check.Max != nil && *check.Min > *check.Max {
+			return fmt.Errorf("contains_action: min (%d) > max (%d)", *check.Min, *check.Max)
+		}
+	case "excludes_action":
+		if check.Type == "" && check.Tool == "" && check.Contains == "" && check.Excludes == "" {
+			return fmt.Errorf("excludes_action: at least one of type, tool, contains, excludes is required")
+		}
+		if check.Type != "" && !validActionType(check.Type) {
+			return fmt.Errorf("excludes_action: invalid type %q", check.Type)
+		}
 	case "terminated_by":
 		if check.Equals == "" && len(check.NotIn) == 0 {
 			return fmt.Errorf("terminated_by requires either equals or not_in")
@@ -88,7 +116,7 @@ func validateActivityCheck(check ActivityCheck) error {
 		}
 		validTerminations := map[string]bool{
 			"completed": true, "max_actions": true, "max_turns": true,
-			"guardrail": true, "timeout": true, "error": true,
+			"guardrail": true, "error": true,
 		}
 		if check.Equals != "" && !validTerminations[check.Equals] {
 			return fmt.Errorf("terminated_by: invalid equals value %q", check.Equals)
@@ -102,6 +130,18 @@ func validateActivityCheck(check ActivityCheck) error {
 		return fmt.Errorf("unknown activity check kind: %q", check.Kind)
 	}
 	return nil
+}
+
+// validActionType reports whether the given event type is a recognized
+// ActionEvent.Type value as produced by eval.BuildActionTimeline.
+func validActionType(t string) bool {
+	switch t {
+	case "tool_call", "file_read", "file_write", "bash", "mcp_call", "skill",
+		"message", "reasoning", "intent", "warning", "error", "file_change",
+		"truncation", "compaction", "turn_start", "turn_end", "abort", "other":
+		return true
+	}
+	return false
 }
 
 // Kind returns the grader type identifier.
@@ -131,7 +171,6 @@ func (g *ActivityGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 
 	// Compute derived metrics
 	maxTurn := maxTurnNumber(input.ActionLog)
-	toolCounts := countTools(input.ActionLog)
 	uniqueToolsUsed := uniqueTools(extractToolNames(input.ActionLog))
 
 	var graderChecks []GraderCheck
@@ -225,34 +264,24 @@ func (g *ActivityGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 			})
 
 		case "contains_action":
-			count := toolCounts[check.Tool]
-			pass := true
-			var failMsg string
-			if check.MinCalls != nil && count < *check.MinCalls {
+			matches := matchActionEvents(input.ActionLog, check)
+			count := len(matches)
+			min := 1
+			if check.Min != nil {
+				min = *check.Min
+			}
+			pass := count >= min
+			if check.Max != nil && count > *check.Max {
 				pass = false
-				failMsg = fmt.Sprintf("tool %q called %d time(s), min is %d", check.Tool, count, *check.MinCalls)
 			}
-			if check.MaxCalls != nil && count > *check.MaxCalls {
-				pass = false
-				failMsg = fmt.Sprintf("tool %q called %d time(s), max is %d", check.Tool, count, *check.MaxCalls)
-			}
-			label := fmt.Sprintf("contains_action: %s", check.Tool)
-			if check.MinCalls != nil || check.MaxCalls != nil {
-				label += " ("
-				if check.MinCalls != nil {
-					label += fmt.Sprintf("min=%d", *check.MinCalls)
-				}
-				if check.MaxCalls != nil {
-					if check.MinCalls != nil {
-						label += ", "
-					}
-					label += fmt.Sprintf("max=%d", *check.MaxCalls)
-				}
-				label += ")"
-			}
-			msg := failMsg
+			label := "contains_action: " + describeActionFilter(check)
+			var msg string
 			if pass {
-				msg = fmt.Sprintf("called %d time(s)", count)
+				msg = fmt.Sprintf("matched %d event(s)", count)
+			} else if check.Max != nil && count > *check.Max {
+				msg = fmt.Sprintf("matched %d event(s), max is %d", count, *check.Max)
+			} else {
+				msg = fmt.Sprintf("matched %d event(s), min is %d", count, min)
 			}
 			graderChecks = append(graderChecks, GraderCheck{
 				Label:   label,
@@ -260,14 +289,16 @@ func (g *ActivityGrader) Grade(_ context.Context, input GraderInput) (GraderResu
 				Message: msg,
 			})
 
-		case "not_truncated":
-			pass := !artifact.ActionsSummary.Truncated
-			label := "not_truncated"
-			msg := ""
-			if !pass {
-				msg = "action log was truncated"
+		case "excludes_action":
+			matches := matchActionEvents(input.ActionLog, check)
+			count := len(matches)
+			pass := count == 0
+			label := "excludes_action: " + describeActionFilter(check)
+			var msg string
+			if pass {
+				msg = "no matching events"
 			} else {
-				msg = "action log was not truncated"
+				msg = fmt.Sprintf("found %d disallowed event(s)", count)
 			}
 			graderChecks = append(graderChecks, GraderCheck{
 				Label:   label,
@@ -381,6 +412,82 @@ func countTools(log []ActionEvent) map[string]int {
 		}
 	}
 	return counts
+}
+
+// matchActionEvents returns the events in log that satisfy the type/tool/contains/excludes
+// filter on an ActivityCheck. Empty filter fields match anything.
+func matchActionEvents(log []ActionEvent, check ActivityCheck) []ActionEvent {
+	var matches []ActionEvent
+	for _, e := range log {
+		// Type filter
+		if check.Type != "" {
+			evType := e.Type
+			if evType == "" {
+				evType = e.Action // legacy events stored the type in Action
+			}
+			if evType != check.Type {
+				continue
+			}
+		}
+		// Tool filter
+		if check.Tool != "" && e.Tool != check.Tool {
+			continue
+		}
+		// Determine the haystack for text matching:
+		//   - error type → Error
+		//   - file_change → Path
+		//   - everything else → Text (which carries Output: message/reasoning/intent/warning/tool output)
+		evType := e.Type
+		if evType == "" {
+			evType = e.Action
+		}
+		var haystack string
+		switch evType {
+		case "error":
+			haystack = e.Error
+		case "file_change", "file_read", "file_write":
+			if e.Path != "" {
+				haystack = e.Path
+			} else {
+				haystack = e.Text
+			}
+		default:
+			haystack = e.Text
+			if haystack == "" && e.Tool != "" {
+				haystack = e.Tool
+			}
+		}
+		if check.Contains != "" && !strings.Contains(haystack, check.Contains) {
+			continue
+		}
+		if check.Excludes != "" && strings.Contains(haystack, check.Excludes) {
+			continue
+		}
+		matches = append(matches, e)
+	}
+	return matches
+}
+
+// describeActionFilter renders a short human-readable summary of the filter
+// fields on an ActivityCheck for use in check labels.
+func describeActionFilter(check ActivityCheck) string {
+	var parts []string
+	if check.Type != "" {
+		parts = append(parts, "type="+check.Type)
+	}
+	if check.Tool != "" {
+		parts = append(parts, "tool="+check.Tool)
+	}
+	if check.Contains != "" {
+		parts = append(parts, fmt.Sprintf("contains=%q", check.Contains))
+	}
+	if check.Excludes != "" {
+		parts = append(parts, fmt.Sprintf("excludes=%q", check.Excludes))
+	}
+	if len(parts) == 0 {
+		return "(any)"
+	}
+	return strings.Join(parts, ", ")
 }
 
 func uniqueTools(tools []string) []string {

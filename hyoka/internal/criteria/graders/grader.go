@@ -93,11 +93,24 @@ type ReviewBucket struct {
 }
 
 // ActionEvent represents a single agent action from the session log.
+//
+// Type is the canonical event classification (tool_call, file_read, file_write,
+// bash, mcp_call, skill, message, reasoning, intent, warning, error,
+// file_change, truncation, compaction, turn_start, turn_end, abort).
+//
+// Text carries the type-specific payload used by text matchers in the activity
+// grader: message/reasoning/intent text, warning text, skill name, file path,
+// or tool output. Use Text for substring matching in contains_action /
+// excludes_action checks. Tool/Path are duplicated here for backwards
+// compatibility with existing tool grader logic.
 type ActionEvent struct {
-Tool       string `json:"tool"`
-Action     string `json:"action"`
-Path       string `json:"path,omitempty"`
-TurnNumber int    `json:"turn_number,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Tool       string `json:"tool"`
+	Action     string `json:"action"`
+	Path       string `json:"path,omitempty"`
+	Text       string `json:"text,omitempty"`
+	Error      string `json:"error,omitempty"`
+	TurnNumber int    `json:"turn_number,omitempty"`
 }
 
 // PromptMetadata holds prompt frontmatter fields relevant to grading.

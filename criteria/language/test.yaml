@@ -71,7 +71,10 @@ graders:
         max: 100
       - kind: tool_call_count
         min: 1
-      - kind: not_truncated
+      - kind: contains_action
+        type: message
+      - kind: excludes_action
+        type: error
       - kind: terminated_by
         equals: completed
 

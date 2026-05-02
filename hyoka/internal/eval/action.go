@@ -177,8 +177,12 @@ func BuildActionTimeline(records []report.SessionEventRecord) *ActionTimeline {
 		}
 
 		// Tool name
+		// Tool name (for skill events, fall back to SkillName so text matchers
+		// and tool-name lookups can find the skill).
 		if rec.ToolName != "" {
 			ev.Tool = rec.ToolName
+		} else if actionType == "skill" && rec.SkillName != "" {
+			ev.Tool = rec.SkillName
 		}
 
 		// File path
@@ -196,7 +200,12 @@ func BuildActionTimeline(records []report.SessionEventRecord) *ActionTimeline {
 		// Output (tool result or content)
 		if rec.ToolResult != "" {
 			ev.Output = truncateField(rec.ToolResult, maxActionFieldLen)
-		} else if rec.Content != "" && actionType != "reasoning" && actionType != "message" {
+		} else if actionType == "intent" && rec.Intent != "" {
+			ev.Output = truncateField(rec.Intent, maxActionFieldLen)
+		} else if actionType == "warning" && rec.WarningText != "" {
+			ev.Output = truncateField(rec.WarningText, maxActionFieldLen)
+		} else if rec.Content != "" {
+			// Includes reasoning/message text — needed by activity grader text matchers.
 			ev.Output = truncateField(rec.Content, maxActionFieldLen)
 		}
 
@@ -323,26 +332,31 @@ func truncateField(s string, maxLen int) string {
 }
 
 // ToGraderActionLog converts the timeline into []graders.ActionEvent for
-// pluggable grader input. Only "start" events for tool executions are included
-// to match grader expectations.
+// pluggable grader input. All event types are forwarded so the activity
+// grader's contains_action / excludes_action checks can match on any action
+// kind (tool calls, messages, reasoning, errors, etc.).
+//
+// "complete" events are skipped so each logical action appears once. Events
+// without an explicit start/complete pair (reasoning, message, intent,
+// turn_start, etc.) are forwarded as-is.
 func (tl *ActionTimeline) ToGraderActionLog() []graders.ActionEvent {
 	if tl == nil {
 		return nil
 	}
 	var out []graders.ActionEvent
 	for _, ev := range tl.Events {
-		if ev.Action != "start" && ev.Action != "" {
+		if ev.Action == "complete" {
 			continue
 		}
-		switch ev.Type {
-		case "tool_call", "file_read", "file_write", "bash", "mcp_call":
-			out = append(out, graders.ActionEvent{
-				Tool:       ev.Tool,
-				Action:     ev.Type,
-				Path:       ev.Path,
-				TurnNumber: ev.TurnNumber,
-			})
-		}
+		out = append(out, graders.ActionEvent{
+			Type:       ev.Type,
+			Tool:       ev.Tool,
+			Action:     ev.Type, // backwards-compat: legacy callers used Action for Type
+			Path:       ev.Path,
+			Text:       ev.Output,
+			Error:      ev.Error,
+			TurnNumber: ev.TurnNumber,
+		})
 	}
 	return out
 }

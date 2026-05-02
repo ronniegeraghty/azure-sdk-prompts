@@ -111,24 +111,40 @@ type ActivityConfig struct {
 
 // ActivityCheck defines a single check within an activity grader.
 type ActivityCheck struct {
-	Kind string `yaml:"kind" json:"kind"` // One of: turn_limit, action_count, tool_call_count, contains_subsequence, contains_action, not_truncated, terminated_by
+	Kind string `yaml:"kind" json:"kind"` // One of: turn_limit, action_count, tool_call_count, contains_subsequence, contains_action, excludes_action, terminated_by
 
 	// For turn_limit
 	Max *int `yaml:"max,omitempty" json:"max,omitempty"`
 
-	// For action_count, tool_call_count
+	// For action_count, tool_call_count, contains_action (count bounds)
 	Min *int `yaml:"min,omitempty" json:"min,omitempty"`
 
 	// For contains_subsequence
 	Tools []string `yaml:"tools,omitempty" json:"tools,omitempty"`
 
-	// For contains_action
+	// For contains_action / excludes_action
+	//   Type:     event type filter (tool_call, file_read, file_write, bash,
+	//             mcp_call, skill, message, reasoning, intent, error, warning,
+	//             file_change, truncation, compaction, turn_start, turn_end,
+	//             abort). Empty matches any type.
+	//   Tool:     tool/skill name filter (matches ev.Tool exactly). Empty = any.
+	//   Contains: substring that must appear in the event's text payload
+	//             (Output for messages/reasoning/intent/warning/tool output;
+	//             Error for error events; Path for file_change).
+	//   Excludes: substring that must NOT appear in the event's text payload.
+	//   For excludes_action: any matching event causes failure (count must be 0).
+	Type     string `yaml:"type,omitempty" json:"type,omitempty"`
 	Tool     string `yaml:"tool,omitempty" json:"tool,omitempty"`
-	MinCalls *int   `yaml:"min_calls,omitempty" json:"min_calls,omitempty"`
-	MaxCalls *int   `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
+	Contains string `yaml:"contains,omitempty" json:"contains,omitempty"`
+	Excludes string `yaml:"excludes,omitempty" json:"excludes,omitempty"`
+
+	// Deprecated: retained as YAML aliases so existing fixtures keep parsing.
+	// MinCalls maps to Min, MaxCalls maps to Max for contains_action.
+	MinCalls *int `yaml:"min_calls,omitempty" json:"min_calls,omitempty"`
+	MaxCalls *int `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
 
 	// For terminated_by
-	Equals string   `yaml:"equals,omitempty" json:"equals,omitempty"` // completed | max_actions | max_turns | guardrail | timeout | error
+	Equals string   `yaml:"equals,omitempty" json:"equals,omitempty"` // completed | max_actions | max_turns | guardrail | error
 	NotIn  []string `yaml:"not_in,omitempty" json:"not_in,omitempty"` // array of forbidden values
 }
 
