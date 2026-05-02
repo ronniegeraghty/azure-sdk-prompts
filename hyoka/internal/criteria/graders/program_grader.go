@@ -79,7 +79,7 @@ func (g *ProgramGrader) Grade(ctx context.Context, input GraderInput) (GraderRes
 		CheckResults: checkResults,
 	}
 
-	msg := fmt.Sprintf("%d/%d checks passed", passed, len(g.checks))
+	msg := fmt.Sprintf("program checks: %d/%d passed", passed, len(g.checks))
 	return NewResult(KindProgram, g.name, input.Config, allChecks, msg, &GraderExtras{Program: extras}), nil
 }
 

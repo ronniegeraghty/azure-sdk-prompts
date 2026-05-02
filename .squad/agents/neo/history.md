@@ -1675,3 +1675,84 @@ Oracle ran parallel documentation audit of `docs/graders/tool.md` to verify comp
 ✅ Canonical examples ready for user reference  
 
 ---
+
+## Learnings
+
+### 2026-05-02: Grader Message Format Standardization
+
+**Pattern:** All graders (workspace, tool, activity, program) use the same message format:
+```go
+msg := fmt.Sprintf("<kind> checks: %d/%d passed", passed, total)
+```
+
+**Location:** Each grader's `Grade()` method constructs the Message string that gets stored in `GraderResult.Message`.
+
+**program_grader divergence:** Used `fmt.Sprintf("%d/%d checks passed", ...)` without the `"program checks: "` prefix. This caused:
+1. Inconsistent summary format (missing kind prefix)
+2. While the report renderer constructs `"Fail (N/M)"` from the `Checks` array, not the Message string, the Message field is still used in logs and summaries
+
+**Fix:** Changed `program_grader.go:82` to match the canonical pattern:
+```go
+msg := fmt.Sprintf("program checks: %d/%d passed", passed, len(g.checks))
+```
+
+**Why it matters:** Message strings appear in CLI output, JSON reports, and debug logs. Consistent formatting makes grep/search patterns work across all graders and improves readability.
+
+**Related files:**
+- `hyoka/internal/criteria/graders/program_grader.go` (the fix)
+- `hyoka/internal/criteria/graders/{workspace,tool,activity}_grader.go` (reference patterns)
+- `hyoka/internal/report/markdown.go:699` (renders `Fail (N/M)` using Checks array, not Message)
+
+
+---
+
+## 2026-04-26 — Single-Check Grader Display Fix (CORRECTIVE)
+
+**Branch:** Working tree (no branch yet — ready for commit)
+
+**Context:** Prior fix to `program_grader.go` (changing Message to `"program checks: %d/%d passed"`) was the WRONG layer. The real bug was in the interactive display renderer.
+
+**Root Cause:**
+- File: `hyoka/internal/progress/display_interactive.go`, line 1005
+- Threshold: `if len(evt.Points) > 1` meant graders with EXACTLY 1 check fell into the flat single-row path
+- Flat path: `"❌ Fail — program checks: 0/1 passed"` (appends Message as suffix)
+- Multi-point path: `"❌ Fail (X/Y)"` (badge format) + sub-rows for each check
+- Only the program grader in `criteria/language/test.yaml` has 1 check, so only it looked wrong
+
+**Why I Missed It:**
+- Looked only at grader code (`program_grader.go`), not the rendering layer
+- Assumed the Message field was the source of the divergence
+- Didn't check how the display layer branches on `len(Points)`
+
+**Fix:**
+1. Changed threshold from `> 1` to `>= 1` in `display_interactive.go:1005`
+   - Now any grader with 1+ checks uses the badge + sub-row format
+   - Flat path is now fallback for zero-point graders only
+2. Updated comment: "Zero-point graders fall back..." (was "Single- or zero-point")
+3. Inverted test assertion in `display_interactive_points_test.go:123`
+   - OLD: Assert that single-point does NOT use badge format
+   - NEW: Assert that single-point DOES use badge format `(program): ✅ Pass (1/1)` and sub-row
+
+**Verification:**
+- `renderGraderWithPoints` handles N=1 gracefully (loops once, badge shows "(1/1)")
+- All progress package tests pass: `ok github.com/ronniegeraghty/hyoka/hyoka/internal/progress`
+- Pre-existing 3 report failures unchanged (dual-emit, v2-schema)
+
+**Prior Change Review:**
+- `program_grader.go:82` — `"program checks: %d/%d passed"` prefix is fine
+- Matches other graders' Message conventions (for JSON/log consistency)
+- No longer appears in interactive display (only in JSON reports)
+
+**Files Changed:**
+- `hyoka/internal/progress/display_interactive.go` (threshold + comment)
+- `hyoka/internal/progress/display_interactive_points_test.go` (test inversion)
+
+**Before/After:**
+```
+BEFORE: - Hello.md Exists (program): ❌ Fail — program checks: 0/1 passed
+AFTER:  - Hello.md Exists (program): ❌ Fail (0/1)
+            - test -f hello.md: ❌ Fail — exited with code 1
+```
+
+**Learning:** When display diverges, check BOTH grader output (Message/Points) AND rendering layer (how display consumes those fields). The bug often lives at the boundary.
+

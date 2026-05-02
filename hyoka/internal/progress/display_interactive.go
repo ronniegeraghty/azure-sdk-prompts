@@ -1000,9 +1000,9 @@ func (r *interactiveRenderer) onGraderComplete(evt ProgressEvent) {
 	r.ensureGradersHeader()
 
 	// Multi-point graders render as a header line + one indented row per
-	// point. Single- or zero-point graders fall back to the legacy flat
-	// row to preserve existing UX.
-	if len(evt.Points) > 1 {
+	// point. Zero-point graders fall back to the legacy flat row to
+	// preserve existing UX for graders without point-level detail.
+	if len(evt.Points) >= 1 {
 		r.renderGraderWithPoints(evt)
 		return
 	}

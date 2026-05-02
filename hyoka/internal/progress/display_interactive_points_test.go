@@ -117,17 +117,17 @@ func TestInteractive_GraderSinglePointFlatRow(t *testing.T) {
 	d.Finish()
 
 	out := buf.String()
-	// Single-Point case must NOT emit the aggregate badge inside a grader
-	// header row (the run summary line "Summary: 1/1 passed" is unrelated
-	// and exists in every transcript).
-	if strings.Contains(out, "(program): ✅ Pass (1/1)") || strings.Contains(out, "(program): ❌ Fail (1/1)") {
-		t.Errorf("single-point grader should use flat row, not aggregate badge\n--- got ---\n%s", out)
+	// Single-Point case MUST now emit the aggregate badge format for
+	// consistency with multi-point graders (changed from > 1 to >= 1).
+	if !strings.Contains(out, "(program): ✅ Pass (1/1)") {
+		t.Errorf("single-point grader should use badge format: (program): ✅ Pass (1/1)\n--- got ---\n%s", out)
 	}
-	if strings.Contains(out, "    - exit code 0:") {
-		t.Errorf("single-point grader should not emit nested rows\n--- got ---\n%s", out)
+	// Sub-point should be rendered as an indented row
+	if !strings.Contains(out, "- exit code 0:") {
+		t.Errorf("single-point grader should emit nested row for the check\n--- got ---\n%s", out)
 	}
-	// But the flat row should still be present.
-	if !strings.Contains(out, "build") || !strings.Contains(out, "(program)") {
-		t.Errorf("missing flat grader row\n--- got ---\n%s", out)
+	// Grader ID and kind should still be present
+	if !strings.Contains(out, "build") {
+		t.Errorf("missing grader ID\n--- got ---\n%s", out)
 	}
 }

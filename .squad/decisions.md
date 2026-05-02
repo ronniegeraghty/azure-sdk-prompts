@@ -51,6 +51,77 @@ Every `graders.GraderResult` produced by the engine — normal `Grade()`, error 
 
 ---
 
+## 2026-05-02: Program Grader Uniform Display — Single-Check Rendering (Neo)
+
+**By:** Neo 💊  
+**Date:** 2026-05-02  
+**Status:** ✅ IMPLEMENTED (ready for commit)  
+**Scope:** `internal/progress/display_interactive.go`, `internal/progress/display_interactive_points_test.go`, `internal/criteria/graders/program_grader.go`
+
+### Summary
+
+Fixed display inconsistency where single-check program graders rendered without the badge+sub-row format used by multi-check graders. Two related fixes at different architectural layers:
+
+1. **Message format normalization** (program_grader.go:82): Standardized message to `"program checks: %d/%d passed"` to match workspace/tool/activity graders
+2. **Display threshold fix** (display_interactive.go:1005): Changed `if len(evt.Points) > 1` to `if len(evt.Points) >= 1` so single-check graders use the uniform badge format
+
+### Root Cause
+
+The interactive display renderer branched on `len(evt.Points) > 1`, meaning graders with exactly 1 check fell into the flat single-row rendering path:
+```
+- Hello.md Exists (program): ❌ Fail — program checks: 0/1 passed
+```
+
+Instead of the uniform badge + sub-row format:
+```
+- Hello.md Exists (program): ❌ Fail (0/1)
+    - test -f hello.md: ❌ Fail — exited with code 1
+```
+
+All other graders had 2+ checks, so only the program grader's single-check `test -f hello.md` exposed this bug.
+
+### Implementation
+
+**File:** `hyoka/internal/progress/display_interactive.go`
+- Line 1005: Changed `if len(evt.Points) > 1` to `if len(evt.Points) >= 1`
+- Updated comment: "Zero-point graders fall back to flat rendering" (was "Single- or zero-point")
+
+**File:** `hyoka/internal/progress/display_interactive_points_test.go`
+- Line 123: Inverted test assertion
+  - OLD: Assert single-point does NOT use badge format
+  - NEW: Assert single-point DOES use badge format `(program): ✅ Pass (1/1)` with indented sub-row
+
+**File:** `hyoka/internal/criteria/graders/program_grader.go`
+- Line 82: Changed `fmt.Sprintf("%d/%d checks passed", ...)` to `fmt.Sprintf("program checks: %d/%d passed", ...)`
+- Rationale: Consistent with workspace/tool/activity graders; matches canonical pattern for all graders
+
+**File:** `hyoka/internal/criteria/graders/program_grader_message_test.go`
+- New test file explicitly verifying message format matches other graders
+
+### Verification
+
+✅ All progress tests pass: `go test ./hyoka/internal/progress/...`  
+✅ All grader tests pass: `go test ./hyoka/internal/criteria/graders/...`  
+✅ Build succeeds: `go build ./...`  
+✅ `renderGraderWithPoints` handles N=1 gracefully (loops once, badge shows "(1/1)")  
+✅ Pre-existing failures unchanged (dual-emit, v2-schema — unrelated)
+
+### Impact
+
+- **User-facing:** All graders now render with consistent badge+sub-row format regardless of check count
+- **JSON reports:** Message string now uniform across all graders (improves log analysis)
+- **No breaking changes:** Message string is informational, not parsed by consumers
+- **Tests updated:** Inverted prior negative assertion to positive (single-point now expected in badge format)
+
+### Lessons Learned
+
+When investigating display bugs:
+1. Check both layers: grader output (Message/Points fields) AND rendering layer (how display consumes those fields)
+2. The bug often lives at the boundary between data production and consumption
+3. Look for branching logic in the renderer (like `if len(Points) > N`) that treats edge cases differently
+
+---
+
 ## 2026-04-27: Guardrail Enforcement Bug — maxTurns/maxFiles Stale Runner State
 
 **Investigator:** Morpheus  
