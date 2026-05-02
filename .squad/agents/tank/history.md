@@ -1084,3 +1084,7 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 
 **Integration Verified:** Switch updated test fixture and ran 3 pairwise eval runs confirming all new graders (tool, workspace, activity) produce results. Fixed missing type registration issue (KindWorkspace, KindActivity) in types.go. Your graders are production-ready and verified working in real sessions.
 
+
+## CROSS-AGENT UPDATE (2026-05-02T06:15:09Z — Neo)
+
+**Grader Workspace Isolation:** Neo shipped per-grader workspace isolation. Engine now copies `genWs.Dir` to a fresh temp dir before every Grade(). Your grader contract changes: `GraderInput.WorkspacePath` is now a per-call isolated copy, never the canonical workspace. Mutations in one grader no longer leak to subsequent graders.

@@ -1756,3 +1756,37 @@ AFTER:  - Hello.md Exists (program): ❌ Fail (0/1)
 
 **Learning:** When display diverges, check BOTH grader output (Message/Points) AND rendering layer (how display consumes those fields). The bug often lives at the boundary.
 
+
+---
+
+## 2026-05-15 — Per-Grader Workspace Isolation (engine-owned)
+
+**Branch:** ronniegeraghty/dev (working tree)
+
+**Problem:** Every grader received `GraderInput.WorkspacePath = genWs.Dir` — the original generator workspace. A mutating grader (program grader running `make`, `npm install`, etc.) could pollute the workspace seen by subsequent graders. Two mutating graders in sequence stepped on each other.
+
+**Fix (Option A — engine-side):** The engine now creates a fresh isolated copy of `genWs.Dir` for each grader iteration. Graders are guaranteed a clean workspace by contract. The canonical `genWs.Dir` is never mutated by graders.
+
+**Files changed:**
+- `hyoka/internal/eval/workspace.go` — added `IsolateGraderWorkspace(sourceDir) (path, cleanup, err)` exported helper that wraps `NewReviewerWorkspace` + RemoveAll
+- `hyoka/internal/eval/engine_eval.go` — the grader execution loop calls `IsolateGraderWorkspace(genWs.Dir)` for both review and typed graders. Typed graders defer cleanup immediately (inside the existing recover IIFE). Review graders defer cleanup until the *next* review iteration starts (or until the engine reads `readReviewedFiles` after the loop), because the engine reads annotated files from the *last* review iteration's dir
+- `hyoka/internal/criteria/graders/prompt_review_grader.go` — removed inline `copyDirToTemp` and `copyDirContents` helpers (~45 lines). `Grade()` now uses `input.WorkspacePath` directly. `LastReviewWorkDir` is now just a record of the engine-provided path. `CleanupWorkspace()` is now a deprecated no-op (kept for back-compat — engine owns lifecycle)
+- `hyoka/internal/criteria/graders/prompt_review_grader_test.go` — replaced `TestPromptReviewGraderCleanup` with `TestPromptReviewGraderRecordsWorkspacePath`; removed `TestCopyDirContents` (helper deleted)
+- `hyoka/internal/eval/grader_isolation_test.go` — NEW. Three tests:
+  1. `IsolateGraderWorkspace_CopiesAndIsolates` — mutations to isolated dir don't leak back to source
+  2. `IsolateGraderWorkspace_TwoGradersDoNotCrossContaminate` — sequential graders each see clean state
+  3. `IsolateGraderWorkspace_CleanupRemovesDir` — cleanup func removes the temp dir
+
+**Verification:**
+- `go build ./...` passes
+- `go test -race ./hyoka/internal/eval/... ./hyoka/internal/criteria/... -timeout 3m` — all pass
+
+## Learnings
+
+### 2026-05-15: Engine-side resource lifecycle for graders
+
+**Pattern:** When multiple graders share a resource (workspace, env, etc.), make the engine the sole owner of that resource's lifecycle. Don't let each grader replicate "make my own copy" logic — that's both duplicated effort (program_grader missed it; only prompt_review_grader did it) and a guarantee a future grader will forget.
+
+**Specifically for review graders that need to survive past Grade():** The reviewer panel writes annotated files into its workspace, and the engine reads them back AFTER Grade returns. Pattern used: track `prevReviewIsolatedDir` inside the loop; clean up the *previous* review iteration's dir at the start of each new review iteration; clean up the final one after `readReviewedFiles` runs post-loop. Typed graders are simpler — defer cleanup inside the existing recover IIFE.
+
+**Gotcha:** `CleanupWorkspace()` on PromptReviewGrader is now a no-op for back-compat. If the engine were to keep calling it AND also do `os.RemoveAll(prevReviewIsolatedDir)`, the os.RemoveAll on a non-existent path is harmless. But making CleanupWorkspace a no-op means tests that did `defer g.CleanupWorkspace()` no longer accidentally delete the engine-owned dir. Don't reintroduce real cleanup behavior to that method.

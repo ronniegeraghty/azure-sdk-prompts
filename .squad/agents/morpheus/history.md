@@ -1154,3 +1154,24 @@ Incorporate explicit namespacing rules into Grader multi-source tool loading spe
 **Status:** Scoping complete. Implementation shipped by Neo. Option A proved correct choice.
 
 ---
+
+---
+
+## 2026-05-02: Config-Aware Grader When Clauses — Scoping
+
+**Task:** Scope `when:` matching against eval-config attributes (generator model, MCP servers, skills, individual MCP tools), so graders can self-gate to configs that actually expose the tools they check.
+
+**Deliverable:** `.squad/decisions/inbox/morpheus-config-aware-when.md`
+
+### Learnings
+
+- **`props` flow is single-source.** Built once in `internal/eval/engine_eval.go:38-50`, threaded through `e.matchedForEval(props)` → `criteria.MatchingUnifiedEntries` (`internal/criteria/buckets.go`), which handles 3-layer file/group/grader `when:` merge via `mergeUnifiedWhen` + `matchesUnifiedWhen` (`internal/criteria/config.go:240`). The `WhenMap.Matches` in `internal/criteria/graders/types.go:64` is the third match site (used by `ApplicableGraders`, only referenced in tests today). All three use identical AND, case-insensitive, empty-matches-all semantics. **Adding keys to `props` requires zero match-site changes.**
+- **`internal/config/tool_filter.go:matchesWhen` is a fourth `matchesWhen` site** — but it filters tool *entries themselves* by prompt props, so it's the layer that *defines* what tools are loaded. Asymmetric: do not feed tool-derived props back into it (circular).
+- **`EnvironmentTools` already exists.** `graders.GraderInput.EnvironmentTools` is populated in `engine_eval.go:597-612` with `{Name, Kind, Repo, Path}` per generator tool entry. Graders consume it for tool_used matching. The same loop is the natural site to also emit prefixed keys into `props`. No new data plumbing needed.
+- **MCP tool wildcard limitation.** `mcp_tools: ["*"]` is the dominant pattern in real configs (azure-mcp-opus.yaml). `internal/pairwise/pairwise.go:347` documents the limitation: "Until the SDK exposes tool discovery, leave the wildcard in place." Individual-tool gating (`mcp_tool:server/tool`) cannot enumerate wildcard servers without SDK work — must ship Phase 2 with this caveat or wait for SDK discovery API.
+- **`tool_used` grader fields (`tool`, `source`, `mcp_server`) map cleanly to prefixed `when:` keys** — `mcp_server:foo`, `skill:bar`, `mcp_tool:server/tool`. This gives users one mental model on both sides.
+- **Prefixed-string-keys beat structured-list-fields.** Keeping `WhenMap` as `map[string]string` means zero schema migration, zero parser/validator changes, and natural AND-composition with existing prompt keys. The cost is a YAML quoting requirement (`"mcp_server:azure": "true"`) which is well-understood.
+
+### Pattern Worth Remembering
+
+When adding new dimensions to a `map[string]string`-based filter, **prefer prefixed string keys over structured fields** when (1) the existing match semantics (AND/case-insensitive/empty-matches-all) are correct, (2) values are membership flags (`"true"`), and (3) the schema is loaded by multiple call sites. Cost of widening props is O(1); cost of widening the type is O(call sites × tests).
