@@ -195,12 +195,14 @@ type ToolConfig struct {
 
 // ToolCheckRule defines one check within a ToolConfig. See tool_grader.go for semantics.
 type ToolCheckRule struct {
-	Kind     string   `yaml:"kind" json:"kind"`
-	Tool     string   `yaml:"tool,omitempty" json:"tool,omitempty"`           // For tool_used, tool_not_used
-	Group    string   `yaml:"group,omitempty" json:"group,omitempty"`         // For any_from_group, none_from_group
-	Except   []string `yaml:"except,omitempty" json:"except,omitempty"`       // Optional exclusion list for group checks
-	MinCalls *int     `yaml:"min_calls,omitempty" json:"min_calls,omitempty"` // Optional for tool_used
-	MaxCalls *int     `yaml:"max_calls,omitempty" json:"max_calls,omitempty"` // Optional for tool_used
+	Kind      string   `yaml:"kind" json:"kind"`
+	Tool      string   `yaml:"tool,omitempty" json:"tool,omitempty"`           // For tool_used, tool_not_used
+	Group     string   `yaml:"group,omitempty" json:"group,omitempty"`         // For any_from_group, none_from_group
+	Except    []string `yaml:"except,omitempty" json:"except,omitempty"`       // Optional exclusion list for group checks
+	MinCalls  *int     `yaml:"min_calls,omitempty" json:"min_calls,omitempty"` // Optional for tool_used
+	MaxCalls  *int     `yaml:"max_calls,omitempty" json:"max_calls,omitempty"` // Optional for tool_used
+	Source    string   `yaml:"source,omitempty" json:"source,omitempty"`       // Optional: skill|mcp|builtin (filters by event.Type)
+	MCPServer string   `yaml:"mcp_server,omitempty" json:"mcp_server,omitempty"` // Optional: MCP server name (requires source=mcp)
 }
 
 // EffectiveWeight returns the grader's weight, defaulting to 1.0 if unset.

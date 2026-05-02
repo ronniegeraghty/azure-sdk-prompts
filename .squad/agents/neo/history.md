@@ -1585,3 +1585,35 @@ Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught t
 - **BUG FOUND:** tool.execution_start events for the "skill" tool created Type=tool_call, Tool="skill" entries that were ALSO counted, causing double-counting and masking individual skill names
 - **FIX:** Filter out tool_call events with Tool="skill" in ToGraderActionLog since individual skill names appear in subsequent skill.invoked events
 
+
+## 2026-05-02 — Tool Source and MCP Server Disambiguation (Neo)
+
+**What shipped:**
+- Added `Source` and `MCPServer` fields to `ToolCheckRule` in `internal/criteria/graders/types.go`
+- Added `MCPServer` field to `ActionEvent` in both `internal/criteria/graders/grader.go` and `internal/eval/action.go`
+- Updated `ToGraderActionLog` in `internal/eval/action.go` to propagate `MCPServer` from eval events to grader events
+- Implemented `countToolsFiltered` function in `tool_grader.go` to filter tool counts by:
+  - `source`: "skill" (Type="skill"), "mcp" (Type="mcp_call"), or "builtin" (Type="tool_call"|"file_read"|"file_write"|"bash")
+  - `mcp_server`: filters MCP tools by server name (requires source="mcp")
+- Updated `evaluateToolCheck` to use filtered counts for both `tool_used` and `tool_not_used` checks
+- Added validation for source values (skill|mcp|builtin) and mcp_server requirements
+- Added comprehensive table-driven tests covering:
+  - Source filtering (skill, mcp, builtin)
+  - MCP server filtering
+  - tool_not_used with source filtering
+  - Validation of source/mcp_server fields
+
+**Design decisions:**
+- Source is OPTIONAL — backward compatible, defaults to matching any source
+- Skills are matched by name only — no skill_path/skill_dir disambiguation per user directive
+- MCP server field requires source=mcp — validation enforced at config load time
+- Builtin tools identified by Type (tool_call, file_read, file_write, bash) not by explicit event field
+
+**Test status:** ✅ All grader tests pass with `-race` flag
+**Build status:** ✅ Clean (`go build ./...` passes)
+
+**Learnings:**
+- ActionEvent exists in two packages (eval and graders) with different field sets — needed to sync MCPServer field to both
+- Event.Type discrimination already exists in action.go (skill, mcp_call, tool_call) — leveraged this for source filtering
+- countTools function lives in activity_grader.go, not tool_grader.go — shared helper pattern
+- Label formatting for checks with multiple qualifiers requires careful parenthesis handling

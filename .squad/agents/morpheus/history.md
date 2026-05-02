@@ -1084,3 +1084,46 @@ When scoping how Grader loads tools from multiple sources (skills + MCP servers)
 
 Incorporate explicit namespacing rules into Grader multi-source tool loading specification. Recommend scoped registry pattern (matches GitHub CLI precedent).
 
+
+---
+
+## 2026-05-02: Tool Disambiguation Scoping (tool_used Grader)
+
+**Task:** Scoping document for tool name collision disambiguation in `tool_used` grader checks.
+
+**Context:**
+- Current `tool_used` matches by bare name only (`ev.Tool` string) — no source/namespace
+- Commit `adb46786` fixed skill name matching; `40058f7c` filters redundant skill wrapper events
+- Switch's SDK research (D-2026-05-02-001): SDK does NOT prevent cross-source collisions
+
+**Problem:** When multiple tools share the same name (e.g., `azure-mcp/list-resources` + `aws-mcp/list-resources`), the grader cannot distinguish them. MCP × MCP collision is highest-risk; skill × skill and skill × MCP are edge cases.
+
+**Proposal: Option A (Optional Source + Server Fields)**
+- Schema: Add optional `source: skill|mcp|builtin` and `server: <name>` to `ToolCheckRule`
+- Bare `tool: foo` continues to match any source (legacy behavior)
+- Explicit `tool: list-resources, source: mcp, server: azure-mcp` disambiguates collisions
+- Load-time warning if collision exists but prompt uses bare name
+- Backward compatible (no breaking changes)
+
+**Options Evaluated:**
+- **A (Recommended):** Optional fields, graceful degradation, pairwise-friendly
+- **B (Rejected):** Fully-qualified syntax (`mcp:server/tool`) — ripple to runner + all graders + site display
+- **C (Rejected):** Load-time uniqueness validation — blocks legitimate pairwise MCP comparison scenarios
+
+**Open Questions for User:**
+1. Derive source at match-time via `EnvironmentTools` lookup (no `ActionEvent` changes) vs. add `Source`/`Server` to `ActionEvent`? → Recommend: lookup, no runner changes
+2. When to log collision warnings? → Recommend: once at config load
+3. Should `source` accept a list? → Recommend: no, single-source is clearer
+
+**Scope Estimate:**
+- Files: `types.go`, `tool_grader.go`, `tool_grader_test.go`, validation
+- No breaking changes
+- ~5 hours team time (2-3 impl + 1 test + 1 docs)
+
+**Deliverable:** `.squad/decisions/inbox/morpheus-tool-used-disambiguation.md` — awaiting user sign-off before issue filed for Neo.
+
+**Key Learnings:**
+- MCP × MCP collision is the real risk (multiple Azure MCP servers, org-internal + public MCP)
+- Graceful degradation (optional fields) wins over rigid enforcement (fail-fast) for pairwise scenarios
+- Namespacing at log-time (Option B) would ripple to runner + all graders — avoid unless unavoidable
+- Load-time warnings should be once-per-eval (not per-check) to avoid log spam

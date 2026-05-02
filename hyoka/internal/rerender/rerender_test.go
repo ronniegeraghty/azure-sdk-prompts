@@ -15,6 +15,7 @@ func TestRerenderRun(t *testing.T) {
 
 	// Create a report.json
 	r := &report.EvalReport{
+		SchemaVersion:  report.CurrentSchemaVersion,
 		PromptID:       "test-prompt",
 		ConfigName:     "baseline",
 		Timestamp:      "2024-01-15T10:00:00Z",
@@ -60,6 +61,7 @@ func TestRerenderAll(t *testing.T) {
 			t.Fatal(err)
 		}
 		r := &report.EvalReport{
+			SchemaVersion: report.CurrentSchemaVersion,
 			PromptID:   "test-prompt",
 			ConfigName: "baseline",
 			Timestamp:  "2024-01-01T10:00:00Z",
@@ -95,9 +97,9 @@ func TestRerenderNoRunFound(t *testing.T) {
 
 func TestBuildSummaryFromReports(t *testing.T) {
 	reports := []*report.EvalReport{
-		{PromptID: "p1", ConfigName: "c1", Success: true, Duration: 10},
-		{PromptID: "p1", ConfigName: "c2", Success: false, Duration: 20},
-		{PromptID: "p2", ConfigName: "c1", Success: true, Error: "", Duration: 15},
+		{SchemaVersion: report.CurrentSchemaVersion, PromptID: "p1", ConfigName: "c1", Success: true, Duration: 10},
+		{SchemaVersion: report.CurrentSchemaVersion, PromptID: "p1", ConfigName: "c2", Success: false, Duration: 20},
+		{SchemaVersion: report.CurrentSchemaVersion, PromptID: "p2", ConfigName: "c1", Success: true, Error: "", Duration: 15},
 	}
 
 	s := buildSummaryFromReports("run1", reports)

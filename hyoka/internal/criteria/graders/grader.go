@@ -111,6 +111,7 @@ type ActionEvent struct {
 	Text       string `json:"text,omitempty"`
 	Error      string `json:"error,omitempty"`
 	TurnNumber int    `json:"turn_number,omitempty"`
+	MCPServer  string `json:"mcp_server,omitempty"` // MCP server name for mcp_call events
 }
 
 // PromptMetadata holds prompt frontmatter fields relevant to grading.

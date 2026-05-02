@@ -72,10 +72,26 @@ func validateToolCheckRule(rule ToolCheckRule, idx int, graderName string) error
 		if rule.MinCalls != nil && rule.MaxCalls != nil && *rule.MinCalls > *rule.MaxCalls {
 			return fmt.Errorf("tool grader %q: %s min_calls cannot exceed max_calls", graderName, pos)
 		}
+		// Validate source field
+		if rule.Source != "" && rule.Source != "skill" && rule.Source != "mcp" && rule.Source != "builtin" {
+			return fmt.Errorf("tool grader %q: %s source must be one of: skill, mcp, builtin", graderName, pos)
+		}
+		// Validate mcp_server requires source=mcp
+		if rule.MCPServer != "" && rule.Source != "mcp" {
+			return fmt.Errorf("tool grader %q: %s mcp_server requires source=mcp", graderName, pos)
+		}
 		
 	case "tool_not_used":
 		if strings.TrimSpace(rule.Tool) == "" {
 			return fmt.Errorf("tool grader %q: %s kind=tool_not_used requires 'tool' field", graderName, pos)
+		}
+		// Validate source field
+		if rule.Source != "" && rule.Source != "skill" && rule.Source != "mcp" && rule.Source != "builtin" {
+			return fmt.Errorf("tool grader %q: %s source must be one of: skill, mcp, builtin", graderName, pos)
+		}
+		// Validate mcp_server requires source=mcp
+		if rule.MCPServer != "" && rule.Source != "mcp" {
+			return fmt.Errorf("tool grader %q: %s mcp_server requires source=mcp", graderName, pos)
 		}
 		
 	case "any_from_group", "none_from_group":
@@ -100,7 +116,7 @@ func (g *ToolGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 	var checks []GraderCheck
 	for i, rule := range g.checks {
 		checkID := fmt.Sprintf("check_%d", i+1)
-		check := evaluateToolCheck(rule, checkID, toolSet, toolCounts, input.EnvironmentTools)
+		check := evaluateToolCheck(rule, checkID, toolSet, toolCounts, input.ActionLog, input.EnvironmentTools)
 		checks = append(checks, check)
 	}
 
@@ -108,10 +124,11 @@ func (g *ToolGrader) Grade(_ context.Context, input GraderInput) (GraderResult, 
 	return NewResult(KindTool, g.name, input.Config, checks, msg, nil), nil
 }
 
-func evaluateToolCheck(rule ToolCheckRule, checkID string, toolSet map[string]bool, toolCounts map[string]int, envTools []EnvironmentTool) GraderCheck {
+func evaluateToolCheck(rule ToolCheckRule, checkID string, toolSet map[string]bool, toolCounts map[string]int, actionLog []ActionEvent, envTools []EnvironmentTool) GraderCheck {
 	switch rule.Kind {
 	case "tool_used":
-		count := toolCounts[rule.Tool]
+		// Filter by source and mcp_server if specified
+		count := countToolsFiltered(actionLog, rule.Tool, rule.Source, rule.MCPServer)
 		used := count > 0
 		
 		// Apply min/max constraints
@@ -135,8 +152,20 @@ func evaluateToolCheck(rule ToolCheckRule, checkID string, toolSet map[string]bo
 		}
 		
 		label := fmt.Sprintf("tool_used: %s", rule.Tool)
+		if rule.Source != "" {
+			label += fmt.Sprintf(" (source=%s", rule.Source)
+			if rule.MCPServer != "" {
+				label += fmt.Sprintf(", server=%s", rule.MCPServer)
+			}
+			label += ")"
+		}
 		if len(constraints) > 0 {
-			label += fmt.Sprintf(" (%s)", strings.Join(constraints, ", "))
+			if rule.Source != "" {
+				label = strings.TrimSuffix(label, ")")
+				label += fmt.Sprintf(", %s)", strings.Join(constraints, ", "))
+			} else {
+				label += fmt.Sprintf(" (%s)", strings.Join(constraints, ", "))
+			}
 		}
 		
 		message := ""
@@ -155,14 +184,24 @@ func evaluateToolCheck(rule ToolCheckRule, checkID string, toolSet map[string]bo
 		}
 
 	case "tool_not_used":
-		used := toolCounts[rule.Tool] > 0
+		// Filter by source and mcp_server if specified
+		count := countToolsFiltered(actionLog, rule.Tool, rule.Source, rule.MCPServer)
+		used := count > 0
 		notUsed := !used
 		message := ""
 		if used {
-			message = fmt.Sprintf("tool %q was used (%d time(s))", rule.Tool, toolCounts[rule.Tool])
+			message = fmt.Sprintf("tool %q was used (%d time(s))", rule.Tool, count)
+		}
+		label := fmt.Sprintf("tool_not_used: %s", rule.Tool)
+		if rule.Source != "" {
+			label += fmt.Sprintf(" (source=%s", rule.Source)
+			if rule.MCPServer != "" {
+				label += fmt.Sprintf(", server=%s", rule.MCPServer)
+			}
+			label += ")"
 		}
 		return GraderCheck{
-			Label:   fmt.Sprintf("tool_not_used: %s", rule.Tool),
+			Label:   label,
 			Pass:    notUsed,
 			Message: message,
 		}
@@ -296,4 +335,42 @@ func summarizeToolChecks(checks []GraderCheck) string {
 		}
 	}
 	return fmt.Sprintf("tool checks: %d/%d passed", passed, len(checks))
+}
+
+// countToolsFiltered counts tool calls matching the given name and optional source/mcp_server filters.
+// source can be "skill", "mcp", or "builtin" (maps to event.Type).
+// mcpServer is only used when source="mcp".
+func countToolsFiltered(log []ActionEvent, toolName string, source string, mcpServer string) int {
+	count := 0
+	for _, e := range log {
+		if e.Tool != toolName {
+			continue
+		}
+		
+		// If source is specified, filter by event.Type
+		if source != "" {
+			matched := false
+			switch source {
+			case "skill":
+				matched = e.Type == "skill"
+			case "mcp":
+				matched = e.Type == "mcp_call"
+			case "builtin":
+				// Builtin tools are tool_call, file_read, file_write, bash (not skill or mcp_call)
+				matched = e.Type == "tool_call" || e.Type == "file_read" || 
+				          e.Type == "file_write" || e.Type == "bash"
+			}
+			if !matched {
+				continue
+			}
+		}
+		
+		// If mcpServer is specified (requires source=mcp), filter by e.MCPServer
+		if mcpServer != "" && e.MCPServer != mcpServer {
+			continue
+		}
+		
+		count++
+	}
+	return count
 }

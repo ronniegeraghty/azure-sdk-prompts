@@ -735,3 +735,75 @@ skill events landed twice in toolCounts:
 Removing (1) eliminates double-counting; (2) provides canonical match key.
 
 **Code Reference:** hyoka/internal/eval/action.go, TestActionTimeline_ToGraderActionLog_SkillEvents
+
+---
+
+## Session: Comprehensive Graders Documentation Audit (2026-05-02)
+
+**Date:** 2026-05-02  
+**Status:** ✅ COMPLETE  
+**Branch:** ronniegeraghty/dev  
+**Decision Drop:** `.squad/decisions/inbox/oracle-grader-docs-audit.md`
+
+### Audit Scope
+
+Comprehensive review of all hyoka documentation touching graders, criteria, and review systems. Verified against current Go implementations and identified documentation gaps.
+
+### Critical Issues Found & Fixed
+
+**CRITICAL #1: Undocumented Tool Grader Fields**
+- Issue: `source` and `mcp_server` fields in ToolCheckRule struct were implemented in code but not documented
+- Evidence: tool_grader.go lines 76-82, 131, 155-158 actively use these fields
+- Fix: Added field documentation to tool.md with table updates + "Filtering by Tool Source" example
+
+**CRITICAL #2: Architecture.md Lists Non-existent Graders**
+- Issue: Listed `output_check` and `action_sequence` as canonical (don't exist), missing `workspace` and `activity`
+- Evidence: Schema flatten commit 7410ecf1 removed all deprecated kinds; types.go defines only 5 canonical + 1 internal
+- Fix: Updated canonical grader list to accurate five types; moved legacy kinds to separate "deprecated" section
+
+**CRITICAL #3: grader-config-schema.md Not Marked as Legacy**
+- Issue: Document claimed to describe "current schema" but was pre-v4 with removed graders, `details:` wrapper, etc.
+- Fix: Rewrote header to mark as OBSOLETE, added redirect to current docs, created grader removal table
+
+**MEDIUM #1: WorkspaceDelta Nil Handling Undocumented**
+- Issue: workspace.md didn't mention WorkspaceDelta is a pointer and may be nil in older reports
+- Fix: Added "Important: WorkspaceDelta Availability" section explaining v0.4+ behavior vs legacy
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| docs/architecture.md | Fixed canonical grader list (removed output_check/action_sequence, added workspace/activity) |
+| docs/graders/tool.md | Documented source + mcp_server fields, added filtering examples |
+| docs/graders/workspace.md | Added WorkspaceDelta nil handling section |
+| docs/grader-config-schema.md | Rewrote as obsolete legacy reference, removed deprecated grader docs |
+
+### Code-vs-Docs Verification
+
+✓ Five canonical graders match types.go constants (program, prompt, workspace, tool, activity)  
+✓ PromptReviewGrader confirmed as engine-internal (not user-configurable YAML)  
+✓ Tool grader Source/MCPServer fields match active implementation  
+✓ WorkspaceDelta pointer type verified in GraderInput struct  
+✓ Removed graders confirmed via schema-flatten commit  
+✓ Prompt architecture clarified: `type: prompt` criteria ≠ PromptGrader class  
+
+### Testing & Validation
+
+- Criteria files validate against current schema: ✓ test.yaml, python.yaml use documented structure
+- Tool grader: ✓ All four check kinds (tool_used, tool_not_used, any_from_group, none_from_group) exercised
+- Activity grader: ✓ All activity checks (turn_limit, action_count, tool_call_count, contains_action, etc.) shown
+- Workspace grader: ✓ All six check kinds (require_to_create, forbidden_to_create, etc.) demonstrated
+
+### Architectural Insights Documented
+
+- `type: prompt` in criteria YAML flows to review panel (NOT through graders.NewGrader)
+- Prompt criteria entries have different structure than PromptGrader class (design separation verified)
+- Both architectures correct; docs now clarify the distinction in prompt_review.md
+
+### Next Steps
+
+- Monitor neo/issue-grader-redesign for any schema evolution
+- If prompt:+checks: structure moves to runtime PromptGrader in future, update docs/graders/prompt.md
+- Consider architecture diagram for "Criteria → Review Panel vs Graders → Engine" flow
+
+**Status:** All critical documentation gaps resolved. Docs now match current hyoka codebase (commit 0a4d1fd9).

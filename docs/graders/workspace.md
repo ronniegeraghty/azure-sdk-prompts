@@ -4,6 +4,14 @@ The `workspace` grader validates the agent's file modifications during a session
 
 This grader replaces the legacy `output_check` and `file` graders with a unified, delta-aware approach.
 
+## Important: WorkspaceDelta Availability
+
+The workspace grader operates on `WorkspaceDelta` — a summary of file changes (created, modified, deleted). WorkspaceDelta is:
+- **Available** in evaluations generated with hyoka v0.4+ (it's created by the engine and included in GraderInput)
+- **Possibly nil** in evaluation reports created with older hyoka versions (pre-#566). Graders handle nil gracefully by treating it as "no file changes available."
+
+If all checks pass when `WorkspaceDelta` is nil, the grader reports success. If any check **requires** a file to be in NewFiles/ModifiedFiles/DeletedFiles and WorkspaceDelta is nil, the check fails.
+
 ## When to Use
 
 - Verify required files were created (e.g., `main.py`, `README.md`)

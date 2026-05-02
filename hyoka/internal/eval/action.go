@@ -364,6 +364,7 @@ func (tl *ActionTimeline) ToGraderActionLog() []graders.ActionEvent {
 			Text:       ev.Output,
 			Error:      ev.Error,
 			TurnNumber: ev.TurnNumber,
+			MCPServer:  ev.MCPServer,
 		})
 	}
 	return out

@@ -1027,3 +1027,65 @@ Morpheus cannot assume SDK-side safety. When designing multi-source tool loading
 
 **Morpheus:** Incorporate namespacing requirements into Grader multi-source tool loading design.
 
+
+## Learnings
+
+### 2026-05-02 — SDK Skill Event Metadata Investigation
+
+**Context:** Designing `tool_used` grader check for disambiguating skills with identical names from different skill_dirs.
+
+**SDK Fields on `skill.invoked` Event Payload:**
+
+From `github.com/github/copilot-sdk/go@v0.2.0/generated_session_events.go:713-720`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Name` | `*string` | Name of the invoked skill (bare, no namespace) |
+| `PluginName` | `*string` | Name of the plugin this skill originated from, when applicable |
+| `PluginVersion` | `*string` | Version of the plugin this skill originated from, when applicable |
+
+**SDK Fields on `session.skills_loaded` Event:**
+
+`event.Data.Skills []Skill` — full array of loaded skills (L1295-1308):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Name` | `string` | Unique identifier for the skill |
+| `Path` | `*string` | **Absolute path to the skill file, if available** |
+| `Source` | `string` | **Source location type (e.g., "project", "personal", "plugin")** |
+| `Description` | `string` | What the skill does |
+| `Enabled` | `bool` | Whether enabled |
+| `UserInvocable` | `bool` | Slash-command eligible |
+
+**Current hyoka Capture:**
+
+- `skill.invoked`: Only captures `event.Data.Name` → `SessionEventRecord.SkillName` (copilot.go:400-403)
+- `session.skills_loaded`: Logs skill names but **does not store** the `Skills` array with Path/Source (copilot.go:449-466)
+
+**Conclusion:**
+
+❌ **SDK does NOT expose Path or Source on `skill.invoked` events** — only the bare skill name.  
+✅ **SDK DOES expose Path and Source on `session.skills_loaded`** — but hyoka currently discards them.
+
+**Solution:**
+
+Skill collision disambiguation at runtime requires **building a lookup table** from `session.skills_loaded`:
+
+1. Capture `event.Data.Skills` array when `SessionSkillsLoaded` fires
+2. Build map: `skillName → {Path, Source}`
+3. On each `skill.invoked`, enrich `SessionEventRecord` with Path/Source from the lookup
+
+**Minimal hyoka changes:**
+
+1. Add to `SessionEventRecord` (report/types.go:312): `SkillPath string`, `SkillSource string`
+2. Add to `ActionEvent` (eval/action.go:15): `SkillPath string`, `SkillSource string`
+3. In `copilot.go`, `OnEvent` handler:
+   - Store `event.Data.Skills` in eval context when `SessionSkillsLoaded`
+   - Enrich `rec.SkillPath`, `rec.SkillSource` from lookup when `SkillInvoked`
+4. In `action.go`, `buildActionTimeline`: propagate `rec.SkillPath`, `rec.SkillSource` → `ActionEvent`
+
+**Files + Lines:**
+- SDK event payload: `generated_session_events.go:713-720` (skill.invoked), `L1295-1308` (Skill struct)
+- hyoka event capture: `hyoka/internal/eval/copilot.go:400-403` (skill.invoked), `L449-466` (skills_loaded)
+- hyoka types: `hyoka/internal/report/types.go:296-320`, `hyoka/internal/eval/action.go:12-25`
+

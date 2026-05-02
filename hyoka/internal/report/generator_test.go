@@ -2,8 +2,10 @@ package report
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
@@ -16,6 +18,7 @@ func TestWriteReport(t *testing.T) {
 	dir := t.TempDir()
 
 	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
 		PromptID:       "test-prompt",
 		ConfigName:     "baseline",
 		Timestamp:      "2024-01-15T10:00:00Z",
@@ -118,7 +121,7 @@ func TestWriteSummary(t *testing.T) {
 }
 
 func TestWriteReportInvalidDir(t *testing.T) {
-	r := &EvalReport{PromptID: "test", ConfigName: "cfg"}
+	r := &EvalReport{SchemaVersion: CurrentSchemaVersion, PromptID: "test", ConfigName: "cfg"}
 	p := &prompt.Prompt{ID: "test", Properties: map[string]string{"service": "svc", "plane": "plane", "language": "lang", "category": "cat"}}
 
 	// Use a path containing characters that are invalid on both Unix and Windows.
@@ -552,29 +555,30 @@ func TestV2ReportReadByV3Code(t *testing.T) {
 	}
 }
 
-// TestMigrateToV3 verifies that MigrateToV3 lifts a v0/v1 report through
-// v2 and lands at CurrentSchemaVersion. v2 → v3 is metadata-only so no
-// new fields appear on migrated reports — they just gain the version bump.
-func TestMigrateToV3(t *testing.T) {
+// TestMigrateToV3Panic verifies that MigrateToV3 panics on v < 4 reports
+// (hard cutover enforced as of v4). Old reports must be regenerated.
+func TestMigrateToV3Panic(t *testing.T) {
 	r := &EvalReport{
 		PromptID:   "migrate-v3",
 		ConfigName: "baseline",
 		Review: &review.ReviewResult{
 			Model: "test-model", OverallScore: 3, MaxScore: 5, Summary: "S",
 		},
+		SchemaVersion: 0, // Explicitly set to v0
 	}
+	
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MigrateToV3 should panic on v0 reports, but it did not")
+		} else {
+			msg := fmt.Sprint(r)
+			if !strings.Contains(msg, "no longer supported") {
+				t.Errorf("expected panic message to contain 'no longer supported', got: %s", msg)
+			}
+		}
+	}()
+	
 	MigrateToV3(r)
-	if r.SchemaVersion != CurrentSchemaVersion {
-		t.Errorf("MigrateToV3: schema=%d, want %d", r.SchemaVersion, CurrentSchemaVersion)
-	}
-	if len(r.GraderResults) == 0 {
-		t.Error("MigrateToV3 should also lift v1 → v2 data (GraderResults populated)")
-	}
-	// Idempotent.
-	MigrateToV3(r)
-	if r.SchemaVersion != CurrentSchemaVersion {
-		t.Errorf("MigrateToV3 not idempotent: schema=%d", r.SchemaVersion)
-	}
 }
 
 // --- Session Setup in Action Timeline tests (#219) ---

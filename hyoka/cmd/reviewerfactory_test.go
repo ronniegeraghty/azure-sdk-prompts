@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -134,9 +135,11 @@ func TestReviewerFactory_MissingSkillFailsFast(t *testing.T) {
 		t.Fatal("expected error for missing reviewer skill")
 	}
 	
-	toolErr, ok := err.(*tool.ToolLoadError)
-	if !ok {
-		t.Fatalf("expected *ToolLoadError, got %T", err)
+	// The error may be a single ToolLoadError or a joinedToolLoadError wrapping multiple errors
+	// Check if we can unwrap to get the underlying ToolLoadError(s)
+	var toolErr *tool.ToolLoadError
+	if !errors.As(err, &toolErr) {
+		t.Fatalf("expected error to contain *ToolLoadError, got %T", err)
 	}
 	
 	if toolErr.Kind != "skill" {

@@ -35,7 +35,7 @@ Four check kinds are supported:
 
 #### 1. `tool_used`
 
-A named tool must be invoked at least once. Optional `min_calls` and `max_calls` bounds.
+A named tool must be invoked at least once. Optional `min_calls` and `max_calls` bounds. Use `source` to filter by tool type (skill/mcp/builtin).
 
 | Field      | Type     | Required | Description                              |
 |------------|----------|----------|------------------------------------------|
@@ -43,15 +43,19 @@ A named tool must be invoked at least once. Optional `min_calls` and `max_calls`
 | `tool`     | string   | yes      | Tool name (skill, plugin, or MCP server name) |
 | `min_calls` | int     | no       | Minimum number of invocations (default: 1 if present is required) |
 | `max_calls` | int     | no       | Maximum number of invocations |
+| `source`   | string   | no       | Filter by tool source: `skill`, `mcp`, or `builtin`. If omitted, matches any source. |
+| `mcp_server` | string | no       | MCP server name (only meaningful with `source: mcp`). Filters to a specific MCP server. |
 
 #### 2. `tool_not_used`
 
-A named tool must NOT be invoked at all.
+A named tool must NOT be invoked at all. Use `source` to filter by tool type.
 
 | Field      | Type     | Required | Description                              |
 |------------|----------|----------|------------------------------------------|
 | `kind`     | string   | yes      | Must be `"tool_not_used"` |
 | `tool`     | string   | yes      | Tool name (skill, plugin, or MCP server name) |
+| `source`   | string   | no       | Filter by tool source: `skill`, `mcp`, or `builtin`. If omitted, matches any source. |
+| `mcp_server` | string | no       | MCP server name (only meaningful with `source: mcp`). Filters to a specific MCP server. |
 
 #### 3. `any_from_group`
 
@@ -159,6 +163,29 @@ graders:
       - kind: none_from_group
         group: dangerous_tools
         except: [bash]  # bash is dangerous but we're allowing it
+```
+
+### Filtering by Tool Source
+
+```yaml
+graders:
+  - name: MCP Server Usage
+    type: tool
+    weight: 0.3
+    checks:
+      # Must use a specific skill (not MCP or builtin)
+      - kind: tool_used
+        tool: markdown-headings
+        source: skill
+      # Must use a specific MCP server
+      - kind: tool_used
+        tool: file-search
+        source: mcp
+        mcp_server: native-tools
+      # Forbid any builtin tool
+      - kind: tool_not_used
+        tool: bash
+        source: builtin
 ```
 
 ## Result Structure
