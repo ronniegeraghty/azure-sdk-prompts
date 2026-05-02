@@ -1832,3 +1832,15 @@ The grader-applicability props map is built **exactly once per eval** in `hyoka/
 ### 2026-05-02: YAML `:` in map keys requires quoting
 
 `mcp_server:azure: "true"` parses as a NESTED MAPPING in unquoted YAML (key `mcp_server`, value `{azure: "true"}`). To get a flat key literally named `mcp_server:azure`, the key must be quoted: `"mcp_server:azure": "true"`. This is the only ergonomic wart of the prefixed-key design — Morpheus picked it anyway for zero-schema-change. Document this in any new docs that introduce the feature; users WILL hit it.
+
+---
+
+## 2026-05-02 — Phase 2 `when:` Schema Implementation + Cross-Eval Views
+
+**Session:** 2026-05-02T07:59:35Z  
+**Contributions:**
+1. **Phase 2 Config-Aware `when:` Schema** (Batch 1) — Implemented structured types: `WhenClause`, `StringOrSlice`, `ToolFilter`, `MatchContext`, `ToolIdentity`. Updated engine callsites (`matchedForEval`, `reviewBuckets`, `mergedCriteria`) to thread `env` for `ToolIdentity` resolution. Migrated criteria/test.yaml to new schema. Hard cut on Phase 1 form. Tests passing; grader gates verified pairwise. Commits 9da48f32, b644bdea, d40d160f.
+2. **Cross-Eval Visualization Matrix** (Batch 2) — Owned evals×checks matrix layout; collaborated with Trinity on 4-view integration (summary band, per-config strip, matrix, stacked bars). Commit 81e797e1.
+3. **Skill_dir Tool Identity Fix** (Batch 3 co-owned) — Coordinator fixed buildToolIdentities; Neo verified pairwise behavior. Commit 328df6e9.
+
+**Outcome:** Phase 2 schema operational; cross-eval views deployed; end-to-end tests passing.

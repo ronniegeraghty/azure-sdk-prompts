@@ -993,3 +993,20 @@ Implement four cross-evaluation views per Morpheus's spec:
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ```
 
+
+---
+
+## 2026-05-02 — Cross-Eval Visualization Views (4 Views)
+
+**Session:** 2026-05-02T07:59:35Z  
+**Contribution:** Implemented 4 cross-eval visualization views for run-detail page per Morpheus spec.
+
+**Views Shipped:**
+1. **Summary Band** — Eval rollup + key metrics (pass rate, model distribution)
+2. **Per-Config Rollup Strip** — Config + model + aggregate points per config variant
+3. **Evals × Checks Matrix** — Per-eval detail; collapsed-by-default to preserve page readability
+4. **Per-Grader-Type Stacked Bars** — Aggregate grader results by kind (prompt, tool, workspace, activity)
+
+**Technical:** React components, Recharts, responsive layout. Full test coverage (131/131 passing). Playwright end-to-end verification. Commits b644bdea, 81e797e1.
+
+**Outcome:** Run-detail page now shows cross-eval context without overwhelming single-run view. Site tests all passing.

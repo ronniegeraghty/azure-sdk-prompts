@@ -1199,3 +1199,14 @@ Brady flagged a gap in the §1 `WhenClause` redesign: every scalar field was pin
 The Go implementation idiom is a custom `StringOrSlice []string` type with a polymorphic `UnmarshalYAML(node *yaml.Node)` that switches on `node.Kind` (`yaml.ScalarNode` vs `yaml.SequenceNode`) and normalizes both to `[]string`. Both YAML authoring forms — flow `[a, b]` and block `- a\n- b` — decode identically because that's a YAML primitive, not a design choice. Always serialize back as a list (don't try to round-trip single-element slices to scalars) — a single shape downstream beats minor YAML cosmetics.
 
 Bonus side effect: making every `WhenClause` field slice-typed collapses the merge rule to one uniform "child non-nil replaces parent" line per field, eliminating the old scalar-vs-list two-rule split. And authors gain a way to *clear* an inherited constraint by writing `field: []` at the child level — a capability the scalar `!= ""` test couldn't express. Pattern: when you're already restructuring a type, prefer uniformity over minimum-diff — the merge code, the docs, and the mental model all get simpler at once.
+
+---
+
+## 2026-05-02 — Phase 2 `when:` Schema Design + Cross-Eval Visualization Scoping
+
+**Session:** 2026-05-02T07:59:35Z  
+**Contribution:** Strategic design for two major features:
+1. **Phase 2 Config-Aware `when:` Schema** — Designed structured `WhenClause` with `StringOrSlice` type, `ToolFilter` array, `MatchContext` bundling. Hard cut on Phase 1 prefixed-key form. Spec adopted by Neo for implementation; shipped commit 9da48f32.
+2. **Cross-Eval Visualization (4 Views)** — Scoped summary band, per-config rollup strip, evals×checks matrix (collapsed-by-default), per-grader-type stacked bars. Spec adopted by Trinity for React implementation; shipped commits b644bdea + 81e797e1.
+
+**Outcome:** Both specs delivered; implementations verified end-to-end. No product code changes.
