@@ -6,22 +6,30 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 )
 
-// TestMatchingUnifiedEntries_GatedByConfigAwarePrefixedKeys verifies a grader
-// gated on `mcp_server:azure: "true"` runs when the eval config exposes the
-// azure MCP server and is skipped otherwise. This is the headline use case for
-// the Phase 1 config-aware `when:` feature.
-func TestMatchingUnifiedEntries_GatedByConfigAwarePrefixedKeys(t *testing.T) {
+// TestMatchingUnifiedEntries_GatedByToolFilters verifies a grader gated on
+// `tool: [{name: azure, source: mcp}]` runs when the eval config includes the
+// azure MCP tool and is skipped otherwise. This is the headline use case for
+// the Phase 2 config-aware `when:` feature.
+func TestMatchingUnifiedEntries_GatedByToolFilters(t *testing.T) {
 	bundle := &Bundle{Configs: []UnifiedGraderConfig{{
 		Graders: []UnifiedGraderEntry{
 			{
 				Type: graders.KindTool,
 				Name: "uses-azure-list-resources",
-				When: map[string]string{"mcp_server:azure": "true"},
+				When: WhenClause{
+					Tool: []ToolFilter{
+						{Name: "azure", Source: "mcp"},
+					},
+				},
 			},
 			{
 				Type: graders.KindTool,
 				Name: "uses-some-skill",
-				When: map[string]string{"skill:reviewer-skills": "true"},
+				When: WhenClause{
+					Tool: []ToolFilter{
+						{Name: "reviewer-skills", Source: "skill"},
+					},
+				},
 			},
 			{
 				// Always runs — no when block.
@@ -33,35 +41,46 @@ func TestMatchingUnifiedEntries_GatedByConfigAwarePrefixedKeys(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		props map[string]string
+		ctx   MatchContext
 		want  []string
 	}{
 		{
 			name: "azure-mcp config loads server → grader runs",
-			props: map[string]string{
-				"language":         "python",
-				"generator":        "claude-opus-4.6",
-				"config":           "azure-mcp/claude-opus-4.6",
-				"mcp_server:azure": "true",
+			ctx: MatchContext{
+				Props: map[string]string{
+					"language":  "python",
+					"generator": "claude-opus-4.6",
+					"config":    "azure-mcp/claude-opus-4.6",
+				},
+				Tools: []ToolIdentity{
+					{Name: "azure", Source: "mcp"},
+				},
 			},
 			want: []string{"uses-azure-list-resources", "always-on"},
 		},
 		{
 			name: "baseline config (no azure mcp) → mcp-gated grader skipped",
-			props: map[string]string{
-				"language":  "python",
-				"generator": "claude-opus-4.6",
-				"config":    "baseline/claude-opus-4.6",
+			ctx: MatchContext{
+				Props: map[string]string{
+					"language":  "python",
+					"generator": "claude-opus-4.6",
+					"config":    "baseline/claude-opus-4.6",
+				},
+				Tools: nil, // No tools
 			},
 			want: []string{"always-on"},
 		},
 		{
 			name: "config with skill but no mcp → only skill-gated runs",
-			props: map[string]string{
-				"language":              "python",
-				"generator":             "claude-opus-4.6",
-				"config":                "skills-only/claude-opus-4.6",
-				"skill:reviewer-skills": "true",
+			ctx: MatchContext{
+				Props: map[string]string{
+					"language":  "python",
+					"generator": "claude-opus-4.6",
+					"config":    "skills-only/claude-opus-4.6",
+				},
+				Tools: []ToolIdentity{
+					{Name: "reviewer-skills", Source: "skill"},
+				},
 			},
 			want: []string{"uses-some-skill", "always-on"},
 		},
@@ -69,7 +88,7 @@ func TestMatchingUnifiedEntries_GatedByConfigAwarePrefixedKeys(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			matched := MatchingUnifiedEntries(bundle, tc.props)
+			matched := MatchingUnifiedEntries(bundle, tc.ctx)
 			got := make([]string, 0, len(matched))
 			for _, m := range matched {
 				got = append(got, m.Entry.Name)

@@ -356,11 +356,11 @@ graders:
 	}
 
 	// Python eval: bad java file is irrelevant.
-	if err := bundle.MatchingErrors(map[string]string{"language": "python"}); err != nil {
+	if err := bundle.MatchingErrors(MatchContext{Props: map[string]string{"language": "python"}}); err != nil {
 		t.Fatalf("python eval should not surface java error, got %v", err)
 	}
 	// Java eval: bad java file IS relevant.
-	if err := bundle.MatchingErrors(map[string]string{"language": "java"}); err == nil {
+	if err := bundle.MatchingErrors(MatchContext{Props: map[string]string{"language": "java"}}); err == nil {
 		t.Fatalf("java eval must surface deferred error")
 	}
 }
@@ -380,7 +380,7 @@ func TestLoadUnifiedDir_UnreadableWhenSurfacesUniversally(t *testing.T) {
 		t.Fatalf("want 1 error, got %d", len(bundle.FileErrors))
 	}
 	// With nil When, error should surface for every eval (fail-loud default).
-	if err := bundle.MatchingErrors(map[string]string{"language": "go"}); err == nil {
+	if err := bundle.MatchingErrors(MatchContext{Props: map[string]string{"language": "go"}}); err == nil {
 		t.Fatalf("expected fail-loud surfacing")
 	}
 }
@@ -401,38 +401,6 @@ func TestLoadUnifiedFile_SetsSource(t *testing.T) {
 	}
 	if gc.Source != p {
 		t.Fatalf("Source=%q want %q", gc.Source, p)
-	}
-}
-
-// --- when helpers ----------------------------------------------------------
-
-func TestMatchesUnifiedWhen_CaseInsensitiveAndEmpty(t *testing.T) {
-	if !matchesUnifiedWhen(nil, map[string]string{"a": "b"}) {
-		t.Error("nil when should match anything")
-	}
-	if !matchesUnifiedWhen(map[string]string{"language": "Python"},
-		map[string]string{"language": "python"}) {
-		t.Error("case-insensitive match failed")
-	}
-	if matchesUnifiedWhen(map[string]string{"language": "go"},
-		map[string]string{"language": "rust"}) {
-		t.Error("non-match should not match")
-	}
-}
-
-func TestMergeUnifiedWhen_ChildOverridesParent(t *testing.T) {
-	got := mergeUnifiedWhen(
-		map[string]string{"language": "python", "service": "kv"},
-		map[string]string{"language": "go"},
-	)
-	if got["language"] != "go" {
-		t.Errorf("child should override: %v", got)
-	}
-	if got["service"] != "kv" {
-		t.Errorf("parent should survive: %v", got)
-	}
-	if mergeUnifiedWhen(nil, nil) != nil {
-		t.Error("merging two empties should return nil")
 	}
 }
 

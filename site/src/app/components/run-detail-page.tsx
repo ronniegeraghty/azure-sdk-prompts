@@ -5,6 +5,7 @@ import type { RunSummary, EvalResult, EvalReport } from "../data/types";
 import { CheckCircle2, XCircle, Clock, FileCode2, ArrowLeft, Loader2, Tag, Zap } from "lucide-react";
 import { GraderResultRow } from "./GraderResultRow";
 import { evalPassFromPoints, evalPointTotals, graderPasses } from "../lib/evalPass";
+import { RunCrossEvalSummary } from "./RunCrossEvalSummary";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -192,6 +193,9 @@ export function RunDetailPage() {
             <span className="text-emerald-400/70" style={{ ...mono, fontSize: 12 }}>View →</span>
           </Link>
         )}
+
+        {/* Cross-evaluation summary views */}
+        <RunCrossEvalSummary run={run} />
 
         <div className="mb-4 flex items-center justify-between">
           <div className="flex flex-wrap gap-2">

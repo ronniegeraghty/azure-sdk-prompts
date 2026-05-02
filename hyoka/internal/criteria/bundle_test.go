@@ -61,8 +61,8 @@ func TestPhase1Loader_MixedPromptAndTyped(t *testing.T) {
 		t.Errorf("graders[1].Type: got %q, want %q", gc.Graders[1].Type, "workspace")
 	}
 	// File-level when preserved.
-	if gc.When["language"] != "python" {
-		t.Errorf("file-level when[language]: got %q, want %q", gc.When["language"], "python")
+	if !gc.When.Language.Matches("python") {
+		t.Errorf("file-level when.Language does not match 'python', got %v", gc.When.Language)
 	}
 }
 

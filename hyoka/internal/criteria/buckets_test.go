@@ -31,16 +31,16 @@ func typedEntry(kind, name string) UnifiedGraderEntry {
 
 func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 	bundle := &Bundle{Configs: []UnifiedGraderConfig{{
-		When: map[string]string{"language": "python"},
+		When: WhenClause{Language: StringOrSlice{"python"}},
 		Graders: []UnifiedGraderEntry{
 			promptEntry("a", "A", false),
 	},
 		Groups: []UnifiedGraderGroup{{
 			Name: "g",
-			When: map[string]string{"plane": "data-plane"},
+			When: WhenClause{Plane: StringOrSlice{"data-plane"}},
 			Graders: []UnifiedGraderEntry{
 				promptEntry("b", "B", false),
-				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: map[string]string{"category": "crud"}},
+				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: WhenClause{Category: StringOrSlice{"crud"}}},
 			},
 		}},
 	}}}
@@ -58,7 +58,8 @@ func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			matched := MatchingUnifiedEntries(bundle, tc.props)
+			ctx := MatchContext{Props: tc.props}
+			matched := MatchingUnifiedEntries(bundle, ctx)
 			got := make([]string, 0, len(matched))
 			for _, m := range matched {
 				got = append(got, m.Entry.Name)
