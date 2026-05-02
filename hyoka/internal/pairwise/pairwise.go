@@ -265,6 +265,11 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 					copy(excluded, te.ExcludedSkills)
 					gen.Tools[i].ExcludedSkills = excluded
 				}
+				if te.ExcludedTools != nil {
+					excluded := make([]string, len(te.ExcludedTools))
+					copy(excluded, te.ExcludedTools)
+					gen.Tools[i].ExcludedTools = excluded
+				}
 			}
 		}
 
@@ -302,6 +307,16 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 					tools := make([]string, len(te.MCPTools))
 					copy(tools, te.MCPTools)
 					rev.Tools[i].MCPTools = tools
+				}
+				if te.ExcludedSkills != nil {
+					excluded := make([]string, len(te.ExcludedSkills))
+					copy(excluded, te.ExcludedSkills)
+					rev.Tools[i].ExcludedSkills = excluded
+				}
+				if te.ExcludedTools != nil {
+					excluded := make([]string, len(te.ExcludedTools))
+					copy(excluded, te.ExcludedTools)
+					rev.Tools[i].ExcludedTools = excluded
 				}
 			}
 		}
