@@ -37,9 +37,9 @@ type UnifiedGraderEntry struct {
 	// Defaults to 1.0 when zero/unset.
 	Weight float64 `yaml:"weight,omitempty" json:"weight,omitempty"`
 
-	// When narrows applicability by prompt properties. AND-matched,
-	// case-insensitive. Empty matches everything.
-	When map[string]string `yaml:"when,omitempty" json:"when,omitempty"`
+	// When narrows applicability by prompt properties and config state.
+	// All fields AND together. Empty matches everything.
+	When WhenClause `yaml:"when,omitempty" json:"when,omitempty"`
 
 	// Isolate, when true and the engine runs in --review-mode isolated,
 	// places this grader in its own review session. Only meaningful for
@@ -68,7 +68,7 @@ type UnifiedGraderEntry struct {
 // (file → group → grader; most specific wins).
 type UnifiedGraderGroup struct {
 	Name    string               `yaml:"name,omitempty" json:"name,omitempty"`
-	When    map[string]string    `yaml:"when,omitempty" json:"when,omitempty"`
+	When    WhenClause           `yaml:"when,omitempty" json:"when,omitempty"`
 	Graders []UnifiedGraderEntry `yaml:"graders" json:"graders"`
 	Isolate bool                 `yaml:"isolate,omitempty" json:"isolate,omitempty"`
 }
@@ -77,7 +77,7 @@ type UnifiedGraderGroup struct {
 // A file may define top-level graders, groups, or both. The Source field is
 // populated by the loader and is never read from YAML.
 type UnifiedGraderConfig struct {
-	When    map[string]string    `yaml:"when,omitempty" json:"when,omitempty"`
+	When    WhenClause           `yaml:"when,omitempty" json:"when,omitempty"`
 	Graders []UnifiedGraderEntry `yaml:"graders,omitempty" json:"graders,omitempty"`
 	Groups  []UnifiedGraderGroup `yaml:"groups,omitempty" json:"groups,omitempty"`
 	Source  string               `yaml:"-" json:"-"`
@@ -235,31 +235,228 @@ func (e UnifiedGraderEntry) EffectiveWeight() float64 {
 	return e.Weight
 }
 
-// matchesUnifiedWhen reports whether all when constraints match props
-// (case-insensitive). An empty when always matches. Equivalent to the
-// matchesWhen helper in internal/criteria — duplicated here to keep the
-// new package self-contained for Phase 1.
-func matchesUnifiedWhen(when, props map[string]string) bool {
-	for k, v := range when {
-		if !strings.EqualFold(props[k], v) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2: Config-aware when: clause with structured tool filters
+// ─────────────────────────────────────────────────────────────────────────────
+
+// StringOrSlice decodes either a YAML scalar or a YAML sequence of scalars
+// into a normalized []string. Empty/nil means "no constraint".
+//
+// JSON/YAML marshalling always emits a list (even for single-element slices),
+// providing a stable shape for downstream consumers.
+type StringOrSlice []string
+
+// UnmarshalYAML accepts either a YAML scalar string or a sequence of strings.
+func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		var v string
+		if err := node.Decode(&v); err != nil {
+			return err
+		}
+		if v == "" {
+			*s = nil
+			return nil
+		}
+		*s = StringOrSlice{v}
+		return nil
+	case yaml.SequenceNode:
+		var v []string
+		if err := node.Decode(&v); err != nil {
+			return err
+		}
+		*s = StringOrSlice(v)
+		return nil
+	default:
+		return fmt.Errorf("when: field at line %d must be a string or a list of strings, got %v",
+			node.Line, node.Kind)
+	}
+}
+
+// Matches reports whether candidate equals any entry (case-insensitive).
+// An empty/nil StringOrSlice matches everything.
+func (s StringOrSlice) Matches(candidate string) bool {
+	if len(s) == 0 {
+		return true
+	}
+	for _, v := range s {
+		if strings.EqualFold(v, candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+// WhenClause narrows grader applicability. All fields AND together.
+// An empty WhenClause matches everything.
+//
+// Every scalar prompt/config field is a StringOrSlice — it accepts either
+// a single string or a YAML list of strings, normalized to []string.
+// Within a field, entries are OR'd (any-of match). Across fields, AND.
+type WhenClause struct {
+	// Scalar prompt props (case-insensitive any-of equality).
+	Language   StringOrSlice `yaml:"language,omitempty" json:"language,omitempty"`
+	Service    StringOrSlice `yaml:"service,omitempty" json:"service,omitempty"`
+	Plane      StringOrSlice `yaml:"plane,omitempty" json:"plane,omitempty"`
+	Category   StringOrSlice `yaml:"category,omitempty" json:"category,omitempty"`
+	SDK        StringOrSlice `yaml:"sdk,omitempty" json:"sdk,omitempty"`
+	Difficulty StringOrSlice `yaml:"difficulty,omitempty" json:"difficulty,omitempty"`
+
+	// Scalar config props.
+	Generator StringOrSlice `yaml:"generator,omitempty" json:"generator,omitempty"`
+	Config    StringOrSlice `yaml:"config,omitempty" json:"config,omitempty"`
+
+	// Structured tool filter; AND across entries.
+	Tool []ToolFilter `yaml:"tool,omitempty" json:"tool,omitempty"`
+}
+
+// ToolFilter matches one entry in the eval config's resolved tool list.
+// Field names mirror ToolCheckRule (graders/types.go:197) deliberately.
+type ToolFilter struct {
+	Name      string `yaml:"name" json:"name"`
+	Source    string `yaml:"source" json:"source"` // skill | mcp | builtin | plugin
+	MCPServer string `yaml:"mcp_server,omitempty" json:"mcp_server,omitempty"`
+	Negate    bool   `yaml:"negate,omitempty" json:"negate,omitempty"`
+}
+
+// MatchContext bundles everything a WhenClause matches against.
+// Built once per (prompt, config) pair before evaluating graders.
+//
+// Props stays map[string]string deliberately: the prompt/config side is 1:1
+// (a prompt has one language, one service, etc.). Only the WhenClause side
+// accepts lists, because only the gate has an "any of these" notion.
+type MatchContext struct {
+	// Scalar props derived from prompt frontmatter + eval config.
+	// Includes language/service/plane/category/sdk/difficulty/generator/config.
+	Props map[string]string
+
+	// Resolved tool list from cfg.Generator.Tools, with type already
+	// disambiguated via ToolEntry.ResolvedType().
+	Tools []ToolIdentity
+}
+
+// ToolIdentity is the canonical (name, source, server) triple.
+type ToolIdentity struct {
+	Name      string
+	Source    string // skill | mcp | builtin | plugin
+	MCPServer string // populated only when Source == "mcp"
+}
+
+// IsEmpty reports whether the clause has no constraints.
+func (w WhenClause) IsEmpty() bool {
+	return len(w.Language) == 0 &&
+		len(w.Service) == 0 &&
+		len(w.Plane) == 0 &&
+		len(w.Category) == 0 &&
+		len(w.SDK) == 0 &&
+		len(w.Difficulty) == 0 &&
+		len(w.Generator) == 0 &&
+		len(w.Config) == 0 &&
+		len(w.Tool) == 0
+}
+
+// Matches evaluates the clause against the resolved match context.
+// All fields AND together; a constraint passes if it's empty or matches.
+func (w WhenClause) Matches(ctx MatchContext) bool {
+	// Scalar fields: AND across fields, OR within each field (via StringOrSlice.Matches).
+	if !w.Language.Matches(ctx.Props["language"]) {
+		return false
+	}
+	if !w.Service.Matches(ctx.Props["service"]) {
+		return false
+	}
+	if !w.Plane.Matches(ctx.Props["plane"]) {
+		return false
+	}
+	if !w.Category.Matches(ctx.Props["category"]) {
+		return false
+	}
+	if !w.SDK.Matches(ctx.Props["sdk"]) {
+		return false
+	}
+	if !w.Difficulty.Matches(ctx.Props["difficulty"]) {
+		return false
+	}
+	if !w.Generator.Matches(ctx.Props["generator"]) {
+		return false
+	}
+	if !w.Config.Matches(ctx.Props["config"]) {
+		return false
+	}
+
+	// Tool filters: AND across entries. Every ToolFilter must match some tool.
+	for _, filter := range w.Tool {
+		matched := false
+		for _, tool := range ctx.Tools {
+			if matchesToolFilter(filter, tool) {
+				matched = true
+				break
+			}
+		}
+		// Apply negation: if negate=true, invert the match result.
+		if filter.Negate {
+			matched = !matched
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	return true
+}
+
+// matchesToolFilter checks if a single ToolFilter matches a ToolIdentity.
+func matchesToolFilter(filter ToolFilter, tool ToolIdentity) bool {
+	// Name must match (case-insensitive).
+	if !strings.EqualFold(filter.Name, tool.Name) {
+		return false
+	}
+	// Source must match (case-insensitive).
+	if !strings.EqualFold(filter.Source, tool.Source) {
+		return false
+	}
+	// If MCPServer is set on the filter, it must match.
+	if filter.MCPServer != "" {
+		if !strings.EqualFold(filter.MCPServer, tool.MCPServer) {
 			return false
 		}
 	}
 	return true
 }
 
-// mergeUnifiedWhen merges parent and child when maps; child wins on key
-// collisions. Returns nil when both inputs are empty.
-func mergeUnifiedWhen(parent, child map[string]string) map[string]string {
-	if len(parent) == 0 && len(child) == 0 {
-		return nil
+// mergeWhenClause merges parent and child WhenClause; child REPLACES parent
+// for every field (scalars and tool alike). An explicit empty list at child
+// level removes the parent's constraint.
+func mergeWhenClause(parent, child WhenClause) WhenClause {
+	out := parent // value copy
+
+	// Uniform rule: child slice non-nil wins.
+	if child.Language != nil {
+		out.Language = child.Language
 	}
-	merged := make(map[string]string, len(parent)+len(child))
-	for k, v := range parent {
-		merged[k] = v
+	if child.Service != nil {
+		out.Service = child.Service
 	}
-	for k, v := range child {
-		merged[k] = v
+	if child.Plane != nil {
+		out.Plane = child.Plane
 	}
-	return merged
+	if child.Category != nil {
+		out.Category = child.Category
+	}
+	if child.SDK != nil {
+		out.SDK = child.SDK
+	}
+	if child.Difficulty != nil {
+		out.Difficulty = child.Difficulty
+	}
+	if child.Generator != nil {
+		out.Generator = child.Generator
+	}
+	if child.Config != nil {
+		out.Config = child.Config
+	}
+	if child.Tool != nil {
+		out.Tool = child.Tool
+	}
+	return out
 }

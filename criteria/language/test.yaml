@@ -42,18 +42,20 @@ graders:
   # ---------------------------------------------------------------------------
   # 3. tool — unified tool checks.
   #
-  # Per-skill `tool_used` graders are gated with `when:` on the matching
-  # `skill:<name>` config-prop so they only run on variants that actually load
-  # the skill. With `pairwise: deep` on test-skills, the without-{skill}
+  # Per-skill `tool_used` graders are gated with structured `tool:` filters
+  # on the config's loaded tools so they only run on variants that actually
+  # load the skill. With `pairwise: deep` on test-skills, the without-{skill}
   # variants strip a skill from the loadout — without gating, those variants
   # would always fail the per-skill check. (See decisions.md
-  # 2026-05-02 "Config-Aware Grader `when:` Phase 1".)
+  # 2026-05-02 "Config-Aware Grader `when:` Phase 2".)
   # ---------------------------------------------------------------------------
   - name: Markdown Headings Tool Usage
     type: tool
     weight: 1.0
     when:
-      "skill:markdown-headings": "true"
+      tool:
+        - name: markdown-headings
+          source: skill
     checks:
       - kind: tool_used
         tool: markdown-headings
@@ -64,7 +66,9 @@ graders:
     type: tool
     weight: 1.0
     when:
-      "skill:markdown-lists": "true"
+      tool:
+        - name: markdown-lists
+          source: skill
     checks:
       - kind: tool_used
         tool: markdown-lists

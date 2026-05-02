@@ -44,35 +44,35 @@ type MatchedUnifiedEntry struct {
 }
 
 // MatchingUnifiedEntries returns every grader entry from bundle.Configs
-// whose file/group/grader when conditions match props. File-level and
+// whose file/group/grader when conditions match ctx. File-level and
 // group-level when conditions are merged (child wins) before matching.
 //
 // Returned slice order is stable: file-walk order → top-level graders →
 // groups → entries within each group.
-func MatchingUnifiedEntries(bundle *Bundle, props map[string]string) []MatchedUnifiedEntry {
+func MatchingUnifiedEntries(bundle *Bundle, ctx MatchContext) []MatchedUnifiedEntry {
 	if bundle == nil {
 		return nil
 	}
 	var out []MatchedUnifiedEntry
 	for _, gc := range bundle.Configs {
-		if !matchesUnifiedWhen(gc.When, props) {
+		if !gc.When.Matches(ctx) {
 			continue
 		}
 		for _, e := range gc.Graders {
-			when := mergeUnifiedWhen(gc.When, e.When)
-			if !matchesUnifiedWhen(when, props) {
+			when := mergeWhenClause(gc.When, e.When)
+			if !when.Matches(ctx) {
 				continue
 			}
 			out = append(out, MatchedUnifiedEntry{Entry: e, Source: gc.Source})
 		}
 		for _, grp := range gc.Groups {
-			grpWhen := mergeUnifiedWhen(gc.When, grp.When)
-			if !matchesUnifiedWhen(grpWhen, props) {
+			grpWhen := mergeWhenClause(gc.When, grp.When)
+			if !grpWhen.Matches(ctx) {
 				continue
 			}
 			for _, e := range grp.Graders {
-				when := mergeUnifiedWhen(grpWhen, e.When)
-				if !matchesUnifiedWhen(when, props) {
+				when := mergeWhenClause(grpWhen, e.When)
+				if !when.Matches(ctx) {
 					continue
 				}
 				out = append(out, MatchedUnifiedEntry{

@@ -97,13 +97,9 @@ func listCmd() *cobra.Command {
 					if rel, err := filepath.Rel(".", source); err == nil {
 						source = rel
 					}
-					whenParts := make([]string, 0, len(gc.When))
-					for k, v := range gc.When {
-						whenParts = append(whenParts, k+"="+v)
-					}
 					whenStr := "*"
-					if len(whenParts) > 0 {
-						whenStr = strings.Join(whenParts, ", ")
+					if !gc.When.IsEmpty() {
+						whenStr = formatWhenClause(gc.When)
 					}
 					fmt.Printf("  %-40s when: %-25s graders: %d\n", source, whenStr, totalGraders(gc))
 				}
@@ -132,9 +128,9 @@ type listConfigEntry struct {
 }
 
 type listCriteriaEntry struct {
-	Source      string            `json:"source"`
-	When        map[string]string `json:"when,omitempty"`
-	GraderCount int               `json:"grader_count"`
+	Source      string              `json:"source"`
+	When        criteria.WhenClause `json:"when,omitempty"`
+	GraderCount int                 `json:"grader_count"`
 }
 
 func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, graderConfigs []criteria.UnifiedGraderConfig) error {
@@ -189,4 +185,49 @@ func totalGraders(gc criteria.UnifiedGraderConfig) int {
 		n += len(g.Graders)
 	}
 	return n
+}
+
+// formatWhenClause renders a WhenClause as a compact human-readable string.
+// Example: "language=python,java; service=key-vault; tool=skill:markdown-headings"
+func formatWhenClause(w criteria.WhenClause) string {
+var parts []string
+if len(w.Language) > 0 {
+parts = append(parts, "language="+strings.Join(w.Language, ","))
+}
+if len(w.Service) > 0 {
+parts = append(parts, "service="+strings.Join(w.Service, ","))
+}
+if len(w.Plane) > 0 {
+parts = append(parts, "plane="+strings.Join(w.Plane, ","))
+}
+if len(w.Category) > 0 {
+parts = append(parts, "category="+strings.Join(w.Category, ","))
+}
+if len(w.SDK) > 0 {
+parts = append(parts, "sdk="+strings.Join(w.SDK, ","))
+}
+if len(w.Difficulty) > 0 {
+parts = append(parts, "difficulty="+strings.Join(w.Difficulty, ","))
+}
+if len(w.Generator) > 0 {
+parts = append(parts, "generator="+strings.Join(w.Generator, ","))
+}
+if len(w.Config) > 0 {
+parts = append(parts, "config="+strings.Join(w.Config, ","))
+}
+if len(w.Tool) > 0 {
+var toolStrs []string
+for _, tf := range w.Tool {
+s := tf.Source + ":" + tf.Name
+if tf.MCPServer != "" {
+s += "/" + tf.MCPServer
+}
+if tf.Negate {
+s = "!" + s
+}
+toolStrs = append(toolStrs, s)
+}
+parts = append(parts, "tool="+strings.Join(toolStrs, ","))
+}
+return strings.Join(parts, "; ")
 }

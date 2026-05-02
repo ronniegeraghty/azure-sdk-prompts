@@ -40,7 +40,7 @@ type Bundle struct {
 // to a given eval (Q4).
 type FileError struct {
 	Path string
-	When map[string]string
+	When *WhenClause
 	Err  error
 }
 
@@ -154,36 +154,43 @@ func LoadUnifiedDir(dir string) (*Bundle, error) {
 // using a permissive (non-strict) decoder. Returns nil if the file is so
 // broken that even the file-level when can't be extracted — in that case
 // MatchingErrors will surface the failure to every eval (safe default).
-func peekFileWhen(path string) map[string]string {
+func peekFileWhen(path string) *WhenClause {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
+	return peekWhen(data)
+}
+
+// peekWhen attempts to decode just the top-level `when:` from raw YAML bytes,
+// returning nil if the file doesn't have a when block or if decoding fails
+// (permissively — any error → nil, fail-loud elsewhere).
+func peekWhen(data []byte) *WhenClause {
 	var probe struct {
-		When map[string]string `yaml:"when"`
+		When WhenClause `yaml:"when"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	// Permissive on purpose: we want the when block even if the rest is malformed.
 	if err := dec.Decode(&probe); err != nil {
 		return nil
 	}
-	return probe.When
+	return &probe.When
 }
 
 // MatchingErrors returns every FileError whose file-level `when:` would have
-// matched props, OR whose `when:` could not be peeked (nil map → assume
-// relevant, fail-loud). Use this to satisfy Q4: "the eval fails only if the
-// malformed file is actually used in that eval run."
+// matched ctx, OR whose `when:` could not be peeked (nil → assume relevant,
+// fail-loud). Use this to satisfy Q4: "the eval fails only if the malformed
+// file is actually used in that eval run."
 //
 // The empty case (no relevant errors) returns nil so callers can write
-// `if err := bundle.MatchingErrors(props); err != nil`.
-func (b *Bundle) MatchingErrors(props map[string]string) error {
+// `if err := bundle.MatchingErrors(ctx); err != nil`.
+func (b *Bundle) MatchingErrors(ctx MatchContext) error {
 	if b == nil || len(b.FileErrors) == 0 {
 		return nil
 	}
 	var relevant []error
 	for _, fe := range b.FileErrors {
-		if fe.When == nil || matchesUnifiedWhen(fe.When, props) {
+		if fe.When == nil || fe.When.Matches(ctx) {
 			relevant = append(relevant, fe)
 		}
 	}

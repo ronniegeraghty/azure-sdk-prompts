@@ -139,35 +139,90 @@ Property keys are not restricted to a fixed set—any prompt property can be use
 
 #### Config-aware properties
 
-In addition to prompt-derived properties, the engine injects properties derived from the **eval config under test**, so a grader can gate itself to configs that actually load the tools it depends on. These are the keys available in `when:`:
+In addition to prompt-derived properties, graders can gate themselves to **eval configs** that provide specific tools or models. Use the structured `when:` clause with these fields:
 
-| Key                       | Value    | Source                                            |
-|---------------------------|----------|---------------------------------------------------|
-| `generator`               | model name | `generator.model` from the eval config          |
-| `config`                  | config name | `name:` field of the eval config               |
-| `skill:<name>`            | `"true"` | one entry per `generator.tools` with `type: skill` |
-| `mcp_server:<name>`       | `"true"` | one entry per `generator.tools` with `type: mcp`   |
-| `plugin:<name>`           | `"true"` | one entry per `generator.tools` with `type: plugin` |
+**Scalar config fields** (match a single string or list of strings):
+
+| Field       | Source                         | Example                              |
+|-------------|--------------------------------|--------------------------------------|
+| `generator` | `generator.model` from config  | `generator: claude-opus-4.6`         |
+| `config`    | `name:` field of config        | `config: azure-mcp/claude-opus-4.6`  |
+
+**Structured tool filter** (`tool:` block — AND across entries):
+
+```yaml
+when:
+  tool:
+    - name: azure               # tool name (required)
+      source: mcp               # skill | mcp | builtin | plugin (required)
+      mcp_server: azure         # optional: MCP server name (only for source: mcp)
+      negate: false             # optional: invert the match (default false)
+```
 
 **Example — gate a `tool_used` grader to configs that load the `azure` MCP server:**
 
 ```yaml
 graders:
   - name: uses-azure-list-resources
-    kind: tool
+    type: tool
     when:
-      "mcp_server:azure": "true"   # quote keys containing ':' (YAML requirement)
-    config:
-      checks:
-        - kind: tool_used
-          tool: list-resources
+      tool:
+        - name: azure
           source: mcp
-          mcp_server: azure
+    checks:
+      - kind: tool_used
+        tool: list-resources
+        source: mcp
+        mcp_server: azure
 ```
 
 On a config that doesn't include the `azure` MCP server, this grader is silently skipped instead of failing every eval.
 
-> **YAML quoting.** Map keys containing `:` must be quoted (e.g. `"mcp_server:azure": "true"`). Unquoted, YAML parses `mcp_server:azure` as a nested mapping. The `:`-prefixed namespace is reserved for engine-injected config props; do not use it for prompt frontmatter.
+**Scalar-or-list fields** accept either a single string OR a YAML list. Lists are OR'd within the field, AND'd across fields:
+
+```yaml
+# Applies to Python OR Java prompts on the key-vault service
+when:
+  language: [python, java]
+  service: key-vault
+
+# Applies to Python prompts on ANY Azure service
+when:
+  language: python
+  service: [key-vault, storage, cosmos-db, identity]
+
+# Applies to all data-plane prompts using the azure-mcp config
+when:
+  plane: data-plane
+  config: azure-mcp/claude-opus-4.6
+```
+
+**Tool filter negation:**
+
+```yaml
+# Gate fires only when azure-mcp is NOT loaded
+when:
+  tool:
+    - name: azure
+      source: mcp
+      negate: true
+```
+
+**Hierarchical merge:** File-level → group-level → grader-level. Child REPLACES parent for every field. An explicit empty list at child level clears the parent constraint:
+
+```yaml
+when:
+  language: [python, java]  # file-level: applies to Python and Java
+groups:
+  - name: Python-only checks
+    when:
+      language: python      # replaces file-level (now Python only)
+    graders: [...]
+  - name: Service-agnostic checks
+    when:
+      language: []          # explicit empty list clears inherited constraint (now all languages)
+    graders: [...]
+```
 
 ## Canonical Grader Types
 
