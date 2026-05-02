@@ -928,3 +928,68 @@ GeneratorModel  string  // Actual generator model used for this eval
 
 **Pattern:** Pairwise diff page renders per-check diffs for each variant. Must handle old reports lacking `check_diffs` field. Implemented optional field handling in React + defensive JSON unmarshaling so UI doesn't crash on legacy eval results. **Back-compat note:** Old reports without check_diffs still render (pairwise view shows high-level diffs only); new evaluations get full per-check breakdown.
 
+---
+
+## 2026-05-01 — Cross-Eval Summary Views on Run Detail Page (Morpheus Spec)
+
+**Task:** Implement four cross-evaluation views on the run-detail page per Morpheus's proposal (`.squad/decisions/inbox/morpheus-run-page-cross-eval.md`).
+
+**Context:** Existing run page showed only per-eval cards (Table/Matrix views). No aggregation across evals. Brady wanted cross-eval views to answer "which check failed in every config?" and "which grader is doing all the work?". Morpheus designed 4 views; Brady locked in defaults (placement: above tabs, collapsed grader mode by default, defer reviewer-disagreement drill-down).
+
+**Shipped (Commit b644bdea):**
+
+1. **Top-line summary band (S)** — 5 stat cards: Configs · Checks (passed/total) · Pass% · Hardest check (grader·label with pass/total) · Avg duration. Pure aggregation from `results[].grader_results[].points[]`.
+
+2. **Per-config rollup strip (S)** — One card per config showing: % checks passed (with progress bar), % evals passed (with sparkline pips), avg duration. Reuses existing card styling.
+
+3. **Evals × Checks matrix (M)** — Rows = evals (prompt × config), columns = checks namespaced as `{grader_name} · {point.label}`. Cells render ✓/✗/— (not applicable). First column sticky; horizontal scroll. Footer row per column: `passed/total` rollup. **Default: collapsed-to-grader mode** (each grader → single ✓/✗/partial cell) with per-grader expand toggle and global "Expand all"/"Collapse all" control. Multi-prompt runs render one matrix block per prompt.
+
+4. **Per-grader-type stacked bars (M)** — Horizontal bars (recharts) for each `grader_type` (prompt_review, output_check, tool_constraint, behavior, program, action_sequence, file). Each bar split pass (green) / fail (red) with "pass X / fail Y (Z%)" label.
+
+**Files Touched:**
+- `site/src/app/components/RunCrossEvalSummary.tsx` (new) — 650 lines, pure functional component with useMemo aggregation
+- `site/src/app/components/run-detail-page.tsx` — imported `RunCrossEvalSummary`, placed above existing `<Tabs>` block
+- `site/dist/` — rebuilt embedded assets (husky pre-commit hook auto-runs `npm run build`)
+
+**Test/Verify:**
+- ✅ `npm run build` — typecheck + Vite bundle succeeded
+- ✅ `go build ./...` — Go build still passes (no backend changes)
+- ✅ Embedded assets updated in `site/dist/` for `hyoka serve`
+
+**Design Decisions:**
+- Client-side aggregation only — every field already in `summary.json`. No engine changes.
+- Memoized with `useMemo` to keep re-renders cheap.
+- Accessibility: ✓/✗ cells include `aria-label` (color not sole signal).
+- Default to collapsed grader view for wide matrices (30+ checks) — per Brady's locked decision.
+- Reuses existing design tokens (mono font, white/emerald palette, border-white/8 cards).
+- Section heading + border separator between summary header and existing tabs for clear visual hierarchy.
+
+**Deviations from Morpheus's Spec:**
+- None. Shipped all 4 views exactly as specified. All locked defaults applied (placement above tabs, collapsed-to-grader default, reviewer-disagreement deferred).
+
+**Open Follow-ups:**
+- Reviewer-disagreement drill-down (per Brady's decision: defer to follow-up PR) — Morpheus noted this as "S–M extra" that slots in naturally as a drill-down from ✓/✗ split cells in matrix. Would use existing `extras.review.panel_results[]` data (no engine change).
+- Multi-prompt grouping refinement — current matrix uses one block per prompt; if future runs have 10+ prompts, may want accordion collapse.
+
+**Commit Message:**
+```
+feat(site): add cross-eval summary views to run detail page
+
+Implement four cross-evaluation views per Morpheus's spec:
+
+1. Top-line summary band - 5 stat cards (configs, checks, pass%, hardest check, avg duration)
+2. Per-config rollup strip - Cards showing % checks passed, % evals passed, avg duration, sparkline pips
+3. Evals × Checks matrix - Rows = evals (prompt×config), columns = checks (grader·label), with collapse/expand
+4. Per-grader-type stacked bars - Horizontal bars showing pass/fail by grader_type using recharts
+
+- Pure frontend aggregation from results[].grader_results[].points[]
+- No engine/JSON schema changes required
+- Accessibility: ✓/✗ cells include aria-labels
+- Defaults to collapsed grader view for wide matrices (30+ checks)
+- Matrix includes footer row with pass/fail rollups per column
+- Supports multi-prompt runs (one matrix block per prompt)
+- Placed above existing Table/Matrix tabs as permanent run summary
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+```
+
