@@ -10,7 +10,7 @@ The `prompt` grader sends generated code and a custom evaluation prompt to an LL
 - **Documentation and comments**: Clarity of inline and external docs
 - **Language idioms**: Proper use of language-specific patterns and features
 
-For objective, deterministic checks (file existence, build success, tool constraints), use typed graders like [`output_check`](./output_check.md), [`file`](./file.md), or [`tool_constraint`](./tool_constraint.md) instead.
+For objective, deterministic checks (file existence, build success, tool constraints), use canonical graders like [`workspace`](./workspace.md), [`program`](./program.md), or [`tool`](./tool.md) instead.
 
 ## Configuration
 

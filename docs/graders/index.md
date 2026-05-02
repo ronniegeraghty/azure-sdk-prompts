@@ -2,11 +2,11 @@
 
 ## Overview
 
-hyoka's grading system evaluates generated code and outputs using composable, single-concern graders. Each grader checks exactly one thing: file existence, build success, LLM-based code review, tool constraint compliance, and so on. Results are aggregated by weighted scoring to produce a final evaluation report.
+hyoka's grading system evaluates generated code and agent behavior using composable, single-concern graders. Each grader checks exactly one aspect: file creation, build success, LLM-based code review, tool usage patterns, or session activity. Results are aggregated by weighted scoring to produce a final evaluation report.
 
 ## Key Concepts
 
-**Graders never gate evaluations.** Each grader runs independently and reports its result. Failed graders don't stop other graders or halt the evaluation—all graders run and contribute to the final score.
+**Graders never gate evaluations.** Each grader runs independently and reports its result. Failed graders don't stop other graders or halt the evaluation—all graders run and contribute to the final weighted score.
 
 **Load-time validation.** When hyoka loads a criteria file containing malformed grader configuration, it validates at load time. If the file is referenced in an active evaluation, that evaluation fails. If the file is not used, the validation error is logged but doesn't affect other evaluations.
 
@@ -14,100 +14,115 @@ hyoka's grading system evaluates generated code and outputs using composable, si
 
 ## Unified Schema
 
-All graders are configured using a flat YAML structure with a `type:` discriminator:
+All graders are configured using a flat YAML structure with a `type:` discriminator. Canonical graders (prompt, program, workspace, tool, activity) flatten their checks to the **top level** of each grader entry, not inside a nested `details:` object:
 
 ```yaml
 graders:
   - name: <string>              # Required: human-readable name, unique in this file
-    type: <string>              # Required: grader type (prompt, output_check, file, etc.)
+    type: <string>              # Required: grader type (prompt, program, workspace, tool, activity)
     weight: <float>             # Optional: scoring weight 0.0–1.0 (default: 1.0)
     when: <map[string]string>   # Optional: property-based applicability conditions
 
-    # ── For type=prompt ONLY ─────────────────────────────────────────
-    prompt: <string>            # Optional preamble shown to the LLM judge
-    checks:                     # List of individual pass/fail items the judge must
-      - <string>                # evaluate. Each non-empty string becomes one line in
-      - <string>                # the rendered review criteria AND one Point in the
-      # ...                     # resulting GraderResult. At least one of prompt/
-                                # checks must be non-empty.
+    # ── For type=prompt ──────────────────────────────────────────────
+    prompt: <string>            # Optional: preamble shown to the LLM before checks
+    checks:                     # Each string becomes one independent pass/fail check
+      - <string>                # judged by the LLM (one Point per check in results)
 
-    # ── For every OTHER type ─────────────────────────────────────────
-    details: <object>           # Required: type-specific configuration (shape varies)
+    # ── For type=program ─────────────────────────────────────────────
+    checks:                     # Each command is one check
+      - kind: command           # Only kind supported: "command"
+        command: <string>       # Command to execute
+        args: [<string>, ...]   # Command arguments (optional)
+        timeout: <int>          # Timeout in seconds (optional)
+
+    # ── For type=workspace ───────────────────────────────────────────
+    checks:                     # Each check validates file state or delta
+      - kind: <string>          # One of: require_to_create, forbidden_to_create,
+                                # required_to_update, required_to_delete,
+                                # forbidden_to_delete, file
+
+    # ── For type=tool ────────────────────────────────────────────────
+    checks:                     # Each check validates tool usage patterns
+      - kind: <string>          # One of: tool_used, tool_not_used,
+                                # any_from_group, none_from_group
+
+    # ── For type=activity ────────────────────────────────────────────
+    checks:                     # Each check validates session activity
+      - kind: <string>          # One of: turn_limit, action_count,
+                                # tool_call_count, contains_subsequence,
+                                # contains_action, excludes_action, terminated_by
 ```
 
-> **v4 invariant — "every grader emits Points":** Each `prompt` grader produces one
-> `Point` per entry in `checks:` (or a single Point when only `prompt:` is set). The
-> pre-v4 magic that split a single prompt blob into multiple checks by parsing
-> bullets is gone for YAML graders — list each sub-check explicitly under `checks:`.
+> **Current schema (flat checks):** All canonical graders now have `checks:` at the top level of the grader entry, not nested under `details:`. This flattening makes the schema more uniform and easier to read. Engine-internal graders like `prompt_review` continue to use their own internal structure.
 
-The `type:` field is the discriminator:
-- `prompt` — LLM-based review grader
-- `output_check` — Workspace file and size checks
-- `program` — Run a custom program/script and evaluate exit code
-- `tool` — Unified tool-perspective checks (canonical)
-- `action_sequence` — Verify expected action sequence
-
-**Deprecated types** (still functional, emit warnings at load time):
-- `file` — use `output_check` with `require_files` instead
-- `behavior` — use `tool` instead
-- `tool_constraint` — use `tool` instead
-- `tool_usage` — use `tool` instead
-
-**Engine-internal types** (not valid in user YAML):
-- `prompt_review` — AI review panel orchestration (used by the engine, not user-configurable)
-
-### Example: Mixed Prompt and Typed Graders
+### Example: All Five Canonical Grader Types
 
 ```yaml
 graders:
-  # LLM prompt grader — `prompt:` and `checks:` are TOP-LEVEL fields,
-  # not inside `details:` (validation rejects details for type=prompt).
-  - name: Code Quality Review
+  # 1. LLM-based prompt grader
+  - name: Code Quality
     type: prompt
     weight: 0.7
-    prompt: "Review the generated Python code against each of the following:"
+    prompt: "Review the code against:"
     checks:
-      - Readable variable names and small focused functions
-      - Errors are caught and handled appropriately
-      - Adheres to PEP 8 style guide
+      - Readable variable names and focused functions
+      - Proper error handling
 
-  # File existence check
-  - name: Main File Exists
-    type: file
-    weight: 0.2
-    details:
-      path: main.py
-      must_exist: true
-
-  # Output check (file count and size)
-  - name: Generated Some Output
-    type: output_check
-    weight: 0.1
-    details:
-      min_files: 1
-      min_bytes_per_file: 10
-
-  # Conditional: only run for Python service + data-plane
-  - name: Python Async Patterns
-    type: prompt
+  # 2. Workspace (file state) checks
+  - name: Files Created
+    type: workspace
     weight: 0.5
-    when:
-      language: python
-      plane: data-plane
-    prompt: Check that async functions use await correctly.
+    checks:
+      - kind: require_to_create
+        files: [main.py, README.md]
+      - kind: file
+        name: main.py
+        state: present
+        min_bytes: 100
+
+  # 3. Tool usage checks
+  - name: Tool Usage
+    type: tool
+    weight: 0.5
+    checks:
+      - kind: tool_used
+        tool: bash
+      - kind: tool_not_used
+        tool: dangerous_tool
+
+  # 4. Session activity checks
+  - name: Session Behavior
+    type: activity
+    weight: 0.3
+    checks:
+      - kind: turn_limit
+        max: 25
+      - kind: contains_action
+        type: message
+      - kind: terminated_by
+        equals: completed
+
+  # 5. Program execution checks
+  - name: Build Success
+    type: program
+    weight: 0.4
+    checks:
+      - kind: command
+        command: go
+        args: [build, ./...]
+        timeout: 30
 ```
 
 ### Field Reference
 
-| Field     | Type                | Required | Default | Description                                                                     |
-|-----------|---------------------|----------|---------|---------------------------------------------------------------------------------|
-| `name`    | string              | yes      | —       | Human-readable name. Must be unique within the grader list.                     |
-| `type`    | string              | yes      | —       | Grader type identifier. See Grader Types below.                                 |
-| `weight`  | float64             | no       | 1.0     | Scoring weight (0.0–1.0). Normalized across all graders in aggregation.         |
-| `prompt`  | string              | type=prompt only | — | Preamble / instructions for the LLM judge. Must be empty for typed graders. |
-| `checks`  | list&lt;string&gt;  | type=prompt only | — | One pass/fail item per entry. Each becomes one Point. Must be empty for typed graders. |
-| `details` | object              | typed graders only | — | Type-specific configuration. Must be empty for `type: prompt`.       |
-| `when`    | map\[string\]string | no       | —       | Property conditions for applicability. All entries must match (AND logic).       |
+| Field     | Type                | Required | Default | Description                                                             |
+|-----------|---------------------|----------|---------|-------------------------------------------------------------------------|
+| `name`    | string              | yes      | —       | Human-readable name, unique within this file.                           |
+| `type`    | string              | yes      | —       | Grader type: `prompt`, `program`, `workspace`, `tool`, `activity`.     |
+| `weight`  | float64             | no       | 1.0     | Scoring weight for aggregation (0.0–1.0).                              |
+| `when`    | map\[string\]string | no       | —       | Conditional applicability by prompt properties (AND logic).             |
+| `prompt`  | string              | type=prompt only | — | LLM preamble/instructions (optional if `checks:` is set).              |
+| `checks`  | list               | yes (for canonical) | — | Type-specific checks (each canonical grader type defines its own schema). |
 
 ### Applicability (`when`)
 
@@ -117,24 +132,25 @@ The `when` field applies a grader conditionally based on prompt properties using
 when:
   language: python        # Only apply to Python prompts
   service: key-vault      # AND only Key Vault service
+  plane: data-plane       # AND only data-plane prompts
 ```
 
 Property keys are not restricted to a fixed set—any prompt property can be used (language, service, plane, category, tags).
 
-## Grader Types
+## Canonical Grader Types
 
-Detailed documentation for each grader type:
+hyoka defines five canonical grader types, each with a flat `checks:` list at the top level:
 
-| Type               | Purpose                                           | Page                                      |
-|--------------------|---------------------------------------------------|-------------------------------------------|
-| `prompt`           | LLM-based review and evaluation                   | [prompt.md](./prompt.md)                  |
-| `output_check`     | File count and size verification                  | [output_check.md](./output_check.md)       |
-| `file`             | File existence and content pattern matching       | [file.md](./file.md)                      |
-| `program`          | Run external program and evaluate exit code       | [program.md](./program.md)                |
-| `behavior`         | Tool and action constraint checking               | [behavior.md](./behavior.md)              |
-| `action_sequence`  | Expected action sequence verification             | [action_sequence.md](./action_sequence.md)|
-| `tool_constraint`  | Tool usage and call count constraints             | [tool_constraint.md](./tool_constraint.md)|
-| `prompt_review`    | AI review panel orchestration (engine-internal; not user-configurable) | [prompt_review.md](./prompt_review.md)    |
+| Type      | Purpose                                    | Check Kinds                                                   | Details               |
+|-----------|--------------------------------------------|---------|-----------------------------------------|
+| `prompt`  | LLM-judged subjective review              | Each string in `checks:` is one independent check          | [prompt.md](./prompt.md)   |
+| `program` | Execute command and grade exit code        | `command` (only kind: runs command, exit 0 = pass)         | [program.md](./program.md) |
+| `workspace` | Validate file creation/modification state  | `require_to_create`, `forbidden_to_create`, `required_to_update`, `required_to_delete`, `forbidden_to_delete`, `file` | [workspace.md](./workspace.md) |
+| `tool`    | Validate tool usage patterns               | `tool_used`, `tool_not_used`, `any_from_group`, `none_from_group` | [tool.md](./tool.md) |
+| `activity` | Validate session activity and action log   | `turn_limit`, `action_count`, `tool_call_count`, `contains_subsequence`, `contains_action`, `excludes_action`, `terminated_by` | [activity.md](./activity.md) |
+
+**Engine-internal type** (not user-configurable):
+- `prompt_review` — AI review panel orchestration (used internally; see [prompt_review.md](./prompt_review.md) for reference)
 
 ## Score Aggregation
 
@@ -147,7 +163,7 @@ score = Σ(grader_score × grader_weight) / Σ(grader_weight)
 - Each grader produces a score between 0 and 1.
 - Weights default to 1.0 if not specified.
 - The final aggregated score is normalized to 0–1.
-- Failed graders score 0; passed graders score 1 (typical behavior, varies by grader type).
+- Failed graders score 0; passed graders score 1 (typical behavior; varies by grader type).
 
 Graders do not gate. A failed grader contributes 0 to the weighted average but does not stop evaluation or fail other graders.
 
@@ -155,11 +171,24 @@ Graders do not gate. A failed grader contributes 0 to the weighted average but d
 
 Criteria files are validated at load time:
 - Each grader entry must have a valid `type` from the supported kinds.
-- The `details` object must match the schema for that grader type.
+- The `checks` array (for canonical types) must match the expected schema for that type.
 - Grader names must be unique within the file.
 - Unknown fields in a grader entry are rejected (strict schema validation).
 
 If a criteria file with validation errors is **not** used in any active evaluation, the error is logged but doesn't affect other evaluations. If the file **is** used, the evaluation fails with a validation error.
+
+## Deprecated Grader Types
+
+The following legacy grader types are no longer supported. If you encounter them in existing configs, migrate to the canonical types listed:
+
+| Legacy Type      | Replacement Guidance                                                 |
+|------------------|----------------------------------------------------------------------|
+| `file`           | Use `workspace` grader with `kind: file` checks instead              |
+| `output_check`   | Use `workspace` grader with `kind: require_to_create`, `forbidden_to_create` checks |
+| `behavior`       | Use `activity` grader for session behavior; use `tool` for tool constraints |
+| `action_sequence` | Use `activity` grader with `kind: contains_subsequence` and `contains_action` checks |
+| `tool_constraint` | Use `tool` grader with `kind: tool_used`, `tool_not_used` checks    |
+| `tool_usage`     | Use `tool` grader instead                                            |
 
 ## Next Steps
 

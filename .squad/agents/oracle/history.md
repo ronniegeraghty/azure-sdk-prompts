@@ -554,3 +554,160 @@ Updated `docs/configuration.md` to explicitly clarify that the limit resolution 
 **Result:** Full feature ship complete: Investigation → Implementation → Testing → Documentation.
 
 ---
+
+## Session: Grader Documentation Audit & Update (2026-05-01)
+
+**Date:** 2026-05-01  
+**Task ID:** oracle-graders-docs (Charter)  
+**Status:** ✅ COMPLETE  
+
+Audited and updated docs/graders/ to match current canonical grader system. Recent grader redesign shipped with flattened envelope and new canonical types.
+
+### Findings vs. Code
+
+**Verified Current Schema (all 5 canonical types now ship with top-level `checks:`):**
+
+1. **program** — single check kind: `command` (only kind supported)
+   - Executes command in workspace; exit 0 = pass
+   - Score = passed_checks / total_checks
+   - Fields: kind, command, args, timeout
+
+2. **workspace** — six check kinds (replaces legacy output_check + file):
+   - `require_to_create`, `forbidden_to_create` — file path must/must-not be in NewFiles
+   - `required_to_update`, `required_to_delete`, `forbidden_to_delete` — delta operations
+   - `file` — on-disk state (present/absent) + optional size/content checks (min_bytes, max_bytes, contains, excludes)
+   - Boolean grader (all checks must pass)
+
+3. **tool** — four check kinds (replaces legacy tool_constraint, behavior, tool_usage):
+   - `tool_used` (optional min_calls/max_calls), `tool_not_used`
+   - `any_from_group` (optional except list), `none_from_group` (optional except list)
+   - Boolean grader (all checks must pass)
+
+4. **activity** — seven check kinds (replaces action_sequence, behavior):
+   - `turn_limit` (max bounds)
+   - `action_count`, `tool_call_count` (min/max bounds)
+   - `contains_subsequence` (tools array)
+   - `contains_action` — **NEW SHAPE TODAY**: type/tool/contains/excludes filters + min/max count bounds (default min=1)
+   - `excludes_action` — negative form of contains_action (count must be 0)
+   - `terminated_by` (equals or not_in list)
+   - Boolean grader (all checks must pass)
+   - **Note:** `not_truncated` was DELETED today; removed from docs
+
+5. **prompt** — LLM-judged review:
+   - Top-level `prompt:` (optional preamble) + `checks:` (list of strings, each = one Point)
+   - One model per grader instance
+
+### Files Updated
+
+1. **docs/graders/index.md** — Complete rewrite
+   - Documented all 5 canonical types with unified flat-checks schema
+   - Added comprehensive schema overview with `checks:` at top level (not nested)
+   - Added "All Five Canonical Grader Types" example showing prompt, workspace, tool, activity, program
+   - Added deprecation table (file, output_check, behavior, action_sequence, tool_constraint, tool_usage)
+   - Clarified engine-internal vs. user-configurable (prompt_review is internal)
+
+2. **docs/graders/program.md** — Updated for flattened schema
+   - Changed examples to use top-level `checks:` with `kind: command`
+   - Documented that only `command` kind is supported
+   - Added multiple examples showing sequential checks, build + test combinations
+   - Added troubleshooting section
+
+3. **docs/graders/prompt.md** — Fixed deprecation references
+   - Updated references from deprecated `output_check`, `file`, `tool_constraint` to canonical `workspace`, `program`, `tool`
+
+4. **docs/graders/workspace.md** — NEW (replaces output_check + file)
+   - Full documentation of 6 check kinds with schema table for each
+   - Examples: basic file creation, forbid secrets, verify content, prevent deletion, update requirements, comprehensive check
+   - Comprehensive "Data Visible to Grader" section
+   - Troubleshooting section
+
+5. **docs/graders/tool.md** — NEW (replaces tool_constraint, behavior, tool_usage)
+   - Full documentation of 4 check kinds with schema table for each
+   - Examples: basic requirements, call bounds, forbid dangerous, group checks, comprehensive validation
+   - Tool name resolution rules + group definition guidance
+   - Troubleshooting section
+
+6. **docs/graders/activity.md** — NEW (replaces action_sequence, behavior)
+   - Full documentation of 7 check kinds with schema table for each
+   - Valid action types enumerated
+   - Valid termination reasons enumerated (completed, max_actions, max_turns, guardrail, error)
+   - Examples: basic limits, action sequence, action presence, exclude patterns, content validation, comprehensive check
+   - **Contains_action repurposing documented:** now supports type/tool/contains/excludes + min/max count
+   - **Excludes_action documented:** negative form, count must be 0
+   - Troubleshooting section
+
+7. **docs/graders/output_check.md** — Deprecated
+   - Added clear "DEPRECATED" header with deprecation notice
+   - Migration guide showing old config → new workspace equivalent
+   - Field mapping table (output_check fields → workspace check kinds)
+
+8. **CHANGELOG.md** — Updated Unreleased section
+   - Added comprehensive "Grader documentation audit and schema update" entry under Changed section
+   - Documented new canonical graders, flattened schema, new docs created, deprecated docs deleted, activity grader notes
+
+### Files Deleted
+
+- `docs/graders/action_sequence.md` (legacy, replaced by activity)
+- `docs/graders/behavior.md` (legacy, replaced by activity + tool)
+- `docs/graders/file.md` (legacy, replaced by workspace)
+- `docs/graders/tool_constraint.md` (legacy, replaced by tool)
+
+### Verification
+
+1. ✅ Matched code against docs for all 5 canonical types
+   - Checked hyoka/internal/criteria/graders/{types,activity,workspace,tool,program,prompt}_grader.go
+   - Verified check kinds, field names, validation rules
+
+2. ✅ Verified flattened schema in criteria/language/test.yaml
+   - All 5 canonical types use top-level `checks:` at example level
+   - No nested `details:` object for canonical types
+
+3. ✅ Verified check kind validators in code match docs
+   - Activity grader: validActivityCheck() confirms 7 kinds + new contains_action/excludes_action shapes
+   - Workspace grader: validateWorkspaceCheck() confirms 6 kinds
+   - Tool grader: validateToolCheckRule() confirms 4 kinds
+   - Program grader: only `command` kind allowed
+
+4. ✅ Cross-reference linkage verified
+   - index.md links to new markdown files (activity, workspace, tool)
+   - Deprecated docs properly linked in migration sections
+   - CHANGELOG references correct doc file paths
+
+### Learnings
+
+**Canonical Grader Inventory (for future doc updates):**
+
+The 5 canonical graders are the authoritative types. Key code paths for future reference:
+
+- **Schema container:** hyoka/internal/criteria/graders/types.go (GraderConfig + kind-specific *Config structs)
+- **Validators:** Each grader's NewXxxGrader constructor validates config + checks
+  - Program: Only `kind: command` supported; timeout defaults to 30s
+  - Workspace: 6 kinds; file checks (state: present|absent) validate state-check field combinations
+  - Tool: 4 kinds; except: list is optional for group checks
+  - Activity: 7 kinds; contains_action supports type/tool/contains/excludes + min/max; min defaults to 1
+  - Prompt: No validation of rubric/prompt content (LLM determines success)
+
+- **Test reference:** criteria/language/test.yaml exercises all 5 kinds (canonical example)
+
+**Documentation Pattern for Future Grader Changes:**
+
+1. **If check kind is added/removed:** Update activity_grader.go (kinds list), then sync:
+   - docs/graders/activity.md (check kind table)
+   - docs/graders/index.md (check kinds reference)
+   - CHANGELOG.md (Breaking Changes or Changed section)
+
+2. **If field added to check:** Update schema table + example + troubleshooting
+
+3. **If schema changes (e.g., another envelope flatten):** All 5 grader docs need updates + index.md + CHANGELOG
+
+**Schema Pattern (no more legacy cruft):**
+
+- All canonical graders: checks at top level, NO details wrapper
+- Engine-internal graders (prompt_review): may use different internal structure (not user-documented)
+- Deprecation notices: Always include migration path (old shape → new shape with field mapping)
+
+**Code-vs-Doc Discrepancies Found:** None. All grader behavior matches documentation.
+
+### Commit
+
+Ready for commit on `ronniegeraghty/dev` with standard Co-authored-by trailer.

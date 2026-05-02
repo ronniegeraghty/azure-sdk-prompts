@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Grader documentation audit and schema update** — docs/graders/ fully updated to reflect current canonical grader types and flattened envelope:
+  - **New canonical graders documented**: `activity` (session activity validation), `workspace` (file delta checks), `tool` (tool usage patterns), `program` (command execution), `prompt` (LLM review)
+  - **Flattened schema**: All canonical graders now have `checks:` at the top level (not nested under `details:`); updated index.md, program.md with full schema
+  - **New docs**: [activity.md](./docs/graders/activity.md), [workspace.md](./docs/graders/workspace.md), [tool.md](./docs/graders/tool.md) with complete check kind references, examples, and troubleshooting
+  - **Deprecated docs deleted**: Removed action_sequence.md, behavior.md, file.md, tool_constraint.md (legacy graders no longer supported)
+  - **Deprecation notices added**: output_check.md now clearly marked as deprecated with migration path to workspace grader
+  - **Activity grader notes**: `contains_action` repurposed (now type/tool/contains/excludes filtering + count bounds); `excludes_action` added; `not_truncated` removed
 - **Tool load validation now hard-fails before code generation** — evals abort immediately when any required plugin, skill directory, or MCP server fails to resolve, preventing silent failures with incomplete tool stacks
 - **Site rebranded** — from Azure SDK code-generation evaluation to general-purpose AI agent evaluation platform
 - **Example configs migrated** — `examples/configs/example-full.yaml` now reflects Phase 3 unified grading architecture (single results list, no separate review block)
