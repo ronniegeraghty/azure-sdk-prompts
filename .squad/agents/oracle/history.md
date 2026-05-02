@@ -831,3 +831,84 @@ Comprehensive review of all hyoka documentation touching graders, criteria, and 
 **Status:** Documentation audit complete, all grader docs accurate and current.
 
 ---
+
+---
+
+### 2026-05-02 — Tool Grader Fields Audit (Oracle)
+
+**Task:** Verify that `source` and `mcp_server` fields on `tool_used` and `tool_not_used` checks are fully and accurately documented.
+
+**Findings:**
+
+**Coverage: ALL REQUIREMENTS MET** ✅
+
+1. ✅ **source field** — Documented with all 3 values (skill/mcp/builtin) in both tool_used and tool_not_used tables (lines 46, 57)
+2. ✅ **mcp_server field** — Documented in both tables (lines 47, 58) with note: "only meaningful with `source: mcp`"
+3. ✅ **Validation rule** — mcp_server requires source=mcp, documented in table descriptions
+4. ✅ **Both check kinds** — Identical source/mcp_server fields on tool_used and tool_not_used (NOT on group checks)
+5. ✅ **Group checks clarification** — Schema tables show any_from_group/none_from_group lack these fields
+6. ✅ **YAML examples** — Section "Filtering by Tool Source" (lines 168-189) demonstrates all three source values + mcp_server usage
+7. ✅ **test.yaml reference** — No prior mention; added new Reference section
+
+**Gaps Found: 3 (all minor, all fixed)**
+
+| Gap | Severity | Fix | Location |
+|-----|----------|-----|----------|
+| Validation rule not explicit | Low | Added Notes bullet: "If `mcp_server` is specified, `source` must be set to `mcp`" | Line 232 |
+| Scope of source/mcp_server unclear | Low | Added Notes bullet: "These apply only to `tool_used` and `tool_not_used`. Group checks do not support..." | Line 231 |
+| No canonical test reference | Low | Added Reference section linking criteria/language/test.yaml | Lines 245-247 |
+
+**Documentation Changes:**
+
+File: `docs/graders/tool.md`
+- Added 2 new bullets to Notes section (lines 231-232):
+  - Scope clarification: source/mcp_server fields apply only to tool_used and tool_not_used
+  - Validation rule: mcp_server requires source=mcp (explicit error message)
+- Added new Reference section (lines 245-247) linking to criteria/language/test.yaml with description
+
+**Files Audited:**
+1. docs/graders/tool.md — **UPDATED**
+2. docs/graders/index.md — OK (high-level overview, not grader-specific)
+3. docs/architecture.md — OK (doesn't detail grader fields)
+4. README.md — OK (no grader field specifics)
+5. criteria/language/test.yaml — OK (already canonical example)
+
+**Code Verification:**
+- Cross-referenced hyoka/internal/criteria/graders/tool_grader.go validation rules (lines 76-95)
+- Confirmed validation error messages match code error text
+- Confirmed all 4 check kinds (tool_used, tool_not_used, any_from_group, none_from_group) correctly represented
+
+**Decision:** Minor edits to improve clarity and discoverability. No factual corrections needed—implementation was already complete and mostly well-documented.
+
+**Learnings:**
+- Tool grader documentation is comprehensive and accurate (Neo's prior work was thorough)
+- Main gaps were clarity/discoverability, not factual errors
+- Canonical test example (test.yaml) valuable reference but not previously mentioned in docs
+- Validation rules benefit from explicit error-message phrasing, not just "only meaningful"
+
+
+## Session: 2026-05-02 — Tool Grader Fields Documentation Audit
+
+**Type:** Feature Verification  
+**Partner:** Neo (parallel work updating criteria YAML)  
+**Timestamp:** 2026-05-02T04-30-57Z
+
+### Work Done
+
+Audited `docs/graders/tool.md` to verify completeness of `source` and `mcp_server` field documentation following Neo's implementation. Found and fixed 3 low-severity gaps:
+- Added explicit MCP server validation error rule
+- Clarified scope (don't apply to group checks)
+- Added reference section linking to canonical test.yaml example
+
+### Partner Context
+
+Neo updated canonical criteria YAML files to use new source/mcp_server fields, providing reference examples for tool source disambiguation. Both agents worked on same feature topic.
+
+### Outcomes
+
+✅ 7/7 documentation requirements verified  
+✅ 3 gaps resolved  
+✅ Code alignment verified against tool_grader.go  
+✅ Documentation now complete and discoverable  
+
+---

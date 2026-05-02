@@ -1633,3 +1633,45 @@ Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught t
 **Status:** Feature complete, documented, tested, merged to decisions.
 
 ---
+
+## Learnings
+
+**Criteria Files with Tool Checks (2026-05-02):**
+- `criteria/language/python.yaml` — Uses `tool_used: tool: azure` to verify Azure MCP server usage
+- `criteria/language/test.yaml` — Uses `tool_used: tool: markdown-headings` (skill) and `tool_not_used: tool: bash` (builtin) for test validation
+- These files now demonstrate the canonical usage of `source` and `mcp_server` fields
+
+**Tool Check Matching Semantics:**
+- Tool name matching is **exact match** (line 346 in tool_grader.go: `e.Tool != toolName`)
+- NOT substring or prefix matching — `tool: azure` only matches tools named exactly "azure"
+- Source field maps to event types:
+  - `source: skill` → Type="skill"
+  - `source: mcp` → Type="mcp_call"
+  - `source: builtin` → Type="tool_call"|"file_read"|"file_write"|"bash"
+- `mcp_server` field filters MCP tools by server name, requires `source: mcp`
+
+## Session: 2026-05-02 — Criteria YAML Tool Source Fields
+
+**Type:** Feature Implementation  
+**Partner:** Oracle (parallel work on documentation audit)  
+**Timestamp:** 2026-05-02T04-30-57Z
+
+### Work Done
+
+Updated canonical criteria YAML files to use new `source` and `mcp_server` fields:
+- `criteria/language/python.yaml`: Added source/mcp_server to MCP tool check
+- `criteria/language/test.yaml`: Added source field to skill and builtin checks
+
+Serves as canonical reference examples for users.
+
+### Partner Context
+
+Oracle ran parallel documentation audit of `docs/graders/tool.md` to verify completeness of source/mcp_server field coverage. Found 3 low-severity gaps and added clarifications: explicit validation error rule, scope note for group checks, reference to canonical test.yaml.
+
+### Outcomes
+
+✅ Build passes  
+✅ Tests pass  
+✅ Canonical examples ready for user reference  
+
+---

@@ -48,9 +48,11 @@ graders:
     checks:
       - kind: tool_used
         tool: markdown-headings
+        source: skill
         min_calls: 1
       - kind: tool_not_used
         tool: bash
+        source: builtin
       - kind: any_from_group
         group: test-skills
       - kind: none_from_group

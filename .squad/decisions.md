@@ -2815,3 +2815,188 @@ Per user directive: Skills are matched by name only. Skill name collisions acros
 **Status:** Design research complete. Deferred pending user review of skill collision policies.
 
 ---
+
+---
+
+## 2026-05-02: COMPLETE — Criteria YAML Tool Source Fields (Neo)
+
+**Status:** ✅ Complete  
+**Author:** Neo  
+**Date:** 2026-05-02  
+**Type:** Implementation — Canonical Examples  
+**Topic:** criteria-yaml-tool-source-fields-and-docs-verify
+
+### Summary
+
+Updated canonical criteria YAML files in `criteria/` to use the new `source` and `mcp_server` fields for tool checks, making them more precise and serving as reference examples.
+
+### Files Updated
+
+#### 1. `criteria/language/python.yaml`
+
+**Change:** Added `source: mcp` + `mcp_server: azure` to the Azure tool check
+
+```yaml
+- kind: tool_used
+  tool: azure
+  source: mcp
+  mcp_server: azure
+```
+
+**Rationale:**
+- Tool name "azure" matches the azure-mcp-server MCP server name
+- Tool matching is exact match (not prefix/substring)
+- Configs define MCP server `name: azure` with `@azure/mcp@latest`
+- This disambiguates MCP tools from potential skills or builtins with similar names
+
+#### 2. `criteria/language/test.yaml`
+
+**Changes:**
+
+a) Added `source: skill` to markdown-headings check:
+```yaml
+- kind: tool_used
+  tool: markdown-headings
+  source: skill
+  min_calls: 1
+```
+
+b) Added `source: builtin` to bash check:
+```yaml
+- kind: tool_not_used
+  tool: bash
+  source: builtin
+```
+
+**Rationale:**
+- `markdown-headings` is a Copilot skill tool (Type="skill")
+- `bash` is a builtin tool (Type="bash")
+- These demonstrate the three source values: skill, mcp, builtin
+- Paired with `prompts/test/hello-markdown.prompt.md` for validation
+
+### Source Value Semantics
+
+From tool_grader.go matching logic (lines 343-376):
+
+| Source Value | Event Types Matched |
+|--------------|---------------------|
+| `skill` | Type="skill" |
+| `mcp` | Type="mcp_call" |
+| `builtin` | Type="tool_call", "file_read", "file_write", "bash" |
+
+**Tool Matching:** Exact match only (`e.Tool != toolName`), NOT prefix/substring.
+
+### Validation
+
+✅ `go build ./...` — passes  
+✅ `go test ./hyoka/internal/criteria/... -timeout 60s` — all tests pass
+
+### Impact
+
+These criteria files now serve as canonical examples demonstrating:
+- How to use `source` field for tool disambiguation
+- How to use `mcp_server` field for MCP-specific tools
+- Proper YAML structure for the new fields
+- Backward compatibility (source is optional)
+
+---
+
+## 2026-05-02: COMPLETE — Tool Grader Fields Documentation Audit (Oracle)
+
+**Status:** ✅ Complete  
+**Author:** Oracle  
+**Date:** 2026-05-02  
+**Type:** Verification — Documentation Completeness  
+**Topic:** criteria-yaml-tool-source-fields-and-docs-verify
+
+### Context
+
+Neo shipped `source` and `mcp_server` fields on tool_used AND tool_not_used checks. Oracle audited `docs/graders/tool.md` to verify completeness and identify any gaps.
+
+### Audit Results
+
+#### Requirements Checklist (All ✅ Met)
+
+1. **source field documented with all 3 values** ✅
+   - Lines 46, 57: "skill, mcp, or builtin" in both tool_used and tool_not_used tables
+   - Lines 179, 183, 188: Example showing all three values
+
+2. **mcp_server field documented** ✅
+   - Line 47: tool_used table
+   - Line 58: tool_not_used table
+   - Line 184: Example with mcp_server: native-tools
+
+3. **Validation rule (mcp_server requires source: mcp) documented** ✅
+   - Table descriptions say "only meaningful with source: mcp"
+   - Line 232: NEW explicit error rule added
+
+4. **Fields apply to BOTH tool_used and tool_not_used** ✅
+   - Both tables show identical source/mcp_server fields
+   - Line 231: NEW note clarifies these don't apply to group checks
+
+5. **Fields do NOT apply to group checks** ✅
+   - any_from_group (lines 64-68): no source/mcp_server fields
+   - none_from_group (lines 74-78): no source/mcp_server fields
+
+6. **YAML examples demonstrate source field** ✅
+   - Section "Filtering by Tool Source" (lines 168-189)
+   - Comprehensive example with skill, mcp, builtin
+
+7. **test.yaml mentioned as canonical reference** ✅
+   - NEW Reference section (lines 245-247)
+
+### Gaps Found and Fixed
+
+| # | Issue | Severity | Fix |
+|---|-------|----------|-----|
+| 1 | Validation rule phrased as "only meaningful" vs explicit error | Low | Added Notes bullet: "If `mcp_server` is specified, `source` must be set to `mcp`. Will cause validation error." |
+| 2 | Unclear that source/mcp_server don't apply to group checks | Low | Added Notes bullet clarifying scope |
+| 3 | No reference to canonical test.yaml example | Low | Added Reference section with link |
+
+### Changes Made
+
+**File:** `docs/graders/tool.md`
+
+#### Change 1: New Notes Bullets (lines 231-232)
+```markdown
+- **Source and mcp_server fields**: These apply only to `tool_used` and `tool_not_used`. 
+  Group checks (`any_from_group`, `none_from_group`) do not support source or mcp_server filtering.
+- **MCP server validation**: If `mcp_server` is specified, `source` must be set to `mcp`. 
+  Specifying `mcp_server` without `source: mcp` will cause a validation error.
+```
+
+#### Change 2: New Reference Section (lines 245-247)
+```markdown
+## Reference
+
+For a comprehensive example of all four tool check kinds in action, see 
+[`criteria/language/test.yaml`](../../criteria/language/test.yaml), which demonstrates 
+`tool_used`, `tool_not_used`, `any_from_group`, and `none_from_group` in a single test 
+criteria file.
+```
+
+### Verification
+
+- ✅ All 3 source values documented in schema tables
+- ✅ mcp_server field in both tool_used and tool_not_used tables
+- ✅ Validation rule in table descriptions AND new explicit Notes bullet
+- ✅ Both check kinds have identical field sets
+- ✅ Group checks lack source/mcp_server fields (verified by absence in schema)
+- ✅ Example section shows all three source values + mcp_server usage
+- ✅ test.yaml linked in new Reference section
+
+### Code Alignment
+
+Verified against `hyoka/internal/criteria/graders/tool_grader.go` (lines 76-95):
+- ✅ validateToolCheckRule() confirms source values: skill, mcp, builtin
+- ✅ Validation error: "mcp_server requires source=mcp" (lines 80, 94)
+- ✅ Applies to both tool_used (line 62) and tool_not_used (line 84)
+- ✅ Group checks (lines 97-100) have no source/mcp_server validation
+
+### Decision
+
+**Approve:** Minor edits improve clarity and discoverability. No factual corrections needed—Neo's implementation was complete and accurate. Documentation was mostly complete; these additions clarify scope and add canonical reference.
+
+**Risk:** None. Changes are additive and non-breaking.
+
+**Follow-up:** None. Tool grader documentation now fully covers all field requirements with clear examples and validation rules.

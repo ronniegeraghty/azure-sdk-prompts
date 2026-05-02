@@ -228,6 +228,8 @@ Consult your evaluation configuration or skill directory to see available groups
 
 - **All-or-nothing**: Grader passes only if **every** check passes. A single failed check fails the grader.
 - **Call count semantics**: `min_calls` and `max_calls` apply only to `kind: tool_used`. If `min_calls` is not specified for a `tool_used` check, the default is to just verify the tool was used at least once.
+- **Source and mcp_server fields**: These apply only to `tool_used` and `tool_not_used`. Group checks (`any_from_group`, `none_from_group`) do not support source or mcp_server filtering.
+- **MCP server validation**: If `mcp_server` is specified, `source` must be set to `mcp`. Specifying `mcp_server` without `source: mcp` will cause a validation error.
 - **Group matching**: Groups are resolved from the tool topology at evaluation time. If a group is not defined, the check will fail with a descriptive error.
 - **Exception handling**: The `except:` list in group checks allows you to exclude specific tools from group validation (e.g., allow "bash" even though it's in the "dangerous_tools" group).
 
@@ -239,3 +241,7 @@ Consult your evaluation configuration or skill directory to see available groups
 - **Multiple tools with same prefix**: Use the full tool name, not a prefix, for exact matching.
 
 See [index.md](./index.md) for general grader concepts and [../configuration.md](../configuration.md) for config file structure.
+
+## Reference
+
+For a comprehensive example of all four tool check kinds in action, see [`criteria/language/test.yaml`](../../criteria/language/test.yaml), which demonstrates `tool_used`, `tool_not_used`, `any_from_group`, and `none_from_group` in a single test criteria file.
