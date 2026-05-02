@@ -47,7 +47,7 @@ graders:
     weight: 1.0
     checks:
       - kind: tool_used
-        tool: skill
+        tool: markdown-headings
         min_calls: 1
       - kind: tool_not_used
         tool: bash

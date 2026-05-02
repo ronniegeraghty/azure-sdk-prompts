@@ -339,6 +339,9 @@ func truncateField(s string, maxLen int) string {
 // "complete" events are skipped so each logical action appears once. Events
 // without an explicit start/complete pair (reasoning, message, intent,
 // turn_start, etc.) are forwarded as-is.
+//
+// tool_call events with Tool="skill" are skipped because they're redundant:
+// the individual skill name appears in the subsequent skill.invoked event.
 func (tl *ActionTimeline) ToGraderActionLog() []graders.ActionEvent {
 	if tl == nil {
 		return nil
@@ -346,6 +349,11 @@ func (tl *ActionTimeline) ToGraderActionLog() []graders.ActionEvent {
 	var out []graders.ActionEvent
 	for _, ev := range tl.Events {
 		if ev.Action == "complete" {
+			continue
+		}
+		// Skip tool_call events with Tool="skill" — the individual skill name
+		// appears in the subsequent skill.invoked event (Type="skill").
+		if ev.Type == "tool_call" && ev.Tool == "skill" {
 			continue
 		}
 		out = append(out, graders.ActionEvent{

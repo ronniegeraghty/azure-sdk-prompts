@@ -348,6 +348,49 @@ func TestActionTimeline_ToGraderActionLog_Nil(t *testing.T) {
 	}
 }
 
+// TestActionTimeline_ToGraderActionLog_SkillEvents verifies that tool_call
+// events with Tool="skill" are filtered out, while skill.invoked events with
+// individual skill names are preserved.
+func TestActionTimeline_ToGraderActionLog_SkillEvents(t *testing.T) {
+	records := []report.SessionEventRecord{
+		{Type: "assistant.turn_start", TurnNumber: 1},
+		{Type: "tool.execution_start", ToolName: "skill"}, // Should be filtered
+		{Type: "skill.invoked", SkillName: "markdown-headings"},
+		{Type: "tool.execution_complete", ToolName: "skill"},
+		{Type: "tool.execution_start", ToolName: "skill"}, // Should be filtered
+		{Type: "skill.invoked", SkillName: "markdown-lists"},
+		{Type: "tool.execution_complete", ToolName: "skill"},
+		{Type: "assistant.turn_end", TurnNumber: 1},
+	}
+
+	tl := BuildActionTimeline(records)
+	log := tl.ToGraderActionLog()
+
+	// Should have: turn_start, 2 skill events (not tool_call), turn_end = 4 events
+	if len(log) != 4 {
+		t.Fatalf("expected 4 events, got %d", len(log))
+	}
+
+	// Verify the skill events have individual skill names, not "skill"
+	var sawHeadings, sawLists bool
+	for _, e := range log {
+		if e.Type == "skill" {
+			if e.Tool == "markdown-headings" {
+				sawHeadings = true
+			}
+			if e.Tool == "markdown-lists" {
+				sawLists = true
+			}
+			if e.Tool == "skill" {
+				t.Errorf("found tool_call event with Tool='skill'; should be filtered")
+			}
+		}
+	}
+	if !sawHeadings || !sawLists {
+		t.Errorf("missing skill events: headings=%v lists=%v", sawHeadings, sawLists)
+	}
+}
+
 func TestActionTimeline_ToReport(t *testing.T) {
 	records := []report.SessionEventRecord{
 		{Type: "assistant.turn_start", TurnNumber: 1},
