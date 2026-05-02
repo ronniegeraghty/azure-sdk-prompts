@@ -807,3 +807,27 @@ Comprehensive review of all hyoka documentation touching graders, criteria, and 
 - Consider architecture diagram for "Criteria → Review Panel vs Graders → Engine" flow
 
 **Status:** All critical documentation gaps resolved. Docs now match current hyoka codebase (commit 0a4d1fd9).
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-02T04:20:51Z — Session: Tool-Used Disambig + Docs Audit)
+
+**Agents Involved:** Neo (feature), Switch (testing), Oracle (docs), Morpheus (scoping)
+
+**Oracle's Work Impact:**
+- Conducted comprehensive grader documentation audit
+- Fixed 4 critical doc issues:
+  1. **Documented Neo's new tool_used fields:** Added `source` and `mcp_server` to `docs/graders/tool.md`
+  2. **Fixed canonical grader list in architecture.md:** Removed 2 phantom entries (output_check, action_sequence), added 2 missing (workspace, activity)
+  3. **Flagged obsolete legacy schema doc:** Marked `docs/grader-config-schema.md` as LEGACY (pre-v4)
+  4. **Documented WorkspaceDelta nil handling:** Added availability section to `docs/graders/workspace.md`
+- All documentation now consistent with current code implementation
+
+**Cross-team Impact:**
+- Architecture now has authoritative canonical grader list (5 graders: program, prompt, tool, workspace, activity)
+- Users have clear guidance on tool source/server disambiguation via updated docs
+- Legacy schema references no longer confuse new readers
+
+**Status:** Documentation audit complete, all grader docs accurate and current.
+
+---

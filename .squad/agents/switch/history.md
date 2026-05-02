@@ -1179,3 +1179,26 @@ These are unrelated to pairwise:deep and can be addressed separately.
 `.squad/decisions/inbox/switch-pairwise-deep-diagnostic.md` → documents investigation findings + test fixes.
 
 **Status:** ✅ SHIPPED (Commit 7a70676e)
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-02T04:20:51Z — Session: Tool-Used Disambig + Docs Audit)
+
+**Agents Involved:** Neo (feature), Switch (testing), Oracle (docs), Morpheus (scoping)
+
+**Switch's Work Impact:**
+- Investigated outstanding pairwise:deep issue — confirmed fully operational ✅
+- Found Neo's prior fixes (commits 4f293e06, a9366641) resolved all known issues
+- Fixed 3 unrelated test failures as bonus work:
+  - `TestReviewerFactory_MissingSkillFailsFast` (error type matching)
+  - `TestWriteReport_LargeReportWrittenCorrectly` (schema version)
+  - `TestRerenderRun` (schema version)
+- Commit 7a70676e contains all test fixes + passing verification
+
+**Cross-team Impact:**
+- Pairwise:deep now verified working with Neo's tool_used source/mcp_server fields
+- Test suite cleaner — 3 orphaned tests fixed, improving CI stability
+
+**Status:** Diagnostic complete, test suite improved, ready for production.
+
+---

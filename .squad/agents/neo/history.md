@@ -1617,3 +1617,19 @@ Switch's C15 pre-commit verification (test fixture rebuild + live eval) caught t
 - Event.Type discrimination already exists in action.go (skill, mcp_call, tool_call) — leveraged this for source filtering
 - countTools function lives in activity_grader.go, not tool_grader.go — shared helper pattern
 - Label formatting for checks with multiple qualifiers requires careful parenthesis handling
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-02T04:20:51Z — Session: Tool-Used Disambig + Docs Audit)
+
+**Agents Involved:** Neo, Switch (testing), Oracle (docs), Morpheus (scoping)
+
+**Neo's Work Impact:**
+- Tool_used `source` + `mcp_server` fields now live in decisions.md as core feature (see `.squad/decisions.md` entry "2026-05-02: Tool Used Grader — Source and MCP Server Disambiguation")
+- Switch verified pairwise:deep works correctly with these fields (no bugs found; test fixes applied in commit 7a70676e)
+- Oracle documented the new fields in `docs/graders/tool.md` + fixed 4 critical doc issues
+- Morpheus's scoping doc (Option A/B/C analysis) marked as **SUPERSEDED** — Option A (your implementation) shipped
+
+**Status:** Feature complete, documented, tested, merged to decisions.
+
+---

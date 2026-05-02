@@ -2536,3 +2536,282 @@ This ensures:
 Criteria using `tool: skill` must be updated to either:
 - Specify individual skill names: `tool: markdown-headings`
 - Use group matching: `any_from_group: <skill-group-name>` (requires group topology implementation)
+
+---
+
+## 2026-05-02: Tool Used Grader — Source and MCP Server Disambiguation (Neo)
+
+**Status:** ✅ Implemented  
+**Author:** Neo  
+**Date:** 2026-05-02  
+**Commits:** (source + mcp_server fields)
+
+### Problem Statement
+
+The `tool_used` grader check matches tools by name only. When multiple tools share the same name across different sources — MCP servers, skills, or built-ins — the grader cannot distinguish between them.
+
+**Real-world scenario:** Pairwise evaluation comparing `azure-mcp` and `aws-mcp` servers, both exporting `list-resources` tool. The grader cannot determine which server actually called the tool.
+
+### Solution: Optional Source and MCP Server Fields
+
+Added two optional fields to `ToolCheckRule` for precise tool disambiguation:
+
+```yaml
+- kind: tool_used
+  tool: list-resources
+  source: mcp              # Optional: skill | mcp | builtin
+  mcp_server: azure-mcp    # Optional: MCP server name (requires source: mcp)
+  min_calls: 1
+```
+
+**Backward Compatible:** When `source` and `mcp_server` are omitted, tool matching behaves as before (matches any tool with the given name).
+
+### Implementation Details
+
+**Schema Changes:**
+- `ToolCheckRule` in `internal/criteria/graders/types.go` — added `Source` and `MCPServer` optional fields
+- `ActionEvent` in grader types — added `MCPServer` field for match-time filtering
+
+**Matching Logic:**
+1. If `source` is missing → match any tool named `tool` (legacy behavior)
+2. If `source: skill` → filter to events where `Type == "skill"`
+3. If `source: mcp` → filter to events where `Type == "mcp_call"`
+4. If `source: builtin` → filter to events where `Type == "tool_call" || "file_read" || "file_write" || "bash"`
+5. If `mcp_server: foo` is also specified (MCP-only) → additionally filter by `MCPServer == "foo"`
+
+**Validation:**
+- `source` must be one of: `skill`, `mcp`, `builtin` (or empty)
+- `mcp_server` requires `source == "mcp"` (error if source is empty or non-MCP)
+
+### Usage Examples
+
+**Basic (no source):**
+```yaml
+- kind: tool_used
+  tool: bash
+  min_calls: 1
+```
+Matches any tool named `bash` from any source.
+
+**Filter by source:**
+```yaml
+- kind: tool_used
+  tool: auth
+  source: skill
+  min_calls: 1
+```
+Matches only the `auth` skill, not MCP tools or builtins with the same name.
+
+**Filter by MCP server:**
+```yaml
+- kind: tool_used
+  tool: list-resources
+  source: mcp
+  mcp_server: azure-mcp
+  min_calls: 1
+```
+Matches `list-resources` only from the `azure-mcp` server, not from `aws-mcp` or other sources.
+
+### Test Coverage
+
+Added 4 new test functions with 21 total test cases in `tool_grader_test.go`:
+- `TestToolGraderToolUsedWithSource` (7 cases)
+- `TestToolGraderToolUsedWithMCPServer` (4 cases)
+- `TestToolGraderToolNotUsedWithSource` (3 cases)
+- `TestToolGraderSourceValidation` (7 cases)
+
+All tests pass with `-race` flag.
+
+### Files Changed
+
+- `hyoka/internal/criteria/graders/types.go` — Added `Source` and `MCPServer` to `ToolCheckRule`
+- `hyoka/internal/criteria/graders/grader.go` — Added `MCPServer` to `ActionEvent`
+- `hyoka/internal/criteria/graders/tool_grader.go` — Implemented source/server filtering logic
+- `hyoka/internal/eval/action.go` — Propagate `MCPServer` field in `ToGraderActionLog()`
+- `hyoka/internal/criteria/graders/tool_grader_test.go` — Added 21 new test cases
+
+### Decision Notes
+
+**Why not Fully-Qualified Tool Names?** Rejected qualified syntax (e.g., `"mcp:azure-mcp/list-resources"`) because it would require namespacing `ActionEvent.Tool` everywhere — ripple effects across graders, comparisons, and site display.
+
+**Why both `source` and `mcp_server`?** Users may want to filter by source without caring which server (e.g., "any MCP tool named X"). Additionally, validation enforces that `mcp_server` requires `source: mcp` — prevents misuse.
+
+**Why not skill disambiguation?** Per user directive: Skills are matched by name only. Skill name collisions across skill_dirs are the user's problem to avoid at config time. For now, skills identified solely by their name (already captured in `skill.invoked` events).
+
+---
+
+## 2026-05-02: Pairwise:Deep Diagnostic — No Bug Found + Test Fixes (Switch)
+
+**Status:** ✅ Complete  
+**Author:** Switch 🤍  
+**Date:** 2026-05-02  
+**Commit:** `7a70676e`
+
+### Investigation Summary
+
+**Finding:** Pairwise:deep functionality is fully operational. Neo's prior fixes (commits `4f293e06`, `a9366641`) resolved all known issues.
+
+### Pairwise Status: ✅ Fully Functional
+
+- All 22 pairwise-specific tests pass
+- Live expansion works correctly (dry-run verified)
+- No regressions in existing grader scoring
+
+### Test Suite Fixes
+
+While auditing test health, fixed 3 **unrelated** blocking test failures:
+
+1. **`TestReviewerFactory_MissingSkillFailsFast`** (cmd)
+   - Root: Type assertion mismatch on wrapped errors
+   - Fix: Use `errors.As()` instead of direct type assertion
+
+2. **`TestWriteReport_LargeReportWrittenCorrectly`** (report)
+   - Root: Test report defaulted to schema v0, triggering migration panic on v4 cutover
+   - Fix: Set `SchemaVersion: CurrentSchemaVersion`
+
+3. **`TestRerenderRun`** (rerender)
+   - Root: Same as #2 — schema version mismatch
+   - Fix: Set `SchemaVersion: CurrentSchemaVersion`
+
+### Files Changed
+
+- `hyoka/cmd/reviewerfactory_test.go` — Use `errors.As()`
+- `hyoka/internal/report/bounds_test.go` — Fix schema version
+- `hyoka/internal/report/generator_test.go` — Fix schema version (9 test reports)
+- `hyoka/internal/rerender/rerender_test.go` — Fix schema version
+
+### Test Suite Status
+
+✅ All pairwise tests pass  
+✅ 27/30 packages pass  
+⚠️ 3 pre-existing report package failures (unrelated to this work, existed before session)
+
+---
+
+## 2026-05-02: Grader Documentation Audit Complete (Oracle)
+
+**Status:** ✅ Complete  
+**Author:** Oracle 📚  
+**Date:** 2026-05-02
+
+### Audit Scope
+
+Comprehensive audit of all hyoka documentation mentioning graders, criteria, or review systems. Verified against Go implementations in `hyoka/internal/criteria/graders/` and `hyoka/internal/criteria/`.
+
+### Critical Findings & Fixes
+
+#### Issue #1: Undocumented Tool Grader Fields (HIGH)
+- **Problem:** `ToolCheckRule` had `Source` and `MCPServer` fields not documented
+- **Evidence:** `hyoka/internal/criteria/graders/types.go` lines 204-205
+- **Fix Applied:** Added field documentation + filtering examples to `docs/graders/tool.md`
+
+#### Issue #2: Architecture.md Canonical Grader List Incorrect (HIGH)
+- **Problem:** Listed non-existent graders (`output_check`, `action_sequence`); missing `workspace`, `activity`
+- **Evidence:** Schema flatten commit `7410ecf1` removed legacy kinds
+- **Fix Applied:** Updated canonical list to accurate 5 graders (program, prompt, tool, workspace, activity)
+
+#### Issue #3: Confusing Legacy Schema Documentation (MEDIUM)
+- **Problem:** `docs/grader-config-schema.md` claimed to describe "current schema" but was pre-v4
+- **Fix Applied:** Marked as LEGACY (pre-v4), added redirect to current docs, created removal table
+
+#### Issue #4: WorkspaceDelta Nil Handling Undocumented (MEDIUM)
+- **Problem:** Docs didn't mention that `WorkspaceDelta` can be `nil` in older reports
+- **Evidence:** Go code type: `WorkspaceDelta *WorkspaceDelta` (pointer type)
+- **Fix Applied:** Added "Important: WorkspaceDelta Availability" section to `docs/graders/workspace.md`
+
+### Canonical Grader Inventory (Verified)
+
+✅ Five canonical graders:
+- `program` — code execution + output analysis
+- `prompt` — criteria preamble + check items for review panel
+- `workspace` — file creation/modification/deletion tracking
+- `tool` — tool/skill/MCP usage counting and classification
+- `activity` — action sequence and behavior pattern matching
+
+✅ Engine-internal (not user-configurable): `prompt_review`
+
+✅ Removed (deprecated): `output_check`, `file`, `behavior`, `action_sequence`, `tool_constraint`, `tool_usage`
+
+### Files Updated
+
+| File | Changes |
+|------|---------|
+| `docs/architecture.md` | Fixed canonical grader list; removed 2 phantom entries, added 2 missing |
+| `docs/graders/tool.md` | Documented `source` and `mcp_server` fields + filtering examples |
+| `docs/graders/workspace.md` | Added WorkspaceDelta nil availability section |
+| `docs/grader-config-schema.md` | Rewrote header; clarified legacy status; added grader removal table |
+
+---
+
+## 2026-05-02: DEFERRED — Tool Disambiguation Scoping (Morpheus)
+
+**Status:** ✅ Scoping Complete (Decision Made, Not Pursued)  
+**Author:** Morpheus (Architect)  
+**Date:** 2026-05-02  
+**Type:** Design Decision — Options Evaluated
+
+### Context
+
+Morpheus evaluated three design options for handling tool name collisions across sources (MCP × MCP, Skill × MCP, Skill × Builtin).
+
+### Options Evaluated
+
+- **Option A:** Optional `source` + `mcp_server` fields — graceful degradation, precise when needed ✅ SELECTED
+- **Option B:** Fully-qualified tool names (e.g., `"mcp:azure-mcp/list-resources"`) — verbose but unambiguous
+- **Option C:** Load-time uniqueness validation — strict enforcement, no schema changes
+
+### Decision Made
+
+**Option A was implemented by Neo** — shipped with simpler surface (source + mcp_server only, no skill path disambiguation).
+
+### Why Not Option B or C
+
+- **Option B** requires namespacing `ActionEvent.Tool` everywhere — ripple effects across graders, comparisons, site display
+- **Option C** blocks legitimate pairwise scenarios (comparing MCP servers) and forces config-level workarounds
+
+### Deferred Work
+
+- Load-time collision warnings (future enhancement)
+- Skill path disambiguation via `session.skills_loaded` (requires SDK integration)
+- Automatic source inference (future)
+- Collision detection in pairwise expansion (future)
+
+**Status:** Design scoping complete. Implementation delivered by Neo; no further action needed.
+
+---
+
+## 2026-05-02: DEFERRED — Skill Source Disambiguation Research (Switch)
+
+**Status:** 📋 Research Complete (Not Implemented)  
+**Author:** Switch  
+**Date:** 2026-05-02  
+**Type:** Technical Investigation
+
+### Question
+
+Can `tool_used` grader distinguish between two skills with identical names from different `skill_dirs` (e.g., `skills/generator/azure-mcp/SKILL.md` vs `skills/reviewer/azure-mcp/SKILL.md`)?
+
+### Investigation Findings
+
+**SDK Capabilities:**
+- ✅ `session.skills_loaded` event DOES expose skill metadata:
+  - `Path` — absolute path to SKILL.md
+  - `Source` — source type (project, personal, plugin)
+- ❌ `skill.invoked` event does NOT expose path/source (only bare name)
+
+**Proposed Solution:** Build lookup table from `session.skills_loaded`, enrich `ActionEvent` with `SkillPath` and `SkillSource` for match-time disambiguation.
+
+### Implementation Requirements
+
+1. Store `session.skills_loaded` array in eval context
+2. Build map: `skillName → {Path, Source}`
+3. Enrich `SessionEventRecord` with `SkillPath`, `SkillSource`
+4. Propagate to `ActionEvent` in grader pipeline
+
+### Reason for Deferral
+
+Per user directive: Skills are matched by name only. Skill name collisions across skill_dirs are the user's problem to avoid at config time.
+
+**Status:** Design research complete. Deferred pending user review of skill collision policies.
+
+---

@@ -1127,3 +1127,30 @@ Incorporate explicit namespacing rules into Grader multi-source tool loading spe
 - Graceful degradation (optional fields) wins over rigid enforcement (fail-fast) for pairwise scenarios
 - Namespacing at log-time (Option B) would ripple to runner + all graders — avoid unless unavoidable
 - Load-time warnings should be once-per-eval (not per-check) to avoid log spam
+
+---
+
+## CROSS-AGENT UPDATE (2026-05-02T04:20:51Z — Session: Tool-Used Disambig + Docs Audit)
+
+**Agents Involved:** Morpheus (scoping), Neo (implementation), Switch (testing), Oracle (docs)
+
+**Morpheus's Work Impact:**
+- Scoping document evaluated 3 design options for tool disambiguation:
+  - Option A: Optional source + server fields (SELECTED ✅)
+  - Option B: Fully-qualified names (rejected due to ripple effects)
+  - Option C: Load-time validation (rejected due to blocking pairwise scenarios)
+- **Status:** Option A was implemented by Neo and shipped successfully
+- Scoping document now recorded in decisions.md as reference material (superseded by implementation)
+
+**Deferred Work (Not Pursued This Session):**
+- Skill path disambiguation via `session.skills_loaded` (requires SDK integration)
+- Load-time collision warnings (future enhancement)
+- Automatic source inference (future)
+
+**Cross-team Impact:**
+- Option A validated as correct design choice — simple surface (source + mcp_server), high precision
+- Upstream scoping saved Neo implementation time (clear spec, validated options)
+
+**Status:** Scoping complete. Implementation shipped by Neo. Option A proved correct choice.
+
+---
