@@ -327,9 +327,10 @@ func (cf *ConfigFile) GetConfigs(names []string) ([]ToolConfig, error) {
 	return result, nil
 }
 
-// InstallSkillsAndPlugins runs "npx skills add <entry>" for each declared
-// plugin across the given configs. It deduplicates entries so each
-// package is only installed once.
+// InstallSkillsAndPlugins installs declared plugins across the given configs.
+// GitHub repo plugins (containing "/") are installed via "copilot plugin install".
+// Other plugins are installed via "npx skills add". Entries are deduplicated
+// so each package is only installed once.
 func InstallSkillsAndPlugins(configs []ToolConfig) error {
 	seen := make(map[string]bool)
 	type entry struct {
@@ -367,11 +368,21 @@ func InstallSkillsAndPlugins(configs []ToolConfig) error {
 
 	for _, e := range entries {
 		fmt.Printf("Installing %s: %s\n", e.kind, e.value)
-		cmd := exec.Command("npx", "skills", "add", e.value)
+		var cmd *exec.Cmd
+		if strings.Contains(e.value, "/") {
+			// GitHub repo plugin (e.g. "heaths/azsdk-samples-mcp")
+			cmd = exec.Command("copilot", "plugin", "install", e.value)
+		} else {
+			// npm-based skill package
+			cmd = exec.Command("npx", "skills", "add", e.value, "--yes")
+		}
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("installing %s %q: %w", e.kind, e.value, err)
+			slog.Warn("Failed to install plugin, skipping",
+				"plugin", e.value,
+				"error", err,
+				"hint", "Install manually with: copilot plugin install "+e.value)
 		}
 	}
 

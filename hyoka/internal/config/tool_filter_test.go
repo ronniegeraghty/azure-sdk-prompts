@@ -134,6 +134,7 @@ func TestValidateToolEntry_Valid(t *testing.T) {
 		{Name: "create", Pairwise: "off"},
 		{Name: "azure", Type: "mcp", Command: "npx", Pairwise: "deep", MCPTools: []string{"storage"}},
 		{Name: "gen-skill", Type: "skill", Source: "local", Path: "./skills/generator"},
+		{Name: "remote-skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills", Branch: "dev"},
 	}
 	for i, tc := range cases {
 		if err := validateToolEntry(tc, "test", i); err != nil {
@@ -307,6 +308,20 @@ func TestValidateToolEntry_SkillDirOnLocal(t *testing.T) {
 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/gen", SkillDir: true}
 	if err := validateToolEntry(entry, "test", 0); err != nil {
 		t.Fatalf("unexpected error for skill_dir on local skill: %v", err)
+	}
+}
+
+func TestValidateToolEntry_BranchOnRemote(t *testing.T) {
+	entry := ToolEntry{Name: "skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills", Branch: "feature-branch"}
+	if err := validateToolEntry(entry, "test", 0); err != nil {
+		t.Fatalf("unexpected error for branch on remote skill: %v", err)
+	}
+}
+
+func TestValidateToolEntry_BranchOnLocal(t *testing.T) {
+	entry := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/gen", Branch: "main"}
+	if err := validateToolEntry(entry, "test", 0); err == nil {
+		t.Fatal("expected error for branch on local skill (no repo)")
 	}
 }
 

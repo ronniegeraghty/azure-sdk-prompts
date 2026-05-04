@@ -225,10 +225,11 @@
   <table class="meta-table">
     <tr><td>Model</td><td>{{.Environment.Model}}</td></tr>
     {{if .Environment.SkillsLoaded}}<tr><td>Skills Loaded</td><td>{{join .Environment.SkillsLoaded ", "}}</td></tr>{{end}}
-    {{if .Environment.SkillsInvoked}}<tr><td>Skills Invoked</td><td>{{join .Environment.SkillsInvoked ", "}}</td></tr>{{end}}
     {{if .Environment.AvailableTools}}<tr><td>Available Tools</td><td>{{join .Environment.AvailableTools ", "}}</td></tr>{{end}}
     {{if .Environment.ExcludedTools}}<tr><td>Excluded Tools</td><td>{{join .Environment.ExcludedTools ", "}}</td></tr>{{end}}
     {{if .Environment.MCPServers}}<tr><td>MCP Servers</td><td>{{join .Environment.MCPServers ", "}}</td></tr>{{end}}
+    {{if .Environment.SkillsInvoked}}<tr><td>Skills Invoked</td><td>{{join .Environment.SkillsInvoked ", "}}</td></tr>{{end}}
+    {{if .Environment.MCPToolsInvoked}}<tr><td>MCP Tools Invoked</td><td>{{join .Environment.MCPToolsInvoked ", "}}</td></tr>{{end}}
     <tr><td>Safety Boundaries</td><td>{{if .Environment.SafetyBoundaries}}✅ Active{{else}}❌ Off{{end}}</td></tr>
     <tr><td>Cloud Access</td><td>{{if .Environment.AllowCloud}}✅ Allowed{{else}}❌ Denied{{end}}</td></tr>
     {{if or .Environment.TotalInputTokens .Environment.TotalOutputTokens}}<tr><td>Token Usage</td><td>in={{.Environment.TotalInputTokens}} out={{.Environment.TotalOutputTokens}}</td></tr>{{end}}
@@ -236,6 +237,25 @@
     {{if .Environment.ContextTruncated}}<tr><td>Context Truncated</td><td>⚠️ Yes</td></tr>{{end}}
     {{if .GenerationDuration}}<tr><td>Generation Duration</td><td>{{fmtDuration .GenerationDuration}}</td></tr>{{end}}
     {{if .ReviewDuration}}<tr><td>Review Duration</td><td>{{fmtDuration .ReviewDuration}}</td></tr>{{end}}
+  </table>
+  </div>
+</div>
+{{end}}
+
+<!-- ━━ Tool & Skill Usage ━━ -->
+{{if .ToolCallCounts}}
+<div class="section">
+  <div class="section-header"><span class="icon">📊</span><h2>Tool & Skill Usage</h2></div>
+  <div class="section-body">
+  <table class="meta-table">
+    <tr><th>Tool / Skill</th><th>Calls</th><th>Source</th></tr>
+    {{range .ToolCallCounts}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{.Count}}</td>
+      <td>{{if .MCPServer}}MCP: {{.MCPServer}}{{else}}built-in{{end}}</td>
+    </tr>
+    {{end}}
   </table>
   </div>
 </div>
@@ -419,6 +439,15 @@
           <td style="padding:0.75rem;text-align:center"><strong style="color:{{scoreColor .Review.OverallScore .Review.MaxScore}}">{{.Review.OverallScore}}/{{.Review.MaxScore}}</strong></td>
           <td style="padding:0.75rem">{{range .Review.Scores.Criteria}}<span style="display:inline-block;margin:2px 4px" title="{{.Reason}}">{{criterionIcon .Passed}} {{.Name}}</span> {{end}}</td>
         </tr>
+        {{end}}
+        {{if .SkippedReviewers}}
+        {{range .SkippedReviewers}}
+        <tr style="color:#9ca3af">
+          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9"><code>{{.Model}}</code></td>
+          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;text-align:center">⚠️ skipped</td>
+          <td style="padding:0.75rem;border-bottom:1px solid #f1f5f9;font-size:0.85rem">{{.Error}}</td>
+        </tr>
+        {{end}}
         {{end}}
       </tbody>
     </table>

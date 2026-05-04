@@ -666,9 +666,19 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	// Resolve skill directories from Generator.Tools using the skills package.
 	// This handles glob patterns, validates directories exist and contain skills,
 	// and warns about empty/missing directories (#291).
+	//
+	// Local skill paths (e.g. "./skills/generator") are relative to the .hyoka
+	// project root, not the isolated configDir. The configDir is an ephemeral
+	// temp directory used only to prevent user-level skills from leaking
+	// into the session (#21); it contains no skill files.
+	proj := config.DiscoverFromCWD()
+	skillBaseDir := ""
+	if proj.Found() {
+		skillBaseDir = proj.Root
+	}
 	var skillDirs []string
 	if cfg.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(cfg.Generator.Tools, configDir)
+		resolved, err := skills.ResolveSkillDirs(cfg.Generator.Tools, skillBaseDir)
 		if err != nil {
 			slog.Warn("Failed to resolve generator skill directories", "error", err)
 		} else {

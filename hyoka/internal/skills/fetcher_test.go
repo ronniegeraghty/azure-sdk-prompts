@@ -195,3 +195,24 @@ func TestResolveLocal_InvalidType(t *testing.T) {
 		t.Fatal("expected error for unknown type")
 	}
 }
+
+func TestParseRepoSpec(t *testing.T) {
+	cases := []struct {
+		in          string
+		wantRepo    string
+		wantSubpath string
+	}{
+		{"microsoft/skills", "microsoft/skills", ""},
+		{"microsoft/skills/.github/plugins/azure-sdk-rust/skills", "microsoft/skills", ".github/plugins/azure-sdk-rust/skills"},
+		{"owner/repo/sub", "owner/repo", "sub"},
+		{"/microsoft/skills/", "microsoft/skills", ""},
+		{"solo", "solo", ""},
+	}
+	for _, tc := range cases {
+		repo, subpath := parseRepoSpec(tc.in)
+		if repo != tc.wantRepo || subpath != tc.wantSubpath {
+			t.Errorf("parseRepoSpec(%q) = (%q, %q), want (%q, %q)",
+				tc.in, repo, subpath, tc.wantRepo, tc.wantSubpath)
+		}
+	}
+}

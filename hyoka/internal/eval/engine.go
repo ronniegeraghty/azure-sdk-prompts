@@ -106,6 +106,8 @@ type EngineOptions struct {
 	CriteriaDir string // Directory containing attribute-matched criteria YAML files.
 	// Pluggable graders (#136)
 	GradersDir string // Directory containing grader config YAML files.
+	// Generator safety (#36)
+	AllowCloud bool // Allow generated code to provision real Azure resources.
 	// Directory exclusion (#63)
 	ExcludeDirs []string // Directories to exclude from generated_files output.
 	// Pre-flight model availability check (#264).
@@ -801,6 +803,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 	}
 	evalReport.StarterFiles = starterFiles
 
+	// Snapshot starter-file sizes so guardrails can charge the agent only for
+	// the bytes/files it actually contributed, not the starter project it was
+	// handed (#565).
+	starterSnapshot := snapshotStarterSizes(genDir, starterFiles)
+
 	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
 		"starter_files", len(starterFiles))
 
@@ -955,9 +962,15 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Populate environment info from config and captured events.
 	// Use ResolveSkillDirs for accurate directory resolution (#291).
+	// Resolve relative to .hyoka root so paths like "./skills/generator" work.
+	proj := config.DiscoverFromCWD()
+	skillBase := ""
+	if proj.Found() {
+		skillBase = proj.Root
+	}
 	var skillDirectories []string
 	if task.Config.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, "")
+		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, skillBase)
 		if err != nil {
 			slog.Warn("Failed to resolve skill directories for report", "error", err)
 		} else {
@@ -977,8 +990,8 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		SkillDirectories: skillDirectories,
 		AvailableTools:   reportAvailableTools,
 		ExcludedTools:    task.Config.Generator.ExcludedTools,
-		SafetyBoundaries: true,
-		AllowCloud:       false,
+		SafetyBoundaries: !e.opts.AllowCloud,
+		AllowCloud:       e.opts.AllowCloud,
 		WorkingDirectory: ws.Dir,
 	}
 	// Extract MCP server names
@@ -1004,6 +1017,18 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		case "session.skills_loaded":
 			if ev.Content != "" {
 				env.SkillsLoaded = strings.Split(ev.Content, ", ")
+			}
+		}
+	}
+	// Derive MCP tools invoked from action timeline events.
+	if evalReport.ActionTimeline != nil {
+		seen := map[string]bool{}
+		for _, ev := range evalReport.ActionTimeline.Events {
+			if ev.MCPServer != "" && ev.Tool != "" && ev.Action == "start" {
+				if !seen[ev.Tool] {
+					seen[ev.Tool] = true
+					env.MCPToolsInvoked = append(env.MCPToolsInvoked, ev.Tool)
+				}
 			}
 		}
 	}
@@ -1088,32 +1113,25 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 				"actions", actionCount, "max_session_actions", lim.maxSessionActions)
 		}
 
-		// Check file count
-		if len(generatedFiles) > lim.maxFiles {
-			reason := fmt.Sprintf("guardrail: file count %d exceeded limit of %d", len(generatedFiles), lim.maxFiles)
+		// Check file count — charge the agent only for files it created or
+		// deleted, not starter files it was handed (#565).
+		agentFileCount := computeAgentFileCount(generatedFiles, starterSnapshot)
+		if agentFileCount > lim.maxFiles {
+			reason := fmt.Sprintf("guardrail: agent file count %d exceeded limit of %d", agentFileCount, lim.maxFiles)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "files", len(generatedFiles), "max_files", lim.maxFiles)
+			lg.Warn("Guardrail triggered", "reason", reason, "agent_files", agentFileCount, "total_files", len(generatedFiles), "max_files", lim.maxFiles)
 		}
 
-		// Check total output size
-		var totalSize int64
-		for _, f := range generatedFiles {
-			absPath := f
-			if !filepath.IsAbs(f) {
-				absPath = filepath.Join(ws.Dir, f)
-			}
-			if info, err := os.Stat(absPath); err == nil {
-				totalSize += info.Size()
-			}
-		}
+		// Check total output size — starter-aware (#565).
+		totalSize := computeAgentOutputSize(ws.Dir, generatedFiles, starterSnapshot)
 		if totalSize > lim.maxOutputSize {
-			reason := fmt.Sprintf("guardrail: total output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
+			reason := fmt.Sprintf("guardrail: agent output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
 			evalReport.GuardrailAbortReason = reason
 			evalReport.Error = reason
 			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "total_size", totalSize, "max_size", lim.maxOutputSize)
+			lg.Warn("Guardrail triggered", "reason", reason, "agent_output_size", totalSize, "max_size", lim.maxOutputSize)
 		}
 	}
 
@@ -1264,7 +1282,11 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 			models := panelReviewer.Models()
 			rlg.Debug("Starting review panel")
 			sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
-			panel, consolidated, err := panelReviewer.ReviewPanel(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
+			panel, consolidated, skipped, err := panelReviewer.ReviewPanel(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
+			if len(skipped) > 0 {
+				evalReport.SkippedReviewers = skipped
+				rlg.Warn("Some reviewers were skipped", "skipped_count", len(skipped))
+			}
 			if err != nil {
 				rlg.Error("Review panel failed", "error", err)
 				sendEvent(progress.EventReasoning, fmt.Sprintf("Review panel failed: %v", err))
@@ -1411,6 +1433,11 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 	// Validate skill directories for each unique config (#291).
 	// This surfaces warnings about empty/missing skill dirs during dry run.
 	validatedConfigs := make(map[string]bool)
+	validProj := config.DiscoverFromCWD()
+	validSkillBase := ""
+	if validProj.Found() {
+		validSkillBase = validProj.Root
+	}
 	for _, t := range tasks {
 		if validatedConfigs[t.Config.Name] {
 			continue
@@ -1418,7 +1445,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
 			entries := countSkillEntries(t.Config.Generator.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, "")
+			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, validSkillBase)
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
@@ -1430,7 +1457,7 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		}
 		if t.Config.Reviewer != nil {
 			entries := countSkillEntries(t.Config.Reviewer.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, "")
+			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, validSkillBase)
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue

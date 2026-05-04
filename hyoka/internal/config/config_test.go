@@ -391,6 +391,60 @@ mcp_servers:
 	}
 }
 
+func TestExpandPluginsSkipsMissing(t *testing.T) {
+	// A config referencing a plugin that doesn't exist should not error —
+	// it should warn and skip, allowing other configs to load.
+	dir := t.TempDir()
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{
+				Name:      "with-missing-plugin",
+				Generator: &GeneratorConfig{Model: "gpt-4"},
+				Reviewer:  &ReviewerConfig{Models: []string{"gpt-4"}},
+				Plugins:   []string{"nonexistent-plugin"},
+			},
+		},
+	}
+	if err := cf.ExpandPlugins(dir); err != nil {
+		t.Fatalf("expected no error for missing plugin, got: %v", err)
+	}
+	// No tools should have been added
+	if len(cf.Configs[0].Generator.Tools) != 0 {
+		t.Errorf("expected 0 generator tools, got %d", len(cf.Configs[0].Generator.Tools))
+	}
+}
+
+func TestExpandPluginsMixedFoundAndMissing(t *testing.T) {
+	dir := t.TempDir()
+	// Create one real plugin
+	pluginData := []byte(`
+name: real-plugin
+skills:
+  - type: local
+    path: ./skills/test
+`)
+	if err := os.WriteFile(filepath.Join(dir, "real-plugin.yaml"), pluginData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cf := &ConfigFile{
+		Configs: []ToolConfig{
+			{
+				Name:      "mixed",
+				Generator: &GeneratorConfig{Model: "gpt-4"},
+				Plugins:   []string{"real-plugin", "missing-plugin"},
+			},
+		},
+	}
+	if err := cf.ExpandPlugins(dir); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	// Only the real plugin's tool should be added
+	if len(cf.Configs[0].Generator.Tools) != 1 {
+		t.Errorf("expected 1 generator tool from real-plugin, got %d", len(cf.Configs[0].Generator.Tools))
+	}
+}
+
 func TestInstallSkillsAndPluginsEmpty(t *testing.T) {
 	configs := []ToolConfig{
 		{Name: "empty", Description: "No skills", Generator: &GeneratorConfig{Model: "gpt-4"}},
