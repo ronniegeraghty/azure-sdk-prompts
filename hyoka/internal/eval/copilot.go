@@ -735,7 +735,7 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 						}
 					}
 				}
-				return &copilot.PreToolUseHookOutput{}, nil
+				return &copilot.PreToolUseHookOutput{PermissionDecision: "allow"}, nil
 			},
 			OnPostToolUse: func(input copilot.PostToolUseHookInput, invocation copilot.HookInvocation) (*copilot.PostToolUseHookOutput, error) {
 				slog.Debug("Tool complete", "tool", input.ToolName)
