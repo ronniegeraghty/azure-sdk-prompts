@@ -11,9 +11,13 @@ graders:
   - name: "@azure/identity for Authentication"
     weight: 1.0
     prompt: >
-      Includes @azure/identity as a dependency. Uses DefaultAzureCredential or
-      another @azure/identity credential class. No hardcoded connection strings,
-      account keys, SAS tokens, or secrets in code.
+      Includes @azure/identity as a dependency. For local development,
+      DefaultAzureCredential is acceptable. For production code, uses a specific
+      Entra token credential (e.g., ManagedIdentityCredential,
+      ClientSecretCredential, WorkloadIdentityCredential) or configures
+      DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment
+      variable set to "prod" or a specific token credential. No hardcoded
+      connection strings, account keys, SAS tokens, or secrets in code.
   - name: Client Constructor with Endpoint and Credential
     weight: 1.0
     prompt: >
