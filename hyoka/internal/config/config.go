@@ -80,10 +80,11 @@ func (tc *ToolConfig) Normalize() {
 	for _, p := range tc.Plugins {
 		if dir := resolveInstalledPlugin(p); dir != "" {
 			tc.Generator.Tools = append(tc.Generator.Tools, ToolEntry{
-				Name:   p,
-				Type:   "skill",
-				Source: "local",
-				Path:   dir,
+				Name:     p,
+				Type:     "skill",
+				Source:   "local",
+				SkillDir: true,
+				Path:     dir,
 			})
 			slog.Info("Resolved plugin to skill directory", "plugin", p, "path", dir)
 		} else {
