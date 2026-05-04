@@ -1,0 +1,66 @@
+when:
+  language: js-ts
+graders:
+  - name: Correct @azure/ Scoped Packages
+    weight: 1.0
+    prompt: >
+      All Azure SDK dependencies use @azure/ scoped packages (e.g.,
+      @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No
+      deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure,
+      @azure/ms-rest-*).
+  - name: "@azure/identity for Authentication"
+    weight: 1.0
+    prompt: >
+      Includes @azure/identity as a dependency. Uses DefaultAzureCredential or
+      another @azure/identity credential class. No hardcoded connection strings,
+      account keys, SAS tokens, or secrets in code.
+  - name: Client Constructor with Endpoint and Credential
+    weight: 1.0
+    prompt: >
+      SDK clients constructed with endpoint URL and credential object, e.g.
+      new BlobServiceClient(url, credential) or new SecretClient(vaultUrl,
+      credential). No legacy constructor patterns or connection string-based
+      construction when identity-based auth is available.
+  - name: Async/Await Pattern
+    weight: 1.0
+    prompt: >
+      Uses async/await for all asynchronous operations. No raw .then()/.catch()
+      chains when await is cleaner. No callback-based patterns. Top-level async
+      function or IIFE for entry point.
+  - name: Pagination with for-await-of
+    weight: 1.0
+    prompt: >
+      List/query operations use for-await-of iteration over the
+      PagedAsyncIterableIterator returned by SDK methods. Does not collect all
+      pages into an array in memory (e.g., no Array.from() or manual page
+      accumulation). Uses byPage() when per-page control is needed.
+  - name: LRO Pattern (beginXxx + pollUntilDone)
+    weight: 1.0
+    prompt: >
+      Long-running operations use the begin* method prefix (e.g.,
+      beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone().
+      No manual setTimeout/setInterval polling loops.
+  - name: RestError Exception Handling
+    weight: 1.0
+    prompt: >
+      Catches RestError (from @azure/core-rest-pipeline or the service package)
+      with statusCode inspection for error-specific handling. Not just generic
+      Error or try/catch without type checking.
+  - name: No Deprecated Packages
+    weight: 1.0
+    prompt: >
+      No deprecated or legacy Azure packages in package.json: azure-storage,
+      azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth,
+      @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.
+  - name: Logging via @azure/logger
+    weight: 1.0
+    prompt: >
+      Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment
+      variable for SDK diagnostic logging. No custom logging wrappers around SDK
+      internals.
+  - name: package.json with Correct Dependencies
+    weight: 1.0
+    prompt: >
+      Includes a valid package.json with all required @azure/* dependencies
+      listed. TypeScript projects include tsconfig.json and appropriate
+      @types/* packages or use a recent TypeScript version with built-in types.
