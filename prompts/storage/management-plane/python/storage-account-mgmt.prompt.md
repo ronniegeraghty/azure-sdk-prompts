@@ -36,15 +36,14 @@ Show required pip packages and include proper error handling.
 
 ## Evaluation Criteria
 
-The generated code should include:
-- `azure-mgmt-storage` and `azure-identity` pip packages
-- `StorageManagementClient` creation with credential and subscription_id
-- `storage_accounts.begin_create()` with `StorageAccountCreateParameters`
-- SKU and kind configuration
-- `storage_accounts.list_by_resource_group()` iteration
-- `storage_accounts.get_properties()` for details
-- `storage_accounts.update()` for property changes
-- `storage_accounts.delete()` for cleanup
+- Includes the required Azure management and identity SDK packages
+- Creates a management client authenticated with credential and subscription ID
+- Creates a storage account as a long-running operation with the correct SKU and kind
+- Lists all storage accounts in the resource group
+- Retrieves detailed properties of a specific storage account
+- Enables blob versioning on the account (via account update or blob service properties)
+- Deletes the storage account
+- Code builds and runs without import errors or API misuse
 
 ## Context
 

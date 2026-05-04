@@ -24,10 +24,10 @@ tags:
 
 ## Prompt
 
-Write a Python script that manages
-Azure Resource Groups using the management plane SDK:
-1. Authenticate using DefaultAzureCredential
-2. Create a new resource group in "eastus" region
+Write a Python script that manages Azure Resource Groups using the management plane SDK.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 3. List all resource groups in the subscription
 4. Get details of the created resource group
 5. Add a tag to the resource group
