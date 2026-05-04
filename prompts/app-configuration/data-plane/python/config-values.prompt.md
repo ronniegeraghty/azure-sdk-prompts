@@ -44,7 +44,7 @@ Show required pip packages and proper error handling with HttpResponseError.
 The generated code should include:
 - `azure-appconfiguration` pip package
 - `set_configuration_setting()` with `ConfigurationSetting` objects
-- `get_configuration_setting()` by key and label
+- `get_configuration_setting()` by key
 - `list_configuration_settings()` with key_filter
 - `FeatureFlagConfigurationSetting` for feature flags
 - `delete_configuration_setting()` and `HttpResponseError` handling

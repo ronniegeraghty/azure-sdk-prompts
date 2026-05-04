@@ -41,13 +41,19 @@ Scan all `.py` files for import statements:
 
 ### 3. Authentication Pattern
 
-Azure SDK for Python uses `DefaultAzureCredential` (or other `azure.identity` credentials) with token-based auth. Connection strings and account keys are discouraged for production.
+Azure SDK for Python uses `DefaultAzureCredential` (or other `azure.identity` credentials) with token-based auth. Connection strings and account keys are discouraged for production **unless the prompt explicitly requires them**.
+
+**First, check what the prompt asks for.** If the prompt explicitly requires using a connection string, account key, SAS token, or similar key-based auth (e.g., "use a connection string", "authenticate with the account key"), then using that auth mechanism is **correct** and should pass — even though token-based auth would normally be preferred. In that case, only flag hardcoded secrets in source code as a failure; reading the connection string from an environment variable or secret store is a pass.
+
+Otherwise (the prompt does not specifically request connection-string/key auth):
 
 - **Pass**: Uses `DefaultAzureCredential` or another `azure.identity` credential class (e.g., `ClientSecretCredential`, `ManagedIdentityCredential`, `AzureCliCredential`)
 - **Pass**: Reads endpoint/vault URL from environment variable (e.g., `os.environ["AZURE_KEYVAULT_URL"]`)
-- **Fail**: Hardcoded connection strings (e.g., `DefaultEndpointsProtocol=https;AccountName=...`)
+- **Pass (when prompt requires it)**: Uses `from_connection_string()` with the connection string read from an environment variable
+- **Fail**: Hardcoded connection strings (e.g., `DefaultEndpointsProtocol=https;AccountName=...`) in source code
 - **Fail**: Hardcoded account keys, SAS tokens, client secrets, or certificates in source code
 - **Fail**: Uses `ServicePrincipalCredentials` or `MSIAuthentication` from `msrestazure` (legacy patterns)
+- **Fail (only when prompt does NOT request it)**: Uses connection strings / account keys instead of `DefaultAzureCredential`
 
 ### 4. Client Construction
 

@@ -45,7 +45,6 @@ The generated code should include:
 - `CosmosClient` creation
 - `database_client.create_database_if_not_exists()`
 - `database.create_container_if_not_exists()` with `PartitionKey`
-- `container.create_item()`, `read_item()`, `replace_item()`, `delete_item()`
 - `container.query_items()` with `enable_cross_partition_query`
 - `CosmosHttpResponseError` exception handling
 

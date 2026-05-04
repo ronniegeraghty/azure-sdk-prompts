@@ -48,7 +48,6 @@ Include a `requirements.txt` with the necessary Azure SDK dependencies.
 ## Evaluation Criteria
 
 ### Scenario-Specific Patterns
-- Retrieves settings with a specific label parameter using `label_filter`
 - Lists settings filtered by key prefix using `key_filter`
 - Implements conditional reads using `match_condition` with `MatchConditions.IfModified` and the setting's `etag`
 - Handles 304 Not Modified (setting unchanged since last read)
