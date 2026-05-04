@@ -9,8 +9,15 @@ graders:
   - name: DefaultAzureCredential Usage
     weight: 1.0
     prompt: >
-      Authentication uses DefaultAzureCredential from azure-identity,
-      not connection strings or hardcoded keys.
+      Authentication matches what the prompt asks for. If the prompt
+      explicitly requires a connection string (or other key-based auth),
+      using `from_connection_string()` / connection-string-based clients
+      is correct and should pass. Otherwise, authentication must use
+      DefaultAzureCredential from azure-identity (or another
+      `azure.identity` credential), not connection strings or hardcoded
+      keys. Hardcoded secrets/keys/connection strings in source code
+      always fail — required values should come from environment
+      variables or a secret store.
   - name: Context Manager for Clients
     weight: 1.0
     prompt: >
