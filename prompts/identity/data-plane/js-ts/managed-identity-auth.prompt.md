@@ -23,15 +23,15 @@ tags:
 
 ## Prompt
 
-Show me how to
-use Managed Identity to authenticate Azure SDK clients in Node.js. Cover:
-1. System-assigned vs user-assigned managed identity
-2. How to create a ManagedIdentityCredential for each type
-3. Using it with Azure SDK clients
-4. Local development fallback strategies
-5. Common pitfalls and error handling
+Write a TypeScript program that
+uses Managed Identity to authenticate Azure SDK clients. The program should:
+1. Create a ManagedIdentityCredential for system-assigned identity
+2. Create a ManagedIdentityCredential for user-assigned identity (with client ID)
+3. Use ChainedTokenCredential to fall back to Azure CLI credential for local development
+4. Pass the credential to an Azure SDK client and perform an operation
+5. Handle CredentialUnavailableError when not running in Azure
 
-Provide TypeScript examples for both identity types.
+Include a package.json with all dependencies and use async/await throughout.
 
 ## Evaluation Criteria
 
