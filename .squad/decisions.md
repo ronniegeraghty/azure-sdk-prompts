@@ -1337,3 +1337,61 @@ For future skills:
 ## Decision
 
 Adopt this pattern for all future skill differentiation work. It's lightweight, model-transparent, and surfaces real quality signals.
+
+---
+
+## 2026-05-05: COMPLETE — Port PR #640 Bug Fixes (Neo + Switch)
+
+**Status:** ✅ SHIPPED  
+**Commit:** 703f638b (ronniegeraghty/dev)  
+**Authors:** Neo (implementation), Switch (test coverage)  
+**Trigger:** Ronnie requested porting 3 logical bug fixes from Larry Osterman's PR #640 (origin/larryo/for_ronnie, commit b0134e3), which contained ~95% gofmt indentation churn.
+
+### Three Bugs Fixed
+
+#### FIX 1: Build artifacts in workspace snapshots (workspace/delta.go)
+
+**Problem:** Generated files from build directories (target/, node_modules/, bin/, obj/, etc.) were captured in workspace snapshots and dumped into review prompts, overwhelming Copilot reviewers.
+
+**Solution:** Added `utils.IsDefaultExcludedDir()` check in `TakeSnapshot()` filepath.Walk callback, mirroring existing hidden-file skip logic.
+
+**Files changed:** `hyoka/internal/workspace/delta.go`
+
+#### FIX 2: SkippedReviewers not surfaced (review/ package)
+
+**Problem:** When a reviewer model failed (panics, errors, all buckets failed), the failure was logged but NOT surfaced in ReviewResult. Users couldn't tell which models were skipped.
+
+**Solution:** 
+- Added `SkippedReviewers []SkippedReviewer` field to ReviewResult struct (types.go)
+- Populated in ReviewPanel() when reviewErr != nil (reviewer.go)
+- Populated in ReviewPanelBuckets() when all buckets fail (buckets.go)
+
+**Files changed:** `hyoka/internal/review/types.go`, `hyoka/internal/review/reviewer.go`, `hyoka/internal/review/buckets.go`
+
+#### FIX 3: Action counter uses engine default instead of per-eval limit (eval/copilot.go)
+
+**Problem:** Debug logging switch (lines 600, 622) checked `e.maxSessionActions` instead of `maxSessionActionsLimit`, ignoring per-eval overrides.
+
+**Solution:** Replaced `e.maxSessionActions` → `maxSessionActionsLimit` at both locations (ToolExecutionStart and AssistantMessage cases).
+
+**Files changed:** `hyoka/internal/eval/copilot.go`
+
+**Note:** Per Ronnie's directive ("anything the agent does is meant to be an action from reasoning to tool calls to bash commands, to responses"), `assistant.reasoning` was already being counted correctly at line 359-365. No additional change was needed.
+
+### Test Coverage
+
+Switch wrote 7 test functions across 3 new test files (~330 lines, tests only):
+- `hyoka/internal/workspace/delta_pr640_test.go` — 2 unit tests for build-artifact exclusion
+- `hyoka/internal/review/reviewer_pr640_test.go` — 1 struct-level test for SkippedReviewers field
+- `hyoka/internal/eval/copilot_pr640_test.go` — 4 unit tests for action-counter limit resolution, event-type accounting, per-eval priority
+
+All tests passing. Test filenames include "pr640" for easy discoverability.
+
+### Verification
+
+- All changes compile: `go build ./...` ✅
+- All tests passing: `go test ./...` ✅
+- Surgical scope: no unrelated code or indentation modified
+- Commit authored by Larry Osterman with co-authorship to Copilot
+
+---

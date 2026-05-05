@@ -912,3 +912,14 @@ Neo updated canonical criteria YAML files to use new source/mcp_server fields, p
 ✅ Documentation now complete and discoverable  
 
 ---
+
+---
+
+## CROSS-AGENT NOTE (2026-05-05 — PR #640: Action Semantics Clarification)
+
+**From:** Scribe (via Ronnie's directive in PR #640 spawn manifest)  
+**Impact:** How actions are counted in eval sessions
+
+Oracle should be aware that per Ronnie's clarification ("anything the agent does is meant to be an action from reasoning to tool calls to bash commands, to responses"), **`assistant.reasoning` events count as actions** for the purpose of session limits (`maxSessionActionsLimit`). This is already implemented and verified in `hyoka/internal/eval/copilot.go:359-365`. The PR #640 port (commit 703f638b) ensured the action counter respects per-eval limit overrides at all sites.
+
+**No immediate action needed.** This is context for future decisions involving action-counting or session-limit tuning.

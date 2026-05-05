@@ -1088,3 +1088,20 @@ Implemented 3-level grouped rendering across markdown, CLI, and site components:
 ## CROSS-AGENT UPDATE (2026-05-02T06:15:09Z — Neo)
 
 **Grader Workspace Isolation:** Neo shipped per-grader workspace isolation. Engine now copies `genWs.Dir` to a fresh temp dir before every Grade(). Your grader contract changes: `GraderInput.WorkspacePath` is now a per-call isolated copy, never the canonical workspace. Mutations in one grader no longer leak to subsequent graders.
+
+---
+
+## CROSS-AGENT NOTE (2026-05-05 — PR #640: Workspace Snapshots Exclude Build Artifacts)
+
+**From:** Scribe (via PR #640 port, commit 703f638b)  
+**Impact:** Workspace snapshot pruning
+
+Tank should note that `hyoka/internal/workspace/delta.go` now excludes build artifact directories (target/, node_modules/, bin/, obj/, dist/, build/, .gradle/, .cache/, etc.) from workspace snapshots. This will:
+
+- Reduce snapshot size and JSON payload to reviewers
+- Speed up reviewer processing (less noise)
+- Improve reviewer focus on actual source code
+
+This aligns with the existing hidden-file skip logic and uses `utils.IsDefaultExcludedDir()` for consistency.
+
+**No action needed for CLI.** This is a backend optimization that doesn't affect config or invocation.

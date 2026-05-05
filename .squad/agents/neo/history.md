@@ -1844,3 +1844,58 @@ The grader-applicability props map is built **exactly once per eval** in `hyoka/
 3. **Skill_dir Tool Identity Fix** (Batch 3 co-owned) — Coordinator fixed buildToolIdentities; Neo verified pairwise behavior. Commit 328df6e9.
 
 **Outcome:** Phase 2 schema operational; cross-eval views deployed; end-to-end tests passing.
+
+## 2026-05-15 — Ported PR #640 Bug Fixes
+
+### Task
+Manually ported three logical bug fixes from Larry Osterman's PR #640 (branch: origin/larryo/for_ronnie, commit b0134e3), avoiding ~95% gofmt indentation churn.
+
+### Learnings
+
+**1. Per-Eval Limit Override Pattern (copilot.go)**
+
+The `maxSessionActionsLimit` variable pattern at line 262 is the correct way to respect config/prompt overrides:
+
+```go
+maxSessionActionsLimit := e.evalMaxSessionActions
+if maxSessionActionsLimit <= 0 {
+    maxSessionActionsLimit = e.maxSessionActions
+}
+```
+
+This local variable should be used consistently throughout the event loop, NOT the field `e.maxSessionActions` directly. Two locations in the debug logging switch were incorrectly using `e.maxSessionActions`, bypassing per-eval overrides from prompt frontmatter or config YAML.
+
+**2. SkippedReviewer Surfacing Pattern**
+
+The `SkippedReviewer` type existed but wasn't wired up. The pattern:
+- Declare `var skipped []SkippedReviewer` before the model loop
+- Append on errors: `skipped = append(skipped, SkippedReviewer{Model: model, Error: err.Error()})`
+- Attach to result: `consolidated.SkippedReviewers = skipped`
+
+Applied in both `ReviewPanel()` (reviewer.go) and `ReviewPanelBuckets()` (buckets.go). This surfaces which reviewers failed to users in the JSON output.
+
+**3. SessionEventType Handling in copilot.go**
+
+The event loop has TWO switch statements:
+1. **Main switch** (lines 330-595): Records data, updates state, enforces limits
+2. **Debug logging switch** (lines 596-650): Only logs, no state changes
+
+The `assistant.reasoning` event was already correctly handled in the main switch at line 359, counting as an action and enforcing `maxSessionActionsLimit`. No duplication needed in the debug switch (which only logs tool start/complete and assistant messages for brevity).
+
+**Key insight:** Any agent action (reasoning, tool calls, bash commands, responses) counts toward the action limit per Ronnie's directive. This prevents runaway loops across all action types, not just tool usage.
+
+**4. Build Artifacts in Workspace Delta**
+
+The `utils.IsDefaultExcludedDir()` helper (already used elsewhere in utils.go) excludes common build artifacts: target/, node_modules/, bin/, obj/, dist/, build/, .git/, etc. Adding this check to `TakeSnapshot()` prevents generated files from polluting workspace deltas that get dumped into review prompts.
+
+Pattern mirrors the existing hidden-file skip logic, but returns `filepath.SkipDir` for directories to avoid descending into large trees.
+
+### Files Modified
+- hyoka/internal/workspace/delta.go
+- hyoka/internal/review/types.go
+- hyoka/internal/review/reviewer.go
+- hyoka/internal/review/buckets.go
+- hyoka/internal/eval/copilot.go
+
+### Verification
+All changes compiled cleanly. Tests deferred to Switch agent.

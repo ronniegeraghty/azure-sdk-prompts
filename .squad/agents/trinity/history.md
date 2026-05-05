@@ -1010,3 +1010,20 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 **Technical:** React components, Recharts, responsive layout. Full test coverage (131/131 passing). Playwright end-to-end verification. Commits b644bdea, 81e797e1.
 
 **Outcome:** Run-detail page now shows cross-eval context without overwhelming single-run view. Site tests all passing.
+
+---
+
+## CROSS-AGENT NOTE (2026-05-05 — PR #640: SkippedReviewers now surfaced)
+
+**From:** Scribe (via PR #640 port, commit 703f638b)  
+**Impact:** Review reporting UI
+
+Trinity should note that `ReviewResult` now includes a `SkippedReviewers []SkippedReviewer` field. When a reviewer model fails or all buckets fail for that model, the failure is now surfaced in the report. This may affect:
+
+- Report JSON structure (`EvalResult.Review.SkippedReviewers[]`)
+- Report rendering if Trinity builds UI around reviewer failures
+- Data-driven retry logic (if applicable)
+
+**Action:** If Trinity is working on report rendering or failure handling, check `hyoka/internal/review/types.go:87` for the field definition.
+
+**No immediate blocker.** This is surfacing information that was previously only logged, not reported.

@@ -1210,3 +1210,16 @@ Bonus side effect: making every `WhenClause` field slice-typed collapses the mer
 2. **Cross-Eval Visualization (4 Views)** — Scoped summary band, per-config rollup strip, evals×checks matrix (collapsed-by-default), per-grader-type stacked bars. Spec adopted by Trinity for React implementation; shipped commits b644bdea + 81e797e1.
 
 **Outcome:** Both specs delivered; implementations verified end-to-end. No product code changes.
+
+---
+
+## CROSS-AGENT NOTE (2026-05-05 — PR #640: Action Semantics Clarification)
+
+**From:** Scribe (via Ronnie's directive in PR #640 spawn manifest)  
+**Impact:** Architectural: action counting and session limits
+
+Morpheus should note Ronnie's clarification on what constitutes an "action": "anything the agent does is meant to be an action from reasoning to tool calls to bash commands, to responses." This means `assistant.reasoning` events are **counted as actions** alongside tool calls and responses. This principle is now baked into the eval engine (commit 703f638b via PR #640 port), which ensures session action limits respect both per-eval overrides AND the semantic that reasoning is a first-class action type.
+
+**Architectural implication:** If designing session limits, LLM action quotas, or reasoning time budgets in future, keep this semantic in mind: reasoning is not free.
+
+**No immediate action needed.** Context for architectural decisions involving action budgeting.
