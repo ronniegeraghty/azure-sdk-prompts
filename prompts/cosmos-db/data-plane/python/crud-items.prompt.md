@@ -24,9 +24,11 @@ tags:
 
 ## Prompt
 
-Write a Python script that performs
-CRUD operations on items in an Azure Cosmos DB NoSQL container:
-1. Create a CosmosClient using endpoint and key
+Write a Python script that performs CRUD operations on items in an Azure Cosmos DB NoSQL container.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
+1. Create a CosmosClient
 2. Create a database "TestDB" and container "Items" with partition key "/category"
 3. Upsert an item dict with keys: id, category, name, quantity
 4. Read the item back using read_item() with id and partition key
@@ -43,7 +45,6 @@ The generated code should include:
 - `CosmosClient` creation
 - `database_client.create_database_if_not_exists()`
 - `database.create_container_if_not_exists()` with `PartitionKey`
-- `container.create_item()`, `read_item()`, `replace_item()`, `delete_item()`
 - `container.query_items()` with `enable_cross_partition_query`
 - `CosmosHttpResponseError` exception handling
 

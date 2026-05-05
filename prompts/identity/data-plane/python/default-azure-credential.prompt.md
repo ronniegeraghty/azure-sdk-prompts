@@ -24,6 +24,9 @@ tags:
 ## Prompt
 
 Show me how to authenticate
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 an Azure SDK client using DefaultAzureCredential. Explain:
 1. What pip packages are needed
 2. How to create and use a DefaultAzureCredential instance
@@ -31,7 +34,6 @@ an Azure SDK client using DefaultAzureCredential. Explain:
 4. How it works in local development (VS Code, Azure CLI) vs Azure deployments
 5. How to troubleshoot authentication failures with logging
 
-Provide a complete example that creates a SecretClient using DefaultAzureCredential.
 
 ## Evaluation Criteria
 

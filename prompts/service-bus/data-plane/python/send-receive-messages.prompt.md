@@ -24,10 +24,10 @@ tags:
 
 ## Prompt
 
-Write a Python script that
-demonstrates messaging with Azure Service Bus:
-1. Create a ServiceBusClient using from_connection_string()
-2. Get a sender for a queue and send a single ServiceBusMessage
+Write a Python script that demonstrates messaging with Azure Service Bus.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 3. Send a batch of 5 messages using a ServiceBusMessageBatch
 4. Get a receiver for the queue and receive messages
 5. Complete a message with receiver.complete_message() after processing
@@ -40,7 +40,6 @@ Show required pip packages and proper context manager patterns (with statements)
 
 The generated code should include:
 - `azure-servicebus` pip package
-- `ServiceBusClient.from_connection_string()`
 - `ServiceBusSender` via `get_queue_sender()` or `get_topic_sender()`
 - `ServiceBusMessage` and `ServiceBusMessageBatch`
 - `ServiceBusReceiver` via `get_queue_receiver()` or `get_subscription_receiver()`

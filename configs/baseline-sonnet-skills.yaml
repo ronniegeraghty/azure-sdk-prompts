@@ -1,10 +1,9 @@
-# Baseline with Claude Sonnet 4.5 + SDK skills — no MCP servers
-# Uses installed Copilot CLI plugin skills for code generation guidance.
-# Install plugins: /plugin install azure-sdk-java@skills
-# Missing plugins are skipped gracefully with a warning.
+# Baseline with Claude Sonnet 4.5 + remote Azure SDK TypeScript skills
+# Skills are fetched from microsoft/skills via git sparse-checkout at eval time.
+# See examples/configs/example-remote-skill.yaml for the remote-skill pattern.
 configs:
   - name: baseline-skills/claude-sonnet-4.5
-    description: "Baseline + Skills — Claude Sonnet 4.5 with SDK plugin skills"
+    description: "Baseline + Skills — Claude Sonnet 4.5 with remote Azure SDK skills"
     generator:
       model: "claude-sonnet-4.5"
       tools:
@@ -13,20 +12,49 @@ configs:
           source: local
           skill_dir: true
           path: "./skills/generator"
+        - name: azure-identity-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-storage-blob-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-keyvault-secrets-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-keyvault-keys-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-cosmos-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-servicebus-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-eventhub-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-appconfiguration-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
+        - name: azure-storage-queue-ts
+          type: skill
+          source: remote
+          repo: microsoft/skills/.github/plugins/azure-sdk-typescript/skills
     reviewer:
       models:
-        - "claude-opus-4.6"
+        - "claude-sonnet-4.5"
         - "gemini-3-pro-preview"
-        - "gpt-4.1"
       tools:
         - name: reviewer-skills
           type: skill
           source: local
           skill_dir: true
           path: "./skills/reviewer"
-    plugins:
-      - "azure-sdk-java@skills"
-      - "azure-sdk-python@skills"
-      - "azure-sdk-dotnet@skills"
-      - "azure-sdk-typescript@skills"
-      - "azure-sdk-rust@skills"

@@ -23,15 +23,17 @@ tags:
 
 ## Prompt
 
-Show me how to
-authenticate to Azure using a Service Principal with client secret. I need:
-1. Required npm packages
-2. How to create a ClientSecretCredential with tenant ID, client ID, and secret
-3. Using it with an Azure SDK client
-4. Best practices for secret management in Node.js
-5. Error handling for authentication failures
+Write a TypeScript program that
+authenticates to Azure using a Service Principal with client secret. The program should:
+1. Install and import @azure/identity with ClientSecretCredential
+2. Read tenant ID, client ID, and client secret from environment variables
+3. Create a ClientSecretCredential instance
+4. Use it to create an Azure SDK client (e.g., SecretClient from @azure/keyvault-secrets)
+5. Perform an operation to verify the credential works
+6. Handle AuthenticationError for invalid credentials
 
-Provide a complete TypeScript example.
+Include a package.json with all dependencies, use dotenv for environment variable
+management, and use async/await throughout.
 
 ## Evaluation Criteria
 
