@@ -391,6 +391,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
 
 	// Run reviewers sequentially — one Copilot session at a time
+	var skipped []SkippedReviewer
 	for i, model := range p.models {
 		// Bail early if the parent context was cancelled (#129).
 		if ctx.Err() != nil {
@@ -410,6 +411,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		}
 		if reviewErr != nil {
 			slog.Warn("Panel reviewer failed", "model", model, "error", reviewErr)
+			skipped = append(skipped, SkippedReviewer{Model: model, Error: reviewErr.Error()})
 			continue
 		}
 		slog.Debug("Panel reviewer complete", "model", model, "overall_score", result.OverallScore, "max_score", result.MaxScore)
@@ -425,6 +427,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 	slog.Info("Computing deterministic consensus (any-fail voting)", "panel_size", len(panel))
 	consolidated = deterministicVote(panel, checks)
 	consolidated.Model = "consensus"
+	consolidated.SkippedReviewers = skipped
 	slog.Info("Panel review complete", "panel_size", len(panel), "consensus_score", consolidated.OverallScore, "max_score", consolidated.MaxScore)
 
 	return panel, consolidated, nil

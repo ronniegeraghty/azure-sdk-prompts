@@ -112,6 +112,7 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 	}
 
 	var panel []ReviewResult
+	var skipped []SkippedReviewer
 	for _, model := range p.models {
 		if ctx.Err() != nil {
 			break
@@ -161,6 +162,7 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 		if len(results) == 0 {
 			// This should never happen now since we synthesize failures instead of continue
 			slog.Warn("All buckets skipped for model (context cancelled?)", "model", model)
+			skipped = append(skipped, SkippedReviewer{Model: model, Error: "all buckets failed"})
 			continue
 		}
 		merged := mergeBucketResults(results)
@@ -172,6 +174,7 @@ func (p *PanelReviewer) ReviewPanelBuckets(ctx context.Context, originalPrompt, 
 	}
 	consolidated := deterministicVote(panel, allChecks)
 	consolidated.Model = "consensus"
+	consolidated.SkippedReviewers = skipped
 	slog.Info("Bucketed panel review complete",
 		"panel_size", len(panel),
 		"buckets", len(buckets),

@@ -10,6 +10,8 @@ import (
 "io"
 "os"
 "path/filepath"
+
+"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
 // WorkspaceDelta captures file-level changes made by the agent during an
@@ -86,6 +88,11 @@ if info.IsDir() {
 return filepath.SkipDir
 }
 return nil
+}
+
+// Skip build-artifact directories (target/, node_modules/, bin/, obj/, etc.)
+if info.IsDir() && utils.IsDefaultExcludedDir(info.Name()) {
+return filepath.SkipDir
 }
 
 // Only capture regular files

@@ -597,9 +597,9 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		switch event.Type {
 		case copilot.SessionEventTypeToolExecutionStart:
 			actionCounter++
-			if e.maxSessionActions > 0 && actionCounter > e.maxSessionActions && !actionLimitHit {
+			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
 				actionLimitHit = true
-				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", e.maxSessionActions)
+				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", maxSessionActionsLimit)
 				genCancel()
 			}
 			toolName := ""
@@ -619,9 +619,9 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			lg.Debug("Tool done", "tool", toolName, "result", content)
 		case copilot.SessionEventTypeAssistantMessage:
 			actionCounter++
-			if e.maxSessionActions > 0 && actionCounter > e.maxSessionActions && !actionLimitHit {
+			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
 				actionLimitHit = true
-				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", e.maxSessionActions)
+				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", maxSessionActionsLimit)
 				genCancel()
 			}
 			content := ""
