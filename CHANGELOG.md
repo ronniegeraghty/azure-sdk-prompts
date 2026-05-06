@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Action counter now includes `assistant.reasoning` events** — per PR #640, any Copilot agent action (reasoning, tool calls, bash commands, responses) increments the action counter for session limits. This gives more accurate session behavior tracking.
+- **Per-property `when:` negation and `tags:` matching** — Criteria graders now support polymorphic `MatchSet` type enabling scalar/sequence/`{is:, not:}` map syntax. New `tags:` field on prompt frontmatter allows graders to match by tag with case-insensitive semantics.
+- **Inline `graders:` on prompt files** — Prompt files now support `graders:` field in both `.prompt.md` frontmatter and `.prompt.yaml` top-level using the unified `UnifiedGraderEntry` schema. Execution order: implicit criteria → inline graders → matched criteria-file graders.
 - **WorkspaceDelta field in EvalReport JSON** — captures file-level changes (created, modified, deleted) per evaluation run, enabling graders and dashboards to reason about what the agent actually changed
 - **Eval Detail page workspace delta display** — reports now render file-level changes (created/modified/deleted) when available
 - **GraderResultRow component** — new reusable TypeScript component for rendering individual grader results with pass/fail badges, scores, and expandable details; standardizes grader display across report views
@@ -40,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes (pre-1.0)
 
+- **`evaluation_criteria:` field removed from `.prompt.yaml` format** — Replaced by `graders:` field using the unified schema. YAML prompts with `evaluation_criteria:` now fail to parse with a migration error guiding users to the `graders:` field. **Zero production impact:** all 91 existing prompts use `.prompt.md` format (unaffected).
 - **`tool_version_override` now keys by `owner/repo` instead of tool entry name.** Configs using name-keyed entries will fail with a migration-hint error. See docs/configuration.md → "Tool Versioning".
 - **Retired top-level `plugins:` field** — Pre-1.0, no deprecation path. All plugin declarations must migrate to `generator.tools` and `reviewer.tools` with `type: plugin`. Example migration:
   ```yaml
@@ -60,7 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Reviewer skill resolution cross-config leakage** — reviewer tool validation is now scoped per-config, preventing skills from one config accidentally being used in another during multi-config runs
+- **Generated files no longer included in Copilot prompt** — PR #640 fix: generated files were overwhelming the agent context. Only uncommitted (new/modified) files are now passed to the prompt.
+- **Skipped reviewers now reported in output** — PR #640 fix: when a reviewer model is unavailable, eval output now clearly reports which reviewers were skipped and why.
+- **Action counter now correctly counts all agent activities** — PR #640 fix: counter now increments on `tool.execution_start` and `assistant.reasoning` event types in addition to existing counts, giving complete action telemetry.
 - **False-positive MaxOutputSize failures on large starter projects** — large starter codebases no longer incorrectly trigger guardrail failures when copied into workspace before generation
 - **Silent zero-render bug from Go↔TypeScript field drift** — Phase 3 unified grading now properly serialized to reports; eval detail page gracefully handles legacy reports with missing grader_results field
 - **README and AGENTS docs:** — updated build/test commands to use `./...` glob instead of old `./hyoka/...` paths
