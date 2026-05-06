@@ -7,6 +7,8 @@ import (
 "strings"
 
 "gopkg.in/yaml.v3"
+
+"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
 )
 
 // sectionHeadingRe matches level-2 markdown headings at the start of a line.
@@ -28,6 +30,9 @@ ExpectedTools     []string          `yaml:"expected_tools"`
 Group             string            `yaml:"group"`
 
 Properties map[string]string `yaml:"properties"`
+
+// Inline graders (both .prompt.yaml and .prompt.md frontmatter)
+Graders []interface{} `yaml:"graders,omitempty"`
 
 // YAML-only prompt fields (used by .prompt.yaml/.prompt.yml)
 PromptTextField         string `yaml:"prompt_text"`
@@ -110,6 +115,15 @@ return nil, fmt.Errorf("parsing frontmatter in %s: %w", filePath, err)
 
 p := frontmatterToPrompt(&fm)
 
+// Parse inline graders if present
+if len(fm.Graders) > 0 {
+	graders, err := criteria.ParseInlineGraders(fm.Graders, p.ID)
+	if err != nil {
+		return nil, fmt.Errorf("parsing inline graders in %s: %w", filePath, err)
+	}
+	p.Graders = graders
+}
+
 sections := splitSections(body)
 if s, ok := sections["Prompt"]; ok {
 p.PromptText = s
@@ -139,6 +153,16 @@ return nil, fmt.Errorf("parsing YAML prompt %s: %w", filePath, err)
 }
 
 p := frontmatterToPrompt(&fm)
+
+// Parse inline graders if present
+if len(fm.Graders) > 0 {
+	graders, err := criteria.ParseInlineGraders(fm.Graders, p.ID)
+	if err != nil {
+		return nil, fmt.Errorf("parsing inline graders in %s: %w", filePath, err)
+	}
+	p.Graders = graders
+}
+
 p.PromptText = fm.PromptTextField
 p.EvaluationCriteria = fm.EvaluationCriteriaField
 if p.EvaluationCriteria != "" {

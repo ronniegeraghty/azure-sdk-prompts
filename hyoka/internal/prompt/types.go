@@ -1,5 +1,7 @@
 package prompt
 
+import "github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+
 // Prompt represents a parsed prompt file (.prompt.md, .prompt.yaml, or .prompt.yml)
 // with metadata and prompt text.
 //
@@ -41,6 +43,11 @@ EvaluationCriteria string `yaml:"-" json:"evaluation_criteria,omitempty"`
 // ParsedCriteria is the structured representation of EvaluationCriteria,
 // extracted by ParseEvaluationCriteria during prompt parsing.
 ParsedCriteria []CriterionEntry `yaml:"-" json:"parsed_criteria,omitempty"`
+
+// Graders defined inline on the prompt file. Same schema as criteria/**.yaml.
+// Both .prompt.yaml and .prompt.md frontmatter support this field.
+// Parsed during prompt loading and validated to forbid `when:` clauses.
+Graders []criteria.UnifiedGraderEntry `yaml:"graders,omitempty" json:"graders,omitempty"`
 
 // Source file path
 FilePath string `yaml:"-" json:"file_path"`

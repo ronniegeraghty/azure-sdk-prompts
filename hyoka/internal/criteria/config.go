@@ -13,6 +13,7 @@
 package criteria
 
 import (
+	"bytes"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -613,4 +614,108 @@ func mergeWhenClause(parent, child WhenClause) WhenClause {
 		out.Tool = child.Tool
 	}
 	return out
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inline grader validation (prompt files)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ParseInlineGraders decodes a []interface{} from YAML frontmatter into []UnifiedGraderEntry.
+// Returns an error if parsing or validation fails.
+func ParseInlineGraders(raw []interface{}, promptID string) ([]UnifiedGraderEntry, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	
+	// Marshal back to YAML and decode strictly to get proper type checking
+	buf := &bytes.Buffer{}
+	enc := yaml.NewEncoder(buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(raw); err != nil {
+		return nil, fmt.Errorf("encoding inline graders: %w", err)
+	}
+	enc.Close()
+	
+	var graders []UnifiedGraderEntry
+	dec := yaml.NewDecoder(buf)
+	dec.KnownFields(true)
+	if err := dec.Decode(&graders); err != nil {
+		return nil, fmt.Errorf("parsing inline graders: %w", err)
+	}
+	
+	if err := ValidateInlineGraders(promptID, graders); err != nil {
+		return nil, err
+	}
+	
+	return graders, nil
+}
+
+// ValidateInlineGraders validates inline graders from a prompt file.
+// Per Ronnie's directive: inline graders MUST NOT have `when:` clauses.
+// Also checks for name collisions within the inline list and reserves
+// "Criteria from prompt file" as a protected name.
+func ValidateInlineGraders(promptID string, graders []UnifiedGraderEntry) error {
+	if len(graders) == 0 {
+		return nil
+	}
+	
+	seen := make(map[string]bool)
+	reservedName := "Criteria from prompt file"
+	
+	for i, g := range graders {
+		// Per-entry validation (type, weight, prompt/checks requirements)
+		if err := validateEntry(g); err != nil {
+			return fmt.Errorf("inline grader %d on prompt %q: %w", i, promptID, err)
+		}
+		
+		// HARD ERROR: inline graders MUST NOT have when: clauses
+		// Ronnie's verdict: "The fact that the grader is in the prompt files means
+		// it should only apply to this prompt file and should always apply to this prompt file."
+		if !g.When.IsEmpty() {
+			return fmt.Errorf(
+				"inline grader %q on prompt %q: when: clause is not supported on prompt-inline graders — "+
+				"inline graders always run for their prompt; to conditionally match graders by attributes, "+
+				"define them in a criteria/**.yaml file instead",
+				g.Name, promptID)
+		}
+		
+		// Reserved name check
+		if g.Name == reservedName {
+			return fmt.Errorf(
+				"inline grader on prompt %q: grader name %q is reserved for the markdown ## Evaluation Criteria section",
+				promptID, reservedName)
+		}
+		
+		// Duplicate name check within inline list
+		if seen[g.Name] {
+			return fmt.Errorf("inline grader on prompt %q: duplicate grader name %q", promptID, g.Name)
+		}
+		seen[g.Name] = true
+	}
+	
+	return nil
+}
+
+// CheckInlineCollisions checks whether any inline grader name collides with a
+// matched criteria-file grader name. Returns an error if any collision is found.
+func CheckInlineCollisions(inlineGraders []UnifiedGraderEntry, matched []MatchedUnifiedEntry) error {
+	if len(inlineGraders) == 0 {
+		return nil
+	}
+	
+	inlineNames := make(map[string]bool)
+	for _, g := range inlineGraders {
+		inlineNames[g.Name] = true
+	}
+	
+	for _, m := range matched {
+		if inlineNames[m.Entry.Name] {
+			return fmt.Errorf(
+				"grader name %q is defined inline on the prompt and also in criteria file %q — "+
+				"rename one to avoid collision",
+				m.Entry.Name, m.Source)
+		}
+	}
+	
+	return nil
 }
