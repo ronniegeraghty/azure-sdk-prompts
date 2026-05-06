@@ -1899,3 +1899,60 @@ Pattern mirrors the existing hidden-file skip logic, but returns `filepath.SkipD
 
 ### Verification
 All changes compiled cleanly. Tests deferred to Switch agent.
+
+---
+
+## 2026-05-02 — Inline `graders:` on Prompt Files (Issue: inline-graders feature)
+
+**Branch:** `ronniegeraghty/dev` (3 commits: b290b848, 13f1ca50, 5c304aca)
+
+### What Shipped
+
+Implemented Morpheus's inline-graders architectural proposal with Ronnie's verdicts:
+
+1. **Parsing** — Added `Graders []criteria.UnifiedGraderEntry` to `Prompt` struct. Both `.prompt.md` frontmatter and `.prompt.yaml` now accept `graders:` using the exact same schema as `criteria/**.yaml`.
+
+2. **Validation** — `ValidateInlineGraders` enforces:
+   - **HARD ERROR on `when:` clauses** (Ronnie: "inline graders always run for their prompt")
+   - Name collision detection (within inline list + with matched criteria-file graders)
+   - Reserved name: "Criteria from prompt file"
+
+3. **Engine Integration** — Inline graders execute at position 1..N (after implicit prompt criteria, before matched criteria-file graders). Collision check runs at eval-build time before grading starts.
+
+4. **Breaking Change** — Removed `evaluation_criteria:` field from YAML prompts. Loud migration error guides authors to `graders:` with `type: prompt`.
+
+5. **Markdown Coexistence** — `## Evaluation Criteria` section PRESERVED. Can coexist with `graders:` on the same file.
+
+### Learnings
+
+#### Parser Two-Pass Decode
+
+`ParseInlineGraders` re-marshals `[]interface{}` from YAML frontmatter → decodes as `[]UnifiedGraderEntry` with `KnownFields(true)`. This preserves strict validation while working around yaml.v3 mixed-type limitations.
+
+#### Collision Detection Timing
+
+Collision check (`CheckInlineCollisions`) runs at eval-build time (engine_eval.go:684), **before** grading starts. If collision detected, eval aborts early with error report — no grading runs. This prevents silent grader-shadowing bugs.
+
+#### Forbidden-`when` Error Wording
+
+Final message (config.go:671):
+> "when: clause is not supported on prompt-inline graders — inline graders always run for their prompt; to conditionally match graders by attributes, define them in a criteria/**.yaml file instead"
+
+Guides authors toward criteria files if they need conditional matching.
+
+#### Migration Cost
+
+Zero production prompts affected (all 91 prompts use `.prompt.md`, which didn't have `evaluation_criteria` field — only markdown section). One example file updated. Breaking change was low-risk.
+
+#### BuildUnifiedReviewBuckets Signature
+
+Added `inlineGraders []UnifiedGraderEntry` parameter. Required updating 7 test call sites (all passed `nil` for back-compat). Engine helpers (`reviewBuckets`, `mergedCriteria`) now include inline graders in bucket/criteria construction.
+
+### Tests
+
+All tests pass (3 pre-existing failures in `internal/report` unrelated). No new test failures from breaking change.
+
+### Handoff
+
+Decision file: `.squad/decisions/inbox/neo-inline-graders-shipped.md`  
+Commits: b290b848, 13f1ca50, 5c304aca
