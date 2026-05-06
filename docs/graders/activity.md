@@ -46,7 +46,7 @@ Maximum turn number must not exceed configured value.
 
 #### 2. `action_count`
 
-Total action count must fall within optional min/max bounds.
+Total action count must fall within optional min/max bounds. An action is any Copilot agent activity including: `assistant.reasoning` events, `tool.execution_start` events, tool calls, bash commands, and responses. Session limit overrides from prompt frontmatter use the same action count semantics.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
