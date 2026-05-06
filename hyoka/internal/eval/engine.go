@@ -257,9 +257,15 @@ func (e *Engine) loadBundle() {
 // matchedForEval returns the grader entries whose file/group/grader `when`
 // blocks match the eval's prompt properties and config. Thin wrapper kept for
 // call-site symmetry with reviewBuckets.
-func (e *Engine) matchedForEval(props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) []criteria.MatchedUnifiedEntry {
+func (e *Engine) matchedForEval(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) []criteria.MatchedUnifiedEntry {
+	// Lowercase tags for case-insensitive matching.
+	tags := make([]string, len(p.Tags))
+	for i, t := range p.Tags {
+		tags[i] = strings.ToLower(t)
+	}
 	ctx := criteria.MatchContext{
 		Props: props,
+		Tags:  tags,
 		Tools: buildToolIdentities(cfg, env),
 	}
 	return criteria.MatchingUnifiedEntries(e.graderBundle, ctx)
@@ -276,7 +282,7 @@ func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string, cfg co
 	if mode == "" {
 		mode = criteria.ReviewModeCombined
 	}
-	matched := e.matchedForEval(props, cfg, env)
+	matched := e.matchedForEval(p, props, cfg, env)
 	promptMatched, _ := criteria.PartitionMatched(matched)
 	if mode == criteria.ReviewModeIsolated && !criteria.HasUnifiedIsolation(promptMatched) {
 		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
@@ -295,8 +301,14 @@ func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string, cfg co
 // Bundle. Kept on Engine for back-compat with the GraderInput.EvalCriteria
 // field consumed by review-aware graders in the single-bucket path.
 func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) string {
+	// Lowercase tags for case-insensitive matching.
+	tags := make([]string, len(p.Tags))
+	for i, t := range p.Tags {
+		tags[i] = strings.ToLower(t)
+	}
 	ctx := criteria.MatchContext{
 		Props: props,
+		Tags:  tags,
 		Tools: buildToolIdentities(cfg, env),
 	}
 	matched := criteria.MatchingUnifiedEntries(e.graderBundle, ctx)

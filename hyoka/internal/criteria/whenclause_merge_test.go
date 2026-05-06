@@ -20,65 +20,65 @@ func TestMergeWhenClause(t *testing.T) {
 		{
 			name: "parent only scalars",
 			parent: WhenClause{
-				Language: StringOrSlice{"python"},
-				Service:  StringOrSlice{"key-vault"},
+				Language: MatchSet{Is: StringOrSlice{"python"}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
 			},
 			child: WhenClause{},
 			want: WhenClause{
-				Language: StringOrSlice{"python"},
-				Service:  StringOrSlice{"key-vault"},
+				Language: MatchSet{Is: StringOrSlice{"python"}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
 			},
 		},
 		{
 			name:   "child only scalars",
 			parent: WhenClause{},
 			child: WhenClause{
-				Language: StringOrSlice{"java"},
-				Plane:    StringOrSlice{"data-plane"},
+				Language: MatchSet{Is: StringOrSlice{"java"}},
+				Plane:    MatchSet{Is: StringOrSlice{"data-plane"}},
 			},
 			want: WhenClause{
-				Language: StringOrSlice{"java"},
-				Plane:    StringOrSlice{"data-plane"},
+				Language: MatchSet{Is: StringOrSlice{"java"}},
+				Plane:    MatchSet{Is: StringOrSlice{"data-plane"}},
 			},
 		},
 		{
 			name: "child replaces parent scalar",
 			parent: WhenClause{
-				Language: StringOrSlice{"python"},
-				Service:  StringOrSlice{"key-vault"},
+				Language: MatchSet{Is: StringOrSlice{"python"}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
 			},
 			child: WhenClause{
-				Language: StringOrSlice{"java"},
+				Language: MatchSet{Is: StringOrSlice{"java"}},
 			},
 			want: WhenClause{
-				Language: StringOrSlice{"java"},
-				Service:  StringOrSlice{"key-vault"},
+				Language: MatchSet{Is: StringOrSlice{"java"}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
 			},
 		},
 		{
 			name: "child scalar-or-list replaces parent",
 			parent: WhenClause{
-				Language: StringOrSlice{"python"},
+				Language: MatchSet{Is: StringOrSlice{"python"}},
 			},
 			child: WhenClause{
-				Language: StringOrSlice{"java", "go"},
+				Language: MatchSet{Is: StringOrSlice{"java", "go"}},
 			},
 			want: WhenClause{
-				Language: StringOrSlice{"java", "go"},
+				Language: MatchSet{Is: StringOrSlice{"java", "go"}},
 			},
 		},
 		{
 			name: "child empty list clears parent constraint",
 			parent: WhenClause{
-				Language: StringOrSlice{"python"},
-				Service:  StringOrSlice{"key-vault"},
+				Language: MatchSet{Is: StringOrSlice{"python"}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
 			},
 			child: WhenClause{
-				Language: StringOrSlice{},
+				Language: MatchSet{Is: StringOrSlice{}},
 			},
 			want: WhenClause{
-				Language: StringOrSlice{},
-				Service:  StringOrSlice{"key-vault"},
+				Language: MatchSet{Is: StringOrSlice{}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
 			},
 		},
 		{
@@ -130,20 +130,20 @@ func TestMergeWhenClause(t *testing.T) {
 		{
 			name: "file → group → grader cascade",
 			parent: WhenClause{
-				Language: StringOrSlice{"python", "java"},
-				Service:  StringOrSlice{"key-vault"},
+				Language: MatchSet{Is: StringOrSlice{"python", "java"}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
 				Tool: []ToolFilter{
 					{Name: "azure", Source: "mcp"},
 				},
 			},
 			child: WhenClause{
-				Language: StringOrSlice{"python"}, // narrows to python only
-				Plane:    StringOrSlice{"data-plane"},
+				Language: MatchSet{Is: StringOrSlice{"python"}}, // narrows to python only
+				Plane:    MatchSet{Is: StringOrSlice{"data-plane"}},
 			},
 			want: WhenClause{
-				Language: StringOrSlice{"python"},
-				Service:  StringOrSlice{"key-vault"},
-				Plane:    StringOrSlice{"data-plane"},
+				Language: MatchSet{Is: StringOrSlice{"python"}},
+				Service:  MatchSet{Is: StringOrSlice{"key-vault"}},
+				Plane:    MatchSet{Is: StringOrSlice{"data-plane"}},
 				Tool: []ToolFilter{
 					{Name: "azure", Source: "mcp"},
 				},
@@ -152,36 +152,36 @@ func TestMergeWhenClause(t *testing.T) {
 		{
 			name: "all fields replaced",
 			parent: WhenClause{
-				Language:   StringOrSlice{"python"},
-				Service:    StringOrSlice{"key-vault"},
-				Plane:      StringOrSlice{"data-plane"},
-				Category:   StringOrSlice{"crud"},
-				SDK:        StringOrSlice{"azure-sdk"},
-				Difficulty: StringOrSlice{"easy"},
-				Generator:  StringOrSlice{"claude-opus-4.6"},
-				Config:     StringOrSlice{"baseline/claude-opus-4.6"},
+				Language:   MatchSet{Is: StringOrSlice{"python"}},
+				Service:    MatchSet{Is: StringOrSlice{"key-vault"}},
+				Plane:      MatchSet{Is: StringOrSlice{"data-plane"}},
+				Category:   MatchSet{Is: StringOrSlice{"crud"}},
+				SDK:        MatchSet{Is: StringOrSlice{"azure-sdk"}},
+				Difficulty: MatchSet{Is: StringOrSlice{"easy"}},
+				Generator:  MatchSet{Is: StringOrSlice{"claude-opus-4.6"}},
+				Config:     MatchSet{Is: StringOrSlice{"baseline/claude-opus-4.6"}},
 				Tool:       []ToolFilter{{Name: "azure", Source: "mcp"}},
 			},
 			child: WhenClause{
-				Language:   StringOrSlice{"java"},
-				Service:    StringOrSlice{"storage"},
-				Plane:      StringOrSlice{"management-plane"},
-				Category:   StringOrSlice{"auth"},
-				SDK:        StringOrSlice{"azure-mgmt"},
-				Difficulty: StringOrSlice{"hard"},
-				Generator:  StringOrSlice{"gpt-5.4"},
-				Config:     StringOrSlice{"azure-mcp/gpt-5.4"},
+				Language:   MatchSet{Is: StringOrSlice{"java"}},
+				Service:    MatchSet{Is: StringOrSlice{"storage"}},
+				Plane:      MatchSet{Is: StringOrSlice{"management-plane"}},
+				Category:   MatchSet{Is: StringOrSlice{"auth"}},
+				SDK:        MatchSet{Is: StringOrSlice{"azure-mgmt"}},
+				Difficulty: MatchSet{Is: StringOrSlice{"hard"}},
+				Generator:  MatchSet{Is: StringOrSlice{"gpt-5.4"}},
+				Config:     MatchSet{Is: StringOrSlice{"azure-mcp/gpt-5.4"}},
 				Tool:       []ToolFilter{{Name: "markdown-lists", Source: "skill"}},
 			},
 			want: WhenClause{
-				Language:   StringOrSlice{"java"},
-				Service:    StringOrSlice{"storage"},
-				Plane:      StringOrSlice{"management-plane"},
-				Category:   StringOrSlice{"auth"},
-				SDK:        StringOrSlice{"azure-mgmt"},
-				Difficulty: StringOrSlice{"hard"},
-				Generator:  StringOrSlice{"gpt-5.4"},
-				Config:     StringOrSlice{"azure-mcp/gpt-5.4"},
+				Language:   MatchSet{Is: StringOrSlice{"java"}},
+				Service:    MatchSet{Is: StringOrSlice{"storage"}},
+				Plane:      MatchSet{Is: StringOrSlice{"management-plane"}},
+				Category:   MatchSet{Is: StringOrSlice{"auth"}},
+				SDK:        MatchSet{Is: StringOrSlice{"azure-mgmt"}},
+				Difficulty: MatchSet{Is: StringOrSlice{"hard"}},
+				Generator:  MatchSet{Is: StringOrSlice{"gpt-5.4"}},
+				Config:     MatchSet{Is: StringOrSlice{"azure-mcp/gpt-5.4"}},
 				Tool:       []ToolFilter{{Name: "markdown-lists", Source: "skill"}},
 			},
 		},
@@ -198,14 +198,15 @@ func TestMergeWhenClause(t *testing.T) {
 }
 
 func whenClauseEqual(a, b WhenClause) bool {
-	return equalSlices(a.Language, b.Language) &&
-		equalSlices(a.Service, b.Service) &&
-		equalSlices(a.Plane, b.Plane) &&
-		equalSlices(a.Category, b.Category) &&
-		equalSlices(a.SDK, b.SDK) &&
-		equalSlices(a.Difficulty, b.Difficulty) &&
-		equalSlices(a.Generator, b.Generator) &&
-		equalSlices(a.Config, b.Config) &&
+	return matchSetEqual(a.Language, b.Language) &&
+		matchSetEqual(a.Service, b.Service) &&
+		matchSetEqual(a.Plane, b.Plane) &&
+		matchSetEqual(a.Category, b.Category) &&
+		matchSetEqual(a.SDK, b.SDK) &&
+		matchSetEqual(a.Difficulty, b.Difficulty) &&
+		matchSetEqual(a.Generator, b.Generator) &&
+		matchSetEqual(a.Config, b.Config) &&
+		matchSetEqual(a.Tags, b.Tags) &&
 		toolFiltersEqual(a.Tool, b.Tool)
 }
 

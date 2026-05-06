@@ -190,44 +190,68 @@ func totalGraders(gc criteria.UnifiedGraderConfig) int {
 // formatWhenClause renders a WhenClause as a compact human-readable string.
 // Example: "language=python,java; service=key-vault; tool=skill:markdown-headings"
 func formatWhenClause(w criteria.WhenClause) string {
-var parts []string
-if len(w.Language) > 0 {
-parts = append(parts, "language="+strings.Join(w.Language, ","))
+	var parts []string
+	if s := formatMatchSet("language", w.Language); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("service", w.Service); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("plane", w.Plane); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("category", w.Category); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("sdk", w.SDK); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("difficulty", w.Difficulty); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("generator", w.Generator); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("config", w.Config); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("tags", w.Tags); s != "" {
+		parts = append(parts, s)
+	}
+	if len(w.Tool) > 0 {
+		var toolStrs []string
+		for _, tf := range w.Tool {
+			s := tf.Source + ":" + tf.Name
+			if tf.MCPServer != "" {
+				s += "/" + tf.MCPServer
+			}
+			if tf.Negate {
+				s = "!" + s
+			}
+			toolStrs = append(toolStrs, s)
+		}
+		parts = append(parts, "tool="+strings.Join(toolStrs, ","))
+	}
+	return strings.Join(parts, "; ")
 }
-if len(w.Service) > 0 {
-parts = append(parts, "service="+strings.Join(w.Service, ","))
-}
-if len(w.Plane) > 0 {
-parts = append(parts, "plane="+strings.Join(w.Plane, ","))
-}
-if len(w.Category) > 0 {
-parts = append(parts, "category="+strings.Join(w.Category, ","))
-}
-if len(w.SDK) > 0 {
-parts = append(parts, "sdk="+strings.Join(w.SDK, ","))
-}
-if len(w.Difficulty) > 0 {
-parts = append(parts, "difficulty="+strings.Join(w.Difficulty, ","))
-}
-if len(w.Generator) > 0 {
-parts = append(parts, "generator="+strings.Join(w.Generator, ","))
-}
-if len(w.Config) > 0 {
-parts = append(parts, "config="+strings.Join(w.Config, ","))
-}
-if len(w.Tool) > 0 {
-var toolStrs []string
-for _, tf := range w.Tool {
-s := tf.Source + ":" + tf.Name
-if tf.MCPServer != "" {
-s += "/" + tf.MCPServer
-}
-if tf.Negate {
-s = "!" + s
-}
-toolStrs = append(toolStrs, s)
-}
-parts = append(parts, "tool="+strings.Join(toolStrs, ","))
-}
-return strings.Join(parts, "; ")
+
+// formatMatchSet formats a MatchSet for human display. Returns empty string if empty.
+// Examples: "language=python,java", "service=!identity,!key-vault"
+func formatMatchSet(name string, ms criteria.MatchSet) string {
+	if ms.IsEmpty() {
+		return ""
+	}
+	var vals []string
+	// Show "is" values first
+	for _, v := range ms.Is {
+		vals = append(vals, v)
+	}
+	// Then "not" values with ! prefix
+	for _, v := range ms.Not {
+		vals = append(vals, "!"+v)
+	}
+	if len(vals) == 0 {
+		return ""
+	}
+	return name + "=" + strings.Join(vals, ",")
 }

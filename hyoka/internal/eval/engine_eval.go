@@ -533,8 +533,14 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 
 	// Fail this eval (and only this eval) if a grader file relevant to
 	// its properties failed to load.
+	// Lowercase tags for case-insensitive matching.
+	tags := make([]string, len(task.Prompt.Tags))
+	for i, t := range task.Prompt.Tags {
+		tags[i] = strings.ToLower(t)
+	}
 	matchCtx := criteria.MatchContext{
 		Props: props,
+		Tags:  tags,
 		Tools: buildToolIdentities(task.Config, env),
 	}
 	if bundleErr := e.graderBundle.MatchingErrors(matchCtx); bundleErr != nil {
@@ -554,7 +560,7 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		// iterates this list in YAML declaration order, treating
 		// type=prompt entries as review items and everything else as
 		// typed graders.
-		matched := e.matchedForEval(props, task.Config, env)
+		matched := e.matchedForEval(task.Prompt, props, task.Config, env)
 
 		// Collect all grader results across typed graders and AI review.
 		var allGraderResults []graders.GraderResult

@@ -31,16 +31,16 @@ func typedEntry(kind, name string) UnifiedGraderEntry {
 
 func TestMatchingUnifiedEntries_HonorsHierarchicalWhen(t *testing.T) {
 	bundle := &Bundle{Configs: []UnifiedGraderConfig{{
-		When: WhenClause{Language: StringOrSlice{"python"}},
+		When: WhenClause{Language: MatchSet{Is: StringOrSlice{"python"}}},
 		Graders: []UnifiedGraderEntry{
 			promptEntry("a", "A", false),
-	},
+		},
 		Groups: []UnifiedGraderGroup{{
 			Name: "g",
-			When: WhenClause{Plane: StringOrSlice{"data-plane"}},
+			When: WhenClause{Plane: MatchSet{Is: StringOrSlice{"data-plane"}}},
 			Graders: []UnifiedGraderEntry{
 				promptEntry("b", "B", false),
-				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: WhenClause{Category: StringOrSlice{"crud"}}},
+				{Type: graders.KindPrompt, Name: "c", Prompt: "C", When: WhenClause{Category: MatchSet{Is: StringOrSlice{"crud"}}}},
 			},
 		}},
 	}}}

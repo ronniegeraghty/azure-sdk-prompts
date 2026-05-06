@@ -302,24 +302,148 @@ func (s StringOrSlice) Matches(candidate string) bool {
 	return false
 }
 
+// MatchSet supports both positive (is) and negative (not) matching for a
+// single when: field. It accepts three YAML forms:
+//   - scalar → Is = [scalar]
+//   - sequence → Is = [...]
+//   - mapping with is:/not: keys
+//
+// For scalar/sequence properties (language, service, etc.), Matches(candidate)
+// passes when candidate is in Is (or Is is empty) AND candidate is NOT in Not.
+// For set-valued properties (tags), MatchesAny(candidates) passes when at least
+// one candidate is in Is (or Is is empty) AND no candidate is in Not.
+type MatchSet struct {
+	Is  StringOrSlice `yaml:"is,omitempty" json:"is,omitempty"`
+	Not StringOrSlice `yaml:"not,omitempty" json:"not,omitempty"`
+}
+
+// UnmarshalYAML decodes scalar, sequence, or map forms into MatchSet.
+func (m *MatchSet) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		// scalar → Is = [scalar]
+		if node.Tag == "!!null" {
+			*m = MatchSet{}
+			return nil
+		}
+		var s StringOrSlice
+		if err := s.UnmarshalYAML(node); err != nil {
+			return err
+		}
+		*m = MatchSet{Is: s}
+		return nil
+	case yaml.SequenceNode:
+		// sequence → Is = [...]
+		var s StringOrSlice
+		if err := s.UnmarshalYAML(node); err != nil {
+			return err
+		}
+		*m = MatchSet{Is: s}
+		return nil
+	case yaml.MappingNode:
+		// Decode as struct, then validate keys
+		type raw struct {
+			Is  StringOrSlice `yaml:"is,omitempty"`
+			Not StringOrSlice `yaml:"not,omitempty"`
+		}
+		var r raw
+		if err := node.Decode(&r); err != nil {
+			return err
+		}
+		// Check for unknown keys
+		for i := 0; i < len(node.Content); i += 2 {
+			key := node.Content[i].Value
+			if key != "is" && key != "not" {
+				return fmt.Errorf("when: field at line %d: unknown key %q (only 'is' and 'not' are allowed)",
+					node.Content[i].Line, key)
+			}
+		}
+		*m = MatchSet{Is: r.Is, Not: r.Not}
+		return nil
+	default:
+		return fmt.Errorf("when: field at line %d must be a string, list, or map with is/not keys",
+			node.Line)
+	}
+}
+
+// Matches reports whether a scalar candidate passes this MatchSet.
+// Passes when candidate is in Is (or Is is empty) AND candidate is NOT in Not.
+// Case-insensitive. An empty MatchSet matches everything.
+func (m MatchSet) Matches(candidate string) bool {
+	// Check Not first (exclusion)
+	for _, v := range m.Not {
+		if strings.EqualFold(v, candidate) {
+			return false
+		}
+	}
+	// Then check Is (inclusion)
+	if len(m.Is) == 0 {
+		return true
+	}
+	for _, v := range m.Is {
+		if strings.EqualFold(v, candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+// MatchesAny reports whether at least one candidate in a set passes this MatchSet.
+// For set-valued fields like tags. Passes when:
+//   - Is is empty OR at least one candidate ∈ Is
+//   - AND no candidate ∈ Not
+//
+// Case-insensitive. An empty MatchSet matches everything.
+func (m MatchSet) MatchesAny(candidates []string) bool {
+	// Check Not first: if any candidate is in Not, fail
+	for _, c := range candidates {
+		for _, v := range m.Not {
+			if strings.EqualFold(v, c) {
+				return false
+			}
+		}
+	}
+	// Then check Is: if Is is empty, pass; otherwise need intersection
+	if len(m.Is) == 0 {
+		return true
+	}
+	for _, c := range candidates {
+		for _, v := range m.Is {
+			if strings.EqualFold(v, c) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IsEmpty reports whether the MatchSet has no constraints.
+func (m MatchSet) IsEmpty() bool {
+	return len(m.Is) == 0 && len(m.Not) == 0
+}
+
 // WhenClause narrows grader applicability. All fields AND together.
 // An empty WhenClause matches everything.
 //
-// Every scalar prompt/config field is a StringOrSlice — it accepts either
-// a single string or a YAML list of strings, normalized to []string.
+// Every scalar prompt/config field is a MatchSet supporting positive (is:) and
+// negative (not:) matching. It accepts scalar, sequence, or map forms.
 // Within a field, entries are OR'd (any-of match). Across fields, AND.
+// Tags uses set-intersection semantics via MatchesAny.
 type WhenClause struct {
 	// Scalar prompt props (case-insensitive any-of equality).
-	Language   StringOrSlice `yaml:"language,omitempty" json:"language,omitempty"`
-	Service    StringOrSlice `yaml:"service,omitempty" json:"service,omitempty"`
-	Plane      StringOrSlice `yaml:"plane,omitempty" json:"plane,omitempty"`
-	Category   StringOrSlice `yaml:"category,omitempty" json:"category,omitempty"`
-	SDK        StringOrSlice `yaml:"sdk,omitempty" json:"sdk,omitempty"`
-	Difficulty StringOrSlice `yaml:"difficulty,omitempty" json:"difficulty,omitempty"`
+	Language   MatchSet `yaml:"language,omitempty" json:"language,omitempty"`
+	Service    MatchSet `yaml:"service,omitempty" json:"service,omitempty"`
+	Plane      MatchSet `yaml:"plane,omitempty" json:"plane,omitempty"`
+	Category   MatchSet `yaml:"category,omitempty" json:"category,omitempty"`
+	SDK        MatchSet `yaml:"sdk,omitempty" json:"sdk,omitempty"`
+	Difficulty MatchSet `yaml:"difficulty,omitempty" json:"difficulty,omitempty"`
 
 	// Scalar config props.
-	Generator StringOrSlice `yaml:"generator,omitempty" json:"generator,omitempty"`
-	Config    StringOrSlice `yaml:"config,omitempty" json:"config,omitempty"`
+	Generator MatchSet `yaml:"generator,omitempty" json:"generator,omitempty"`
+	Config    MatchSet `yaml:"config,omitempty" json:"config,omitempty"`
+
+	// Set-valued prompt prop (tags from prompt frontmatter).
+	Tags MatchSet `yaml:"tags,omitempty" json:"tags,omitempty"`
 
 	// Structured tool filter; AND across entries.
 	Tool []ToolFilter `yaml:"tool,omitempty" json:"tool,omitempty"`
@@ -345,6 +469,9 @@ type MatchContext struct {
 	// Includes language/service/plane/category/sdk/difficulty/generator/config.
 	Props map[string]string
 
+	// Tags from prompt frontmatter, lowercased for matching.
+	Tags []string
+
 	// Resolved tool list from cfg.Generator.Tools, with type already
 	// disambiguated via ToolEntry.ResolvedType().
 	Tools []ToolIdentity
@@ -359,21 +486,22 @@ type ToolIdentity struct {
 
 // IsEmpty reports whether the clause has no constraints.
 func (w WhenClause) IsEmpty() bool {
-	return len(w.Language) == 0 &&
-		len(w.Service) == 0 &&
-		len(w.Plane) == 0 &&
-		len(w.Category) == 0 &&
-		len(w.SDK) == 0 &&
-		len(w.Difficulty) == 0 &&
-		len(w.Generator) == 0 &&
-		len(w.Config) == 0 &&
+	return w.Language.IsEmpty() &&
+		w.Service.IsEmpty() &&
+		w.Plane.IsEmpty() &&
+		w.Category.IsEmpty() &&
+		w.SDK.IsEmpty() &&
+		w.Difficulty.IsEmpty() &&
+		w.Generator.IsEmpty() &&
+		w.Config.IsEmpty() &&
+		w.Tags.IsEmpty() &&
 		len(w.Tool) == 0
 }
 
 // Matches evaluates the clause against the resolved match context.
 // All fields AND together; a constraint passes if it's empty or matches.
 func (w WhenClause) Matches(ctx MatchContext) bool {
-	// Scalar fields: AND across fields, OR within each field (via StringOrSlice.Matches).
+	// Scalar fields: AND across fields, OR within each field (via MatchSet.Matches).
 	if !w.Language.Matches(ctx.Props["language"]) {
 		return false
 	}
@@ -396,6 +524,11 @@ func (w WhenClause) Matches(ctx MatchContext) bool {
 		return false
 	}
 	if !w.Config.Matches(ctx.Props["config"]) {
+		return false
+	}
+
+	// Tags: set-intersection semantics
+	if !w.Tags.MatchesAny(ctx.Tags) {
 		return false
 	}
 
@@ -440,35 +573,41 @@ func matchesToolFilter(filter ToolFilter, tool ToolIdentity) bool {
 }
 
 // mergeWhenClause merges parent and child WhenClause; child REPLACES parent
-// for every field (scalars and tool alike). An explicit empty list at child
-// level removes the parent's constraint.
+// for every field (scalars, tags, and tool alike). An explicit empty MatchSet
+// at child level removes the parent's constraint.
 func mergeWhenClause(parent, child WhenClause) WhenClause {
 	out := parent // value copy
 
-	// Uniform rule: child slice non-nil wins.
-	if child.Language != nil {
+	// Uniform rule: child field non-empty wins (includes MatchSet).
+	// Note: MatchSet zero value is empty (both Is and Not nil), so we check
+	// !IsEmpty() to detect explicit child constraints (including empty maps/lists
+	// that reset parent constraints).
+	if !child.Language.IsEmpty() || (child.Language.Is != nil || child.Language.Not != nil) {
 		out.Language = child.Language
 	}
-	if child.Service != nil {
+	if !child.Service.IsEmpty() || (child.Service.Is != nil || child.Service.Not != nil) {
 		out.Service = child.Service
 	}
-	if child.Plane != nil {
+	if !child.Plane.IsEmpty() || (child.Plane.Is != nil || child.Plane.Not != nil) {
 		out.Plane = child.Plane
 	}
-	if child.Category != nil {
+	if !child.Category.IsEmpty() || (child.Category.Is != nil || child.Category.Not != nil) {
 		out.Category = child.Category
 	}
-	if child.SDK != nil {
+	if !child.SDK.IsEmpty() || (child.SDK.Is != nil || child.SDK.Not != nil) {
 		out.SDK = child.SDK
 	}
-	if child.Difficulty != nil {
+	if !child.Difficulty.IsEmpty() || (child.Difficulty.Is != nil || child.Difficulty.Not != nil) {
 		out.Difficulty = child.Difficulty
 	}
-	if child.Generator != nil {
+	if !child.Generator.IsEmpty() || (child.Generator.Is != nil || child.Generator.Not != nil) {
 		out.Generator = child.Generator
 	}
-	if child.Config != nil {
+	if !child.Config.IsEmpty() || (child.Config.Is != nil || child.Config.Not != nil) {
 		out.Config = child.Config
+	}
+	if !child.Tags.IsEmpty() || (child.Tags.Is != nil || child.Tags.Not != nil) {
+		out.Tags = child.Tags
 	}
 	if child.Tool != nil {
 		out.Tool = child.Tool
