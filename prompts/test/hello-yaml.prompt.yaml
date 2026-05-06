@@ -31,30 +31,37 @@ prompt_text: |
 
   Do not write any other files. Complete this task in one turn.
 
-# Inline graders — non-prompt types that always apply to this prompt file.
-# Mirrors the inline graders on hello-markdown-with-code.prompt.md so we
-# get parity coverage across the .prompt.md and .prompt.yaml loaders.
+# Inline graders — specific to THIS prompt's contract (basic markdown
+# with three exact bullets, no other files, no code blocks). Distinct
+# from the generic test-language graders in criteria/language/test.yaml.
 graders:
   - type: workspace
-    name: hello.md present
+    name: YAML-prompt contract
     weight: 1.0
     checks:
       - kind: require_to_create
         files: [hello.md]
+      # hello.md must contain each of the three exact bullet labels the
+      # prompt asks for, AND must NOT contain a fenced code block (the
+      # companion hello-markdown-with-code prompt covers that case).
       - kind: file
         name: hello.md
         state: present
         min_bytes: 30
-
-  - type: tool
-    name: Used markdown skills
-    weight: 0.5
-    checks:
-      - kind: tool_used
-        tool: markdown-headings
-        source: skill
-        min_calls: 1
-      - kind: tool_used
-        tool: markdown-lists
-        source: skill
-        min_calls: 1
+        max_bytes: 200
+        contains: "First"
+      - kind: file
+        name: hello.md
+        state: present
+        contains: "Second"
+      - kind: file
+        name: hello.md
+        state: present
+        contains: "Third"
+      - kind: file
+        name: hello.md
+        state: present
+        excludes: "```"
+      # Prompt explicitly says "Do not write any other files."
+      - kind: forbidden_to_create
+        files: [README.md, notes.md, hello.txt, main.rs, main.py]

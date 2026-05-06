@@ -14,33 +14,32 @@ tags:
 - markdown
 - code-block
 
-# Inline graders — non-prompt types that always apply to this prompt file.
-# Demonstrates the non-LLM grader types (workspace + tool) running inline
-# alongside the prompt-grader generated from `## Evaluation Criteria` below.
+# Inline graders — specific to THIS prompt's contract (rust code block,
+# no extra source files). Distinct from the generic test-language graders
+# in criteria/language/test.yaml.
 graders:
   - type: workspace
-    name: hello.md present
+    name: Code-block prompt contract
     weight: 1.0
     checks:
       - kind: require_to_create
         files: [hello.md]
+      # hello.md must include the fenced rust block — checked by substring,
+      # not by a generic "any code block" rule.
       - kind: file
         name: hello.md
         state: present
-        min_bytes: 30
-
-  - type: tool
-    name: Used markdown skills
-    weight: 0.5
-    checks:
-      - kind: tool_used
-        tool: markdown-headings
-        source: skill
-        min_calls: 1
-      - kind: tool_used
-        tool: markdown-lists
-        source: skill
-        min_calls: 1
+        min_bytes: 100
+        contains: "```rust"
+      - kind: file
+        name: hello.md
+        state: present
+        contains: "fn main"
+      # The prompt explicitly says "Do not write any other files." Specifically,
+      # the rust snippet must live INSIDE hello.md as a fenced block, not as a
+      # separate Rust source file or build manifest.
+      - kind: forbidden_to_create
+        files: [main.rs, hello.rs, Cargo.toml, Cargo.lock]
 ---
 
 # Hello Markdown with Code Test
