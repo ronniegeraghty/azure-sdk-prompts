@@ -124,6 +124,8 @@ graders:
 | `prompt`  | string              | type=prompt only | — | LLM preamble/instructions (optional if `checks:` is set).              |
 | `checks`  | list               | yes (for canonical) | — | Type-specific checks (each canonical grader type defines its own schema). |
 
+> **Inline graders note:** Graders defined directly in `.prompt.md` frontmatter or `.prompt.yaml` files use the same schema but **forbid `when:` clauses** (hard error). Inline graders apply only to their specific prompt file and always execute. See [docs/prompt-authoring.md](../prompt-authoring.md) for examples.
+
 ### Applicability (`when`)
 
 The `when` field applies a grader conditionally based on prompt properties using exact, case-insensitive string matching. All specified keys must match for the grader to run. If `when` is omitted, the grader applies to all prompts.
@@ -177,6 +179,49 @@ graders:
 ```
 
 On a config that doesn't include the `azure` MCP server, this grader is silently skipped instead of failing every eval.
+
+#### Polymorphic Match Sets (Negation & Tag Matching)
+
+The `when:` clause now supports polymorphic `MatchSet` type for any property: scalar strings, YAML lists, or structured `{is:, not:}` maps. All forms encode into the same shape and are backwards compatible.
+
+**Scalar form (implicit OR):**
+```yaml
+when:
+  language: python              # Matches prompts with language=python
+  service: [key-vault, storage] # Matches ANY service in the list
+```
+
+**Structured form (explicit negation):**
+```yaml
+when:
+  language:
+    is: [python, java]       # Must be python OR java
+    not: [jython, pypy]      # But NOT jython or pypy
+  category:
+    is: [crud]               # MUST be crud
+    not: []                  # (empty not list — no exclusions)
+```
+
+**Tag matching (new feature):**
+```yaml
+# Matches only prompts with tags="auth" OR "msal"
+when:
+  tags:
+    is: [auth, msal]
+
+# Matches prompts that have "crud" tag but NOT "experimental"
+when:
+  tags:
+    is: [crud]
+    not: [experimental]
+
+# Matches any prompt WITHOUT "draft" or "wip" tags
+when:
+  tags:
+    not: [draft, wip]
+```
+
+Tags are case-insensitive. Matching semantics: `(Is empty OR ≥1 candidate ∈ Is) AND no candidate ∈ Not`.
 
 **Scalar-or-list fields** accept either a single string OR a YAML list. Lists are OR'd within the field, AND'd across fields:
 
