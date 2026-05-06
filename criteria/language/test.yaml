@@ -139,3 +139,49 @@ graders:
           - -f
           - hello.md
         timeout: 5
+
+  # ---------------------------------------------------------------------------
+  # 6. NEW SYNTAX DEMO — per-property negation + tag matching.
+  #    Validates the MatchSet polymorphism (is:/not:) and tag filtering added
+  #    in commit 3a78909a. The hello-markdown-with-code prompt carries the
+  #    `code-block` tag; the original hello-markdown prompt does not.
+  # ---------------------------------------------------------------------------
+
+  # Tag IS — runs only on prompts tagged `code-block`. Should PASS on
+  # hello-markdown-with-code and be SKIPPED on hello-markdown.
+  - name: Rust Code Block (tag-gated)
+    type: prompt
+    weight: 1.0
+    when:
+      tags:
+        is: [code-block]
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md contains a fenced code block tagged with the language `rust`.
+
+  # Tag NOT — runs only on prompts NOT tagged `code-block`. Should PASS on
+  # hello-markdown and be SKIPPED on hello-markdown-with-code.
+  - name: No Code Block (tag-negated)
+    type: prompt
+    weight: 1.0
+    when:
+      tags:
+        not: [code-block]
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md does NOT contain any fenced code blocks (no triple-backtick fences).
+
+  # Property NEGATION — demonstrates `is:`/`not:` object form on a scalar
+  # property. Both test prompts have difficulty=basic, so both match the
+  # `is` constraint; neither has difficulty=advanced, so both pass the
+  # `not` constraint. Validates the parse + match path runs cleanly.
+  - name: Difficulty Sanity (object-form when)
+    type: prompt
+    weight: 0.5
+    when:
+      difficulty:
+        is:  [basic, intermediate]
+        not: [advanced, expert]
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md exists.
