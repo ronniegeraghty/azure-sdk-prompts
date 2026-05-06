@@ -13,6 +13,34 @@ tags:
 - test-fixture
 - markdown
 - code-block
+
+# Inline graders — non-prompt types that always apply to this prompt file.
+# Demonstrates the non-LLM grader types (workspace + tool) running inline
+# alongside the prompt-grader generated from `## Evaluation Criteria` below.
+graders:
+  - type: workspace
+    name: hello.md present
+    weight: 1.0
+    checks:
+      - kind: require_to_create
+        files: [hello.md]
+      - kind: file
+        name: hello.md
+        state: present
+        min_bytes: 30
+
+  - type: tool
+    name: Used markdown skills
+    weight: 0.5
+    checks:
+      - kind: tool_used
+        tool: markdown-headings
+        source: skill
+        min_calls: 1
+      - kind: tool_used
+        tool: markdown-lists
+        source: skill
+        min_calls: 1
 ---
 
 # Hello Markdown with Code Test

@@ -1,0 +1,60 @@
+# Test fixture in pure-YAML prompt format.
+#
+# Companion to hello-markdown.prompt.md / hello-markdown-with-code.prompt.md
+# that exercises the .prompt.yaml loader path. Generates a tiny markdown file
+# so the existing test-language graders in criteria/language/test.yaml apply.
+
+id: test-dp-test-hello-yaml
+
+properties:
+  service: test
+  plane: data-plane
+  language: test
+  category: test
+  difficulty: basic
+  description: >
+    YAML-format test fixture that asks the agent to write a minimal hello.md
+    so the test-language criteria suite runs end-to-end against the .prompt.yaml
+    loader path.
+  created: '2026-05-06'
+  author: neo
+
+tags:
+  - test-fixture
+  - markdown
+  - yaml-format
+
+prompt_text: |
+  Write a file called `hello.md` to the workspace containing:
+  - A level-1 heading with the text "Hello"
+  - A single bullet list with exactly three items: "First", "Second", "Third"
+
+  Do not write any other files. Complete this task in one turn.
+
+# Inline graders — non-prompt types that always apply to this prompt file.
+# Mirrors the inline graders on hello-markdown-with-code.prompt.md so we
+# get parity coverage across the .prompt.md and .prompt.yaml loaders.
+graders:
+  - type: workspace
+    name: hello.md present
+    weight: 1.0
+    checks:
+      - kind: require_to_create
+        files: [hello.md]
+      - kind: file
+        name: hello.md
+        state: present
+        min_bytes: 30
+
+  - type: tool
+    name: Used markdown skills
+    weight: 0.5
+    checks:
+      - kind: tool_used
+        tool: markdown-headings
+        source: skill
+        min_calls: 1
+      - kind: tool_used
+        tool: markdown-lists
+        source: skill
+        min_calls: 1
