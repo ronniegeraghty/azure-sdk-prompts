@@ -1395,3 +1395,44 @@ All tests passing. Test filenames include "pr640" for easy discoverability.
 - Commit authored by Larry Osterman with co-authorship to Copilot
 
 ---
+
+---
+
+## 2026-05-02 — Inline `graders:` on Prompt Files (Neo)
+
+**Status:** SHIPPED  
+**Branch:** ronniegeraghty/dev  
+**Commits:** b290b848, 13f1ca50, 5c304aca, 35d83eed
+
+### Decision
+
+Prompt files (`.prompt.md` frontmatter and `.prompt.yaml`) now support inline `graders:` using the same `UnifiedGraderEntry` schema as `criteria/**.yaml`. Enables prompt-specific graders without separate criteria files.
+
+**Key rulings (Ronnie):**
+- **`when:` clauses FORBIDDEN** on inline graders (hard error)
+- **Name collisions are hard errors** (inline vs inline, inline vs criteria-file, inline vs reserved "Criteria from prompt file")
+- **Markdown `## Evaluation Criteria` PRESERVED** — coexists with `graders:`
+- **YAML `evaluation_criteria:` REMOVED** (breaking change)
+
+### Execution Order
+
+1. Implicit "Criteria from prompt file" (from markdown `## Evaluation Criteria`)
+2. Inline `graders:` from prompt frontmatter
+3. Matched criteria-file graders
+
+### Breaking Change
+
+`.prompt.yaml` files with `evaluation_criteria:` now fail to parse with migration error guiding to `graders:` with `type: prompt`.
+
+**Impact:** Zero production prompts (all 91 use `.prompt.md`). One example file updated.
+
+### Files
+
+- Parser: `internal/prompt/parser.go`, `types.go`
+- Validation: `internal/criteria/config.go` (ParseInlineGraders, ValidateInlineGraders, CheckInlineCollisions)
+- Engine: `internal/eval/engine_eval.go`, `engine.go`, `internal/criteria/buckets.go`
+- Example: `examples/prompts/example.prompt.yaml`
+
+### Full Decision
+
+See `.squad/decisions/inbox/neo-inline-graders-shipped.md` (gitignored) and `.squad/agents/neo/history.md` for implementation details.
