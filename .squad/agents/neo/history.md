@@ -1977,3 +1977,15 @@ All inbox files processed and deleted per Scribe protocol. Feature fully documen
 - Confirms loader paths (.prompt.md vs .prompt.yaml) handle inline graders correctly in orchestration
 - Validates mixed execution order per Neo's redesign (commits bd8ff298, 9cdff379)
 
+### 2026-05-06: Inline Graders Must Specialize, Not Duplicate
+
+After shipping inline graders (commits bd8ff298, 9cdff379), Coordinator flagged that test prompts' inline graders duplicated checks already in `criteria/language/test.yaml`. Learned:
+- **Inline graders are for prompt-specific contracts**, not shared checks
+- If a check exists in both inline and criteria-file form, it wastes space and creates maintenance confusion
+- Either specialize the inline grader (e.g., "Rust code must be in code block") or move it to criteria files for reuse
+
+Test prompts were reframed (commit b1769058):
+- `hello-markdown-with-code`: Now checks Rust code block + no extra .rs files (prompt-unique)
+- `hello-yaml`: Now checks exact bullet labels + no code fence + no extra files (prompt-unique)
+- Duplicates removed; grader contracts now clean and purposeful
+

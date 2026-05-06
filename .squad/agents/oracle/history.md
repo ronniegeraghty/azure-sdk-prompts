@@ -1006,3 +1006,28 @@ Oracle should be aware that per Ronnie's clarification ("anything the agent does
 **Status:** Documentation audit complete and up-to-date. All three feature batches are now
 fully documented with examples, CHANGELOG entries, and architectural context.
 
+
+---
+
+## Learnings (2026-05-06)
+
+### Inline Graders Must Specialize, Not Duplicate Criteria-File Checks
+
+**Context:** Coordinator flag on prompt-specific inline graders (commit b1769058).
+
+Inline `graders:` clauses on prompt files should encode **prompt-unique evaluation contracts**, not duplicate checks from `criteria/language/*.yaml` or `criteria/service/*.yaml`. When an inline grader is identical to a criteria-file grader, it creates:
+- Maintenance burden (update both places, or risk divergence)
+- Reader confusion (unclear what makes the prompt special)
+- Bloat (reusable checks belong in criteria files, not per-prompt)
+
+**Resolution Pattern:**
+1. If inline grader is prompt-specific (e.g., "Rust code must be in code block") → keep it inline
+2. If inline grader duplicates a criteria-file check → either specialize it or move to criteria files
+3. When writing docs/examples for inline graders next, reference this pattern
+
+**Examples:**
+- `prompts/test/hello-markdown-with-code.prompt.md`: inline graders now check "Rust code in block + no extra .rs files"
+- `prompts/test/hello-yaml.prompt.yaml`: inline graders now check "exact bullets + no code fence + no extra files"
+- Both removed generic duplicates; grader contracts are now clean and purposeful
+
+**Implication for Future Work:** Any time Oracle revises inline graders documentation or examples, enforce this discipline. If a check looks reusable across prompts, criteria files are the right home.
