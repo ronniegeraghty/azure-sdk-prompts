@@ -678,7 +678,41 @@ func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string,
 		})
 	}
 
-	// Then criteria-file graders in YAML declaration order.
+	// Position 1..N: inline graders from prompt frontmatter.
+	// Check for collisions with matched criteria-file graders first.
+	if len(task.Prompt.Graders) > 0 {
+		if err := criteria.CheckInlineCollisions(task.Prompt.Graders, matched); err != nil {
+			// Return early with error report
+			collisionErr := fmt.Sprintf("inline grader collision: %v", err)
+			evalReport.Error = collisionErr
+			evalReport.Success = false
+			lg.Error("Inline grader name collision detected", "error", err)
+			return evalReport
+		}
+		
+		for _, e := range task.Prompt.Graders {
+			if e.Type == graders.KindPrompt {
+				execItems = append(execItems, graderExecItem{
+					isReview: true,
+					bucket: graders.ReviewBucket{
+						Name:     e.Name,
+						Criteria: criteria.MergeUnifiedCriteria([]criteria.UnifiedGraderEntry{e}, ""),
+					},
+					srcFile: task.Prompt.FilePath,
+					srcType: "prompt_inline",
+				})
+			} else {
+				execItems = append(execItems, graderExecItem{
+					isReview: false,
+					gc:       e.ToRuntimeConfig(),
+					srcFile:  task.Prompt.FilePath,
+					srcType:  "prompt_inline",
+				})
+			}
+		}
+	}
+
+	// Position N+1..N+M: criteria-file graders in YAML declaration order.
 	for _, m := range matched {
 		if m.Entry.Type == graders.KindPrompt {
 			execItems = append(execItems, graderExecItem{

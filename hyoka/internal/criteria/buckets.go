@@ -331,7 +331,12 @@ func parsedTextToChecks(text string, startNum int) []review.ReviewCheck {
 //
 // When isolated mode is requested but nothing is marked isolate, matched
 // criteria-file entries fall back to per-entry buckets (same as combined mode).
-func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mode string) []graders.ReviewBucket {
+func BuildUnifiedReviewBuckets(
+	matched []MatchedUnifiedEntry,
+	promptCriteria string,
+	mode string,
+	inlineGraders []UnifiedGraderEntry,
+) []graders.ReviewBucket {
 	var buckets []graders.ReviewBucket
 
 	// Prompt-frontmatter criteria always get their own bucket, regardless of mode.
@@ -341,6 +346,17 @@ func BuildUnifiedReviewBuckets(matched []MatchedUnifiedEntry, promptCriteria, mo
 		checks := MergeUnifiedCriteriaToChecks(nil, promptCriteria)
 		buckets = append(buckets, graders.ReviewBucket{
 			Name:     "Criteria from prompt file",
+			Criteria: criteria,
+			Checks:   checks,
+		})
+	}
+
+	// Inline graders from prompt frontmatter (position 1..N).
+	for _, e := range inlineGraders {
+		criteria := MergeUnifiedCriteria([]UnifiedGraderEntry{e}, "")
+		checks := MergeUnifiedCriteriaToChecks([]UnifiedGraderEntry{e}, "")
+		buckets = append(buckets, graders.ReviewBucket{
+			Name:     bucketName(e.Name, len(buckets)),
 			Criteria: criteria,
 			Checks:   checks,
 		})

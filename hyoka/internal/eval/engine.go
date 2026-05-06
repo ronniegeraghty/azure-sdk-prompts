@@ -293,7 +293,8 @@ func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string, cfg co
 	if criteriaText == "" {
 		criteriaText = p.EvaluationCriteria
 	}
-	return criteria.BuildUnifiedReviewBuckets(promptMatched, criteriaText, mode)
+	// Include inline graders from prompt frontmatter
+	return criteria.BuildUnifiedReviewBuckets(promptMatched, criteriaText, mode, p.Graders)
 }
 
 // mergedCriteria returns the combined attribute-matched + prompt-specific
@@ -317,6 +318,8 @@ func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string, cfg c
 	for _, m := range promptMatched {
 		entries = append(entries, m.Entry)
 	}
+	// Include inline graders from prompt frontmatter
+	entries = append(entries, p.Graders...)
 	// Format parsed criteria if available, otherwise use raw EvaluationCriteria
 	criteriaText := prompt.FormatParsedCriteria(p.ParsedCriteria)
 	if criteriaText == "" {

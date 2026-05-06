@@ -119,7 +119,7 @@ func TestBuildUnifiedReviewBuckets_CombinedMode(t *testing.T) {
 		{Entry: promptEntry("a", "criterion A", true)}, // isolate flag IGNORED in combined
 		{Entry: promptEntry("b", "criterion B", false)},
 	}
-	buckets := BuildUnifiedReviewBuckets(prompts, "prompt criteria", ReviewModeCombined)
+	buckets := BuildUnifiedReviewBuckets(prompts, "prompt criteria", ReviewModeCombined, nil)
 	if len(buckets) != 3 {
 		t.Fatalf("combined: expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
 	}
@@ -152,7 +152,7 @@ func TestBuildUnifiedReviewBuckets_IsolatedWithIsolation(t *testing.T) {
 		{Entry: promptEntry("format", "format ok", false)},
 		{Entry: promptEntry("tests", "tests exist", false)},
 	}
-	buckets := BuildUnifiedReviewBuckets(prompts, "pc", ReviewModeIsolated)
+	buckets := BuildUnifiedReviewBuckets(prompts, "pc", ReviewModeIsolated, nil)
 	if len(buckets) != 3 {
 		t.Fatalf("isolated: expected 3 buckets (prompt + security + combined), got %d", len(buckets))
 	}
@@ -195,7 +195,7 @@ func TestBuildUnifiedReviewBuckets_IsolatedDegradesToCombined(t *testing.T) {
 		{Entry: promptEntry("a", "A", false)},
 		{Entry: promptEntry("b", "B", false)},
 	}
-	buckets := BuildUnifiedReviewBuckets(prompts, "pc", ReviewModeIsolated)
+	buckets := BuildUnifiedReviewBuckets(prompts, "pc", ReviewModeIsolated, nil)
 	if len(buckets) != 3 {
 		t.Fatalf("degraded: expected 3 buckets (prompt + 2 per-entry), got %d", len(buckets))
 	}
@@ -212,7 +212,7 @@ func TestBuildUnifiedReviewBuckets_IsolatedDegradesToCombined(t *testing.T) {
 
 func TestBuildUnifiedReviewBuckets_OnlyPromptCriteria(t *testing.T) {
 	// No matched criteria-file entries, only prompt frontmatter.
-	buckets := BuildUnifiedReviewBuckets(nil, "prompt only", ReviewModeCombined)
+	buckets := BuildUnifiedReviewBuckets(nil, "prompt only", ReviewModeCombined, nil)
 	if len(buckets) != 1 {
 		t.Fatalf("expected 1 bucket (prompt only), got %d", len(buckets))
 	}
@@ -230,7 +230,7 @@ func TestBuildUnifiedReviewBuckets_OnlyCriteriaFiles(t *testing.T) {
 		{Entry: promptEntry("a", "criterion A", false)},
 		{Entry: promptEntry("b", "criterion B", false)},
 	}
-	buckets := BuildUnifiedReviewBuckets(prompts, "", ReviewModeCombined)
+	buckets := BuildUnifiedReviewBuckets(prompts, "", ReviewModeCombined, nil)
 	if len(buckets) != 2 {
 		t.Fatalf("expected 2 buckets (per-entry), got %d", len(buckets))
 	}
@@ -250,7 +250,7 @@ func TestBuildUnifiedReviewBuckets_OnlyCriteriaFiles(t *testing.T) {
 
 func TestBuildUnifiedReviewBuckets_EmptyInputs(t *testing.T) {
 	// No matched entries, no prompt criteria → empty slice
-	buckets := BuildUnifiedReviewBuckets(nil, "", ReviewModeCombined)
+	buckets := BuildUnifiedReviewBuckets(nil, "", ReviewModeCombined, nil)
 	if len(buckets) != 0 {
 		t.Fatalf("expected 0 buckets for empty inputs, got %d", len(buckets))
 	}
@@ -363,7 +363,7 @@ promptCriteria := `1. Use DefaultAzureCredential
 3. Error handling for authentication failures`
 
 // No attribute-matched entries, only prompt criteria
-buckets := BuildUnifiedReviewBuckets(nil, promptCriteria, ReviewModeCombined)
+buckets := BuildUnifiedReviewBuckets(nil, promptCriteria, ReviewModeCombined, nil)
 
 if len(buckets) != 1 {
 t.Fatalf("expected 1 bucket, got %d", len(buckets))
