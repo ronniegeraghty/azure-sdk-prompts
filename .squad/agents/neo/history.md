@@ -1966,3 +1966,14 @@ Scribe captured orchestration logs for both Morpheus (proposal phase) and Neo (i
 
 All inbox files processed and deleted per Scribe protocol. Feature fully documented in decisions.md with reference to Neo's implementation details in this history file.
 
+---
+
+## LEARNINGS UPDATE (2026-05-06T17-50-49Z — Scribe)
+
+**Test fixtures now exercise inline non-prompt graders on both .prompt.md and .prompt.yaml:**
+- `prompts/test/hello-markdown-with-code.prompt.md` now includes inline `workspace` and `tool` graders in frontmatter
+- `prompts/test/hello-yaml.prompt.yaml` (NEW) mirrors the markdown scenario in pure-YAML format
+- Tag-filtered criteria grader on `test` tag validates all three execution paths coexist: prompt-file inline graders → prompt-generated criteria → tag-filtered criteria graders
+- Confirms loader paths (.prompt.md vs .prompt.yaml) handle inline graders correctly in orchestration
+- Validates mixed execution order per Neo's redesign (commits bd8ff298, 9cdff379)
+

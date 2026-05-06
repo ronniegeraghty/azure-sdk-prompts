@@ -3173,3 +3173,7 @@ Phase 2 keys / capabilities **not** in this ship; revisit only when a real user 
 
 ---
 
+# Active Decisions
+
+---
+

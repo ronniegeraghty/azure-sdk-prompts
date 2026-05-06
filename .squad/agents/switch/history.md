@@ -1304,3 +1304,4 @@ go test ./hyoka/internal/...
 - **Struct-level tests work when integration seams don't exist:** TestReviewResult_SkippedReviewersField validates the field exists and marshals correctly without needing a full ReviewPanel run
 - **Unit tests > integration for pure logic:** eval tests prove the switch statement + counter math without SDK dependency
 - **Test names matter for future grep:** "pr640" in filenames makes these tests easy to find when the PR merges
+- **Test fixtures validate inline graders (2026-05-06):** Prompts now exercise inline non-prompt graders on both .prompt.md (hello-markdown-with-code) and .prompt.yaml (hello-yaml NEW) with tag-filtered criteria graders. Confirms all three grader execution paths coexist in orchestration.
