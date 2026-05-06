@@ -1223,3 +1223,30 @@ Morpheus should note Ronnie's clarification on what constitutes an "action": "an
 **Architectural implication:** If designing session limits, LLM action quotas, or reasoning time budgets in future, keep this semantic in mind: reasoning is not free.
 
 **No immediate action needed.** Context for architectural decisions involving action budgeting.
+
+## 2026-05-02 — Inline Graders Proposal (investigation)
+
+**Task:** INVESTIGATE & PROPOSE adding `graders:` to prompt files (both `.prompt.md` frontmatter and `.prompt.yaml`), removing `evaluation_criteria:` from YAML.
+
+**Deliverable:** `.squad/decisions/inbox/morpheus-inline-graders-proposal.md`
+
+### Learnings
+
+**Key file paths:**
+- `hyoka/internal/prompt/parser.go:33-34, 134-153` — YAML prompt parsing; `frontmatter` struct holds `prompt_text` and `evaluation_criteria` fields
+- `hyoka/internal/prompt/parser.go:117-120` — markdown `## Evaluation Criteria` extraction → `Prompt.EvaluationCriteria` + `ParsedCriteria`
+- `hyoka/internal/prompt/types.go:39-43` — `EvaluationCriteria string` and `ParsedCriteria []CriterionEntry` are the only criteria-shaped fields on Prompt today
+- `hyoka/internal/criteria/config.go:27-64` — `UnifiedGraderEntry` is the shared schema; flat `type` discriminator, `Type/Name/Weight/When/Isolate/Prompt/Checks`
+- `hyoka/internal/criteria/config.go:126-228` — `validateEntry` + `validateConfig` (file-level name uniqueness)
+- `hyoka/internal/criteria/buckets.go:231-257` — `MergeUnifiedCriteria` / `MergeUnifiedCriteriaToChecks` already merge prompt-type entries with free-text criteria; reusable
+- `hyoka/internal/eval/engine_eval.go:664-701` — exec-list builder; implicit "Criteria from prompt file" bucket at position 0, matched criteria-file graders after
+- `hyoka/internal/eval/engine.go:260-330` — `matchedForEval`, `reviewBuckets`, `mergedCriteria`; the three call sites that need inline-grader awareness
+
+**Architectural insights:**
+- `internal/criteria` does NOT import `internal/prompt` today — adding the reverse dependency is safe (no cycle).
+- yaml.v3 is used WITHOUT `KnownFields(true)` for prompt parsing (parser.go:106) — must keep it that way for back-compat. The "deprecated `evaluation_criteria:` → loud error" check needs to be an explicit pre-decode key probe, NOT strict-mode.
+- 91 / 91 production `.prompt.md` files use `## Evaluation Criteria`; 0 / 0 production `.prompt.yaml` files use `evaluation_criteria:`. The YAML breaking change costs us exactly one example file (`examples/prompts/example.prompt.yaml`).
+- The implicit "Criteria from prompt file" bucket name has been stable across reports for the entire grader-redesign rewrite — renaming would invalidate every on-disk report. Recommended to make it a reserved name instead.
+- `criteria.UnifiedGraderConfig` has `groups:` for hierarchical when/isolate, but on a prompt file the prompt itself IS the scope, so groups add no value inline → recommended to reject.
+
+**Proposal recommendation:** Allow inline `graders:` with the unmodified `UnifiedGraderEntry` schema. Markdown's `## Evaluation Criteria` stays forever. Ship in two PRs (additive, then breaking). Hard-error on name collisions across all sources. Allow `when:` on inline graders with a warn-on-redundant validator hint.
