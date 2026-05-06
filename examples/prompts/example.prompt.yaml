@@ -52,16 +52,20 @@ prompt_text: |
   Structure the code as helper functions: `create_item()`, `read_item()`,
   `update_item()`, and `delete_item()`.
 
-# evaluation_criteria: The criteria the generated code should satisfy
-# (In .prompt.md, this would be the "## Evaluation Criteria" section)
-evaluation_criteria: |
-  The generated code should demonstrate:
-
-  - Correct import statements: `from azure.cosmos import CosmosClient, PartitionKey`
-  - Connection using CosmosClient with valid connection string
-  - CRUD operations using container_client methods: create_item(), read_item(), upsert_item(), delete_item()
-  - Proper partition key usage in read/delete operations
-  - Exception handling for CosmosHttpResponseError or HttpResponseError
-  - Item structure includes required id and partition key fields
-  - Connection/client cleanup (context manager or explicit close)
-  - No hardcoded credentials (uses environment variables)
+# graders: Inline graders using the unified schema (same as criteria/**.yaml)
+# This replaces the deprecated evaluation_criteria field.
+graders:
+  - type: prompt
+    name: crud-correctness
+    weight: 2
+    prompt: |
+      The generated code should demonstrate:
+    checks:
+      - Correct import statements from azure.cosmos (CosmosClient, PartitionKey)
+      - Connection using CosmosClient with valid connection string
+      - CRUD operations using container_client methods (create_item, read_item, upsert_item, delete_item)
+      - Proper partition key usage in read/delete operations
+      - Exception handling for CosmosHttpResponseError or HttpResponseError
+      - Item structure includes required id and partition key fields
+      - Connection/client cleanup (context manager or explicit close)
+      - No hardcoded credentials (uses environment variables)
