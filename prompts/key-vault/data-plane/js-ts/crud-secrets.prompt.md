@@ -31,7 +31,7 @@ Write a Node.js script
 3. Update the secret to a new value "updated-value"
 4. Delete the secret and purge it (soft-delete enabled vault)
 
-Use DefaultAzureCredential for authentication. Show required npm packages
+Use a credential from `@azure/identity` for authentication. Show required npm packages
 and include proper error handling with try/catch.
 
 ## Evaluation Criteria

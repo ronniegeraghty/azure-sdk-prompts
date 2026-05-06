@@ -27,7 +27,7 @@ tags:
 
 Write a TypeScript program
 that demonstrates messaging with Azure Service Bus:
-1. Create a ServiceBusClient using a connection string
+1. Create a ServiceBusClient
 2. Create a sender for a queue and send a single message
 3. Send a batch of 5 messages using createMessageBatch() and tryAddMessage()
 4. Create a receiver and receive messages using receiveMessages()
@@ -41,7 +41,7 @@ Show required npm package (@azure/service-bus) and proper close() cleanup.
 
 The generated code should include:
 - `@azure/service-bus` npm package
-- `ServiceBusClient` constructor with connection string
+- `ServiceBusClient` constructor with a credential from `@azure/identity`
 - `createSender()` for queue or topic
 - `ServiceBusMessageBatch` with `tryAddMessage()`
 - `createReceiver()` for queue or subscription

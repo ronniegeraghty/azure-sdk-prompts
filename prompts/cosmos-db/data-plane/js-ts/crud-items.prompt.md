@@ -27,7 +27,7 @@ tags:
 
 Write a TypeScript program
 that performs CRUD operations on items in an Azure Cosmos DB NoSQL container:
-1. Create a CosmosClient using endpoint and key
+1. Create a CosmosClient using credential from `@azure/identity`
 2. Create a database "TestDB" and container "Items" with partition key "/category"
 3. Create an item with properties: id, category, name, quantity
 4. Read the item back using item().read()
@@ -41,7 +41,7 @@ Show required npm package and handle errors with appropriate status code checks.
 
 The generated code should include:
 - `@azure/cosmos` npm package
-- `CosmosClient` constructor with endpoint and key
+- `CosmosClient` constructor with credential from `@azure/identity`
 - `client.databases.createIfNotExists()` and `database.containers.createIfNotExists()`
 - `container.items.create()`, `container.item(id, partitionKey).read()`
 - `container.items.query()` with `SqlQuerySpec`

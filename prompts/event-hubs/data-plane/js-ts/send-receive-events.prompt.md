@@ -26,7 +26,7 @@ tags:
 
 Write a TypeScript program
 that demonstrates sending and receiving events with Azure Event Hubs:
-1. Create an EventHubProducerClient using a connection string
+1. Create an EventHubProducerClient
 2. Create a batch with createBatch() and add 10 events with custom properties
 3. Send the batch using sendBatch()
 4. Create an EventHubConsumerClient with a BlobCheckpointStore
