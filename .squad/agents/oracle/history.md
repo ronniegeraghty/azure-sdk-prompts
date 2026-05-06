@@ -923,3 +923,86 @@ Neo updated canonical criteria YAML files to use new source/mcp_server fields, p
 Oracle should be aware that per Ronnie's clarification ("anything the agent does is meant to be an action from reasoning to tool calls to bash commands, to responses"), **`assistant.reasoning` events count as actions** for the purpose of session limits (`maxSessionActionsLimit`). This is already implemented and verified in `hyoka/internal/eval/copilot.go:359-365`. The PR #640 port (commit 703f638b) ensured the action counter respects per-eval limit overrides at all sites.
 
 **No immediate action needed.** This is context for future decisions involving action-counting or session-limit tuning.
+
+---
+
+## 2026-05-06 — Audit and Update Docs for Three Feature Batches (Oracle)
+
+**Task:** Audit and update all docs + examples for three recent feature batches:
+1. PR #640 fixes (generated files exclusion, skipped reviewers, action counter semantics)
+2. Per-property `when:` negation + `tags:` matching (MatchSet polymorphic type)
+3. Inline `graders:` on prompt files (breaking change: `evaluation_criteria:` removal from YAML)
+
+**Files Audited (12 total):**
+- CHANGELOG.md — ✅ Added entries for all 3 batches (7 new bullets)
+- docs/prompt-authoring.md — ✅ Documented graders: field, tags:, inline graders coexistence
+- docs/graders/index.md — ✅ Documented MatchSet polymorphic type, negation, tags: semantics
+- docs/graders/activity.md — ✅ Clarified action_count includes assistant.reasoning + tool.execution_start
+- docs/architecture.md — ✅ Added grader execution order + action counter semantics
+- docs/configuration.md — ✓ Verified clean (no stale evaluation_criteria references)
+- examples/prompts/example.prompt.yaml — ✓ Verified inline graders already present
+- examples/criteria/hierarchical-when-example.yaml — ✓ Verified up-to-date
+- docs/guardrails.md — ✓ No action needed (action counter is internal detail)
+- docs/getting-started.md — ✓ No action needed (no feature-specific changes)
+- README.md — ✓ No action needed (quickstart doesn't show prompt internals)
+- AGENTS.md — ✓ No action needed (team capability unchanged)
+
+**Files Updated (6):**
+1. CHANGELOG.md — Added PR #640 fixes + batch 2 + batch 3 + breaking change
+2. docs/prompt-authoring.md — Documented graders:, tags:, inline graders coexistence
+3. docs/graders/index.md — Documented MatchSet, negation, tags: matching
+4. docs/graders/activity.md — Clarified action_count semantics
+5. docs/architecture.md — Added grader execution order
+6. examples/prompts/inline-graders-example.prompt.md — NEW example (markdown format)
+
+**Commits (6):**
+- 487949da: CHANGELOG entries (PR #640, batch 2, batch 3, breaking change)
+- 3b66f0b9: Prompt authoring guide updates (graders:, tags:, inline docs)
+- c3aec5d3: Graders index updates (MatchSet, negation, tags:)
+- 6f113d5c: Activity grader clarification (action_count semantics)
+- 7dd451ad: Architecture doc updates (execution order, action counter)
+- fef55ecf: Inline graders example prompt (markdown format)
+
+**Key Findings:**
+
+**Coverage: 100% COMPLETE** ✅
+- All three feature batches have corresponding doc updates
+- CHANGELOG reflects all breaking changes and fixes
+- Examples demonstrate inline graders (both YAML and markdown formats)
+- Grader execution order clearly documented
+- Tags: matching and MatchSet polymorphic type fully explained
+
+**Gaps Found: 0** ✅
+- No pre-existing gaps discovered
+- All doc files are current and accurate
+- Breaking change (evaluation_criteria: removal) is already protected by loud migration error in code
+
+**Validation:**
+- ✅ All 6 commits build successfully
+- ✅ New inline-graders-example.prompt.md validates without errors
+- ✅ No stale references to evaluation_criteria in docs
+- ✅ No pre-existing prompt/config validation failures (known test.yaml errors are unrelated)
+
+**Learnings:**
+1. **Doc layout pattern:** Feature batches map naturally to file groupings:
+   - Breaking changes → CHANGELOG (always)
+   - New config schema → docs/graders/ (per-grader docs)
+   - Prompt-level features → docs/prompt-authoring.md (central guide)
+   - Architecture implications → docs/architecture.md (pipeline/order)
+
+2. **Example creation:** Inline graders needed both YAML and markdown format examples:
+   - YAML already present in examples/prompts/example.prompt.yaml
+   - Markdown example added to show coexistence with ## Evaluation Criteria section
+   - Both demonstrate real-world usage with weights, preambles, and multiple check types
+
+3. **Migration guidance:** When a breaking change includes a loud code-level error,
+   doc updates should reference the error (not duplicate the migration guide).
+   This keeps the source of truth at the code level while directing users there.
+
+4. **Deprecation vs Removal:** evaluation_criteria: field was cleanly removed (not deprecated)
+   because: (1) zero production prompts use it, (2) loud error guides users, (3) graders: is a
+   drop-in replacement. This matches pre-1.0 velocity.
+
+**Status:** Documentation audit complete and up-to-date. All three feature batches are now
+fully documented with examples, CHANGELOG entries, and architectural context.
+
