@@ -171,6 +171,19 @@ graders:
     checks:
       - File hello.md does NOT contain any fenced code blocks (no triple-backtick fences).
 
+  # Tag IS (positive include) — runs on every prompt tagged `markdown`.
+  # Both test prompts share this tag, so this grader runs on both. Useful
+  # demo of a tag filter that *includes* work rather than gating it away.
+  - name: Markdown File Present (tag-filtered)
+    type: prompt
+    weight: 0.5
+    when:
+      tags:
+        is: [markdown]
+    prompt: "Check the following criterion:"
+    checks:
+      - The agent produced a file named hello.md in the working directory.
+
   # Property NEGATION — demonstrates `is:`/`not:` object form on a scalar
   # property. Both test prompts have difficulty=basic, so both match the
   # `is` constraint; neither has difficulty=advanced, so both pass the
