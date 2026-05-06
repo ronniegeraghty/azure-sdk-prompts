@@ -95,14 +95,15 @@ Copilot skills (SKILL.md files) provide domain knowledge to the generator and re
 The `hyoka init` command scaffolds a `.hyoka` project directory containing `configs/`, `prompts/`, `criteria/`, `skills/`, and `reports/` subdirectories. This allows teams to maintain their own evaluation setups outside the main repository.
 
 ### Graders
+
 Pluggable grading criteria defined in YAML. Five canonical grader types (flat schema with top-level `checks:`): 
 - `program` — execute commands and check exit codes
 - `workspace` — validate file creation/modification/deletion against workspace delta
 - `tool` — validate tool usage patterns (skills, MCP servers, built-ins)
-- `activity` — validate session activity (turns, action counts, action sequences)
+- `activity` — validate session activity (turns, action counts including `assistant.reasoning`, action sequences)
 - `prompt` — criteria that feed the multi-model review panel (not an executable grader)
 
-Legacy grader types (behavior, tool_constraint, tool_usage, file, output_check, action_sequence) are deprecated. Graders support property-based applicability (`when` conditions). See [grader-config-schema.md](grader-config-schema.md) and [graders/index.md](docs/graders/index.md).
+Execution order: implicit "Criteria from prompt file" → inline graders (from prompt frontmatter) → matched criteria-file graders. Legacy grader types (behavior, tool_constraint, tool_usage, file, output_check, action_sequence) are deprecated. Graders support property-based applicability (`when` conditions) including tag matching. See [grader-config-schema.md](grader-config-schema.md) and [graders/index.md](docs/graders/index.md).
 
 ### Guardrails
 - **Turn limit**: 25 assistant turns per generation (prevents runaway sessions)
