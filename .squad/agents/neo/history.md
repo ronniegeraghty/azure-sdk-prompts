@@ -1956,3 +1956,13 @@ All tests pass (3 pre-existing failures in `internal/report` unrelated). No new 
 
 Decision file: `.squad/decisions/inbox/neo-inline-graders-shipped.md`  
 Commits: b290b848, 13f1ca50, 5c304aca
+
+## CROSS-AGENT UPDATE (2026-05-06T01-02-53Z — Scribe: Inline Graders Orchestration Complete)
+
+**From:** Scribe (orchestration capture)  
+**Status:** Decision documented and shipped
+
+Scribe captured orchestration logs for both Morpheus (proposal phase) and Neo (implementation phase), merged decisions into `.squad/decisions.md`, and created session log at `.squad/log/2026-05-06T01-02-53Z-inline-graders.md`.
+
+All inbox files processed and deleted per Scribe protocol. Feature fully documented in decisions.md with reference to Neo's implementation details in this history file.
+

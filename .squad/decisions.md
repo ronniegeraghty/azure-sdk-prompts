@@ -1396,6 +1396,14 @@ All tests passing. Test filenames include "pr640" for easy discoverability.
 
 ---
 
+## 2026-05-02 — Inline `graders:` Proposal Acceptance (Morpheus)
+
+**Status:** PROPOSAL ACCEPTED (with override)  
+**Author:** Morpheus 🕶️  
+**Reference:** `.squad/decisions/inbox/morpheus-inline-graders-proposal.md` (26.4 KB architectural proposal)
+
+**Ronnie's Override:** `when:` clauses **FORBIDDEN** on inline graders (hard error, not soft warning). All other architectural guidance accepted as-is.
+
 ---
 
 ## 2026-05-02 — Inline `graders:` on Prompt Files (Neo)

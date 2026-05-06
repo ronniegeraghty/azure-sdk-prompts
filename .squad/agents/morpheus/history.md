@@ -1250,3 +1250,17 @@ Morpheus should note Ronnie's clarification on what constitutes an "action": "an
 - `criteria.UnifiedGraderConfig` has `groups:` for hierarchical when/isolate, but on a prompt file the prompt itself IS the scope, so groups add no value inline → recommended to reject.
 
 **Proposal recommendation:** Allow inline `graders:` with the unmodified `UnifiedGraderEntry` schema. Markdown's `## Evaluation Criteria` stays forever. Ship in two PRs (additive, then breaking). Hard-error on name collisions across all sources. Allow `when:` on inline graders with a warn-on-redundant validator hint.
+
+## CROSS-AGENT UPDATE (2026-05-06T01-02-53Z — Scribe: Inline Graders Ship Complete)
+
+**From:** Scribe (orchestration capture)  
+**Status:** Proposal accepted, implementation shipped, decisions merged
+
+Morpheus's inline-graders proposal was accepted by Ronnie with **one override**: `when:` clauses are **FORBIDDEN** on inline graders (hard error, not soft warning).
+
+Neo implemented and shipped across 5 commits (b290b848 → 2c76fab3) on `ronniegeraghty/dev`. All test passing; build green.
+
+**Decisions merged:** `.squad/decisions.md` now documents both Morpheus's proposal acceptance and Neo's implementation. Inbox files deleted per Scribe protocol.
+
+**Proposal reference:** Morpheus's full 26.4 KB architectural spec remains available in Scribe logs for future reference (no longer in inbox).
+
