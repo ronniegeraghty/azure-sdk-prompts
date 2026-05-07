@@ -118,7 +118,7 @@ func TestCacheRoot_LegacySkillsCacheWarningFiresOnce(t *testing.T) {
 	_ = CacheRoot()
 
 	out := buf.String()
-	count := strings.Count(out, "legacy .skills-cache/ dir detected")
+	count := strings.Count(out, "legacy skills cache dir detected")
 	if count != 1 {
 		t.Errorf("expected legacy-cache warning to fire exactly once, got %d\nlog output:\n%s", count, out)
 	}
@@ -152,7 +152,46 @@ func TestCacheRoot_NoLegacySkillsCache_NoWarning(t *testing.T) {
 	resetForTest()
 	_ = CacheRoot()
 
-	if strings.Contains(buf.String(), "legacy .skills-cache/ dir detected") {
+	if strings.Contains(buf.String(), "legacy skills cache dir detected") {
 		t.Errorf("legacy warning fired without a legacy dir present\nlog output:\n%s", buf.String())
+	}
+}
+
+// TestCacheRoot_LegacySparseSkillsCacheWarning covers the second historical
+// layout: <cwd>/.hyoka/.skills-cache/ from the sparse-checkout era (commits
+// 923a8d4d / daa5dc53). Without this detection a stale dir from an old hyoka
+// build silently collides with `git clone` into the new global cache root and
+// surfaces only as a confusing "destination path already exists" git error.
+func TestCacheRoot_LegacySparseSkillsCacheWarning(t *testing.T) {
+	tmp := t.TempDir()
+	legacy := filepath.Join(tmp, ".hyoka", ".skills-cache")
+	if err := os.MkdirAll(legacy, 0o755); err != nil {
+		t.Fatalf("seed legacy sparse dir: %v", err)
+	}
+	prevWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prevWd) })
+
+	var buf bytes.Buffer
+	prevLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prevLogger) })
+
+	t.Setenv(EnvCacheDir, "/test/cache")
+	t.Setenv(EnvXDGCacheHome, "")
+	resetForTest()
+	_ = CacheRoot()
+
+	out := buf.String()
+	if !strings.Contains(out, "legacy skills cache dir detected") {
+		t.Errorf("expected legacy-cache warning for .hyoka/.skills-cache layout\nlog output:\n%s", out)
+	}
+	if !strings.Contains(out, legacy) {
+		t.Errorf("warning should include the detected sparse path %q\nlog output:\n%s", legacy, out)
 	}
 }

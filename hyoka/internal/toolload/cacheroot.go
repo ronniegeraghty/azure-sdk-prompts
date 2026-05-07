@@ -72,15 +72,35 @@ func resolveCacheRoot() string {
 	return filepath.Join(home, ".hyoka", "cache")
 }
 
+// warnIfLegacySkillsCache logs a warning if either of the historical
+// project-local skill cache layouts is detected in the current working
+// directory:
+//
+//   - <cwd>/.skills-cache/         (very early prototype layout)
+//   - <cwd>/.hyoka/.skills-cache/  (sparse-checkout era — see commits
+//     923a8d4d "Support subpath specs for remote skills via git
+//     sparse-checkout" and daa5dc53 "Consolidate remote-skill example and
+//     isolate sparse cache dir")
+//
+// Both layouts were retired when the cache root was centralized under
+// $HYOKA_CACHE_DIR / $XDG_CACHE_HOME/hyoka / ~/.hyoka/cache (commits
+// 2698ffad and 7d750d4f, late April 2026). The directories are never
+// auto-deleted — we only surface a one-time warning so users notice they
+// can delete the stale cache, and so a stale on-disk dir doesn't silently
+// collide with a fresh `git clone` into a different cache root.
 func warnIfLegacySkillsCache(newRoot string) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return
 	}
-	legacy := filepath.Join(cwd, ".skills-cache")
-	if info, err := os.Stat(legacy); err == nil && info.IsDir() {
-		slog.Warn("toolload: legacy .skills-cache/ dir detected — safe to remove; cache moved",
-			"path", legacy, "new_root", newRoot)
+	for _, legacy := range []string{
+		filepath.Join(cwd, ".skills-cache"),
+		filepath.Join(cwd, ".hyoka", ".skills-cache"),
+	} {
+		if info, err := os.Stat(legacy); err == nil && info.IsDir() {
+			slog.Warn("toolload: legacy skills cache dir detected — safe to remove; cache moved",
+				"path", legacy, "new_root", newRoot)
+		}
 	}
 }
 
