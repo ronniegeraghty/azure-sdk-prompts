@@ -202,17 +202,24 @@ const { resources } = await container.items
 import { EventHubProducerClient, EventHubConsumerClient } from "@azure/event-hubs";
 import { ContainerClient } from "@azure/storage-blob";
 import { BlobCheckpointStore } from "@azure/eventhubs-checkpointstore-blob";
+import { DefaultAzureCredential } from "@azure/identity";
 
-// Producer
-const producer = new EventHubProducerClient(connectionString, eventHubName);
+const credential = new DefaultAzureCredential();
+const fullyQualifiedNamespace = process.env.AZURE_EVENTHUB_FULLY_QUALIFIED_NAMESPACE || "my-namespace.servicebus.windows.net";
+const eventHubName = process.env.AZURE_EVENTHUB_NAME || "my-event-hub";
+
+// Producer — use fully qualified namespace + credential (not connection strings)
+const producer = new EventHubProducerClient(fullyQualifiedNamespace, eventHubName, credential);
 const batch = await producer.createBatch();
 batch.tryAdd({ body: "event data" });
 await producer.sendBatch(batch);
 await producer.close();
 
 // Consumer with checkpoint store
+const storageAccountUrl = process.env.AZURE_STORAGE_ACCOUNT_URL || "https://mystorage.blob.core.windows.net";
+const containerClient = new ContainerClient(`${storageAccountUrl}/checkpoints`, credential);
 const checkpointStore = new BlobCheckpointStore(containerClient);
-const consumer = new EventHubConsumerClient("$Default", connectionString, eventHubName, checkpointStore);
+const consumer = new EventHubConsumerClient("$Default", fullyQualifiedNamespace, eventHubName, credential, checkpointStore);
 const subscription = consumer.subscribe({
   processEvents: async (events, context) => {
     for (const event of events) {
@@ -226,6 +233,7 @@ const subscription = consumer.subscribe({
 });
 ```
 
+- Use fully qualified namespace + `DefaultAzureCredential` (never connection strings)
 - Use `createBatch()` + `tryAdd()` for producing (not `send()` with raw arrays)
 - Use `BlobCheckpointStore` for consumer checkpointing
 - Always call `updateCheckpoint()` in `processEvents`
