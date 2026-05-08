@@ -31,6 +31,7 @@ authenticates an Azure SDK client using DefaultAzureCredential. The program shou
 4. Retrieve a secret from the vault and print its value
 5. Handle AuthenticationError for credential failures
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Include a package.json with all dependencies and use async/await throughout.
 
 ## Evaluation Criteria

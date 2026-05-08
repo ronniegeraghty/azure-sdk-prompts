@@ -34,6 +34,7 @@ that demonstrates sending and receiving events with Azure Event Hubs:
 6. Print received event bodies and update checkpoints
 7. Implement graceful shutdown with close()
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Show required npm packages (@azure/event-hubs and
 @azure/eventhubs-checkpointstore-blob) and proper async/await patterns.
 

@@ -44,6 +44,8 @@ The project needs:
 
 - A **main script** that demos the full flow: loading several config keys at startup, reading them from cache, refreshing one, printing a warning if any secret is near expiry, and performing a secret rotation (creating a new version, then demonstrating the delete-and-purge cleanup flow). Print results at each step.
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level for debugging.
+
 Include a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.
 
 ## Evaluation Criteria

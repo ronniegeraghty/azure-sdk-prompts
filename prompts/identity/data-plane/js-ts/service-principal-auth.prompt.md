@@ -32,6 +32,7 @@ authenticates to Azure using a Service Principal with client secret. The program
 5. Perform an operation to verify the credential works
 6. Handle AuthenticationError for invalid credentials
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Include a package.json with all dependencies, use dotenv for environment variable
 management, and use async/await throughout.
 

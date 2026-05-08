@@ -42,6 +42,8 @@ The project needs:
 
 - A **main script** that demos the full encrypt-upload-download-decrypt round-trip: encrypts and uploads a sample string, then downloads and decrypts it back. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output to verify the round-trip.
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level for debugging.
+
 Include a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.
 
 ## Evaluation Criteria

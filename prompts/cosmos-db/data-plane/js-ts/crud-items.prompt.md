@@ -35,6 +35,7 @@ that performs CRUD operations on items in an Azure Cosmos DB NoSQL container:
 6. Replace the item with updated quantity using item().replace()
 7. Delete the item using item().delete()
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Show required npm package and handle errors with appropriate status code checks.
 
 ## Evaluation Criteria

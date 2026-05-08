@@ -34,6 +34,7 @@ that manages Azure Storage Accounts using the management plane SDK:
 6. Update the account to enable blob versioning
 7. Delete the Storage Account
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Show required npm packages (@azure/arm-storage) and proper async/await patterns.
 
 ## Evaluation Criteria

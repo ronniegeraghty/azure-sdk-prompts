@@ -35,6 +35,7 @@ that manages configuration settings in Azure App Configuration:
 6. Create a feature flag configuration setting for "BetaFeature"
 7. Delete the setting by key
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Show required npm package (@azure/app-configuration) and
 proper error handling with RestError.
 

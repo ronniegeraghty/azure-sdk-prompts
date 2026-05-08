@@ -35,6 +35,7 @@ that demonstrates messaging with Azure Service Bus:
 6. Subscribe to messages using subscribe() with processMessage and processError handlers
 7. Demonstrate sending to a topic and receiving from a subscription
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Show required npm package (@azure/service-bus) and proper close() cleanup.
 
 ## Evaluation Criteria
