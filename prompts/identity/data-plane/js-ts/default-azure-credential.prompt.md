@@ -32,6 +32,7 @@ authenticates an Azure SDK client using DefaultAzureCredential. The program shou
 5. Handle AuthenticationError for credential failures
 
 Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks for service call failures.
 Include a package.json with all dependencies and use async/await throughout.
 
 ## Evaluation Criteria

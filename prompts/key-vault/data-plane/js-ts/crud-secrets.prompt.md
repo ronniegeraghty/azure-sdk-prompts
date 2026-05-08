@@ -32,8 +32,9 @@ Write a Node.js script
 4. Delete the secret and purge it (soft-delete enabled vault)
 
 Use a credential from `@azure/identity` for authentication. Enable SDK diagnostic
-logging using `@azure/logger` with a configurable log level. Show required npm packages
-and include proper error handling with try/catch.
+logging using `@azure/logger` with a configurable log level. Handle errors using
+`RestError` from `@azure/core-rest-pipeline` with `statusCode` checks (e.g., 404 for not found).
+Show required npm packages including `@azure/core-rest-pipeline`.
 
 ## Evaluation Criteria
 

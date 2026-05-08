@@ -33,6 +33,7 @@ authenticates to Azure using a Service Principal with client secret. The program
 6. Handle AuthenticationError for invalid credentials
 
 Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks for service call failures.
 Include a package.json with all dependencies, use dotenv for environment variable
 management, and use async/await throughout.
 

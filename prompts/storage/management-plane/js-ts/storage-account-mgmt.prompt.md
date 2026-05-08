@@ -35,7 +35,8 @@ that manages Azure Storage Accounts using the management plane SDK:
 7. Delete the Storage Account
 
 Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
-Show required npm packages (@azure/arm-storage) and proper async/await patterns.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks.
+Show required npm packages (@azure/arm-storage and @azure/core-rest-pipeline) and proper async/await patterns.
 
 ## Evaluation Criteria
 

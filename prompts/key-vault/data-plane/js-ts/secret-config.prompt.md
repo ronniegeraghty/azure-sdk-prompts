@@ -34,7 +34,7 @@ Create a TypeScript Node.js project that implements an application configuration
 
 The project needs:
 
-- A **secret provider class** that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.
+- A **secret provider class** that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing) — use `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks (e.g., 404) to detect not-found vs other failures. It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.
 
 - A **caching layer** on top of the provider that stores secret values in memory after first retrieval. It should support bulk-loading a predefined set of required config keys at startup, on-demand refresh of individual keys, and automatic re-fetch of any secret whose expiry date is within a configurable warning window (e.g., 7 days out).
 

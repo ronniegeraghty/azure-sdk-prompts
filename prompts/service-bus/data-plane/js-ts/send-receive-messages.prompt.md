@@ -36,7 +36,8 @@ that demonstrates messaging with Azure Service Bus:
 7. Demonstrate sending to a topic and receiving from a subscription
 
 Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
-Show required npm package (@azure/service-bus) and proper close() cleanup.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks.
+Show required npm packages (@azure/service-bus and @azure/core-rest-pipeline) and proper close() cleanup.
 
 ## Evaluation Criteria
 

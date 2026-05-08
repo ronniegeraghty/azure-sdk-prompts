@@ -36,7 +36,8 @@ that performs CRUD operations on items in an Azure Cosmos DB NoSQL container:
 7. Delete the item using item().delete()
 
 Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
-Show required npm package and handle errors with appropriate status code checks.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks (e.g., 404 for not found).
+Show required npm packages including `@azure/core-rest-pipeline`.
 
 ## Evaluation Criteria
 
