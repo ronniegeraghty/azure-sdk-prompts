@@ -1071,3 +1071,19 @@ The branch is mergeable pending CHANGELOG entries for the two missing bug fixes.
 
 **Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-oracle.md`
 
+
+---
+
+## Task Complete: CHANGELOG Audit Findings (2026-05-15)
+
+**Action:** Added two missing CHANGELOG entries in [Unreleased] → ### Fixed:
+1. **Skill leaf-expansion in `when: tool:` matching** (commit 328df6e9) — Graders with skill-source tool filters were silently dropped because only the wrapper skill_dir was visible; eval now uses post-session env.SkillsLoaded as the authoritative source
+2. **Pairwise tool-usage chart classification** (commit 97a174b5) — Tools incorrectly classified as "available but unused" when impact signals were symmetric; baseline tool_availability is now the ground truth
+
+**File:** CHANGELOG.md (2 lines added to Fixed section)
+
+**Note:** No dual-emit alias line found in CHANGELOG or docs — already clean or never documented.
+
+**Commit:** c2e21472 "docs: add CHANGELOG entries for leaf-skill + tool_availability fixes"
+
+---

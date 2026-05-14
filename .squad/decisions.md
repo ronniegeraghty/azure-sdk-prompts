@@ -1,5 +1,21 @@
 # Active Decisions
 
+## Report/Site Schema Cutover: Dual-Emit Alias Removed (2026-05-14)
+
+**By:** Trinity  
+**Status:** MERGED (commit a41238ab)
+
+**Decision:** Removed all dual-emit alias tests and expectations from codebase. `MigrateToV3()` already hard-rejects pre-v4 reports, and `GraderResult.Checks` emits `points` (not an alias). Keeping tests or code around a never-shipped alias path only creates false failures and schema drift.
+
+**What Changed:**
+- Removed test_* in internal/report that validated unreachable alias contract
+- Aligned site/src/app/data/types.ts to match current Go JSON emit shape (panel_results: score/pass/issues/strengths/criteria)
+- Fixed site/src/app/shared/components to read availableTools correctly
+
+**Rationale:** Clear the schema regression blocker from dev-branch merge review (blockers #7, #8 of 9).
+
+---
+
 ## Dev Branch Merge Review Blockers (2026-05-14)
 
 **Decision Context:** Six-agent parallel review of `ronniegeraghty/dev` for merge readiness. All agents found merge blockers; one approved with notes.

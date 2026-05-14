@@ -1341,3 +1341,22 @@ go test ./hyoka/internal/...
 
 **Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-switch.md`
 
+---
+
+## 2026-05-14 — Pairwise `TestComputeCheckDiffs` Verification
+
+### Context
+Assigned to fix the reported failing `TestComputeCheckDiffs` in `hyoka/internal/pairwise` on `ronniegeraghty/dev`.
+
+### Findings
+- Re-ran the requested repro command: `go test ./hyoka/internal/pairwise -run TestComputeCheckDiffs -v` — **PASS**.
+- Re-ran the package suite: `go test ./hyoka/internal/pairwise/...` — **PASS**.
+- Inspected `checkdiff_test.go` and `ComputeCheckDiffs` in `pairwise.go`.
+- Confirmed the earlier failure was a **stale test expectation**, not a production regression: `ComputeCheckDiffs` now sorts graders alphabetically for deterministic output, so `build_test` comes before `file_check`.
+- The expectation update already landed in commit `1095e6ba` (`fix(tests): rewrite tool_grader_test for new schema; fix pairwise check ordering`).
+
+### Outcome
+- No new code change was necessary in this session because the branch already contains the test fix.
+- Current HEAD verified: `f4969de2`.
+- Task status: pairwise suite green; todo closed.
+

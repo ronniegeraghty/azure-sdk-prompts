@@ -1132,3 +1132,12 @@ This aligns with the existing hidden-file skip logic and uses `utils.IsDefaultEx
 
 **Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-tank.md`
 
+
+## 2025-05-14: Removed accidentally-committed cruft (fix-cruft)
+- **Task**: Remove smoke-test-output/ and test_output.txt; update .gitignore
+- **Removed**: 
+  - smoke-test-output/hyoka-neo (14.9 MB binary)
+  - test_output.txt (tracked)
+- **.gitignore updates**: Added smoke-test-output/ and test_output.txt
+- **Commit**: f4969de2 chore: remove accidentally-committed smoke-test-output binary and test_output.txt; gitignore
+- **Status**: Clean repo root (only untracked .squad-commit-msg.txt and smoke_check_local_skill.go remain)
