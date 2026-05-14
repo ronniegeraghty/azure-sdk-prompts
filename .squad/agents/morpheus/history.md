@@ -1264,3 +1264,31 @@ Neo implemented and shipped across 5 commits (b290b848 → 2c76fab3) on `ronnieg
 
 **Proposal reference:** Morpheus's full 26.4 KB architectural spec remains available in Scribe logs for future reference (no longer in inbox).
 
+
+---
+
+## 2026-05-14 — Architectural Review: `ronniegeraghty/dev` → `main`
+
+**Verdict:** REJECT (fixable hygiene; arc is sound)
+
+**Scope:** 424 commits, 714 files, +92 486 / −28 743.
+
+### Findings
+
+**Architecture: APPROVE.** Inline graders, Phase-2 `when:` schema (MatchSet polymorphism + per-property negation + tags:), skill leaf expansion, and PR #640 port form a coherent thesis. `evaluation_criteria` removal is a clean pre-1.0 break — parser hard-errors with migration hint, CHANGELOG documents it, zero production prompts impacted. Inline graders shipped exactly per accepted proposal (UnifiedGraderEntry reused unchanged, no reverse dep, hard-error on collision, `when:` forbidden inline per Ronnie's override).
+
+**Blockers (hygiene, not architecture):**
+1. `go test ./hyoka/internal/report/...` has 4 failures: `TestGraderResultDualEmit/{unmarshal_new_checks_only,unmarshal_both...}`, `TestGraderResultMarshalDualEmit`, `TestV2ReportReadByV3Code` (panics). Root cause: CHANGELOG promised dual-emit `points`↔`checks` JSON aliases but `GraderResult.Checks` still only carries `json:"points"`. v2-migration test panics on v4 hard cutover.
+2. Committed 14 MB binary `smoke-test-output/hyoka-neo` + redundant logs. Build artifact pollution.
+3. `test_output.txt` at repo root — scratch file.
+
+**Pattern worth remembering:** When CHANGELOG promises a "one-release alias" for a renamed field, check the JSON tags. Renaming the Go identifier (GraderPoint→GraderCheck) doesn't migrate the wire format unless you add `MarshalJSON`/`UnmarshalJSON`. The test asserting dual-emit was the canary — broken since the rename commit (3c04d9a4).
+
+**Follow-up:** Once blockers clear → APPROVE. CHANGELOG promotion to [0.4.0]; consider splitting `internal/report/types.go` (1029 LOC) and converting `MigrateToV3` panic to error.
+
+**Verdict written to:** `.squad/decisions/inbox/morpheus-dev-branch-merge-review.md`
+
+---
+
+**Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-morpheus.md`
+

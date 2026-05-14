@@ -1031,3 +1031,43 @@ Inline `graders:` clauses on prompt files should encode **prompt-unique evaluati
 - Both removed generic duplicates; grader contracts are now clean and purposeful
 
 **Implication for Future Work:** Any time Oracle revises inline graders documentation or examples, enforce this discipline. If a check looks reusable across prompts, criteria files are the right home.
+
+---
+
+## Docs Audit: ronniegeraghty/dev Branch (2026-05-06)
+
+**Scope:** Review all documentation changes on dev branch for feature completeness.
+
+**Requested Features to Audit:**
+1. Inline graders (`graders:` in YAML & MD frontmatter)
+2. when: schema — per-property negation, tags: matching
+3. BREAKING: `evaluation_criteria` field removed from YAML prompts
+4. Skill leaf-expansion fix for `when: tool:` matching
+5. tool_availability ground-truth fix for pairwise usage chart
+6. 3 bug fixes ported from PR #640
+
+**Key Findings:**
+
+✅ **DOCUMENTED (4/6):**
+- Inline graders: docs/prompt-authoring.md + docs/graders/index.md + CHANGELOG
+- when: negation/tags: docs/graders/index.md "Polymorphic Match Sets" + docs/prompt-authoring.md "Tags for Grader Matching"
+- evaluation_criteria removal: CHANGELOG under "Breaking Changes (pre-1.0)" with migration error guidance
+- PR #640 bug fixes: All three documented in CHANGELOG under Fixed
+
+❌ **NOT DOCUMENTED (2/6):**
+- Skill leaf-expansion (commit 328df6e9): Bug fix allowing graders with `when: tool:` filters to match individual leaf skills from skill_dir entries. NO CHANGELOG entry or docs reference. Related: "Grouped Tools progress output" CHANGELOG entry is about display, not grader matching.
+- tool_availability fix (commit 97a174b5): Bug fix correcting pairwise usage chart to show actual tool invocation. NO CHANGELOG entry or docs reference.
+
+**Stale References:**
+- docs/plans/grader-points-and-display.md (historical plan): References old `evaluation_criteria` field. Low risk (archival document).
+
+**Verdict:** APPROVE WITH NOTES
+
+The branch is mergeable pending CHANGELOG entries for the two missing bug fixes. All major features are fully documented with examples and clear breaking-change guidance. The two missing entries are non-user-facing bug fixes, not breaking changes, but should be documented for operator visibility.
+
+**Recommendation for merge:** Add CHANGELOG entries for commits 328df6e9 and 97a174b5 before landing. Details documented in .squad/decisions/inbox/oracle-dev-branch-docs-review.md.
+
+---
+
+**Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-oracle.md`
+

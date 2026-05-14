@@ -1105,3 +1105,30 @@ Tank should note that `hyoka/internal/workspace/delta.go` now excludes build art
 This aligns with the existing hidden-file skip logic and uses `utils.IsDefaultExcludedDir()` for consistency.
 
 **No action needed for CLI.** This is a backend optimization that doesn't affect config or invocation.
+
+---
+
+## 2026-05-14 — CLI/Config review of `ronniegeraghty/dev` vs `origin/main`
+
+**Verdict:** REJECT
+
+**Scope reviewed:** `hyoka/cmd/`, `hyoka/internal/config/`, `hyoka/internal/checkenv/`, `hyoka/internal/validate/`, `hyoka/internal/clean/`, `hyoka/internal/progress/`, `hyoka/internal/build/`, `hyoka/internal/pidfile/`, `hyoka/internal/manifest/`, `configs/`.
+
+**What I checked:**
+- Ran the requested scoped `git diff --stat` and inspected notable diffs in `cmd/` + config/validation paths.
+- Verified new CLI flags via help output (`run`, `validate`, `list`) and code paths: `--with-trends`, `--all-configs`, `--pairwise-variant`, `--review-mode`, config-driven `prompt_directory`, repo-keyed `tool_version_override`, retired top-level `plugins:` migration error.
+- Verified progress/output coverage via scoped tests and build:
+  - `go test ./hyoka/cmd/... ./hyoka/internal/config/... ./hyoka/internal/checkenv/... ./hyoka/internal/clean/... ./hyoka/internal/progress/... ./hyoka/internal/validate/...`
+  - `go build ./...`
+
+**Findings:**
+- I did **not** find a blocking CLI/config/progress logic regression in the reviewed code. Help text/defaults looked consistent with implementation, and scoped tests/build passed.
+- I **did** find two accidentally committed artifacts that should block merge until removed:
+  - `smoke-test-output/hyoka-neo` — tracked 15 MB compiled binary, introduced in commit `8a584f17`.
+  - `test_output.txt` — tracked compiler failure output from the criteria refactor, introduced in commit `9da48f32`.
+- Checked commit `08b3e75e`: it only touches `hyoka/internal/toolload/cacheroot.go` + test coverage, extending warnings for legacy `.hyoka/.skills-cache/` sparse layout. Looks intentional and does not introduce a CLI/config concern in my review lane.
+
+---
+
+**Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-tank.md`
+

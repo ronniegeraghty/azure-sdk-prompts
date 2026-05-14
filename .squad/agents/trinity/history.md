@@ -1027,3 +1027,31 @@ Trinity should note that `ReviewResult` now includes a `SkippedReviewers []Skipp
 **Action:** If Trinity is working on report rendering or failure handling, check `hyoka/internal/review/types.go:87` for the field definition.
 
 **No immediate blocker.** This is surfacing information that was previously only logged, not reported.
+
+---
+
+## 2026-05-14 — Dev branch site/frontend review (`ronniegeraghty/dev` vs `origin/main`)
+
+**Requested by:** Ronnie Geraghty  
+**Verdict:** REJECT
+
+**What I reviewed:** `site/`, `hyoka/internal/serve/`, `hyoka/internal/report/`, `hyoka/internal/rerender/`, `hyoka/internal/trends/`, `templates/`
+
+**Findings:**
+- Blocking: `site/src/app/data/types.ts` models `extras.review.panel_results[]` with legacy `overall_score/max_score/summary`, but Go now emits `score/pass/issues/strengths/criteria` for `report.ReviewPanelResult` (`hyoka/internal/report/types.go`). `site/src/app/components/grader-extras/ReviewExtras.tsx` renders `panel.overall_score` / `panel.max_score`, so real v4 review-panel cards will show blank/undefined score text and omit the backend payload's pass/issues/strengths semantics. Current tests reinforce the wrong shape instead of catching it.
+- Important mismatch: `EnvironmentInfo` still emits `availableTools` (camelCase) from Go, but the site only types/reads `available_tools` in `site/src/app/data/types.ts` and `site/src/app/components/eval-detail-page.tsx`. On reports without top-level `tool_availability`, builtin tools from older env payloads will silently disappear from the Available Tools panel.
+- Package validation: `go test ./hyoka/internal/report ./hyoka/internal/rerender ./hyoka/internal/serve ./hyoka/internal/trends` fails in `hyoka/internal/report` (dual-emit + v2 migration tests). `rerender`, `serve`, and `trends` pass.
+- New utility modules are otherwise in decent shape: `comparison-groups.ts` and `run-filters.ts` have direct unit coverage, and the new scoring/pass helpers are exercised indirectly by component/page tests.
+- Removed UI components check passed: no remaining imports of `ui/tabs`, `ui/textarea`, `ui/toggle`, `ui/toggle-group`, `ui/tooltip`, or `use-mobile` under `site/src/`.
+
+**Verification:**
+- ✅ `cd site && npm run build`
+- ✅ Focused vitest run: 147 tests passed
+- ❌ `go test ./hyoka/internal/report ./hyoka/internal/rerender ./hyoka/internal/serve ./hyoka/internal/trends` (report package failures)
+
+**Workflow note learned:** current embed flow is `cd site && npm run build`; `site/embed.go` now embeds `site/dist` directly and CI enforces freshness via `.github/workflows/site-embed-freshness.yml`. Old `make site-embed` guidance in earlier history is obsolete.
+
+---
+
+**Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-trinity.md`
+

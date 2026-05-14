@@ -1989,3 +1989,39 @@ Test prompts were reframed (commit b1769058):
 - `hello-yaml`: Now checks exact bullet labels + no code fence + no extra files (prompt-unique)
 - Duplicates removed; grader contracts now clean and purposeful
 
+---
+
+## 2026-05-14 — Eval framework review: `ronniegeraghty/dev` vs `origin/main`
+
+**Verdict:** REJECT
+
+**Scope reviewed:** `hyoka/internal/eval/`, `hyoka/internal/criteria/`, `hyoka/internal/graders/`, `hyoka/internal/prompt/`, `hyoka/internal/skills/`, `hyoka/internal/review/`, `hyoka/internal/plugin/`
+
+**What I verified:**
+- `when:` negation + `tags:` intersection semantics are implemented in `criteria/config.go` and covered by `matchset_test.go` / `whenclause_test.go`.
+- Skill leaf expansion uses `env.SkillsLoaded` as the authoritative post-session source in `eval/config_props.go`; this matches the intended verifier contract.
+- PR #640 follow-up tests/build are green in the touched eval packages.
+
+**Blocking findings:**
+1. **`evaluation_criteria` removal for YAML prompts is not actually shipped.**
+   - `internal/prompt/parser.go` still defines `EvaluationCriteriaField string \`yaml:"evaluation_criteria"\`` and `ParsePromptYAML` still assigns it into `Prompt.EvaluationCriteria`.
+   - `internal/prompt/types.go` still documents `.prompt.yaml/.prompt.yml` support for `evaluation_criteria`.
+   - `internal/prompt/loader_test.go` still has a passing YAML prompt fixture using `evaluation_criteria`.
+   - Result: the advertised breaking change is not enforced; old YAML prompts still parse successfully.
+2. **Typed inline graders leak into review-bucket construction.**
+   - `internal/eval/engine.go:reviewBuckets()` passes **all** `p.Graders` into `criteria.BuildUnifiedReviewBuckets(...)`.
+   - `internal/criteria/buckets.go` appends a review bucket for every inline grader without filtering to `type: prompt`.
+   - Real fixtures now include inline `workspace` graders (`prompts/test/hello-markdown-with-code.prompt.md`, `prompts/test/hello-yaml.prompt.yaml`), so this path is live.
+   - `MergeUnifiedCriteria` skips typed graders when rendering text, so these become empty AI-review buckets instead of being excluded. That is a pipeline/reporting mismatch and currently untested.
+
+**Validation:**
+- `go build ./...` ✅
+- `go test ./hyoka/internal/criteria ./hyoka/internal/prompt ./hyoka/internal/eval` ✅
+
+**Recommendation:** fix the two blockers above, then re-review.
+
+
+---
+
+**Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-neo.md`
+

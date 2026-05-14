@@ -1305,3 +1305,39 @@ go test ./hyoka/internal/...
 - **Unit tests > integration for pure logic:** eval tests prove the switch statement + counter math without SDK dependency
 - **Test names matter for future grep:** "pr640" in filenames makes these tests easy to find when the PR merges
 - **Test fixtures validate inline graders (2026-05-06):** Prompts now exercise inline non-prompt graders on both .prompt.md (hello-markdown-with-code) and .prompt.yaml (hello-yaml NEW) with tag-filtered criteria graders. Confirms all three grader execution paths coexist in orchestration.
+
+## 2026-05-14: Dev Branch Test & Build Verification
+
+### Context
+- Reviewed branch `ronniegeraghty/dev` per Ronnie's request.
+- Required checks: `go build ./...`, `go test ./...`, `go vet ./...`, criteria/eval coverage spot-checks, workflow diff review, and module verification.
+
+### Results
+- `go build ./...`: PASS
+- `go test ./... -count=1`: FAIL
+  - `hyoka/internal/pairwise`: `TestComputeCheckDiffs`
+  - `hyoka/internal/report`: `TestGraderResultDualEmit`, `TestGraderResultMarshalDualEmit`, `TestV2ReportReadByV3Code`
+- `go vet ./...`: PASS
+- `go mod verify` (in `hyoka/`): PASS (`all modules verified`)
+- `go.work`: not present at repo root
+
+### Coverage Assessment
+- New unified `graders:` parsing is covered well in `hyoka/internal/criteria/bundle_test.go` and `hyoka/internal/criteria/config_test.go` (`TestPhase1Loader_*`, `TestParse_MixedPromptAndTyped`, legacy/back-compat and malformed-entry cases).
+- Per-property negation is covered in `hyoka/internal/criteria/whenclause_test.go` (`TestWhenClause_Negation`).
+- Tag matching is covered in `hyoka/internal/criteria/matchset_test.go` (`TestMatchSet_MatchesAny`) plus tag-aware `WhenClause` cases.
+- I did not find a direct unit test named for `ParseInlineGraders`/`ValidateInlineGraders`, but the broader parsing surface and integration paths are exercised.
+
+### CI Notes
+- `.github/workflows/ci.yml` now runs on PRs to `main` only and pushes to `main` only; branch-specific `ronniegeraghty/dev` push trigger was removed.
+- CI also gained a `site-build-and-test` job (Node 22, `npm ci`, build, test).
+- New `.github/workflows/site-embed-freshness.yml` verifies committed `site/dist/` matches a fresh build.
+
+### Verdict
+- REJECT for now: branch is not test-green because `go test ./...` fails in `internal/pairwise` and `internal/report`.
+- Coverage for the new criteria features is broadly adequate, but the failing suite blocks approval.
+- Revision should be owned by a non-author on the affected `pairwise` / `report` changes, per reviewer protocol.
+
+---
+
+**Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-switch.md`
+
