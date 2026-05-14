@@ -71,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Silent zero-render bug from Go↔TypeScript field drift** — Phase 3 unified grading now properly serialized to reports; eval detail page gracefully handles legacy reports with missing grader_results field
 - **README and AGENTS docs:** — updated build/test commands to use `./...` glob instead of old `./hyoka/...` paths
 - **Stale directory references in docs** — removed obsolete references to `hyoka/internal/` and `cd hyoka/` patterns from documentation
+- **Skill leaf-expansion in `when: tool:` matching** — Graders with skill-source tool filters were silently dropped because only the wrapper skill_dir was visible; eval now uses post-session env.SkillsLoaded as the authoritative source for leaf-skill identity (#TBD)
+- **Pairwise tool-usage chart classification** — Tools were incorrectly classified as "available but unused" when impact signals were symmetric; baseline tool_availability is now the ground truth (#TBD)
 
 ## [0.3.1] — Phase 3: Advanced Core & CLI Polish
 
