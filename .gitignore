@@ -53,3 +53,7 @@ node_modules/
 
 # Skill fetch cache
 .skills-cache/
+
+# Smoke test artifacts
+smoke-test-output/
+test_output.txt
