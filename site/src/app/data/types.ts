@@ -41,6 +41,15 @@ export interface ReviewPanelEntry {
   events?: unknown[];
 }
 
+export interface ReviewPanelResult {
+  model: string;
+  score: number;
+  pass: boolean;
+  issues?: string[];
+  strengths?: string[];
+  criteria: ReviewCriterionResult[];
+}
+
 // ── Grader system types (v4 unified) ────────────────────────────────
 
 /**
@@ -158,7 +167,7 @@ export interface ReviewExtras {
   model: string;
   summary: string;
   is_consensus?: boolean;
-  panel_results?: ReviewPanelEntry[];
+  panel_results?: ReviewPanelResult[];
   issues?: string[];
   strengths?: string[];
   duration_seconds?: number;
@@ -315,6 +324,7 @@ export interface Environment {
   skills_invoked?: string[];
   /** Schema v2 alias (Go emits camelCase). Same data as `skills_invoked`. */
   skillsInvoked?: string[];
+  availableTools?: string[];
   available_tools?: string[];
   mcp_servers?: string[];
   /** Schema v2 alias (Go emits camelCase). Same data as `mcp_servers`. */

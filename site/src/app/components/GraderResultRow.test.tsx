@@ -103,9 +103,8 @@ describe("GraderResultRow (v4)", () => {
             panel_results: [
               {
                 model: "opus",
-                overall_score: 5,
-                max_score: 5,
-                summary: "Good",
+                score: 5,
+                pass: false,
                 criteria: [
                   { name: "Uses DefaultAzureCredential", passed: true, reason: "Correct usage" },
                   { name: "Handles errors properly", passed: false, reason: "Missing try-catch" },
@@ -113,9 +112,8 @@ describe("GraderResultRow (v4)", () => {
               },
               {
                 model: "sonnet",
-                overall_score: 4,
-                max_score: 5,
-                summary: "OK",
+                score: 4,
+                pass: true,
                 criteria: [
                   { name: "Uses DefaultAzureCredential", passed: true, reason: "Looks good" },
                   { name: "Handles errors properly", passed: true, reason: "Try-catch present" },
@@ -154,9 +152,8 @@ describe("GraderResultRow (v4)", () => {
             panel_results: [
               {
                 model: "opus",
-                overall_score: 5,
-                max_score: 5,
-                summary: "Good",
+                score: 5,
+                pass: true,
                 criteria: [
                   { name: "Exact Match", passed: true, reason: "Found" },
                   { name: "Different Name", passed: true, reason: "Also found" },
@@ -195,9 +192,8 @@ describe("GraderResultRow (v4)", () => {
             panel_results: [
               {
                 model: "opus",
-                overall_score: 5,
-                max_score: 5,
-                summary: "Good",
+                score: 5,
+                pass: true,
                 criteria: [
                   { name: "Different Name", passed: true, reason: "Doesn't match" },
                 ],
@@ -230,9 +226,8 @@ describe("GraderResultRow (v4)", () => {
             panel_results: [
               {
                 model: "opus",
-                overall_score: 5,
-                max_score: 5,
-                summary: "Good",
+                score: 5,
+                pass: true,
                 // No criteria field
               },
             ],

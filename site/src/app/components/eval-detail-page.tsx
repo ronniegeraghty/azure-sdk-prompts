@@ -669,7 +669,7 @@ export function EvalDetailPage() {
                 skill_groups fall through to the flat layout. */}
             {((r.tool_availability?.length ?? 0) > 0 ||
               ((environment.skills_loaded ?? environment.skillsLoaded)?.length ?? 0) > 0 ||
-              (environment.available_tools?.length ?? 0) > 0) && (() => {
+              ((environment.availableTools ?? environment.available_tools)?.length ?? 0) > 0) && (() => {
               // Normalize Env field names — Go emits a mix of camelCase (most
               // fields) and snake_case (skill_groups). Read both casings.
               const envSkillsLoaded = environment.skills_loaded ?? environment.skillsLoaded ?? [];
@@ -678,16 +678,16 @@ export function EvalDetailPage() {
               const envSkillGroups = environment.skill_groups ?? [];
 
               // Prefer top-level r.tool_availability (v3, has type/used). Fall
-              // back to environment.available_tools (legacy flat list) or
-              // synthesize from envSkillsLoaded/envMcpServers (v2).
+              // back to environment.availableTools (Go emit) / available_tools
+              // (legacy flat list) or synthesize from envSkillsLoaded/envMcpServers (v2).
               type ToolRow = { name: string; type?: string; used?: boolean };
               let toolRows: ToolRow[] = [];
               if ((r.tool_availability?.length ?? 0) > 0) {
                 toolRows = (r.tool_availability ?? []).map(t => ({
                   name: t.name, type: t.type, used: t.used,
                 }));
-              } else if ((environment.available_tools?.length ?? 0) > 0) {
-                toolRows = (environment.available_tools ?? []).map(n => ({ name: n }));
+              } else if ((environment.availableTools ?? environment.available_tools)?.length ?? 0) {
+                toolRows = (environment.availableTools ?? environment.available_tools ?? []).map(n => ({ name: n }));
               } else {
                 toolRows = [
                   ...envSkillsLoaded.map(n => ({ name: n, type: "skill" })),

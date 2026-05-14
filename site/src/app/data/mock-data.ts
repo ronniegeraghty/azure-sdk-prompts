@@ -63,7 +63,7 @@ export interface Environment {
   model: string;
   skills_loaded: string[];
   skills_invoked: string[];
-  available_tools: string[];
+  availableTools: string[];
   mcp_servers: string[];
   total_input_tokens: number;
   total_output_tokens: number;
@@ -386,7 +386,7 @@ function generateEvalReport(promptId?: string, configName?: string): EvalReport 
       model,
       skills_loaded: ["azure-sdk-knowledge", "code-generation", "code-review"],
       skills_invoked: pickN(["azure-sdk-knowledge", "code-generation"], randBetween(1, 2, 0)),
-      available_tools: toolNames,
+      availableTools: toolNames,
       mcp_servers: ["filesystem", "terminal"],
       total_input_tokens: randBetween(2000, 12000, 0),
       total_output_tokens: randBetween(3000, 15000, 0),

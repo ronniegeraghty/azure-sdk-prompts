@@ -1055,3 +1055,13 @@ Trinity should note that `ReviewResult` now includes a `SkippedReviewers []Skipp
 
 **Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-trinity.md`
 
+
+---
+
+## 2026-05-14: Report test cleanup + site schema alignment
+
+- Dropped obsolete `hyoka/internal/report/dual_emit_test.go` after confirming `GraderResult.Checks` intentionally kept the single `json:"points"` tag and the planned alias path never landed.
+- Removed the stale v2-read migration test in `generator_test.go`; `MigrateToV3()` has been a hard-cutover panic since `4ef80d89`, so v2 reports must be regenerated rather than migrated in-process.
+- Updated `site/src/app/data/types.ts` so `extras.review.panel_results[]` matches Go's `ReviewPanelResult` wire shape (`score`, `pass`, `issues`, `strengths`, `criteria`) while preserving the legacy `review_panel` type separately.
+- Updated site consumers to read `environment.availableTools` (with legacy fallback), render the new panel-result fields, and refreshed the related test fixtures.
+- Verification: `go test ./hyoka/internal/report/...` ✅, `cd site && npm run build` ✅.

@@ -76,18 +76,44 @@ export function ReviewExtras({ extras }: { extras: ReviewExtrasType }) {
                   key={i}
                   className="rounded-md border border-white/5 bg-white/[0.01] p-2"
                 >
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="text-white/50" style={{ ...mono, fontSize: 10 }}>
                       {panel.model}
                     </span>
-                    <span className="text-white/30" style={{ fontSize: 10 }}>
-                      {panel.overall_score}/{panel.max_score}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={panel.pass ? "text-emerald-400/80" : "text-red-400/80"} style={{ fontSize: 10 }}>
+                        {panel.pass ? "PASS" : "FAIL"}
+                      </span>
+                      <span className="text-white/30" style={{ fontSize: 10 }}>
+                        {panel.score}
+                      </span>
+                    </div>
                   </div>
-                  {panel.summary && (
-                    <p className="text-white/40" style={{ fontSize: 10, lineHeight: 1.4 }}>
-                      {panel.summary}
-                    </p>
+                  {(panel.issues?.length || panel.strengths?.length) && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {panel.issues && panel.issues.length > 0 && (
+                        <div>
+                          <div className="mb-1 text-red-400/60" style={{ fontSize: 10 }}>Issues</div>
+                          {panel.issues.map((issue, idx) => (
+                            <div key={idx} className="mb-1 flex gap-1.5">
+                              <XCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-400/50" />
+                              <span className="text-white/40" style={{ fontSize: 10 }}>{issue}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {panel.strengths && panel.strengths.length > 0 && (
+                        <div>
+                          <div className="mb-1 text-emerald-400/60" style={{ fontSize: 10 }}>Strengths</div>
+                          {panel.strengths.map((strength, idx) => (
+                            <div key={idx} className="mb-1 flex gap-1.5">
+                              <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400/50" />
+                              <span className="text-white/40" style={{ fontSize: 10 }}>{strength}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
