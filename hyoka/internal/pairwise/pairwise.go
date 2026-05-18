@@ -508,8 +508,17 @@ func ComputeCheckDiffs(baseline *EvalReportData, variants []*EvalReportData) map
 		for _, graderName := range graderNames {
 			baselinePoints := baselineChecks[graderName]
 			variantPoints, hasVariant := variantChecks[graderName]
-			
-			for checkIdx, basePoint := range baselinePoints {
+
+			// Iterate baseline check indices in sorted order so diff
+			// ordering is deterministic (map iteration is randomized).
+			baseIdxs := make([]int, 0, len(baselinePoints))
+			for idx := range baselinePoints {
+				baseIdxs = append(baseIdxs, idx)
+			}
+			sort.Ints(baseIdxs)
+
+			for _, checkIdx := range baseIdxs {
+				basePoint := baselinePoints[checkIdx]
 				varPoint, hasCheck := variantPoints[checkIdx]
 				
 				var movement string
@@ -547,7 +556,13 @@ func ComputeCheckDiffs(baseline *EvalReportData, variants []*EvalReportData) map
 			
 			// Handle checks that exist in variant but not in baseline (rare)
 			if hasVariant {
-				for checkIdx, varPoint := range variantPoints {
+				varIdxs := make([]int, 0, len(variantPoints))
+				for idx := range variantPoints {
+					varIdxs = append(varIdxs, idx)
+				}
+				sort.Ints(varIdxs)
+				for _, checkIdx := range varIdxs {
+					varPoint := variantPoints[checkIdx]
 					if _, exists := baselinePoints[checkIdx]; !exists {
 						diffs = append(diffs, PairwiseCheckDiff{
 							GraderName:     graderName,
