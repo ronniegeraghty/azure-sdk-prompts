@@ -23,16 +23,15 @@ tags:
 
 ## Prompt
 
-Show me how to
-authenticate an Azure SDK client using DefaultAzureCredential. Explain:
-1. What npm packages are needed
-2. How to create and use a DefaultAzureCredential instance
-3. The credential chain order and which credentials are tried
-4. How it works in local dev (VS Code, Azure CLI) vs Azure-hosted environments
-5. How to troubleshoot authentication failures
+Write a TypeScript program that
+authenticates an Azure SDK client using DefaultAzureCredential. The program should:
+1. Install and import the required npm packages
+2. Create a DefaultAzureCredential instance
+3. Use it to create a SecretClient from @azure/keyvault-secrets
+4. Retrieve a secret from the vault and print its value
+5. Handle AuthenticationError for credential failures
 
-Provide a complete TypeScript example that creates a SecretClient using
-DefaultAzureCredential.
+Include a package.json with all dependencies and use async/await throughout.
 
 ## Evaluation Criteria
 

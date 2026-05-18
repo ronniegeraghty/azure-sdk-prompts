@@ -25,9 +25,11 @@ tags:
 
 ## Prompt
 
-Write a Python script that manages
-configuration settings in Azure App Configuration:
-1. Create an AzureAppConfigurationClient using from_connection_string()
+Write a Python script that manages configuration settings in Azure App Configuration.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
+1. Create an `AzureAppConfigurationClient`.
 2. Set a configuration setting with key "app:Settings:FontSize" and value "24"
 3. Set a setting with label "Production"
 4. Get the setting by key and print its value
@@ -41,10 +43,9 @@ Show required pip packages and proper error handling with HttpResponseError.
 
 The generated code should include:
 - `azure-appconfiguration` pip package
-- `AzureAppConfigurationClient.from_connection_string()`
 - `set_configuration_setting()` with `ConfigurationSetting` objects
-- `get_configuration_setting()` by key and label
-- `list_configuration_settings()` with key_filter and label_filter
+- `get_configuration_setting()` by key
+- `list_configuration_settings()` with key_filter
 - `FeatureFlagConfigurationSetting` for feature flags
 - `delete_configuration_setting()` and `HttpResponseError` handling
 

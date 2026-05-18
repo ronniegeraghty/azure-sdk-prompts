@@ -1,0 +1,85 @@
+---
+id: identity-dp-python-credential-chain
+properties:
+  service: identity
+  plane: data-plane
+  language: python
+  category: auth
+  difficulty: intermediate
+  description: 'Can an agent build environment-specific Azure credential chains (dev, CI, production) using ChainedTokenCredential,
+    with managed identity, workload identity, CAE support, and environment auto-detection?
+
+    '
+  sdk_package: azure-identity
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/identity-readme
+  created: '2026-04-10'
+  author: copilot
+tags:
+- identity
+- chained-credential
+- managed-identity
+- workload-identity
+- cae
+- environment-detection
+- azure-pipelines
+- async
+---
+
+# Credential Chain Builder: Azure Identity (Python)
+
+## Prompt
+
+Create a Python project that demonstrates how to correctly build Azure credential chains tailored to different deployment environments — local development, CI/CD pipelines, and production.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
+The project needs:
+
+- A **credential factory module** that builds the appropriate Azure credential for each environment. For local development, it should chain together credentials that work from developer tools (CLI, VS Code, etc.). For CI pipelines, it should support credentials sourced from pipeline environment variables or Azure Pipelines service connections. For production, it should prefer managed identity (supporting both system-assigned and user-assigned, where the user-assigned identity's client ID comes from an environment variable), with workload identity as a fallback for Kubernetes scenarios. The factory should also support enabling Continuous Access Evaluation (CAE) on token requests, which lets Azure revoke tokens mid-session for security events.
+
+- An **environment detector module** that auto-detects which environment the app is running in by probing for well-known environment variables (e.g., CI pipeline workspace variables, managed identity endpoint availability). It should classify the environment as dev, CI, or production.
+
+- A **connectivity tester module** (both sync and async versions) that verifies a credential works by requesting a token for a given Azure scope. It should print success/failure, the token's expiry time, and whether CAE was requested. It should handle and report the specific failure reason if authentication fails (expired cert, wrong tenant, no identity available, etc.) rather than just printing a generic error.
+
+- A **main script** that detects the current environment, builds the right credential, and runs the connectivity test against Azure Resource Manager using the sync tester first, then repeats with the async tester. Print the detected environment, the selected credential strategy, and the test results from both.
+
+Include a `requirements.txt` with the necessary Azure SDK dependencies.
+
+## Evaluation Criteria
+
+### Credential Chain Construction
+- Uses `ChainedTokenCredential` to compose multiple credentials
+- Credentials passed in order to the constructor — order matters
+
+### Environment-Specific Chains
+- **Dev chain**: includes `AzureCliCredential`; may include `VisualStudioCodeCredential`, `AzurePowerShellCredential`
+- **CI chain**: uses `EnvironmentCredential` or `AzurePipelinesCredential` (not just `DefaultAzureCredential`)
+- **Production chain**: `ManagedIdentityCredential` first (supports user-assigned via `client_id` kwarg), `WorkloadIdentityCredential` as fallback
+
+### CAE Support
+- Enables CAE via `enable_cae=True` in `get_token()` call or token request context
+
+### Environment Detection
+- Detects CI (checks `CI`, `TF_BUILD`, `BUILD_SOURCESDIRECTORY`, or similar env vars)
+- Detects production/managed identity (checks `IDENTITY_ENDPOINT`, `MSI_ENDPOINT`, or similar)
+- Falls back to dev if neither detected
+
+### Token Request & Testing
+- Calls `get_token()` with correct scope (`https://management.azure.com/.default`)
+- Prints token expiry from `AccessToken.expires_on`
+- Handles failure with specific exception info from `ClientAuthenticationError`
+
+### Async Support
+- Async tester uses `azure.identity.aio` async credentials and `await get_token()`
+
+### Anti-Patterns (scenario-specific)
+- NOT using `DefaultAzureCredential` as the CI credential (too broad)
+
+## Context
+
+This goes beyond basic DefaultAzureCredential usage (covered by `default-azure-credential.prompt.md`)
+to test whether the agent can build targeted credential chains for each deployment environment.
+Key differentiators: ChainedTokenCredential (not just DefaultAzureCredential),
+AzurePipelinesCredential for CI, user-assigned managed identity, WorkloadIdentityCredential for
+Kubernetes, and Continuous Access Evaluation (CAE) — a recent feature that many LLMs don't know
+about without skill augmentation.

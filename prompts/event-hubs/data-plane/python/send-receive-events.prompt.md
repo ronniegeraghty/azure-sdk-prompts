@@ -24,10 +24,10 @@ tags:
 
 ## Prompt
 
-Write a Python script that
-demonstrates sending and receiving events with Azure Event Hubs:
-1. Create an EventHubProducerClient using from_connection_string()
-2. Create an EventDataBatch and add 10 events with custom properties
+Write a Python script that demonstrates sending and receiving events with Azure Event Hubs.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 3. Send the batch to the event hub
 4. Create an EventHubConsumerClient for receiving
 5. Create a BlobCheckpointStore for checkpointing
@@ -42,7 +42,6 @@ azure-eventhub-checkpointstoreblob-aio) and async patterns.
 
 The generated code should include:
 - `azure-eventhub` and `azure-eventhub-checkpointstoreblob-aio` pip packages
-- `EventHubProducerClient.from_connection_string()`
 - `create_batch()` and `EventDataBatch.add()`
 - `send_batch()` for publishing
 - `EventHubConsumerClient` with `BlobCheckpointStore`

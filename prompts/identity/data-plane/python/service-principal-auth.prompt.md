@@ -23,8 +23,10 @@ tags:
 
 ## Prompt
 
-Show me how to authenticate
-to Azure using a Service Principal with client secret in Python. I need:
+Write a runnable Python project that authenticates to Azure using a Service Principal with a client secret.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 1. Required pip packages
 2. How to create a ClientSecretCredential with tenant_id, client_id, and client_secret
 3. Using it with an Azure SDK client

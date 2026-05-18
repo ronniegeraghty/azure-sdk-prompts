@@ -23,8 +23,10 @@ tags:
 
 ## Prompt
 
-Show me how to use
-Managed Identity to authenticate Azure SDK clients in Python. Cover:
+Write a runnable Python project that authenticates Azure SDK clients using Managed Identity.
+
+**Write the code to files (use file-write tools, do not reply with code blocks).**
+
 1. System-assigned vs user-assigned managed identity differences
 2. How to create a ManagedIdentityCredential for each type
 3. Using it with Azure SDK clients

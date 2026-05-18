@@ -23,29 +23,17 @@ tags:
 
 ## Prompt
 
-Create a runnable Python project that demonstrates authenticating an Azure SDK
-client using `DefaultAzureCredential`. You MUST write the following files to
-the workspace:
+Show me how to authenticate
 
-1. `requirements.txt` — pinning `azure-identity` and `azure-keyvault-secrets`
-2. `main.py` — a complete, executable script that:
-   - constructs a `DefaultAzureCredential`
-   - passes it to a `SecretClient` for an Azure Key Vault
-   - reads a secret and prints its value
-   - configures the `logging` module so credential-chain attempts are visible
-   - handles `ClientAuthenticationError` with a useful error message
-3. `README.md` — a short README that explains, in this order:
-   1. What pip packages are needed and how to install them
-   2. How `DefaultAzureCredential` is created and used
-   3. The credential chain order (Environment → Workload Identity → Managed
-      Identity → Azure CLI → etc.) and which credentials are tried
-   4. How it works in local development (VS Code, Azure CLI) vs. Azure
-      deployments
-   5. How to troubleshoot authentication failures using the logging output
-      from `main.py`
+**Write the code to files (use file-write tools, do not reply with code blocks).**
 
-Do not just describe the solution in chat — write the files. The evaluation
-inspects the workspace, not your assistant response.
+an Azure SDK client using DefaultAzureCredential. Explain:
+1. What pip packages are needed
+2. How to create and use a DefaultAzureCredential instance
+3. The credential chain order and which credentials are tried
+4. How it works in local development (VS Code, Azure CLI) vs Azure deployments
+5. How to troubleshoot authentication failures with logging
+
 
 ## Evaluation Criteria
 
