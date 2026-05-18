@@ -1,4 +1,33 @@
 // Package serve provides a local web server for browsing evaluation reports.
+//
+// # Security
+//
+// The serve command is designed for local, single-user inspection of
+// evaluation reports. It has no authentication, no authorization, and no
+// rate limiting. The default listener binds to all interfaces on the chosen
+// port (e.g. 0.0.0.0:8080), which means anyone who can reach the host on
+// that port can:
+//
+//   - Read every evaluation report, prompt, and doc the server is configured
+//     to expose, including prompt text, generated source, and model output.
+//   - Enumerate run IDs and download raw JSON via /api/runs and /reports/.
+//   - Access the embedded SPA without any credential.
+//
+// CORS is intentionally permissive (Access-Control-Allow-Origin: *) so the
+// dev-mode Vite server can hit the API; this is safe for localhost use but
+// should NOT be exposed on a shared network.
+//
+// Operator guidance for shared machines:
+//
+//   - Prefer binding to 127.0.0.1 via a reverse proxy or SSH tunnel rather
+//     than exposing the port directly.
+//   - Treat the reports directory as sensitive: it may contain prompt text,
+//     agent output, and evaluation results that reveal internal grading
+//     rubrics or proprietary prompts.
+//   - Do not run `hyoka serve` on an untrusted network without first placing
+//     an authenticating proxy (nginx, caddy) in front of it.
+//
+// These expectations are also printed as a banner at startup.
 package serve
 
 import (
@@ -34,9 +63,9 @@ type DocInfo struct {
 }
 
 // internalDocs lists documentation files that should be excluded from the API.
+// Developer docs (architecture, contributing) belong in the repo, not the user-facing site.
 var internalDocs = map[string]bool{
-	"cleanup-plan":   true,
-	"eval-tool-plan": true,
+	"architecture": true,
 }
 
 // Start launches a local HTTP server for browsing reports.
@@ -90,21 +119,31 @@ func Start(opts Options) error {
 	if opts.PromptsDir != "" {
 		fmt.Printf("   Prompts directory: %s\n", opts.PromptsDir)
 	}
+	fmt.Printf("\n")
+	fmt.Printf("   ⚠  No authentication. Reports are readable by anyone who\n")
+	fmt.Printf("      can reach this port. Do not expose on untrusted networks —\n")
+	fmt.Printf("      use an SSH tunnel or authenticating reverse proxy instead.\n")
+	fmt.Printf("\n")
 	fmt.Printf("   Press Ctrl+C to stop\n\n")
 
 	return http.Serve(listener, corsMiddleware(mux))
 }
 
 // buildMux creates the HTTP handler with all routes.
+//
+// Each call constructs a dedicated in-memory file cache (see cache.go). The
+// cache is scoped to the returned mux so tests and concurrent Start calls
+// don't share state.
 func buildMux(opts Options) *http.ServeMux {
 	mux := http.NewServeMux()
+	cache := newFileCache()
 
 	// --- API: runs ---
 	mux.HandleFunc("/api/runs", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIRuns(w, r, opts.ReportsDir)
+		handleAPIRuns(w, r, opts.ReportsDir, cache)
 	})
 	mux.HandleFunc("/api/runs/", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIRunDetail(w, r, opts.ReportsDir)
+		handleAPIRunDetail(w, r, opts.ReportsDir, cache)
 	})
 
 	// --- API: docs ---
@@ -129,7 +168,7 @@ func buildMux(opts Options) *http.ServeMux {
 	})
 
 	// --- Dashboard routes (comparison, trends, drill-down) ---
-	registerDashboardRoutes(mux, opts)
+	registerDashboardRoutes(mux, opts, cache)
 
 	// --- Static file serving for raw report files ---
 	reportFS := http.FileServer(http.Dir(opts.ReportsDir))
@@ -157,8 +196,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 // --- Runs API handlers ---
 
-func handleAPIRuns(w http.ResponseWriter, _ *http.Request, reportsDir string) {
-	runs, err := listRunSummaries(reportsDir)
+func handleAPIRuns(w http.ResponseWriter, _ *http.Request, reportsDir string, cache *fileCache) {
+	runs, err := listRunSummaries(reportsDir, cache)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -166,7 +205,7 @@ func handleAPIRuns(w http.ResponseWriter, _ *http.Request, reportsDir string) {
 	writeJSON(w, runs)
 }
 
-func handleAPIRunDetail(w http.ResponseWriter, r *http.Request, reportsDir string) {
+func handleAPIRunDetail(w http.ResponseWriter, r *http.Request, reportsDir string, cache *fileCache) {
 	// Route: /api/runs/{runId} or /api/runs/{runId}/eval?path=...
 	rest := strings.TrimPrefix(r.URL.Path, "/api/runs/")
 	if rest == "" {
@@ -187,48 +226,43 @@ func handleAPIRunDetail(w http.ResponseWriter, r *http.Request, reportsDir strin
 	if len(parts) == 2 {
 		switch parts[1] {
 		case "eval":
-			handleAPIEval(w, r, reportsDir, runID)
+			handleAPIEval(w, r, reportsDir, runID, cache)
 		case "graders":
-			handleAPIGraders(w, r, reportsDir, runID)
+			handleAPIGraders(w, r, reportsDir, runID, cache)
 		case "timeline":
-			handleAPITimeline(w, r, reportsDir, runID)
+			handleAPITimeline(w, r, reportsDir, runID, cache)
 		case "score-breakdown":
-			handleAPIScoreBreakdown(w, r, reportsDir, runID)
+			handleAPIScoreBreakdown(w, r, reportsDir, runID, cache)
+		case "comparisons":
+			handleAPIRunComparisons(w, r, reportsDir, runID)
+		case "pairwise":
+			handleAPIPairwise(w, r, reportsDir, runID, cache)
 		default:
 			http.NotFound(w, r)
 		}
 		return
 	}
 
-	// /api/runs/{runId}/graders
-	if len(parts) == 2 && parts[1] == "graders" {
-		handleAPIGraders(w, r, reportsDir, runID)
-		return
-	}
-
-	// /api/runs/{runId}/timeline
-	if len(parts) == 2 && parts[1] == "timeline" {
-		handleAPITimeline(w, r, reportsDir, runID)
-		return
-	}
-
-	// /api/runs/{runId}/score-breakdown
-	if len(parts) == 2 && parts[1] == "score-breakdown" {
-		handleAPIScoreBreakdown(w, r, reportsDir, runID)
-		return
-	}
-
 	// /api/runs/{runId} — return full summary.json
 	if len(parts) == 1 {
 		summaryPath := filepath.Join(reportsDir, runID, "summary.json")
-		serveJSONFile(w, r, summaryPath)
+		serveJSONFile(w, r, summaryPath, cache)
 		return
 	}
 
 	http.NotFound(w, r)
 }
 
-func handleAPIEval(w http.ResponseWriter, r *http.Request, reportsDir, runID string) {
+// handleAPIPairwise returns the pairwise.json contents for a run, or 404 if
+// the run has no pairwise analysis. This makes pairwise results a first-class
+// part of the run detail API rather than requiring the site to fish them out
+// of summary.json (#360 R140).
+func handleAPIPairwise(w http.ResponseWriter, r *http.Request, reportsDir, runID string, cache *fileCache) {
+	pairwisePath := filepath.Join(reportsDir, runID, "pairwise.json")
+	serveJSONFile(w, r, pairwisePath, cache)
+}
+
+func handleAPIEval(w http.ResponseWriter, r *http.Request, reportsDir, runID string, cache *fileCache) {
 	relPath := r.URL.Query().Get("path")
 	if relPath == "" {
 		http.Error(w, `missing "path" query parameter`, http.StatusBadRequest)
@@ -243,7 +277,7 @@ func handleAPIEval(w http.ResponseWriter, r *http.Request, reportsDir, runID str
 	}
 
 	fullPath := filepath.Join(reportsDir, runID, cleaned)
-	serveJSONFile(w, r, fullPath)
+	serveJSONFile(w, r, fullPath, cache)
 }
 
 // --- Docs API handlers ---
@@ -340,14 +374,8 @@ func spaHandler(siteDir string) http.HandlerFunc {
 	if siteDir != "" {
 		siteFS = os.DirFS(siteDir)
 	} else {
-		sub, err := fs.Sub(embeddedSite, "site")
-		if err != nil {
-			slog.Error("failed to access embedded site", "error", err)
-			return func(w http.ResponseWriter, r *http.Request) {
-				http.Error(w, "embedded site unavailable", http.StatusInternalServerError)
-			}
-		}
-		siteFS = sub
+		// embeddedSite is already the dist/ subtree, use it directly
+		siteFS = embeddedSite
 	}
 
 	fileServer := http.FileServerFS(siteFS)
@@ -381,8 +409,10 @@ func spaHandler(siteDir string) http.HandlerFunc {
 
 // --- Data helpers ---
 
-// listRunSummaries reads run directories and returns their full summary.json content.
-func listRunSummaries(reportsDir string) ([]json.RawMessage, error) {
+// listRunSummaries reads run directories and returns their full summary.json
+// content. Summaries are served through the file cache so repeated list
+// requests don't re-read unchanged summary.json files from disk.
+func listRunSummaries(reportsDir string, cache *fileCache) ([]json.RawMessage, error) {
 	entries, err := os.ReadDir(reportsDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading reports dir: %w", err)
@@ -400,7 +430,7 @@ func listRunSummaries(reportsDir string) ([]json.RawMessage, error) {
 		}
 
 		summaryPath := filepath.Join(reportsDir, e.Name(), "summary.json")
-		data, err := os.ReadFile(summaryPath)
+		data, err := cache.ReadFile(summaryPath)
 		if err != nil {
 			// Include a minimal entry for runs without summary.json
 			minimal, _ := json.Marshal(map[string]string{"run_id": e.Name()})
@@ -475,8 +505,12 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 }
 
-func serveJSONFile(w http.ResponseWriter, _ *http.Request, path string) {
-	data, err := os.ReadFile(path)
+// serveJSONFile reads the named JSON file through the cache and writes it to
+// the response, or responds 404 on any read error. Using the cache makes
+// repeated reads of unchanged report files (summary.json, report.json, etc.)
+// a memory hit rather than a disk + JSON re-parse round-trip.
+func serveJSONFile(w http.ResponseWriter, _ *http.Request, path string, cache *fileCache) {
+	data, err := cache.ReadFile(path)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return

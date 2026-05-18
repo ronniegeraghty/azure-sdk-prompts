@@ -11,7 +11,7 @@ source: "manual (RFC #426 — PAO External Communications)"
 Use this skill whenever PAO drafts external-facing responses for issues or discussions.
 
 - Tone must be warm, helpful, and human-sounding — never robotic or corporate.
-- Brady's constraint applies everywhere: **Humanized tone is mandatory**.
+- the user's constraint applies everywhere: **Humanized tone is mandatory**.
 - This applies to **all external-facing content** drafted by PAO in Phase 1 issues/discussions workflows.
 
 ## Patterns

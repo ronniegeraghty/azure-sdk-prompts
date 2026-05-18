@@ -39,7 +39,7 @@ func (r *ModelCheckResult) Error() string {
 // reviewer) is present. This pre-flight check prevents mid-eval failures
 // when a model like "gemini-3-pro-preview" is configured but not available
 // in the backend (#264).
-func (e *CopilotSDKEvaluator) CheckModelAvailability(ctx context.Context, configs []config.ToolConfig) (*ModelCheckResult, error) {
+func (e *CopilotPromptRunner) CheckModelAvailability(ctx context.Context, configs []config.ToolConfig) (*ModelCheckResult, error) {
 	// Create a temporary workspace for the client — the ListModels RPC
 	// doesn't access the filesystem, but the SDK requires a valid CWD.
 	tmpDir, err := os.MkdirTemp("", "hyoka-modelcheck-*")
@@ -123,7 +123,7 @@ func collectRequiredModels(configs []config.ToolConfig) []string {
 // ValidateModelAvailability is a convenience wrapper that runs
 // CheckModelAvailability and returns an error if any models are unavailable.
 // Intended for use at run start to fail fast (#264).
-func (e *CopilotSDKEvaluator) ValidateModelAvailability(ctx context.Context, configs []config.ToolConfig) error {
+func (e *CopilotPromptRunner) ValidateModelAvailability(ctx context.Context, configs []config.ToolConfig) error {
 	result, err := e.CheckModelAvailability(ctx, configs)
 	if err != nil {
 		return fmt.Errorf("model availability check failed: %w", err)

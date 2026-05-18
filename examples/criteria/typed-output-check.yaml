@@ -1,0 +1,29 @@
+# Example: typed output_check grader
+#
+# The output_check grader is a boolean grader that evaluates the run's
+# WorkspaceDelta (files the agent created or modified, not starter files)
+# against a set of configured knobs. Each knob produces one pass/fail
+# sub-check; the overall result is the AND of every sub-check.
+#
+# v1 knobs (see docs/graders/output_check.md for full reference):
+#   min_files / max_files          — count of files created OR updated
+#   require_files                  — paths that must appear in output
+#   forbid_files                   — paths that must NOT appear in output
+#   require_updated                — paths that must appear in modified set
+#   min_bytes_per_file /
+#   max_bytes_per_file             — per-file byte bounds
+#
+# Unconfigured knobs are skipped. Graders never gate — a failing
+# output_check lowers the run's score but does not abort the eval.
+
+graders:
+  - name: files-produced
+    type: output_check
+    weight: 0.5
+    details:
+      min_files: 1
+      require_files: [README.md]
+      require_updated: [src/main.py]
+      min_bytes_per_file: 10
+      max_bytes_per_file: 1048576
+      forbid_files: [.env, secrets.json]

@@ -1,0 +1,16 @@
+graders:
+  - name: Output Files Produced
+    type: workspace
+    weight: 1.0
+    checks:
+      - kind: require_to_create
+        files:
+          - main.py
+  - name: Bounded Output Size
+    type: workspace
+    weight: 0.5
+    checks:
+      - kind: file
+        name: main.py
+        state: present
+        max_bytes: 1048576

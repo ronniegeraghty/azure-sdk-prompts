@@ -131,14 +131,6 @@ if !strings.Contains(string(content), "test-prompt") {
 t.Error("markdown should contain prompt ID")
 }
 
-htmlPath, err := WriteHTML(tr, outDir)
-if err != nil {
-t.Fatalf("WriteHTML failed: %v", err)
-}
-htmlContent, _ := os.ReadFile(htmlPath)
-if !strings.Contains(string(htmlContent), "test-prompt") {
-t.Error("HTML should contain prompt ID")
-}
 }
 
 func TestEvaluateToolUsage(t *testing.T) {
@@ -265,75 +257,6 @@ if !strings.Contains(trendEmoji(TrendRegressing), "regressing") {
 t.Error("regressing trend should contain 'regressing'")
 }
 }
-
-func TestGenerateWithMultipleRunsHTML(t *testing.T) {
-dir := t.TempDir()
-reportsDir := filepath.Join(dir, "reports")
-
-// Create two runs with two configs
-for _, run := range []struct{ id, ts string }{
-{"20250101-120000", "2025-01-01T12:00:00Z"},
-{"20250102-120000", "2025-01-02T12:00:00Z"},
-} {
-for _, cfg := range []string{"baseline", "azure-mcp"} {
-runDir := filepath.Join(reportsDir, run.id, "results", "kv", "dp", "py", "crud", cfg)
-os.MkdirAll(runDir, 0755)
-r := report.EvalReport{
-PromptID:       "kv-dp-python-crud",
-ConfigName:     cfg,
-Timestamp:      run.ts,
-Duration:       45.0,
-Success:        cfg == "baseline", // azure-mcp fails
-PromptMeta:     map[string]any{},
-ToolCalls:      []string{"bash"},
-GeneratedFiles: []string{"main.py"},
-}
-data, _ := json.Marshal(r)
-os.WriteFile(filepath.Join(runDir, "report.json"), data, 0644)
-}
-}
-
-tr, err := Generate(TrendOptions{ReportsDir: reportsDir})
-if err != nil {
-t.Fatalf("Generate failed: %v", err)
-}
-if tr.TotalRuns != 4 {
-t.Fatalf("expected 4 runs, got %d", tr.TotalRuns)
-}
-if len(tr.PromptTrends) != 1 {
-t.Fatalf("expected 1 prompt trend, got %d", len(tr.PromptTrends))
-}
-if len(tr.RunIDs) != 2 {
-t.Fatalf("expected 2 run IDs, got %d", len(tr.RunIDs))
-}
-
-outDir := filepath.Join(dir, "trends")
-htmlPath, err := WriteHTML(tr, outDir)
-if err != nil {
-t.Fatalf("WriteHTML failed: %v", err)
-}
-htmlContent, _ := os.ReadFile(htmlPath)
-html := string(htmlContent)
-
-// Should contain time-series elements
-if !strings.Contains(html, "Performance Over Time") {
-t.Error("HTML should contain Performance Over Time section")
-}
-if !strings.Contains(html, "kv-dp-python-crud") {
-t.Error("HTML should contain prompt ID")
-}
-if !strings.Contains(html, "baseline") {
-t.Error("HTML should contain config name")
-}
-if !strings.Contains(html, "Config Comparison") {
-t.Error("HTML should contain Config Comparison section")
-}
-// Should have trend badges
-if !strings.Contains(html, "badge") {
-t.Error("HTML should contain trend badges")
-}
-}
-
 func TestGenerateWithAnalysis(t *testing.T) {
 dir := t.TempDir()
 reportsDir := filepath.Join(dir, "reports")
@@ -354,16 +277,6 @@ tr, _ := Generate(TrendOptions{ReportsDir: reportsDir})
 tr.Analysis = "Test analysis: baseline config is performing well."
 
 outDir := filepath.Join(dir, "trends")
-htmlPath, _ := WriteHTML(tr, outDir)
-htmlContent, _ := os.ReadFile(htmlPath)
-html := string(htmlContent)
-
-if !strings.Contains(html, "AI Analysis") {
-t.Error("HTML should contain AI Analysis section")
-}
-if !strings.Contains(html, "Test analysis") {
-t.Error("HTML should contain analysis text")
-}
 
 mdPath, _ := WriteMarkdown(tr, outDir)
 mdContent, _ := os.ReadFile(mdPath)

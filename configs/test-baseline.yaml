@@ -1,0 +1,21 @@
+# Test fixture config — fast iteration for grader development
+configs:
+  - name: test/baseline
+    description: "Test fixture with Haiku and Sonnet generators (fast iteration)"
+    generator:
+      models:
+        - "claude-haiku-4.5"
+        - "claude-sonnet-4.6"
+      # Skill dir with `pairwise: deep` so each individual skill becomes its
+      # own variant (baseline + without-{skill-name} per skill in the dir).
+      tools:
+        - name: test-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/test"
+          pairwise: deep
+    reviewer:
+      models:
+        - "claude-haiku-4.5"
+        - "gpt-4.1"

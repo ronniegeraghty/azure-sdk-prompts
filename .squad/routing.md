@@ -7,8 +7,10 @@ How to decide who handles what.
 | Work Type | Route To | Examples |
 |-----------|----------|----------|
 | Eval engine, review panel, criteria, prompts, SDK integration, skills, plugins | Neo 💊 | Build reviewer pipeline, add criteria, fix prompt parsing, Copilot SDK client, skills framework, plugin architecture |
-| CLI commands, flags, config, environment checks, validation, progress | Tank 📡 | Add CLI flag, fix config loading, checkenv logic, validate command, progress output, go.work issues |
-| Reports, templates, site, serve, trends, frontend rendering | Trinity 🖤 | HTML/JSON/Markdown reports, Go template authoring, serve command, site assets, trends visualization |
+| CLI commands, flags, config, environment checks, validation, **terminal/CLI output** (`internal/progress/`, interactive renderer, tail truncation, ANSI styling, terminal width) | Tank 📡 | Add CLI flag, fix config loading, checkenv logic, validate command, progress renderer bugs, ANSI/tail/width issues, go.work issues |
+| **Browser/site output** — reports, templates, serve, trends, rerender, frontend rendering | Trinity 🖤 | HTML/JSON/Markdown reports, Go template authoring, serve command, site assets, trends visualization |
+
+> **Browser vs. terminal split (2026-04-23):** Trinity owns anything users see in the **browser** (reports, served site). Tank owns anything users see in the **terminal** (CLI output, progress renderer, ANSI). When in doubt: where does the user see it?
 | Architecture, system design, scope, technical direction | Morpheus 🕶️ | Design module boundaries, review architecture proposals, scope decisions |
 | Code review | Morpheus 🕶️ | Review PRs, check quality, approve/reject changes |
 | Testing, QA, edge cases, CI/CD, GitHub Actions | Switch 🤍 | Write tests, find edge cases, verify guardrails, coverage analysis, CI workflow maintenance |

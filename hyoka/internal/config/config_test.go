@@ -292,7 +292,7 @@ func TestParseGeneratorSkillsAndPlugins(t *testing.T) {
 	data := []byte(`
 configs:
   - name: with-skills
-    description: "Config with skills and plugins"
+    description: "Config with skills and a plugin tool entry"
     generator:
       model: "gpt-4"
       tools:
@@ -304,16 +304,17 @@ configs:
           type: skill
           source: remote
           repo: "github:org/repo"
-    plugins:
-      - "@azure/functions"
+        - name: azure-functions
+          type: plugin
+          source: remote
 `)
 	cfg, err := Parse(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	c := cfg.Configs[0]
-	if len(c.Generator.Tools) != 2 {
-		t.Errorf("expected 2 tools, got %d", len(c.Generator.Tools))
+	if len(c.Generator.Tools) != 3 {
+		t.Fatalf("expected 3 tools, got %d", len(c.Generator.Tools))
 	}
 	if c.Generator.Tools[0].ResolvedType() != "skill" || c.Generator.Tools[0].Path != "./skills/tool-use" {
 		t.Errorf("expected local skill './skills/tool-use', got %+v", c.Generator.Tools[0])
@@ -321,11 +322,30 @@ configs:
 	if c.Generator.Tools[1].ResolvedType() != "skill" || c.Generator.Tools[1].Repo != "github:org/repo" {
 		t.Errorf("expected remote skill 'github:org/repo', got %+v", c.Generator.Tools[1])
 	}
-	if len(c.Plugins) != 1 {
-		t.Errorf("expected 1 plugin, got %d", len(c.Plugins))
+	if c.Generator.Tools[2].ResolvedType() != "plugin" || c.Generator.Tools[2].Name != "azure-functions" {
+		t.Errorf("expected plugin tool entry 'azure-functions', got %+v", c.Generator.Tools[2])
 	}
-	if c.Plugins[0] != "@azure/functions" {
-		t.Errorf("expected plugin '@azure/functions', got %q", c.Plugins[0])
+}
+
+// TestParse_RejectsRetiredTopLevelPluginsField asserts that the retired
+// top-level `plugins:` field produces a migration-hint error rather than
+// being silently ignored or parsed under the old model.
+func TestParse_RejectsRetiredTopLevelPluginsField(t *testing.T) {
+	data := []byte(`
+configs:
+  - name: legacy
+    description: "uses retired schema"
+    generator:
+      model: "gpt-4"
+    plugins:
+      - "@azure/functions"
+`)
+	_, err := Parse(data)
+	if err == nil {
+		t.Fatal("expected migration error for top-level plugins: field")
+	}
+	if !strings.Contains(err.Error(), "retired") || !strings.Contains(err.Error(), "type: plugin") {
+		t.Errorf("error should mention retirement and migration shape; got: %v", err)
 	}
 }
 
@@ -344,104 +364,6 @@ configs:
 	c := cfg.Configs[0]
 	if len(c.Generator.Tools) != 0 {
 		t.Errorf("expected 0 tools, got %d", len(c.Generator.Tools))
-	}
-	if len(c.Plugins) != 0 {
-		t.Errorf("expected 0 plugins, got %d", len(c.Plugins))
-	}
-}
-
-func TestExpandPluginsAppendsTools(t *testing.T) {
-	dir := t.TempDir()
-	pluginPath := filepath.Join(dir, "test-plugin.yaml")
-	pluginData := []byte(`
-name: test-plugin
-skills:
-  - type: local
-    path: ./skills/generator
-mcp_servers:
-  azure:
-    type: stdio
-    command: npx
-    args: ["-y", "@azure/mcp@latest"]
-`)
-	if err := os.WriteFile(pluginPath, pluginData, 0644); err != nil {
-		t.Fatalf("failed to write plugin: %v", err)
-	}
-
-	cf := &ConfigFile{
-		Configs: []ToolConfig{
-			{
-				Name:        "with-plugin",
-				Description: "plugin config",
-				Generator:   &GeneratorConfig{Model: "gpt-4"},
-				Reviewer:    &ReviewerConfig{Models: []string{"gpt-4"}},
-				Plugins:     []string{"test-plugin"},
-			},
-		},
-	}
-	if err := cf.ExpandPlugins(dir); err != nil {
-		t.Fatalf("expand plugins failed: %v", err)
-	}
-	c := cf.Configs[0]
-	if len(c.Generator.Tools) != 2 {
-		t.Fatalf("expected 2 generator tools, got %d", len(c.Generator.Tools))
-	}
-	if len(c.Reviewer.Tools) != 2 {
-		t.Fatalf("expected 2 reviewer tools, got %d", len(c.Reviewer.Tools))
-	}
-}
-
-func TestExpandPluginsSkipsMissing(t *testing.T) {
-	// A config referencing a plugin that doesn't exist should not error —
-	// it should warn and skip, allowing other configs to load.
-	dir := t.TempDir()
-	cf := &ConfigFile{
-		Configs: []ToolConfig{
-			{
-				Name:      "with-missing-plugin",
-				Generator: &GeneratorConfig{Model: "gpt-4"},
-				Reviewer:  &ReviewerConfig{Models: []string{"gpt-4"}},
-				Plugins:   []string{"nonexistent-plugin"},
-			},
-		},
-	}
-	if err := cf.ExpandPlugins(dir); err != nil {
-		t.Fatalf("expected no error for missing plugin, got: %v", err)
-	}
-	// No tools should have been added
-	if len(cf.Configs[0].Generator.Tools) != 0 {
-		t.Errorf("expected 0 generator tools, got %d", len(cf.Configs[0].Generator.Tools))
-	}
-}
-
-func TestExpandPluginsMixedFoundAndMissing(t *testing.T) {
-	dir := t.TempDir()
-	// Create one real plugin
-	pluginData := []byte(`
-name: real-plugin
-skills:
-  - type: local
-    path: ./skills/test
-`)
-	if err := os.WriteFile(filepath.Join(dir, "real-plugin.yaml"), pluginData, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cf := &ConfigFile{
-		Configs: []ToolConfig{
-			{
-				Name:      "mixed",
-				Generator: &GeneratorConfig{Model: "gpt-4"},
-				Plugins:   []string{"real-plugin", "missing-plugin"},
-			},
-		},
-	}
-	if err := cf.ExpandPlugins(dir); err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	// Only the real plugin's tool should be added
-	if len(cf.Configs[0].Generator.Tools) != 1 {
-		t.Errorf("expected 1 generator tool from real-plugin, got %d", len(cf.Configs[0].Generator.Tools))
 	}
 }
 
@@ -855,7 +777,6 @@ configs:
     limits:
       max_turns: 10
       max_files: 20
-      max_output_size: 524288
       max_session_actions: 30
 `)
 	cfg, err := Parse(data)
@@ -871,9 +792,6 @@ configs:
 	}
 	if lim.MaxFiles != 20 {
 		t.Errorf("MaxFiles: expected 20, got %d", lim.MaxFiles)
-	}
-	if lim.MaxOutputSize != 524288 {
-		t.Errorf("MaxOutputSize: expected 524288, got %d", lim.MaxOutputSize)
 	}
 	if lim.MaxSessionActions != 30 {
 		t.Errorf("MaxSessionActions: expected 30, got %d", lim.MaxSessionActions)
@@ -919,9 +837,6 @@ configs:
 	if lim.MaxFiles != 0 {
 		t.Errorf("MaxFiles: expected 0, got %d", lim.MaxFiles)
 	}
-	if lim.MaxOutputSize != 0 {
-		t.Errorf("MaxOutputSize: expected 0, got %d", lim.MaxOutputSize)
-	}
 	if lim.MaxSessionActions != 0 {
 		t.Errorf("MaxSessionActions: expected 0, got %d", lim.MaxSessionActions)
 	}
@@ -954,22 +869,6 @@ func TestValidateRejectsNegativeMaxFiles(t *testing.T) {
 		t.Fatal("expected error for negative max_files")
 	}
 	want := `config "neg": limits.max_files must not be negative`
-	if err.Error() != want {
-		t.Errorf("got %q, want %q", err.Error(), want)
-	}
-}
-
-func TestValidateRejectsNegativeMaxOutputSize(t *testing.T) {
-	cf := &ConfigFile{
-		Configs: []ToolConfig{
-			{Name: "neg", Generator: &GeneratorConfig{Model: "gpt-4"}, Limits: &SessionLimits{MaxOutputSize: -1024}},
-		},
-	}
-	err := cf.Validate()
-	if err == nil {
-		t.Fatal("expected error for negative max_output_size")
-	}
-	want := `config "neg": limits.max_output_size must not be negative`
 	if err.Error() != want {
 		t.Errorf("got %q, want %q", err.Error(), want)
 	}

@@ -87,5 +87,5 @@ to apply.
 
 ## Go types
 
-See [`hyoka/internal/config/tool_filter.go`](../hyoka/internal/config/tool_filter.go)
+See [`internal/config/tool_filter.go`](../internal/config/tool_filter.go)
 for the implementation.

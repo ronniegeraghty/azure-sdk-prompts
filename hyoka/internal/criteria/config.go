@@ -1,0 +1,721 @@
+// Unified grader schema (Phase 1 of Grader Unification — issue #624).
+//
+// This file defines the new YAML schema that supersedes both
+// internal/criteria/.GraderEntry and the legacy GraderConfig in types.go.
+//
+// Every grader entry has a flat `type` discriminator. Prompt graders
+// (`type: prompt`) carry the LLM-review prompt in `prompt:`. All other
+// supported types carry their typed configuration in `details:`. There is
+// no `gate` field — every grader runs and reports its result.
+//
+// The schema is loaded by unified_loader.go. The engine wiring is Phase 2
+// (issue #625) and is intentionally not done here.
+package criteria
+
+import (
+	"bytes"
+	"fmt"
+	"log/slog"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
+)
+
+// UnifiedGraderEntry is one grader in a criteria/graders YAML file under the
+// unified schema. The flat `type` field selects the grader implementation.
+type UnifiedGraderEntry struct {
+	// Type is the grader-kind discriminator. Required. One of "prompt"
+	// or any value in validTypedKinds (file, program, behavior,
+	// action_sequence, tool_constraint, prompt_review, output_check).
+	Type string `yaml:"type" json:"type"`
+
+	// Name uniquely identifies this grader within its file. Required.
+	Name string `yaml:"name" json:"name"`
+
+	// Weight is the grader's contribution to the aggregate score.
+	// Defaults to 1.0 when zero/unset.
+	Weight float64 `yaml:"weight,omitempty" json:"weight,omitempty"`
+
+	// When narrows applicability by prompt properties and config state.
+	// All fields AND together. Empty matches everything.
+	When WhenClause `yaml:"when,omitempty" json:"when,omitempty"`
+
+	// Isolate, when true and the engine runs in --review-mode isolated,
+	// places this grader in its own review session. Only meaningful for
+	// type=prompt; silently ignored for typed graders.
+	Isolate bool `yaml:"isolate,omitempty" json:"isolate,omitempty"`
+
+	// Prompt is the LLM-review prompt. For type=prompt, either Prompt or
+	// Checks must be non-empty (both may be set; when Checks is non-empty
+	// Prompt acts as preamble text shown to the judge before the numbered
+	// checks). Must be empty for any other type.
+	Prompt string `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+
+	// Checks lists the individual pass/fail items the LLM judge must
+	// evaluate. Allowed only for type=prompt. Each non-empty string becomes
+	// one line in the rendered review criteria and one Point in the
+	// resulting GraderResult. When set, Prompt is treated as optional
+	// preamble text shown to the judge before the numbered checks.
+	//
+	// For typed graders (workspace, tool, activity, program), Checks is a
+	// yaml.Node that will be decoded into the type-specific []XxxCheck slice.
+	Checks yaml.Node `yaml:"checks,omitempty" json:"checks,omitempty"`
+}
+
+// UnifiedGraderGroup is a named collection of grader entries with optional
+// group-level when conditions. Groups support hierarchical when resolution
+// (file → group → grader; most specific wins).
+type UnifiedGraderGroup struct {
+	Name    string               `yaml:"name,omitempty" json:"name,omitempty"`
+	When    WhenClause           `yaml:"when,omitempty" json:"when,omitempty"`
+	Graders []UnifiedGraderEntry `yaml:"graders" json:"graders"`
+	Isolate bool                 `yaml:"isolate,omitempty" json:"isolate,omitempty"`
+}
+
+// UnifiedGraderConfig is the top-level shape of a unified criteria YAML file.
+// A file may define top-level graders, groups, or both. The Source field is
+// populated by the loader and is never read from YAML.
+type UnifiedGraderConfig struct {
+	When    WhenClause           `yaml:"when,omitempty" json:"when,omitempty"`
+	Graders []UnifiedGraderEntry `yaml:"graders,omitempty" json:"graders,omitempty"`
+	Groups  []UnifiedGraderGroup `yaml:"groups,omitempty" json:"groups,omitempty"`
+	Source  string               `yaml:"-" json:"-"`
+}
+
+// validTypedKinds enumerates the non-prompt grader types accepted by the
+// unified schema. Mirrors validKinds in types.go minus graders.KindPrompt.
+// KindPromptReview is NOT included — it's the kind of manually-created
+// PromptReviewGrader instances, not a valid criteria-file type.
+var validTypedKinds = map[string]bool{
+	graders.KindProgram:   true,
+	graders.KindTool:      true,
+	graders.KindWorkspace: true,
+	graders.KindActivity:  true,
+}
+
+// IsValidUnifiedType returns true if t is a recognized unified-schema type
+// (graders.KindPrompt or any typed kind).
+func IsValidUnifiedType(t string) bool {
+	if t == graders.KindPrompt {
+		return true
+	}
+	return validTypedKinds[t]
+}
+
+// hasChecks reports whether n carries a non-empty YAML payload for checks.
+// yaml.v3 returns Kind==0 for absent fields; an explicit empty mapping has Kind!=0.
+func hasChecks(n yaml.Node) bool {
+	if n.Kind == 0 {
+		return false
+	}
+	// A null scalar (`checks: ~`) is treated as empty.
+	if n.Kind == yaml.ScalarNode && (n.Tag == "!!null" || n.Value == "") {
+		return false
+	}
+	// An empty mapping or sequence counts as empty too.
+	if (n.Kind == yaml.MappingNode || n.Kind == yaml.SequenceNode) && len(n.Content) == 0 {
+		return false
+	}
+	return true
+}
+
+// validateEntry checks a single entry against the unified-schema rules.
+// Returns nil if valid; otherwise an error including the entry name when
+// available.
+func validateEntry(e UnifiedGraderEntry) error {
+	tag := e.Name
+	if tag == "" {
+		tag = "<unnamed>"
+	}
+	if e.Name == "" {
+		return fmt.Errorf("grader entry: name is required")
+	}
+	if e.Type == "" {
+		return fmt.Errorf("grader %q: type is required", tag)
+	}
+	
+	// Reject deprecated types with loud migration errors.
+	deprecatedTypes := map[string]string{
+		"file":            "workspace",
+		"behavior":        "tool or activity",
+		"action_sequence": "activity",
+		"tool_constraint": "tool",
+		"output_check":    "workspace",
+		"tool_usage":      "tool",
+	}
+	if replacement, ok := deprecatedTypes[e.Type]; ok {
+		return fmt.Errorf("grader %q: type %q is no longer supported — use %q instead (see docs/graders.md)", tag, e.Type, replacement)
+	}
+	
+	if !IsValidUnifiedType(e.Type) {
+		return fmt.Errorf("grader %q: unknown type %q", tag, e.Type)
+	}
+	if e.Weight < 0 {
+		return fmt.Errorf("grader %q: weight must be >= 0, got %f", tag, e.Weight)
+	}
+	if e.Type == graders.KindPrompt {
+		hasPrompt := strings.TrimSpace(e.Prompt) != ""
+		// For prompt graders, we need to decode Checks as []string
+		var promptChecks []string
+		if hasChecks(e.Checks) {
+			if err := e.Checks.Decode(&promptChecks); err != nil {
+				return fmt.Errorf("grader %q: failed to decode checks as []string: %w", tag, err)
+			}
+		}
+		hasChecksArray := len(promptChecks) > 0
+		if !hasPrompt && !hasChecksArray {
+			return fmt.Errorf("grader %q: type=prompt requires non-empty prompt or checks", tag)
+		}
+		if hasPrompt && !hasChecksArray {
+			slog.Warn("grader type=prompt has prompt but no checks: will synthesize a single pass/fail check at runtime; prefer adding explicit checks",
+				"grader", tag)
+		}
+		if hasChecksArray {
+			for i, c := range promptChecks {
+				if strings.TrimSpace(c) == "" {
+					return fmt.Errorf("grader %q: checks[%d] must be a non-empty string", tag, i)
+				}
+			}
+		}
+		return nil
+	}
+	// Typed grader — require checks.
+	if e.Prompt != "" {
+		return fmt.Errorf("grader %q: type=%s must not set prompt", tag, e.Type)
+	}
+	if !hasChecks(e.Checks) {
+		return fmt.Errorf("grader %q: type=%s requires non-empty checks", tag, e.Type)
+	}
+	return nil
+}
+
+// validateConfig validates a fully-translated UnifiedGraderConfig. It enforces
+// per-entry validity AND name uniqueness across the file (top-level graders
+// plus all group graders share one namespace).
+func validateConfig(gc *UnifiedGraderConfig) error {
+	seen := make(map[string]string) // name → location (for error messages)
+	check := func(e UnifiedGraderEntry, where string) error {
+		if err := validateEntry(e); err != nil {
+			return err
+		}
+		if prev, ok := seen[e.Name]; ok {
+			return fmt.Errorf("duplicate grader name %q (already defined at %s)", e.Name, prev)
+		}
+		seen[e.Name] = where
+		return nil
+	}
+	for i, e := range gc.Graders {
+		if err := check(e, fmt.Sprintf("graders[%d]", i)); err != nil {
+			return err
+		}
+	}
+	for gi, grp := range gc.Groups {
+		for ei, e := range grp.Graders {
+			loc := fmt.Sprintf("groups[%d].graders[%d]", gi, ei)
+			if grp.Name != "" {
+				loc = fmt.Sprintf("groups[%q].graders[%d]", grp.Name, ei)
+			}
+			if err := check(e, loc); err != nil {
+				return err
+			}
+		}
+	}
+	if len(gc.Graders) == 0 && len(gc.Groups) == 0 {
+		return fmt.Errorf("no graders or groups defined")
+	}
+	return nil
+}
+
+// EffectiveWeight returns the entry weight, defaulting to 1.0 when zero.
+func (e UnifiedGraderEntry) EffectiveWeight() float64 {
+	if e.Weight == 0 {
+		return 1.0
+	}
+	return e.Weight
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2: Config-aware when: clause with structured tool filters
+// ─────────────────────────────────────────────────────────────────────────────
+
+// StringOrSlice decodes either a YAML scalar or a YAML sequence of scalars
+// into a normalized []string. Empty/nil means "no constraint".
+//
+// JSON/YAML marshalling always emits a list (even for single-element slices),
+// providing a stable shape for downstream consumers.
+type StringOrSlice []string
+
+// UnmarshalYAML accepts either a YAML scalar string or a sequence of strings.
+func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		// Only accept string-typed scalars. Reject ints/bools/etc so a
+		// stray `language: 42` is a loud error rather than the silent
+		// string `"42"`. Untagged plain scalars resolve to !!str for
+		// text (yaml.v3 sets the tag during parsing); an empty/null
+		// scalar is treated as "no constraint".
+		switch node.Tag {
+		case "!!null":
+			*s = nil
+			return nil
+		case "", "!!str":
+			// fall through
+		default:
+			return fmt.Errorf("when: field at line %d must be a string or a list of strings, got scalar with tag %s",
+				node.Line, node.Tag)
+		}
+		var v string
+		if err := node.Decode(&v); err != nil {
+			return err
+		}
+		if v == "" {
+			*s = nil
+			return nil
+		}
+		*s = StringOrSlice{v}
+		return nil
+	case yaml.SequenceNode:
+		var v []string
+		if err := node.Decode(&v); err != nil {
+			return err
+		}
+		*s = StringOrSlice(v)
+		return nil
+	default:
+		return fmt.Errorf("when: field at line %d must be a string or a list of strings, got %v",
+			node.Line, node.Kind)
+	}
+}
+
+// Matches reports whether candidate equals any entry (case-insensitive).
+// An empty/nil StringOrSlice matches everything.
+func (s StringOrSlice) Matches(candidate string) bool {
+	if len(s) == 0 {
+		return true
+	}
+	for _, v := range s {
+		if strings.EqualFold(v, candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+// MatchSet supports both positive (is) and negative (not) matching for a
+// single when: field. It accepts three YAML forms:
+//   - scalar → Is = [scalar]
+//   - sequence → Is = [...]
+//   - mapping with is:/not: keys
+//
+// For scalar/sequence properties (language, service, etc.), Matches(candidate)
+// passes when candidate is in Is (or Is is empty) AND candidate is NOT in Not.
+// For set-valued properties (tags), MatchesAny(candidates) passes when at least
+// one candidate is in Is (or Is is empty) AND no candidate is in Not.
+type MatchSet struct {
+	Is  StringOrSlice `yaml:"is,omitempty" json:"is,omitempty"`
+	Not StringOrSlice `yaml:"not,omitempty" json:"not,omitempty"`
+}
+
+// UnmarshalYAML decodes scalar, sequence, or map forms into MatchSet.
+func (m *MatchSet) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		// scalar → Is = [scalar]
+		if node.Tag == "!!null" {
+			*m = MatchSet{}
+			return nil
+		}
+		var s StringOrSlice
+		if err := s.UnmarshalYAML(node); err != nil {
+			return err
+		}
+		*m = MatchSet{Is: s}
+		return nil
+	case yaml.SequenceNode:
+		// sequence → Is = [...]
+		var s StringOrSlice
+		if err := s.UnmarshalYAML(node); err != nil {
+			return err
+		}
+		*m = MatchSet{Is: s}
+		return nil
+	case yaml.MappingNode:
+		// Decode as struct, then validate keys
+		type raw struct {
+			Is  StringOrSlice `yaml:"is,omitempty"`
+			Not StringOrSlice `yaml:"not,omitempty"`
+		}
+		var r raw
+		if err := node.Decode(&r); err != nil {
+			return err
+		}
+		// Check for unknown keys
+		for i := 0; i < len(node.Content); i += 2 {
+			key := node.Content[i].Value
+			if key != "is" && key != "not" {
+				return fmt.Errorf("when: field at line %d: unknown key %q (only 'is' and 'not' are allowed)",
+					node.Content[i].Line, key)
+			}
+		}
+		*m = MatchSet{Is: r.Is, Not: r.Not}
+		return nil
+	default:
+		return fmt.Errorf("when: field at line %d must be a string, list, or map with is/not keys",
+			node.Line)
+	}
+}
+
+// Matches reports whether a scalar candidate passes this MatchSet.
+// Passes when candidate is in Is (or Is is empty) AND candidate is NOT in Not.
+// Case-insensitive. An empty MatchSet matches everything.
+func (m MatchSet) Matches(candidate string) bool {
+	// Check Not first (exclusion)
+	for _, v := range m.Not {
+		if strings.EqualFold(v, candidate) {
+			return false
+		}
+	}
+	// Then check Is (inclusion)
+	if len(m.Is) == 0 {
+		return true
+	}
+	for _, v := range m.Is {
+		if strings.EqualFold(v, candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+// MatchesAny reports whether at least one candidate in a set passes this MatchSet.
+// For set-valued fields like tags. Passes when:
+//   - Is is empty OR at least one candidate ∈ Is
+//   - AND no candidate ∈ Not
+//
+// Case-insensitive. An empty MatchSet matches everything.
+func (m MatchSet) MatchesAny(candidates []string) bool {
+	// Check Not first: if any candidate is in Not, fail
+	for _, c := range candidates {
+		for _, v := range m.Not {
+			if strings.EqualFold(v, c) {
+				return false
+			}
+		}
+	}
+	// Then check Is: if Is is empty, pass; otherwise need intersection
+	if len(m.Is) == 0 {
+		return true
+	}
+	for _, c := range candidates {
+		for _, v := range m.Is {
+			if strings.EqualFold(v, c) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IsEmpty reports whether the MatchSet has no constraints.
+func (m MatchSet) IsEmpty() bool {
+	return len(m.Is) == 0 && len(m.Not) == 0
+}
+
+// WhenClause narrows grader applicability. All fields AND together.
+// An empty WhenClause matches everything.
+//
+// Every scalar prompt/config field is a MatchSet supporting positive (is:) and
+// negative (not:) matching. It accepts scalar, sequence, or map forms.
+// Within a field, entries are OR'd (any-of match). Across fields, AND.
+// Tags uses set-intersection semantics via MatchesAny.
+type WhenClause struct {
+	// Scalar prompt props (case-insensitive any-of equality).
+	Language   MatchSet `yaml:"language,omitempty" json:"language,omitempty"`
+	Service    MatchSet `yaml:"service,omitempty" json:"service,omitempty"`
+	Plane      MatchSet `yaml:"plane,omitempty" json:"plane,omitempty"`
+	Category   MatchSet `yaml:"category,omitempty" json:"category,omitempty"`
+	SDK        MatchSet `yaml:"sdk,omitempty" json:"sdk,omitempty"`
+	Difficulty MatchSet `yaml:"difficulty,omitempty" json:"difficulty,omitempty"`
+
+	// Scalar config props.
+	Generator MatchSet `yaml:"generator,omitempty" json:"generator,omitempty"`
+	Config    MatchSet `yaml:"config,omitempty" json:"config,omitempty"`
+
+	// Set-valued prompt prop (tags from prompt frontmatter).
+	Tags MatchSet `yaml:"tags,omitempty" json:"tags,omitempty"`
+
+	// Structured tool filter; AND across entries.
+	Tool []ToolFilter `yaml:"tool,omitempty" json:"tool,omitempty"`
+}
+
+// ToolFilter matches one entry in the eval config's resolved tool list.
+// Field names mirror ToolCheckRule (graders/types.go:197) deliberately.
+type ToolFilter struct {
+	Name      string `yaml:"name" json:"name"`
+	Source    string `yaml:"source" json:"source"` // skill | mcp | builtin | plugin
+	MCPServer string `yaml:"mcp_server,omitempty" json:"mcp_server,omitempty"`
+	Negate    bool   `yaml:"negate,omitempty" json:"negate,omitempty"`
+}
+
+// MatchContext bundles everything a WhenClause matches against.
+// Built once per (prompt, config) pair before evaluating graders.
+//
+// Props stays map[string]string deliberately: the prompt/config side is 1:1
+// (a prompt has one language, one service, etc.). Only the WhenClause side
+// accepts lists, because only the gate has an "any of these" notion.
+type MatchContext struct {
+	// Scalar props derived from prompt frontmatter + eval config.
+	// Includes language/service/plane/category/sdk/difficulty/generator/config.
+	Props map[string]string
+
+	// Tags from prompt frontmatter, lowercased for matching.
+	Tags []string
+
+	// Resolved tool list from cfg.Generator.Tools, with type already
+	// disambiguated via ToolEntry.ResolvedType().
+	Tools []ToolIdentity
+}
+
+// ToolIdentity is the canonical (name, source, server) triple.
+type ToolIdentity struct {
+	Name      string
+	Source    string // skill | mcp | builtin | plugin
+	MCPServer string // populated only when Source == "mcp"
+}
+
+// IsEmpty reports whether the clause has no constraints.
+func (w WhenClause) IsEmpty() bool {
+	return w.Language.IsEmpty() &&
+		w.Service.IsEmpty() &&
+		w.Plane.IsEmpty() &&
+		w.Category.IsEmpty() &&
+		w.SDK.IsEmpty() &&
+		w.Difficulty.IsEmpty() &&
+		w.Generator.IsEmpty() &&
+		w.Config.IsEmpty() &&
+		w.Tags.IsEmpty() &&
+		len(w.Tool) == 0
+}
+
+// Matches evaluates the clause against the resolved match context.
+// All fields AND together; a constraint passes if it's empty or matches.
+func (w WhenClause) Matches(ctx MatchContext) bool {
+	// Scalar fields: AND across fields, OR within each field (via MatchSet.Matches).
+	if !w.Language.Matches(ctx.Props["language"]) {
+		return false
+	}
+	if !w.Service.Matches(ctx.Props["service"]) {
+		return false
+	}
+	if !w.Plane.Matches(ctx.Props["plane"]) {
+		return false
+	}
+	if !w.Category.Matches(ctx.Props["category"]) {
+		return false
+	}
+	if !w.SDK.Matches(ctx.Props["sdk"]) {
+		return false
+	}
+	if !w.Difficulty.Matches(ctx.Props["difficulty"]) {
+		return false
+	}
+	if !w.Generator.Matches(ctx.Props["generator"]) {
+		return false
+	}
+	if !w.Config.Matches(ctx.Props["config"]) {
+		return false
+	}
+
+	// Tags: set-intersection semantics
+	if !w.Tags.MatchesAny(ctx.Tags) {
+		return false
+	}
+
+	// Tool filters: AND across entries. Every ToolFilter must match some tool.
+	for _, filter := range w.Tool {
+		matched := false
+		for _, tool := range ctx.Tools {
+			if matchesToolFilter(filter, tool) {
+				matched = true
+				break
+			}
+		}
+		// Apply negation: if negate=true, invert the match result.
+		if filter.Negate {
+			matched = !matched
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	return true
+}
+
+// matchesToolFilter checks if a single ToolFilter matches a ToolIdentity.
+func matchesToolFilter(filter ToolFilter, tool ToolIdentity) bool {
+	// Name must match (case-insensitive).
+	if !strings.EqualFold(filter.Name, tool.Name) {
+		return false
+	}
+	// Source must match (case-insensitive).
+	if !strings.EqualFold(filter.Source, tool.Source) {
+		return false
+	}
+	// If MCPServer is set on the filter, it must match.
+	if filter.MCPServer != "" {
+		if !strings.EqualFold(filter.MCPServer, tool.MCPServer) {
+			return false
+		}
+	}
+	return true
+}
+
+// mergeWhenClause merges parent and child WhenClause; child REPLACES parent
+// for every field (scalars, tags, and tool alike). An explicit empty MatchSet
+// at child level removes the parent's constraint.
+func mergeWhenClause(parent, child WhenClause) WhenClause {
+	out := parent // value copy
+
+	// Uniform rule: child field non-empty wins (includes MatchSet).
+	// Note: MatchSet zero value is empty (both Is and Not nil), so we check
+	// !IsEmpty() to detect explicit child constraints (including empty maps/lists
+	// that reset parent constraints).
+	if !child.Language.IsEmpty() || (child.Language.Is != nil || child.Language.Not != nil) {
+		out.Language = child.Language
+	}
+	if !child.Service.IsEmpty() || (child.Service.Is != nil || child.Service.Not != nil) {
+		out.Service = child.Service
+	}
+	if !child.Plane.IsEmpty() || (child.Plane.Is != nil || child.Plane.Not != nil) {
+		out.Plane = child.Plane
+	}
+	if !child.Category.IsEmpty() || (child.Category.Is != nil || child.Category.Not != nil) {
+		out.Category = child.Category
+	}
+	if !child.SDK.IsEmpty() || (child.SDK.Is != nil || child.SDK.Not != nil) {
+		out.SDK = child.SDK
+	}
+	if !child.Difficulty.IsEmpty() || (child.Difficulty.Is != nil || child.Difficulty.Not != nil) {
+		out.Difficulty = child.Difficulty
+	}
+	if !child.Generator.IsEmpty() || (child.Generator.Is != nil || child.Generator.Not != nil) {
+		out.Generator = child.Generator
+	}
+	if !child.Config.IsEmpty() || (child.Config.Is != nil || child.Config.Not != nil) {
+		out.Config = child.Config
+	}
+	if !child.Tags.IsEmpty() || (child.Tags.Is != nil || child.Tags.Not != nil) {
+		out.Tags = child.Tags
+	}
+	if child.Tool != nil {
+		out.Tool = child.Tool
+	}
+	return out
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inline grader validation (prompt files)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ParseInlineGraders decodes a []interface{} from YAML frontmatter into []UnifiedGraderEntry.
+// Returns an error if parsing or validation fails.
+func ParseInlineGraders(raw []interface{}, promptID string) ([]UnifiedGraderEntry, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	
+	// Marshal back to YAML and decode strictly to get proper type checking
+	buf := &bytes.Buffer{}
+	enc := yaml.NewEncoder(buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(raw); err != nil {
+		return nil, fmt.Errorf("encoding inline graders: %w", err)
+	}
+	enc.Close()
+	
+	var graders []UnifiedGraderEntry
+	dec := yaml.NewDecoder(buf)
+	dec.KnownFields(true)
+	if err := dec.Decode(&graders); err != nil {
+		return nil, fmt.Errorf("parsing inline graders: %w", err)
+	}
+	
+	if err := ValidateInlineGraders(promptID, graders); err != nil {
+		return nil, err
+	}
+	
+	return graders, nil
+}
+
+// ValidateInlineGraders validates inline graders from a prompt file.
+// Per Ronnie's directive: inline graders MUST NOT have `when:` clauses.
+// Also checks for name collisions within the inline list and reserves
+// "Criteria from prompt file" as a protected name.
+func ValidateInlineGraders(promptID string, graders []UnifiedGraderEntry) error {
+	if len(graders) == 0 {
+		return nil
+	}
+	
+	seen := make(map[string]bool)
+	reservedName := "Criteria from prompt file"
+	
+	for i, g := range graders {
+		// Per-entry validation (type, weight, prompt/checks requirements)
+		if err := validateEntry(g); err != nil {
+			return fmt.Errorf("inline grader %d on prompt %q: %w", i, promptID, err)
+		}
+		
+		// HARD ERROR: inline graders MUST NOT have when: clauses
+		// Ronnie's verdict: "The fact that the grader is in the prompt files means
+		// it should only apply to this prompt file and should always apply to this prompt file."
+		if !g.When.IsEmpty() {
+			return fmt.Errorf(
+				"inline grader %q on prompt %q: when: clause is not supported on prompt-inline graders — "+
+				"inline graders always run for their prompt; to conditionally match graders by attributes, "+
+				"define them in a criteria/**.yaml file instead",
+				g.Name, promptID)
+		}
+		
+		// Reserved name check
+		if g.Name == reservedName {
+			return fmt.Errorf(
+				"inline grader on prompt %q: grader name %q is reserved for the markdown ## Evaluation Criteria section",
+				promptID, reservedName)
+		}
+		
+		// Duplicate name check within inline list
+		if seen[g.Name] {
+			return fmt.Errorf("inline grader on prompt %q: duplicate grader name %q", promptID, g.Name)
+		}
+		seen[g.Name] = true
+	}
+	
+	return nil
+}
+
+// CheckInlineCollisions checks whether any inline grader name collides with a
+// matched criteria-file grader name. Returns an error if any collision is found.
+func CheckInlineCollisions(inlineGraders []UnifiedGraderEntry, matched []MatchedUnifiedEntry) error {
+	if len(inlineGraders) == 0 {
+		return nil
+	}
+	
+	inlineNames := make(map[string]bool)
+	for _, g := range inlineGraders {
+		inlineNames[g.Name] = true
+	}
+	
+	for _, m := range matched {
+		if inlineNames[m.Entry.Name] {
+			return fmt.Errorf(
+				"grader name %q is defined inline on the prompt and also in criteria file %q — "+
+				"rename one to avoid collision",
+				m.Entry.Name, m.Source)
+		}
+	}
+	
+	return nil
+}

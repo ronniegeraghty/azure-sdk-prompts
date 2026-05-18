@@ -1,67 +1,14 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
 
-// ToolEntry represents a tool, MCP server, or skill with optional conditions.
-// When the When map is empty, the entry is unconditionally included.
-// When the When map has entries, all key-value pairs must match the
-// prompt's properties for the entry to be included.
-type ToolEntry struct {
-	Name     string            `yaml:"name" json:"name"`
-	Type     string            `yaml:"type,omitempty" json:"type,omitempty"` // "tool" (default), "mcp", "skill"
-	When     map[string]string `yaml:"when,omitempty" json:"when,omitempty"`
-	AlwaysOn bool              `yaml:"always_on,omitempty" json:"always_on,omitempty"`
-	Pairwise string            `yaml:"pairwise,omitempty" json:"pairwise,omitempty"` // "off", "shallow" (default), "deep"
-	// MCP-specific fields
-	Command  string   `yaml:"command,omitempty" json:"command,omitempty"`
-	Args     []string `yaml:"args,omitempty" json:"args,omitempty"`
-	MCPTools []string `yaml:"mcp_tools,omitempty" json:"mcp_tools,omitempty"`
-	// Skill-specific fields
-	Source   string `yaml:"source,omitempty" json:"source,omitempty"` // "local" or "remote"
-	Path     string `yaml:"path,omitempty" json:"path,omitempty"`
-	Repo     string `yaml:"repo,omitempty" json:"repo,omitempty"`
-	Branch   string `yaml:"branch,omitempty" json:"branch,omitempty"`       // git branch for remote skills (default: repo default branch)
-	SkillDir bool   `yaml:"skill_dir,omitempty" json:"skill_dir,omitempty"` // true = path is a directory of skills, false = path is a single skill
-}
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+)
 
-func resolvedToolType(entry ToolEntry) string {
-	if entry.Type == "" {
-		return "tool"
-	}
-	return entry.Type
-}
-
-// ResolvedType returns the normalized entry type ("tool" by default).
-func (e ToolEntry) ResolvedType() string {
-	return resolvedToolType(e)
-}
-
-// ResolvedPairwise returns the effective pairwise setting ("shallow" default).
-// AlwaysOn overrides any explicit setting to "off".
-func (e ToolEntry) ResolvedPairwise() string {
-	if e.AlwaysOn {
-		return "off"
-	}
-	if e.Pairwise == "" {
-		return "shallow"
-	}
-	return e.Pairwise
-}
-
-// SkillSource returns the normalized skill source ("local" or "remote").
-// If Source is unset, it infers from Path/Repo when possible.
-func (e ToolEntry) SkillSource() string {
-	if e.Source != "" {
-		return e.Source
-	}
-	if e.Path != "" {
-		return "local"
-	}
-	if e.Repo != "" {
-		return "remote"
-	}
-	return ""
-}
+// ToolEntry is an alias for tool.Entry, preserving backward compatibility.
+// See the tool sub-package for the type definition and methods.
+type ToolEntry = tool.Entry
 
 // ResolveTools evaluates tool entries against prompt properties and returns
 // the names of tools whose conditions are satisfied. An empty entries slice
@@ -74,7 +21,7 @@ func ResolveTools(entries []ToolEntry, properties map[string]string) []string {
 	seen := make(map[string]bool, len(entries))
 	var resolved []string
 	for _, e := range entries {
-		if resolvedToolType(e) != "tool" {
+		if e.ResolvedType() != "tool" {
 			continue
 		}
 		if matchesWhen(e.When, properties) && !seen[e.Name] {
@@ -104,12 +51,22 @@ func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 	if entry.Pairwise != "" && entry.Pairwise != "off" && entry.Pairwise != "shallow" && entry.Pairwise != "deep" {
 		return fmt.Errorf("config %q: tools[%d] has invalid pairwise %q", configName, idx, entry.Pairwise)
 	}
-	switch resolvedToolType(entry) {
+	switch entry.ResolvedType() {
 	case "tool":
 		return nil
 	case "mcp":
-		if entry.Command == "" {
-			return fmt.Errorf("config %q: tools[%d] mcp entry missing command", configName, idx)
+		mcpType := entry.ResolvedMCPType()
+		if mcpType == "remote" {
+			if entry.URL == "" {
+				return fmt.Errorf("config %q: tools[%d] remote mcp entry missing url", configName, idx)
+			}
+		} else {
+			if entry.Command == "" {
+				return fmt.Errorf("config %q: tools[%d] mcp entry missing command", configName, idx)
+			}
+		}
+		if entry.MCPType != "" && entry.MCPType != "local" && entry.MCPType != "remote" {
+			return fmt.Errorf("config %q: tools[%d] mcp entry has invalid mcp_type %q", configName, idx, entry.MCPType)
 		}
 	case "skill":
 		if entry.Path == "" && entry.Repo == "" {
@@ -121,8 +78,13 @@ func validateToolEntry(entry ToolEntry, configName string, idx int) error {
 		if entry.SkillDir && entry.Repo != "" {
 			return fmt.Errorf("config %q: tools[%d] skill_dir is only valid for local skills", configName, idx)
 		}
-		if entry.Branch != "" && entry.Repo == "" {
-			return fmt.Errorf("config %q: tools[%d] branch is only valid for remote skills", configName, idx)
+	case "plugin":
+		// Plugins resolve via name (Entry.Name). Optional `source: local|remote`
+		// selects between the local plugin directory and the remote marketplace
+		// cache. Unset source is inferred at resolution time (remote-first,
+		// local fallback).
+		if entry.Source != "" && entry.Source != "local" && entry.Source != "remote" {
+			return fmt.Errorf("config %q: tools[%d] plugin entry has invalid source %q (want local|remote)", configName, idx, entry.Source)
 		}
 	default:
 		return fmt.Errorf("config %q: tools[%d] has unknown type %q", configName, idx, entry.Type)

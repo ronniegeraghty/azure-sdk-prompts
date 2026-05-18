@@ -4,16 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/eval"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/trends"
 	"github.com/spf13/cobra"
@@ -31,22 +34,18 @@ type runFlags struct {
 	configFile   string
 	configDir    string
 	workers      int
-	maxSessions  int
 	model        string
 	output       string
 	progressMode string
-	skipTests    bool
 	skipReview   bool
-	skipTrends   bool
+	withTrends   bool
 	dryRun       bool
-	useStub      bool
 	// Fan-out visibility (#34)
 	autoConfirm bool
 	allConfigs  bool
 	// Generator guardrails (#35)
 	maxSessionActions int
 	maxFiles          int
-	maxOutputSize     string
 	// Generator safety (#36)
 	allowCloud bool
 	// Resource monitoring (#45)
@@ -60,9 +59,14 @@ type runFlags struct {
 	// Session timeout
 	sessionTimeout string
 	// Pairwise tool-ablation (#121)
-	pairwiseMode bool
+	pairwiseMode    bool
+	pairwiseVariant string
+	// Max turns per generation session
+	maxTurns int
 	// Pre-flight model check (#264)
 	checkModels bool
+	// Review session splitting (#580)
+	reviewMode string
 }
 
 func addFilterFlags(cmd *cobra.Command, f *runFlags) {
@@ -72,45 +76,50 @@ func addFilterFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.plane, "plane", "", "Filter by data-plane/management-plane")
 	cmd.Flags().StringVar(&f.category, "category", "", "Filter by use-case category")
 	cmd.Flags().StringVar(&f.tags, "tags", "", "Filter by tags (comma-separated)")
-	cmd.Flags().StringVar(&f.promptID, "prompt-id", "", "Run a single prompt by ID")
+	cmd.Flags().StringVar(&f.promptID, "prompt-id", "", "Filter by a single prompt ID")
 	cmd.Flags().StringVar(&f.configName, "config", "", "Config name(s) from config file (comma-separated)")
 	cmd.Flags().StringVar(&f.configFile, "config-file", "", "Path to a specific configuration YAML file (default: load all from configs/)")
 	cmd.Flags().StringVar(&f.configDir, "config-dir", "./configs", "Directory containing configuration YAML files")
-	cmd.Flags().IntVar(&f.workers, "workers", 0, "Parallel evaluation workers (default: number of CPUs, max 8)")
-	cmd.Flags().IntVar(&f.maxSessions, "max-sessions", 0, "Maximum concurrent Copilot sessions (default: workers \u00d7 3)")
+	// Tiered criteria (#30)
+	cmd.Flags().StringVar(&f.criteriaDir, "criteria-dir", "", "Directory containing attribute-matched criteria YAML files (e.g., criteria/)")
+}
+
+// addRunFlags adds execution-only flags to the run command.
+func addRunFlags(cmd *cobra.Command, f *runFlags) {
+	cmd.Flags().IntVar(&f.workers, "workers", 0, "Parallel evaluation workers (default: 1)")
 	cmd.Flags().StringVar(&f.model, "model", "", "Override model for all configs")
+	cmd.Flags().MarkHidden("model")
 	cmd.Flags().StringVar(&f.output, "output", "./reports", "Report output directory")
-	cmd.Flags().BoolVar(&f.skipTests, "skip-tests", false, "Skip test generation")
 	cmd.Flags().BoolVar(&f.skipReview, "skip-review", false, "Skip code review")
-	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, live, log, off")
+	cmd.Flags().StringVar(&f.progressMode, "progress", "auto", "Progress display mode: auto, interactive, ci, live, log, off")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "List matching prompts without running")
-	cmd.Flags().BoolVar(&f.useStub, "stub", false, "Use stub evaluator (no Copilot SDK)")
-	cmd.Flags().BoolVar(&f.skipTrends, "skip-trends", false, "Skip automatic trend analysis after run")
+	cmd.Flags().BoolVar(&f.withTrends, "with-trends", false, "Generate trend analysis after run (opt-in; default: trends are skipped)")
 	// Fan-out visibility (#34)
 	cmd.Flags().BoolVarP(&f.autoConfirm, "yes", "y", false, "Skip confirmation prompt for large runs (>10 evaluations)")
 	cmd.Flags().BoolVar(&f.allConfigs, "all-configs", false, "Run all configs when no --config filter is specified (required for multi-config runs)")
 	// Generator guardrails (#35)
 	cmd.Flags().IntVar(&f.maxSessionActions, "max-session-actions", 50, "Maximum actions per Copilot session (reasoning, response, or tool call each count as 1)")
+	cmd.Flags().IntVar(&f.maxTurns, "max-turns", 0, "Maximum conversation turns per generation (0 = use config/default)")
 	cmd.Flags().IntVar(&f.maxFiles, "max-files", 50, "Maximum generated files per evaluation before aborting")
-	cmd.Flags().StringVar(&f.maxOutputSize, "max-output-size", "1MB", "Maximum total output size per evaluation (e.g., 1MB, 512KB)")
 	// Generator safety (#36)
-	cmd.Flags().BoolVar(&f.allowCloud, "allow-cloud", false, "Allow generated code to provision real Azure resources (disables safety boundaries)")
+	cmd.Flags().BoolVar(&f.allowCloud, "allow-cloud", false, "Allow agent output to provision real Azure resources (disables safety boundaries)")
 	cmd.Flags().Bool("sandbox", true, "Enforce safety boundaries preventing real Azure resource provisioning (default, opposite of --allow-cloud)")
 	cmd.Flags().MarkHidden("sandbox") // sandbox is the default; --allow-cloud is the opt-out
 	// Resource monitoring (#45)
 	cmd.Flags().BoolVar(&f.monitorResources, "monitor-resources", false, "Monitor CPU and memory usage of Copilot sessions during evaluation")
 	// Process lifecycle (#46)
 	cmd.Flags().BoolVar(&f.strictCleanup, "strict-cleanup", false, "Fail run with non-zero exit if orphaned Copilot processes remain after cleanup")
-	// Tiered criteria (#30)
-	cmd.Flags().StringVar(&f.criteriaDir, "criteria-dir", "", "Directory containing attribute-matched criteria YAML files (e.g., criteria/)")
 	// Directory exclusion (#63)
 	cmd.Flags().StringVar(&f.excludeDirs, "exclude-dirs", "", "Comma-separated directories to exclude from generated_files output (e.g., node_modules,target,dist)")
 	// Session timeout
 	cmd.Flags().StringVar(&f.sessionTimeout, "session-timeout", "10m", "Maximum duration for a single generation or review session (e.g., 10m, 30m, 1h)")
 	// Pairwise tool-ablation (#121)
 	cmd.Flags().BoolVarP(&f.pairwiseMode, "pairwise", "P", false, "Expand each config into N+1 pairwise tool-ablation variants")
+	cmd.Flags().StringVar(&f.pairwiseVariant, "pairwise-variant", "", "Run a specific pairwise variant (e.g., 'baseline', 'without-azure', 'without-azure/storage_blob_list'). Mutually exclusive with -P/--pairwise.")
 
 	cmd.Flags().BoolVar(&f.checkModels, "check-models", false, "Pre-flight check that all configured models (generator + reviewer) are available before starting evaluations")
+	// Review session splitting (#580)
+	cmd.Flags().StringVar(&f.reviewMode, "review-mode", "combined", "How review criteria are bucketed across reviewer sessions: combined (default, single session per panel model) or isolated (one session per grader/group marked isolate: true)")
 }
 
 func buildFilter(f *runFlags) prompt.Filter {
@@ -141,6 +150,32 @@ func buildFilter(f *runFlags) prompt.Filter {
 	}
 }
 
+// resolveAutoProgress picks a concrete progress mode for `--progress auto`.
+//
+// Case order matters: workers>1 must be checked before the non-TTY check, because
+// the CI renderer is append-only and specifically designed to work in piped/CI
+// contexts. Suppressing progress on non-TTY only makes sense for single-eval
+// (workers==1) runs where there is no meaningful multi-eval summary to emit.
+//
+// When interactive mode is selected with verbose logging (debug/info) and no
+// --log-file, slog output on stderr would corrupt ANSI cursor redraws, so we
+// downgrade to the append-only CI renderer.
+func resolveAutoProgress(workers int, isTerminal bool, logLevel, logFile string) string {
+	var mode string
+	switch {
+	case workers > 1:
+		mode = "ci"
+	case !isTerminal:
+		mode = "off"
+	default:
+		mode = "interactive"
+	}
+	if mode == "interactive" && (logLevel == "debug" || logLevel == "info") && logFile == "" {
+		mode = "ci"
+	}
+	return mode
+}
+
 func runCmd() *cobra.Command {
 	f := &runFlags{}
 	cmd := &cobra.Command{
@@ -148,31 +183,48 @@ func runCmd() *cobra.Command {
 		Short: "Run evaluations",
 		Long:  "Run evaluations with optional filters against the prompt library.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Backward compat: --debug upgrades log level to debug
-			// When log-level is debug or info and progress mode is auto,
-			// disable live progress so slog output is visible on stderr.
+			logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
+			logFile, _ := cmd.Root().PersistentFlags().GetString("log-file")
+
 			if f.progressMode == "auto" {
-				logLevel, _ := cmd.Root().PersistentFlags().GetString("log-level")
-				if logLevel == "debug" || logLevel == "info" {
-					f.progressMode = "log"
-				}
+				f.progressMode = resolveAutoProgress(f.workers, progress.IsTerminal(os.Stdout), logLevel, logFile)
 			}
 
-			f.prompts = resolvePromptsDir(cmd)
+			// If interactive progress mode is active without --log-file, suppress
+			// console logging to prevent slog writes to stderr from corrupting
+			// the ANSI in-place tail rewriting (issue: multi-line tail leak).
+			// Warnings/errors will still be written to the log file if --log-file
+			// is specified.
+			if f.progressMode == "interactive" && logFile == "" {
+				closer, err := logging.Setup(logging.Options{
+					Level:           logLevel,
+					FilePath:        logFile,
+					SuppressConsole: true,
+				})
+				if err != nil {
+					return fmt.Errorf("reconfiguring logging for interactive mode: %w", err)
+				}
+				// Update the closer in the root command's PostRun
+				cmd.Root().PersistentPostRun = func(*cobra.Command, []string) { closer() }
+			}
+
+			// Resolve all paths first, before any loading
 			f.output = resolveOutputDir(cmd)
 			f.criteriaDir = resolveCriteriaDir(cmd)
+			f.configFile = resolveConfigFile(cmd)
+			configDir := resolveConfigDir(cmd)
 
-			// Load config(s)
+			// Load config(s) before resolving the prompts directory so that a
+			// config-driven `prompt_directory:` override can take precedence
+			// over the default .hyoka/prompts/ → ./prompts fallback.
 			var cfgFile *config.ConfigFile
 			if cmd.Flags().Changed("config-file") {
-				f.configFile = resolveConfigFile(cmd)
 				var err error
 				cfgFile, err = config.Load(f.configFile)
 				if err != nil {
 					return fmt.Errorf("loading config: %w", err)
 				}
 			} else {
-				configDir := resolveConfigDir(cmd)
 				var err error
 				cfgFile, err = config.LoadDir(configDir)
 				if err != nil {
@@ -180,6 +232,9 @@ func runCmd() *cobra.Command {
 				}
 			}
 
+			f.prompts = resolvePromptsDirWithConfig(cmd, cfgFile.PromptDirectory)
+
+			// ── Load all resources ──────────────────────────────────
 			// Get selected configs
 			var configNames []string
 			if f.configName != "" {
@@ -193,11 +248,35 @@ func runCmd() *cobra.Command {
 				return err
 			}
 
+			// Load prompts
+			prompts, err := prompt.LoadPrompts(f.prompts)
+			if err != nil {
+				return fmt.Errorf("loading prompts: %w", err)
+			}
+
+			// ── Apply filters ─────────────────────────────────────
+			filter := buildFilter(f)
+			filtered := prompt.FilterPrompts(prompts, filter)
+
+			if len(filtered) == 0 {
+				fmt.Println("\u2717 No prompts matched the given filters.")
+				if len(prompts) > 0 {
+					fmt.Printf("  (%d prompt(s) were loaded but none matched the specified filters)\n", len(prompts))
+				}
+				return fmt.Errorf("no prompts matched the given filters")
+			}
+
 			// Require --all-configs when multiple configs exist and no --config filter is specified (#34)
 			if f.configName == "" && len(configs) > 1 && !f.allConfigs {
 				fmt.Printf("\u26a0\ufe0f  Found %d configs but no --config filter specified.\n", len(configs))
 				fmt.Println("   Use --all-configs to run all configs, or --config <name> to select specific ones.")
 				return fmt.Errorf("multiple configs found without --config or --all-configs flag")
+			}
+
+			// ── Config transformations ────────────────────────────
+			// Mutual exclusion: --pairwise and --pairwise-variant cannot both be set
+			if f.pairwiseMode && f.pairwiseVariant != "" {
+				return fmt.Errorf("--pairwise (-P) and --pairwise-variant are mutually exclusive")
 			}
 
 			// Override model if specified via CLI flag
@@ -212,10 +291,12 @@ func runCmd() *cobra.Command {
 			}
 
 			// Pairwise tool-ablation expansion (#121)
+			// Use parent of configDir (repo root) for skill path resolution
+			repoRoot := filepath.Dir(configDir)
 			if f.pairwiseMode {
 				var expanded []config.ToolConfig
 				for _, c := range configs {
-					variants := pairwise.ExpandPairwise(c)
+					variants := pairwise.ExpandPairwise(c, repoRoot)
 					slog.Info("Expanded config into pairwise variants", "config", c.Name, "variants", len(variants))
 					fmt.Printf("Expanded config %q into %d pairwise variants\n", c.Name, len(variants))
 					expanded = append(expanded, variants...)
@@ -223,31 +304,63 @@ func runCmd() *cobra.Command {
 				configs = expanded
 			}
 
+			// Pairwise variant selection (Option F)
+			if f.pairwiseVariant != "" {
+				var selected []config.ToolConfig
+				for _, c := range configs {
+					variants := pairwise.ExpandPairwise(c, repoRoot)
+					// Look for the variant whose name ends with "/{pairwiseVariant}"
+					targetSuffix := "/" + f.pairwiseVariant
+					var found *config.ToolConfig
+					for _, v := range variants {
+						if strings.HasSuffix(v.Name, targetSuffix) {
+							found = &v
+							break
+						}
+					}
+					if found == nil {
+						// Collect available variant names for helpful error message
+						var available []string
+						for _, v := range variants {
+							// Extract the variant suffix (everything after the base name)
+							if idx := strings.LastIndex(v.Name, "/"); idx != -1 {
+								available = append(available, v.Name[idx+1:])
+							}
+						}
+						return fmt.Errorf("pairwise variant %q not found for config %q. Available variants: %s",
+							f.pairwiseVariant, c.Name, strings.Join(available, ", "))
+					}
+					selected = append(selected, *found)
+					slog.Info("Selected pairwise variant", "config", c.Name, "variant", f.pairwiseVariant)
+					fmt.Printf("Selected pairwise variant %q for config %q\n", f.pairwiseVariant, c.Name)
+				}
+				configs = selected
+			}
+
 			// Resolve relative skill_directories in configs to absolute paths
 			resolveConfigSkillDirs(configs, f.prompts)
+
+			// Pre-flight: every remote skill needs a registered Fetcher.
+			// Failing here gives a fast, clear error before any session starts.
+			var allEntries []tool.Entry
+			for _, c := range configs {
+				if c.Generator != nil {
+					allEntries = append(allEntries, c.Generator.Tools...)
+				}
+				if c.Reviewer != nil {
+					allEntries = append(allEntries, c.Reviewer.Tools...)
+				}
+			}
+			if err := tool.ValidateFetchers(allEntries); err != nil {
+				return fmt.Errorf("tool fetcher validation: %w", err)
+			}
 
 			// Install declared skills and plugins (npx skills add)
 			if err := config.InstallSkillsAndPlugins(configs); err != nil {
 				return fmt.Errorf("installing skills/plugins: %w", err)
 			}
 
-			// Load and filter prompts
-			prompts, err := prompt.LoadPrompts(f.prompts)
-			if err != nil {
-				return fmt.Errorf("loading prompts: %w", err)
-			}
-
-			filter := buildFilter(f)
-			filtered := prompt.FilterPrompts(prompts, filter)
-
-			if len(filtered) == 0 {
-				fmt.Println("\u2717 No prompts matched the given filters.")
-				if len(prompts) > 0 {
-					fmt.Printf("  (%d prompt(s) were loaded but none matched the specified filters)\n", len(prompts))
-				}
-				return fmt.Errorf("no prompts matched the given filters")
-			}
-
+			// ── Calculate eval matrix ─────────────────────────────
 			effectiveConfigs := 0
 			for _, c := range configs {
 				if c.Generator == nil {
@@ -267,112 +380,113 @@ func runCmd() *cobra.Command {
 				len(filtered), effectiveConfigs, len(filtered)*effectiveConfigs)
 
 			// Select evaluator and reviewer
-			var evaluator eval.CopilotEvaluator
+			var evaluator eval.PromptRunner
 			var reviewerFactory eval.ReviewerFactory
 
-			// Parse session-timeout flag early \u2014 needed for reviewer setup.
+			// Parse session-timeout flag early — needed for reviewer setup.
 			sessionTimeout, err := time.ParseDuration(f.sessionTimeout)
 			if err != nil {
 				return fmt.Errorf("invalid --session-timeout %q: %w", f.sessionTimeout, err)
 			}
 
-			if f.useStub {
-				slog.Info("Using stub evaluator", "reason", "--stub flag")
-				fmt.Println("Using stub evaluator (--stub flag)")
-				evaluator = &eval.StubEvaluator{}
-			} else {
-				// Try to create a real Copilot SDK evaluator
-				sdkEval := eval.NewCopilotSDKEvaluator(eval.CopilotEvalOptions{
-					AllowCloud:        f.allowCloud,
-					MaxSessionActions: f.maxSessionActions,
-				})
-				sdkEval.SetSessionTimeout(sessionTimeout)
-				evaluator = sdkEval
+			// Validate --review-mode (#580). Empty string is treated as combined.
+			if err := validateReviewMode(f.reviewMode); err != nil {
+				return err
+			}
 
+			// Create a real Copilot SDK evaluator
+			sdkEval := eval.NewCopilotPromptRunner(eval.PromptRunnerOptions{
+				AllowCloud:        f.allowCloud,
+				MaxSessionActions: f.maxSessionActions,
+				MaxTurns:          f.maxTurns,
+				MaxFiles:          f.maxFiles,
+			})
+			sdkEval.SetSessionTimeout(sessionTimeout)
+			evaluator = sdkEval
+
+			// Skip SDK verification for dry-run — we don't need the Copilot CLI
+			if !f.dryRun {
 				// Verify Copilot CLI is available
-				client := copilot.NewClient(&copilot.ClientOptions{
-					Env: eval.HyokaBaseEnv(), // Tag verification process (#70)
-				})
+				client := copilot.NewClient(eval.BuildBaseClientOpts())
 				if err := client.Start(context.Background()); err != nil {
-					slog.Warn("Copilot SDK unavailable, falling back to stub", "error", err)
-					fmt.Printf("\u26a0\ufe0f  Copilot SDK unavailable (%v), falling back to stub evaluator\n", err)
-					evaluator = &eval.StubEvaluator{}
-				} else {
-					defer client.Stop() // #65: ensure cleanup on any exit path
-					slog.Info("Using Copilot SDK evaluator")
-					fmt.Println("Using Copilot SDK evaluator")
+					return fmt.Errorf("copilot SDK unavailable: %w", err)
+				}
+				defer client.Stop() // #65: ensure cleanup on any exit path
+				slog.Info("Using Copilot SDK evaluator")
+				fmt.Println("Using Copilot SDK evaluator")
 
-					clientOpts := &copilot.ClientOptions{
-						Env: eval.HyokaBaseEnv(), // Tag reviewer processes (#70)
+				clientOpts := eval.BuildBaseClientOpts()
+
+				// Reviewer skill resolution is now per-config inside the
+				// factory closure (WU-2). Previously this pooled reviewer
+				// skill paths across every matched config — a single
+				// --config invocation would leak the other configs'
+				// reviewer skills into the resolved set. The closure below
+				// scopes ValidateAndExpand to cfg.Reviewer.Tools only.
+
+				// Create reviewer factory that builds a reviewer per config (#92)
+				reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
+					var reviewerModels []string
+					if cfg.Reviewer != nil && len(cfg.Reviewer.Models) > 0 {
+						reviewerModels = cfg.Reviewer.Models
 					}
-					if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-						clientOpts.LogLevel = "debug"
+					if len(reviewerModels) == 0 {
+						return nil, nil, nil
 					}
 
-					// Extract reviewer skill directories from configs
+					// Per-config reviewer skill validation. A missing reviewer
+					// skill dir or empty skill_dir fails the reviewer build
+					// so the eval aborts with a clear error — no more silent
+					// raw-path passthrough to the SDK.
 					var reviewerSkillsDirs []string
-					for _, c := range configs {
-						if c.Reviewer != nil {
-							for _, entry := range c.Reviewer.Tools {
-								if entry.ResolvedType() == "skill" && entry.SkillSource() == "local" && entry.Path != "" {
-									reviewerSkillsDirs = append(reviewerSkillsDirs, entry.Path)
-								}
-							}
+					if cfg.Reviewer != nil && len(cfg.Reviewer.Tools) > 0 {
+						report, err := tool.ValidateAndExpand(context.Background(), tool.ValidationInput{
+							ReviewerTools: cfg.Reviewer.Tools,
+							ConfigDir:     "",
+							PluginsDir:    config.ResolvePluginsDir(),
+						})
+						if err != nil {
+							// err is a *joinedToolLoadError from tool.SummarizeToolLoadErrors
+							// — surfaces every broken reviewer tool, not just the first.
+							return nil, nil, fmt.Errorf("reviewer tool load failure for config %q:\n%w", cfg.Name, err)
 						}
+						reviewerSkillsDirs = report.ReviewerSkillDirs()
 					}
 
-					// Create reviewer factory that builds a reviewer per config (#92)
-					reviewerFactory = func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error) {
-						var reviewerModels []string
-						if cfg.Reviewer != nil && len(cfg.Reviewer.Models) > 0 {
-							reviewerModels = cfg.Reviewer.Models
-						}
-						if len(reviewerModels) == 0 {
-							return nil, nil, nil
-						}
-
-						if len(reviewerModels) > 1 {
-							// Multi-model panel
-							panelReviewer := review.NewPanelReviewer(clientOpts, reviewerModels, f.maxSessionActions)
-							panelReviewer.SetSessionTimeout(sessionTimeout)
-							if len(reviewerSkillsDirs) > 0 {
-								panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
-							}
-							if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
-								panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
-							}
-							slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels)
-							return nil, panelReviewer, nil
-						}
-
-						// Single reviewer
-						reviewClient := copilot.NewClient(clientOpts)
-						if err := reviewClient.Start(context.Background()); err != nil {
-							return nil, nil, fmt.Errorf("could not start reviewer client: %w", err)
-						}
-						copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.maxSessionActions)
-						copilotReviewer.SetSessionTimeout(sessionTimeout)
+					if len(reviewerModels) > 1 {
+						// Multi-model panel
+						panelReviewer := review.NewPanelReviewer(clientOpts, reviewerModels, f.maxSessionActions)
+						panelReviewer.SetSessionTimeout(sessionTimeout)
 						if len(reviewerSkillsDirs) > 0 {
-							copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+							panelReviewer.SetSkillDirectories(reviewerSkillsDirs)
 						}
 						if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
-							copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+							panelReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
 						}
-						slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0])
-						return copilotReviewer, nil, nil
+						slog.Debug("Created review panel for config", "config", cfg.Name, "models", reviewerModels, "reviewer_skill_dirs", len(reviewerSkillsDirs))
+						return nil, panelReviewer, nil
 					}
 
+					// Single reviewer
+					reviewClient := copilot.NewClient(clientOpts)
+					if err := reviewClient.Start(context.Background()); err != nil {
+						return nil, nil, fmt.Errorf("could not start reviewer client: %w", err)
+					}
+					copilotReviewer := review.NewCopilotReviewer(reviewClient, reviewerModels[0], f.maxSessionActions)
+					copilotReviewer.SetSessionTimeout(sessionTimeout)
+					if len(reviewerSkillsDirs) > 0 {
+						copilotReviewer.SetSkillDirectories(reviewerSkillsDirs)
+					}
+					if cfg.Reviewer != nil && cfg.Reviewer.SystemPrompt != "" {
+						copilotReviewer.SetSystemPrompt(cfg.Reviewer.SystemPrompt)
+					}
+					slog.Debug("Created single reviewer for config", "config", cfg.Name, "model", reviewerModels[0], "reviewer_skill_dirs", len(reviewerSkillsDirs))
+					return copilotReviewer, nil, nil
 				}
-			}
+			} // end if !f.dryRun
 
 			if f.skipReview {
 				reviewerFactory = nil
-			}
-
-			// Parse max-output-size flag (#35)
-			maxOutputSize, err := parseByteSize(f.maxOutputSize)
-			if err != nil {
-				return fmt.Errorf("invalid --max-output-size %q: %w", f.maxOutputSize, err)
 			}
 
 			// Create and run engine
@@ -389,21 +503,20 @@ func runCmd() *cobra.Command {
 
 			engine := eval.NewEngineWithReviewerFactory(evaluator, reviewerFactory, eval.EngineOptions{
 				Workers:           f.workers,
-				MaxSessions:       f.maxSessions,
 				OutputDir:         f.output,
-				SkipTests:         f.skipTests,
 				SkipReview:        f.skipReview,
 				DryRun:            f.dryRun,
 				ProgressMode:      f.progressMode,
 				ConfirmLargeRuns:  true,
 				AutoConfirm:       f.autoConfirm,
+				MaxTurns:          f.maxTurns,
 				MaxSessionActions: f.maxSessionActions,
 				MaxFiles:          f.maxFiles,
-				MaxOutputSize:     maxOutputSize,
 				MonitorResources:  f.monitorResources,
 				StrictCleanup:     f.strictCleanup,
 				AllowCloud:        f.allowCloud,
 				CriteriaDir:       f.criteriaDir,
+				ReviewMode:        f.reviewMode,
 				ExcludeDirs:       excludeDirs,
 				SessionTimeout:    sessionTimeout,
 				CheckModels:       f.checkModels,
@@ -422,8 +535,8 @@ func runCmd() *cobra.Command {
 			fmt.Printf("  Errors:      %d\n", summary.Errors)
 			fmt.Printf("  Duration:    %.2fs\n", summary.Duration)
 
-			// Auto-run trend analysis unless opted out
-			if !f.skipTrends && !f.dryRun {
+			// Run trend analysis only when explicitly opted in via --with-trends
+			if f.withTrends && !f.dryRun {
 				fmt.Printf("\n%s\n", strings.Repeat("\u2500", 60))
 				fmt.Println("\U0001f4ca Generating trend analysis...")
 
@@ -448,21 +561,12 @@ func runCmd() *cobra.Command {
 						fmt.Println(analysis)
 						fmt.Println("-------------------")
 
-						// Re-write summary HTML with AI analysis included (Issue 7)
 						summary.Analysis = analysis
-						if _, err := report.WriteSummaryHTML(summary, f.output); err != nil {
-							slog.Warn("Failed to update summary with analysis", "error", err)
-							fmt.Printf("\u26a0\ufe0f  Failed to update summary with analysis: %v\n", err)
-						}
 					}
 
 					mdPath, _ := trends.WriteMarkdown(tr, trendsOutputDir)
-					htmlPath, _ := trends.WriteHTML(tr, trendsOutputDir)
 					if mdPath != "" {
 						fmt.Printf("Trend report (MD):   %s\n", mdPath)
-					}
-					if htmlPath != "" {
-						fmt.Printf("Trend report (HTML): %s\n", htmlPath)
 					}
 					fmt.Printf("Analyzed %d evaluation(s) across %d prompt(s)\n", tr.TotalRuns, len(tr.PromptTrends))
 				} else {
@@ -475,5 +579,7 @@ func runCmd() *cobra.Command {
 	}
 
 	addFilterFlags(cmd, f)
+	addRunFlags(cmd, f)
 	return cmd
 }
+

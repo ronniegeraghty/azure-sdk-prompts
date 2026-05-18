@@ -26,12 +26,13 @@ copied into the workspace root.
 ```yaml
 ---
 id: storage-dp-dotnet-fix-retry-logic
-service: storage
-plane: data-plane
-language: dotnet
-category: debugging
-difficulty: intermediate
-description: Fix broken retry logic in an existing Azure Storage client
+properties:
+  service: storage
+  plane: data-plane
+  language: dotnet
+  category: debugging
+  difficulty: intermediate
+  description: Fix broken retry logic in an existing Azure Storage client
 starter_project: ./starters/
 ---
 ```
@@ -61,36 +62,11 @@ After copy, the agent workspace contains:
 > co-located, avoids long file lists in frontmatter, and mirrors how developers think
 > about projects.
 
-### 2.2 Option B: Explicit File List
-
-For prompts that need only one or two files, an explicit `starter_files` list avoids
-creating a dedicated directory.
-
-```yaml
----
-id: identity-dp-python-fix-auth
-service: identity
-plane: data-plane
-language: python
-category: debugging
-difficulty: beginner
-description: Fix a broken DefaultAzureCredential setup
-starter_files:
-  - ./main.py
-  - ./requirements.txt
----
-```
-
-Each path is resolved relative to the prompt file's directory. Files are copied into
-the workspace root preserving only the filename (no subdirectory nesting).
-
-### 2.3 Precedence Rules
+### 2.2 Precedence Rules
 
 | Condition | Behavior |
 |-----------|----------|
-| Both `starter_project` and `starter_files` set | Validation error — use one or the other |
 | `starter_project` set | Copy entire directory contents to workspace root |
-| `starter_files` set | Copy each listed file to workspace root |
 | Neither set | Empty workspace (current default behavior) |
 
 ## 3. Path Resolution
@@ -172,54 +148,31 @@ to `internal/validate/validate.go`:
 | Path exists and is a directory | Error | `starter_project path does not exist or is not a directory: %s` |
 | Path does not escape `prompts/` tree | Error | `starter_project must not reference paths outside prompts/ directory` |
 | Directory is not empty | Warning | `starter_project directory is empty: %s` |
-| No conflict with `starter_files` | Error | `cannot set both starter_project and starter_files` |
 
-### 6.2 Checks for `starter_files`
-
-| Check | Severity | Message |
-|-------|----------|---------|
-| Each path exists and is a regular file | Error | `starter file does not exist: %s` |
-| Path does not escape `prompts/` tree | Error | `starter file must not reference paths outside prompts/ directory` |
-| No duplicate filenames after resolution | Warning | `duplicate filename in starter_files after path resolution: %s` |
-| No conflict with `starter_project` | Error | `cannot set both starter_project and starter_files` |
-
-### 6.3 Cross-field consistency
+### 6.2 Cross-field consistency
 
 | Check | Severity | Message |
 |-------|----------|---------|
-| `project_context: existing` without starter files | Warning | `project_context is 'existing' but no starter_project or starter_files provided` |
-| `project_context: blank` with starter files | Warning | `project_context is 'blank' but starter files are configured` |
+| `project_context: existing` without starter files | Warning | `project_context is 'existing' but no starter_project provided` |
+| `project_context: blank` with starter files | Warning | `project_context is 'blank' but starter_project is configured` |
 
-## 7. Struct Changes
-
-The `Prompt` struct in `internal/prompt/types.go` already has `StarterProject`. Add
-`StarterFiles` for Option B:
-
-```go
-type Prompt struct {
-    // ... existing fields ...
-    StarterProject  string   `yaml:"starter_project" json:"starter_project,omitempty"`
-    StarterFiles    []string `yaml:"starter_files" json:"starter_files,omitempty"`
-    // ...
-}
-```
-
-## 8. Complete Example Prompt
+## 7. Complete Example Prompt
 
 ```markdown
 ---
 id: key-vault-dp-python-fix-error-handling
-service: key-vault
-plane: data-plane
-language: python
-category: debugging
-difficulty: intermediate
-description: Fix missing error handling in an Azure Key Vault secrets client
-sdk_package: azure-keyvault-secrets
-doc_url: https://learn.microsoft.com/python/api/azure-keyvault-secrets/
 tags: [error-handling, secrets, existing-project]
-created: "2025-07-25"
-author: morpheus
+properties:
+  service: key-vault
+  plane: data-plane
+  language: python
+  category: debugging
+  difficulty: intermediate
+  description: Fix missing error handling in an Azure Key Vault secrets client
+  sdk_package: azure-keyvault-secrets
+  doc_url: https://learn.microsoft.com/python/api/azure-keyvault-secrets/
+  created: "2025-07-25"
+  author: morpheus
 project_context:
   type: existing
 starter_project: ./fix-error-handling.starters/
@@ -251,13 +204,4 @@ Add proper error handling:
 - Existing functionality is preserved
 ```
 
-## 9. Implementation Roadmap
 
-| Step | Task | Blocked by |
-|------|------|------------|
-| 1 | Add `StarterFiles []string` field to `Prompt` struct | — |
-| 2 | Update `eval/copilot.go` to handle `starter_files` (copy individual files) | Step 1 |
-| 3 | Add validation checks to `validate/validate.go` | Step 1 |
-| 4 | Add tests for new validation rules | Step 3 |
-| 5 | Create first starter-project prompt as proof of concept | Steps 1–3 |
-| 6 | Update `docs/prompt-authoring.md` with starter file guidance | Step 5 |

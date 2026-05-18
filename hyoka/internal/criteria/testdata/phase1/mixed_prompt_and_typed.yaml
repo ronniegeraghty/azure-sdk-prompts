@@ -1,0 +1,15 @@
+when:
+  language: python
+graders:
+  - name: DefaultAzureCredential Authentication
+    type: prompt
+    weight: 1.0
+    prompt: >
+      Uses DefaultAzureCredential or another azure-identity credential.
+  - name: Output Files Exist
+    type: workspace
+    weight: 0.5
+    checks:
+      - kind: require_to_create
+        files:
+          - main.py

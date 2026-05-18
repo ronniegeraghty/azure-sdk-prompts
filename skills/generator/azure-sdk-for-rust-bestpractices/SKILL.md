@@ -1,7 +1,6 @@
 ---
 name: azure-sdk-for-rust-bestpractices
-description: "Best practices for generating Rust code that uses the Azure SDK for Rust. Use when generating Rust code targeting Azure services to ensure correct crate selection, authentication patterns, error handling, pagination, and idiomatic SDK usage."
-applyTo: "**/*.rs,**/Cargo.toml"
+description: Authoritative best practices for generating Rust code against the Azure SDK for Rust — covers official `azure_*` crate selection (and banned legacy crates), `azure_identity` token credentials, `Result`/`?` error handling with `ErrorKind` matching, `Pager<T>` pagination via `TryStreamExt`, `Poller<T>` long-running operations, and `#[tokio::main]` runtime setup. Use this skill whenever you generate or modify Rust code (`.rs`, `Cargo.toml`) that talks to any Azure service — even single-file snippets, quick examples, or prompts that only mention "Azure" plus Rust/cargo without naming a specific service. Apply it before writing the first line so crate names, auth, and pagination are correct on the first pass.
 ---
 
 # Azure SDK for Rust Best Practices

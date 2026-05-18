@@ -58,9 +58,8 @@ func TestReviewerFactoryPerConfig(t *testing.T) {
 	}
 
 	// Create engine with the factory
-	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, factory, quietOpts(EngineOptions{
+	engine := NewEngineWithReviewerFactory(&StubRunner{}, factory, quietOpts(EngineOptions{
 		OutputDir:    t.TempDir(),
-		SkipTests:    true,
 		SkipReview:   false, // Enable review to trigger factory calls
 		DryRun:       false,
 		Workers:      1,
@@ -103,9 +102,8 @@ func TestReviewerFactoryNilWhenSkipReview(t *testing.T) {
 		return &review.StubReviewer{}, nil, nil
 	}
 
-	engine := NewEngineWithReviewerFactory(&StubEvaluator{}, factory, quietOpts(EngineOptions{
+	engine := NewEngineWithReviewerFactory(&StubRunner{}, factory, quietOpts(EngineOptions{
 		OutputDir:    t.TempDir(),
-		SkipTests:    true,
 		SkipReview:   true, // Skip review
 		DryRun:       false,
 		Workers:      1,

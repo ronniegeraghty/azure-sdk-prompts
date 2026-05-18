@@ -1,0 +1,5 @@
+graders:
+  - name: Using Kind Instead Of Type
+    kind: prompt
+    weight: 1.0
+    prompt: Schema uses `type`, not `kind` — KnownFields(true) must reject.

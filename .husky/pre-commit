@@ -1,0 +1,22 @@
+#!/bin/sh
+# Husky pre-commit hook: Ensure site/dist/ is built whenever site/src/ changes.
+# This prevents developers from committing stale bundles.
+
+# Only run if site/src/ files are staged for commit
+if git diff --cached --name-only | grep -q '^site/src/'; then
+  echo "[husky] Rebuilding site bundle (site/src/ was modified)..."
+  cd site && npm run build
+  RESULT=$?
+  cd ..
+  
+  if [ $RESULT -ne 0 ]; then
+    echo "[husky] ERROR: site build failed. Fix the error and try again."
+    exit 1
+  fi
+  
+  # Stage the rebuilt bundle
+  git add site/dist/
+  echo "[husky] site/dist/ added to commit."
+fi
+
+exit 0

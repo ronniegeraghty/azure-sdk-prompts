@@ -39,8 +39,8 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 	fmt.Fprintf(&b, "| Prompt ID | `%s` |\n", r.PromptID)
 	fmt.Fprintf(&b, "| Config | %s |\n", r.ConfigName)
 	fmt.Fprintf(&b, "| Result | %s |\n", result)
-	if r.Review != nil {
-		fmt.Fprintf(&b, "| Score | %d/10 |\n", r.Review.OverallScore)
+	if passed, total := TotalGraderChecks(r.GraderResults); total > 0 {
+		fmt.Fprintf(&b, "| Score | %d/%d |\n", passed, total)
 	}
 	fmt.Fprintf(&b, "| Duration | %.1fs |\n", r.Duration)
 	fmt.Fprintf(&b, "| Timestamp | %s |\n", r.Timestamp)
@@ -245,24 +245,13 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		b.WriteString("\n")
 	}
 
-	// Review scores
-	if r.Review != nil {
-		b.WriteString("## Code Review (LLM-as-Judge)\n\n")
-		fmt.Fprintf(&b, "**Score: %d/%d criteria passed**\n\n", r.Review.OverallScore, r.Review.MaxScore)
-
-		if len(r.Review.Scores.Criteria) > 0 {
-			b.WriteString("### Criteria Results\n\n")
-			b.WriteString("| Criterion | Result | Reason |\n")
-			b.WriteString("|-----------|--------|--------|\n")
-			for _, c := range r.Review.Scores.Criteria {
-				icon := "❌"
-				if c.Passed {
-					icon = "✅"
-				}
-				fmt.Fprintf(&b, "| %s | %s | %s |\n", c.Name, icon, c.Reason)
-			}
-			b.WriteString("\n")
-		}
+	// Reviewer prose notes (Summary/Strengths/Issues from the LLM-as-Judge
+	// prompt_review grader). The pass/fail scoring for these criteria is
+	// rendered under "## Grader Results" — we intentionally do NOT repeat
+	// the criteria score here to avoid the confusing "X/Y criteria passed"
+	// line that double-counts the prompt_review grader.
+	if r.Review != nil && (r.Review.Summary != "" || len(r.Review.Strengths) > 0 || len(r.Review.Issues) > 0) {
+		b.WriteString("## Reviewer Notes (LLM-as-Judge)\n\n")
 
 		if r.Review.Summary != "" {
 			b.WriteString("### Summary\n\n")
@@ -298,22 +287,11 @@ func WriteMarkdownReport(r *EvalReport, outputDir string, runID string, service,
 		b.WriteString("\n")
 	}
 
-	// Grader Results summary
+	// Grader Results — 3-level grouped by source file.
+	// Falls back to flat list when SourceFile is empty (pre-Neo data).
 	if len(r.GraderResults) > 0 {
 		b.WriteString("## Grader Results\n\n")
-		b.WriteString("| Grader | Type | Score | Summary |\n")
-		b.WriteString("|--------|------|-------|----------|\n")
-		for _, g := range r.GraderResults {
-			prefix := ""
-			if g.IsConsensus {
-				prefix = "🏆 "
-			}
-			summary := g.Summary
-			if len(summary) > 80 {
-				summary = summary[:80] + "…"
-			}
-			fmt.Fprintf(&b, "| %s`%s` | %s | %d/%d | %s |\n", prefix, g.GraderName, g.GraderType, g.OverallScore, g.MaxScore, summary)
-		}
+		writeGraderResults(&b, r.GraderResults)
 		b.WriteString("\n")
 	}
 
@@ -460,8 +438,8 @@ func WriteSummaryMarkdown(s *RunSummary, outputDir string) (string, error) {
 			icon = "✅"
 		}
 		score := "—"
-		if r.Review != nil {
-			score = fmt.Sprintf("%d/%d", r.Review.OverallScore, r.Review.MaxScore)
+		if passed, total := TotalGraderChecks(r.GraderResults); total > 0 {
+			score = fmt.Sprintf("%d/%d", passed, total)
 		} else if r.FailureReason != "" {
 			score = r.FailureReason
 		}
@@ -606,6 +584,140 @@ func truncateStr(s string, n int) string {
 		return s
 	}
 	return s[:n] + "\n... (truncated)"
+}
+
+// sourceTypeLabel converts a SourceType value to the human-facing label used
+// in the 3-level grader output format.
+func sourceTypeLabel(sourceType string) string {
+	switch sourceType {
+	case "prompt_file":
+		return "prompt file"
+	case "criteria_file":
+		return "criteria file"
+	default:
+		return sourceType
+	}
+}
+
+// graderFileGroup holds all graders from a single source file.
+type graderFileGroup struct {
+	sourceFile  string
+	sourceType  string
+	displayName string // basename of sourceFile, or "" for ungrouped
+	graders     []GraderResult
+}
+
+// groupGradersBySource partitions results into file groups preserving insertion
+// order. Results with an empty SourceFile are placed into a single "ungrouped"
+// group (displayName == "") appended at the end.
+func groupGradersBySource(results []GraderResult) []graderFileGroup {
+	var groups []graderFileGroup
+	index := map[string]int{} // sourceFile → index into groups
+
+	for _, g := range results {
+		key := g.SourceFile
+		if key == "" {
+			key = "__ungrouped__"
+		}
+		if i, ok := index[key]; ok {
+			groups[i].graders = append(groups[i].graders, g)
+		} else {
+			index[key] = len(groups)
+			display := ""
+			if g.SourceFile != "" {
+				display = filepath.Base(g.SourceFile)
+			}
+			groups = append(groups, graderFileGroup{
+				sourceFile:  g.SourceFile,
+				sourceType:  g.SourceType,
+				displayName: display,
+				graders:     []GraderResult{g},
+			})
+		}
+	}
+	return groups
+}
+
+// RenderGraderBreakdown returns the grader section rendered in the 3-level
+// grouped format used by the per-eval markdown report. It is exported so
+// callers (e.g. the live progress display) can present the same breakdown to
+// the terminal after each individual evaluation completes.
+func RenderGraderBreakdown(results []GraderResult) string {
+	if len(results) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	writeGraderResults(&b, results)
+	return b.String()
+}
+
+// writeGraderResults renders the grader section in the 3-level grouped format:
+//
+//   - {basename} ({source type}):
+//   - {grader name} ({type}): Pass/Fail ({passed}/{total})
+//   - {point label}: Pass/Fail
+//
+// Falls back to flat ungrouped list when all results lack SourceFile.
+func writeGraderResults(b *strings.Builder, results []GraderResult) {
+	groups := groupGradersBySource(results)
+
+	// If there is only one group and it is the ungrouped sentinel, render as
+	// the old flat list (no file header level) to stay readable on legacy data.
+	flatFallback := len(groups) == 1 && groups[0].displayName == ""
+
+	for _, grp := range groups {
+		if !flatFallback && grp.displayName != "" {
+			label := sourceTypeLabel(grp.sourceType)
+			if label != "" {
+				fmt.Fprintf(b, "- %s (%s):\n", grp.displayName, label)
+			} else {
+				fmt.Fprintf(b, "- %s:\n", grp.displayName)
+			}
+		}
+
+		for _, g := range grp.graders {
+			// Count pass/total from Points.
+			passed := 0
+			for _, c := range g.Checks {
+				if c.Pass {
+					passed++
+				}
+			}
+			total := len(g.Checks)
+			graderPass := "Pass"
+			if !g.Pass {
+				graderPass = "Fail"
+			}
+
+			graderType := g.GraderType
+			if graderType == "prompt_review" {
+				graderType = "prompt"
+			}
+
+			if flatFallback {
+				// Flat: no file header prefix.
+				fmt.Fprintf(b, "- %s (%s): %s (%d/%d)\n", g.GraderName, graderType, graderPass, passed, total)
+			} else {
+				fmt.Fprintf(b, "  - %s (%s): %s (%d/%d)\n", g.GraderName, graderType, graderPass, passed, total)
+			}
+
+			for _, c := range g.Checks {
+				checkPass := "Pass"
+				if !c.Pass {
+					checkPass = "Fail"
+				}
+				label := c.Label
+				if label == "" {
+					label = g.GraderName
+				}
+				if flatFallback {
+					fmt.Fprintf(b, "    - %s: %s\n", label, checkPass)
+				} else {
+					fmt.Fprintf(b, "      - %s: %s\n", label, checkPass)
+				}
+			}
+		}
+	}
 }
 
 // langFromPath returns a markdown code fence language hint from a file path.

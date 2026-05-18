@@ -1,0 +1,4 @@
+graders:
+  - name: Output Check Without Details
+    type: output_check
+    weight: 1.0

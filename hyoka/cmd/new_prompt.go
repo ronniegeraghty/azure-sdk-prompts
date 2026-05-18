@@ -59,7 +59,7 @@ return fmt.Errorf("file already exists: %s", filePath)
 
 today := time.Now().Format("2006-01-02")
 
-content := fmt.Sprintf("---\nid: %s\nservice: %s\nplane: %s\nlanguage: %s\ncategory: %s\ndifficulty: %s\ndescription: >\n  %s\nsdk_package: \"\"\ndoc_url: \"\"\ntags: []\ncreated: %s\nauthor: \"\"\n---\n\n# TODO: Title \u2014 %s (%s)\n\n## Prompt\n\nTODO: Write your prompt here.\n\n## Expected Coverage\n\nThe generated code should demonstrate:\n- TODO: List key aspects to test\n\n## Context\n\nTODO: Why this prompt matters.\n",
+content := fmt.Sprintf("---\nid: %s\nservice: %s\nplane: %s\nlanguage: %s\ncategory: %s\ndifficulty: %s\ndescription: >\n  %s\nsdk_package: \"\"\ndoc_url: \"\"\ntags: []\ncreated: %s\nauthor: \"\"\n---\n\n# TODO: Title \u2014 %s (%s)\n\n## Prompt\n\nTODO: Write your prompt here.\n\n## Expected Coverage\n\nThe agent output should demonstrate:\n- TODO: List key aspects to test\n\n## Context\n\nTODO: Why this prompt matters.\n",
 id, service, plane, language, category, difficulty, description, today, service, language)
 
 if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {

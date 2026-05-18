@@ -2,16 +2,19 @@ when:
   service: key-vault
 graders:
   - name: Secret/Key/Certificate Client Separation
+    type: prompt
     weight: 1.0
     prompt: >
       Uses the correct sub-client for the operation (SecretClient for
       secrets, KeyClient for keys, CertificateClient for certificates).
   - name: Key Vault URI Format
+    type: prompt
     weight: 1.0
     prompt: >
       Vault URI follows the https://{vault-name}.vault.azure.net
       pattern and is parameterized, not hardcoded.
   - name: Purge Protection Awareness
+    type: prompt
     weight: 1.0
     prompt: >
       Delete operations account for soft-delete and purge protection —

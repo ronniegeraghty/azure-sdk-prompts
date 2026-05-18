@@ -1,4 +1,4 @@
-// Package report handles generation of JSON, HTML, and Markdown reports.
+// Package report handles generation of JSON and Markdown reports.
 package report
 
 import (
@@ -40,7 +40,7 @@ func WriteReport(r *EvalReport, outputDir string, runID string, p *prompt.Prompt
 	}
 
 	// Ensure schema version is current.
-	MigrateToV2(r)
+	MigrateToV3(r)
 
 	// Truncate verbose fields when the report is excessively large.
 	TruncateReport(r)

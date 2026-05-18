@@ -14,12 +14,18 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/artifact"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotperm"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/utils"
 )
 
+// GeneratorArtifact is a type alias for the generator artifact type.
+// This allows review to access artifact.GeneratorArtifact without creating an import cycle.
+type GeneratorArtifact = artifact.GeneratorArtifact
+
 // Reviewer runs LLM-as-judge code reviews via a separate Copilot session.
 type Reviewer interface {
-	Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error)
+	Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (*ReviewResult, error)
 }
 
 // CopilotReviewer uses a Copilot session to perform code reviews.
@@ -58,16 +64,22 @@ func (r *CopilotReviewer) SetSystemPrompt(prompt string) {
 }
 
 // Review creates a separate Copilot session, sends the review prompt, and parses results.
-func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error) {
+func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (*ReviewResult, error) {
 	slog.Debug("Reading generated files for review", "workDir", workDir)
 	generatedFiles, err := utils.ReadDirFiles(workDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading generated files: %w", err)
 	}
+
+	// Empty workspace is acceptable if we have an artifact with a response
 	if len(generatedFiles) == 0 {
-		return nil, fmt.Errorf("no generated files found in %s", workDir)
+		if artifact == nil || artifact.FinalResponse == "" {
+			return nil, fmt.Errorf("no generated files found in %s and no agent response to review", workDir)
+		}
+		slog.Debug("No generated files, reviewing agent's final response only")
+	} else {
+		slog.Debug("Generated files loaded", "file_count", len(generatedFiles))
 	}
-	slog.Debug("Generated files loaded", "file_count", len(generatedFiles))
 
 	var referenceFiles map[string]string
 	if referenceDir != "" {
@@ -79,7 +91,8 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		}
 	}
 
-	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria)
+	checks := criteriaStringToChecks(evaluationCriteria)
+	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
 
 	// Create isolated config directory to prevent user-level skills from
 	// leaking into the review session (#21).
@@ -101,7 +114,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 		Model:               r.model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: copilotperm.ApproveAll,
 		SkillDirectories:    r.skillDirectories,
 		OnEvent:             collector.handleEvent,
 	}
@@ -153,11 +166,12 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 
 	responseText, capturedEvents := collector.response()
 
-	result, err := parseReviewResponse(responseText)
-	if err != nil {
-		slog.Error("Failed to parse review response", "model", r.model, "error", err)
-		return nil, err
+	result, validationErrors := parseReviewResponseV2(responseText, checks)
+	if len(validationErrors) > 0 {
+		slog.Error("Failed to parse review response", "model", r.model, "errors", validationErrors)
+		return nil, fmt.Errorf("parsing review response: %s", strings.Join(validationErrors, "; "))
 	}
+
 	result.Events = capturedEvents
 	slog.Info("Review complete", "model", r.model, "overall_score", result.OverallScore, "max_score", result.MaxScore)
 	return result, nil
@@ -167,7 +181,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 type StubReviewer struct{}
 
 // Review returns a stub review result.
-func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _ string) (*ReviewResult, error) {
+func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _ string, _ *GeneratorArtifact) (*ReviewResult, error) {
 	return &ReviewResult{
 		Scores: ReviewScores{
 			Criteria: []CriterionResult{
@@ -182,26 +196,124 @@ func (s *StubReviewer) Review(_ context.Context, _ string, _ string, _ string, _
 	}, nil
 }
 
-// parseReviewResponse extracts the JSON ReviewResult from the LLM response.
-func parseReviewResponse(text string) (*ReviewResult, error) {
-	// Try to find JSON in the response (LLM may wrap it in markdown fences)
+// ReviewBuckets returns a stub review result with one criterion per bucket so
+// StubReviewer satisfies MultiBucketReviewer for tests.
+func (s *StubReviewer) ReviewBuckets(_ context.Context, _ string, _ string, _ string, buckets []Bucket, _ *GeneratorArtifact) (*ReviewResult, error) {
+	criteria := make([]CriterionResult, 0, len(buckets))
+	for _, b := range buckets {
+		criteria = append(criteria, CriterionResult{
+			Name: "stub_criterion_" + b.Name, Passed: true, Reason: "stub mode",
+		})
+	}
+	if len(criteria) == 0 {
+		criteria = append(criteria, CriterionResult{Name: "stub_criterion", Passed: true, Reason: "stub mode"})
+	}
+	return &ReviewResult{
+		Scores:       ReviewScores{Criteria: criteria},
+		OverallScore: len(criteria),
+		MaxScore:     len(criteria),
+		Summary:      "Review skipped (stub evaluator, bucketed)",
+		Issues:       []string{},
+		Strengths:    []string{},
+	}, nil
+}
+
+// parseReviewResponseV2 parses an id-aware review response and validates against expected checks.
+// Returns the populated ReviewResult with canonical labels from expected, plus any validation errors.
+// The Name field of each CriterionResult is set to the canonical text from expected (indexed by ID).
+func parseReviewResponseV2(text string, expected []ReviewCheck) (*ReviewResult, []string) {
 	jsonStr := utils.ExtractJSON(text)
 	if jsonStr == "" {
-		return nil, fmt.Errorf("no JSON found in review response: %.200s", text)
+		return nil, []string{fmt.Sprintf("no JSON found in review response: %.200s", text)}
 	}
 
-	var result ReviewResult
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return nil, fmt.Errorf("parsing review JSON: %w (response: %.200s)", err, jsonStr)
+	var resp struct {
+		Criteria  []CriterionJudgment `json:"criteria"`
+		Summary   string              `json:"summary"`
+		Issues    []string            `json:"issues"`
+		Strengths []string            `json:"strengths"`
 	}
-	// Ensure MaxScore and OverallScore are consistent with criteria
-	if result.MaxScore == 0 && len(result.Scores.Criteria) > 0 {
-		result.MaxScore = result.Scores.TotalCount()
+	if err := json.Unmarshal([]byte(jsonStr), &resp); err != nil {
+		return nil, []string{fmt.Sprintf("parsing review JSON: %v (response: %.200s)", err, jsonStr)}
 	}
-	if result.OverallScore == 0 && len(result.Scores.Criteria) > 0 {
-		result.OverallScore = result.Scores.PassedCount()
+
+	// Build expected id → text lookup
+	expectedIDs := make(map[string]string)
+	for _, c := range expected {
+		expectedIDs[c.ID] = c.Text
 	}
-	return &result, nil
+
+	// Validate: returned IDs must match expected IDs exactly
+	returnedIDs := make(map[string]bool)
+	var validationErrors []string
+	for _, c := range resp.Criteria {
+		if c.ID == "" {
+			validationErrors = append(validationErrors, "found criterion with empty id")
+			continue
+		}
+		returnedIDs[c.ID] = true
+		if _, ok := expectedIDs[c.ID]; !ok {
+			validationErrors = append(validationErrors, fmt.Sprintf("unexpected id: %s", c.ID))
+		}
+		if c.Reasoning == "" {
+			validationErrors = append(validationErrors, fmt.Sprintf("id %s has empty reasoning", c.ID))
+		}
+	}
+
+	// Check for missing IDs
+	var missing []string
+	for id := range expectedIDs {
+		if !returnedIDs[id] {
+			missing = append(missing, id)
+		}
+	}
+	if len(missing) > 0 {
+		validationErrors = append(validationErrors, fmt.Sprintf("missing ids: %v", missing))
+	}
+
+	// If validation failed, return errors
+	if len(validationErrors) > 0 {
+		return nil, validationErrors
+	}
+
+	// Populate criteria with canonical labels and stable IDs
+	criteria := make([]CriterionResult, len(resp.Criteria))
+	for i, c := range resp.Criteria {
+		criteria[i] = CriterionResult{
+			ID:     c.ID,               // stable id for vote keying
+			Name:   expectedIDs[c.ID],  // canonical label from YAML
+			Passed: c.Passed,
+			Reason: c.Reasoning,
+		}
+	}
+
+	scores := ReviewScores{Criteria: criteria}
+	return &ReviewResult{
+		Scores:       scores,
+		OverallScore: scores.PassedCount(),
+		MaxScore:     scores.TotalCount(),
+		Summary:      resp.Summary,
+		Issues:       resp.Issues,
+		Strengths:    resp.Strengths,
+	}, nil
+}
+
+// validateReviewerResponse checks that a parsed response contains valid criteria.
+// Returns a list of validation errors; nil means valid.
+func validateReviewerResponse(result *ReviewResult) []string {
+	var errs []string
+	if result == nil {
+		return []string{"nil review result"}
+	}
+	if len(result.Scores.Criteria) == 0 {
+		errs = append(errs, "no criteria in response")
+	}
+	for i, c := range result.Scores.Criteria {
+		if c.Name == "" {
+			errs = append(errs, fmt.Sprintf("criterion %d has empty name", i))
+		}
+	}
+	return errs
 }
 
 // PanelReviewer runs multiple reviewers in parallel and consolidates results.
@@ -251,15 +363,19 @@ func (p *PanelReviewer) Models() []string {
 // in the list, which receives all other reviewers' outputs.
 // Reviews run one at a time so each Copilot session starts, completes, and stops
 // before the next begins, reducing peak memory usage.
-func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (panel []ReviewResult, consolidated *ReviewResult, skipped []SkippedReviewer, err error) {
+func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (panel []ReviewResult, consolidated *ReviewResult, err error) {
 	slog.Info("Starting sequential panel review", "model_count", len(p.models), "models", p.models)
 	if len(p.models) == 0 {
-		return nil, nil, nil, fmt.Errorf("no reviewer models configured")
+		return nil, nil, fmt.Errorf("no reviewer models configured")
 	}
 
 	generatedFiles, err := utils.ReadDirFiles(workDir)
 	if err != nil || len(generatedFiles) == 0 {
-		return nil, nil, nil, fmt.Errorf("no generated files to review in %s", workDir)
+		// Empty workspace is acceptable if we have an artifact with a response
+		if artifact == nil || artifact.FinalResponse == "" {
+			return nil, nil, fmt.Errorf("no generated files to review in %s and no agent response to review", workDir)
+		}
+		slog.Debug("No generated files, reviewing agent's final response only")
 	}
 
 	var referenceFiles map[string]string
@@ -271,9 +387,11 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		}
 	}
 
-	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, evaluationCriteria)
+	checks := criteriaStringToChecks(evaluationCriteria)
+	reviewPrompt := BuildReviewPrompt(originalPrompt, generatedFiles, referenceFiles, checks, artifact)
 
 	// Run reviewers sequentially — one Copilot session at a time
+	var skipped []SkippedReviewer
 	for i, model := range p.models {
 		// Bail early if the parent context was cancelled (#129).
 		if ctx.Err() != nil {
@@ -287,7 +405,7 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 		} else {
 			defer os.RemoveAll(modelWorkDir)
 		}
-		result, reviewErr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir)
+		result, reviewErr := p.runSingleReview(ctx, model, reviewPrompt, modelWorkDir, checks)
 		if result != nil {
 			result.Model = model
 		}
@@ -301,37 +419,29 @@ func (p *PanelReviewer) ReviewPanel(ctx context.Context, originalPrompt string, 
 	}
 
 	if len(panel) == 0 {
-		return nil, nil, skipped, fmt.Errorf("all reviewers failed")
+		return nil, nil, fmt.Errorf("all reviewers failed")
 	}
 
-	// If only one reviewer succeeded, use it as consolidated
-	if len(panel) == 1 {
-		c := panel[0]
-		return panel, &c, skipped, nil
-	}
-
-	// Consolidate: use the first model to synthesize all reviews
-	slog.Info("Starting review consolidation", "consolidator_model", p.models[0], "panel_size", len(panel))
-	consolidated, err = p.consolidate(ctx, originalPrompt, generatedFiles, panel)
-	if err != nil {
-		// Fallback: use average scores from panel
-		slog.Warn("Consolidation failed, falling back to average", "error", err)
-		consolidated = averageReview(panel)
-	}
+	// Deterministic multi-model voting: for each criterion, if ANY reviewer
+	// says it failed, mark it as failed. No AI consolidation needed.
+	slog.Info("Computing deterministic consensus (any-fail voting)", "panel_size", len(panel))
+	consolidated = deterministicVote(panel, checks)
 	consolidated.Model = "consensus"
+	consolidated.SkippedReviewers = skipped
 	slog.Info("Panel review complete", "panel_size", len(panel), "consensus_score", consolidated.OverallScore, "max_score", consolidated.MaxScore)
 
-	return panel, consolidated, skipped, nil
+	return panel, consolidated, nil
 }
 
 // Review implements the Reviewer interface using the panel (for backward compat).
-func (p *PanelReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string) (*ReviewResult, error) {
-	_, consolidated, _, err := p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, evaluationCriteria)
+func (p *PanelReviewer) Review(ctx context.Context, originalPrompt string, workDir string, referenceDir string, evaluationCriteria string, artifact *GeneratorArtifact) (*ReviewResult, error) {
+	_, consolidated, err := p.ReviewPanel(ctx, originalPrompt, workDir, referenceDir, evaluationCriteria, artifact)
 	return consolidated, err
 }
 
 // runSingleReview creates a Copilot client, runs a review session, and returns the result.
-func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, reviewPrompt string, workDir string) (*ReviewResult, error) {
+// If checks are provided, uses id-aware parser with retry-on-validation-error.
+func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, reviewPrompt string, workDir string, checks []ReviewCheck) (*ReviewResult, error) {
 	slog.Debug("Starting single review", "model", model)
 	opts := *p.clientOpts
 	client := copilot.NewClient(&opts)
@@ -378,7 +488,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		Model:               model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: copilotperm.ApproveAll,
 		SkillDirectories:    p.skillDirectories,
 		OnEvent:             collector.handleEvent,
 	}
@@ -404,66 +514,206 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 	defer sendCancel()
 
 	slog.Debug("Sending review prompt", "model", model, "timeout", panelTimeout, "length", len(reviewPrompt))
-	_, err = session.SendAndWait(sendCtx, copilot.MessageOptions{
-		Prompt: reviewPrompt,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("review session send for %s: %w", model, err)
+
+	// Send initial review prompt, then validate and retry up to 3 times
+	const maxRetries = 3
+	var result *ReviewResult
+	currentPrompt := reviewPrompt
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			slog.Info("Retrying review with validation feedback", "model", model, "attempt", attempt)
+		}
+
+		_, err = session.SendAndWait(sendCtx, copilot.MessageOptions{
+			Prompt: currentPrompt,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("review session send for %s: %w", model, err)
+		}
+
+		responseText, _ := collector.response()
+		
+		// Use id-aware parser if checks provided, otherwise fall back to legacy
+		if len(checks) > 0 {
+			var validationErrors []string
+			result, validationErrors = parseReviewResponseV2(responseText, checks)
+			if len(validationErrors) > 0 {
+				if attempt < maxRetries {
+					// Build precise retry prompt with missing/extra id details
+					missing := []string{}
+					extra := []string{}
+					expectedIDs := make(map[string]bool)
+					for _, c := range checks {
+						expectedIDs[c.ID] = true
+					}
+					
+					// Parse to extract returned IDs for better error message
+					jsonStr := utils.ExtractJSON(responseText)
+					if jsonStr != "" {
+						var resp struct {
+							Criteria []struct {
+								ID string `json:"id"`
+							} `json:"criteria"`
+						}
+						if json.Unmarshal([]byte(jsonStr), &resp) == nil {
+							returnedIDs := make(map[string]bool)
+							for _, c := range resp.Criteria {
+								returnedIDs[c.ID] = true
+								if !expectedIDs[c.ID] {
+									extra = append(extra, c.ID)
+								}
+							}
+							for id := range expectedIDs {
+								if !returnedIDs[id] {
+									missing = append(missing, id)
+								}
+							}
+						}
+					}
+					
+					var retryMsg strings.Builder
+					retryMsg.WriteString("Your response has validation errors:\n")
+					for _, e := range validationErrors {
+						fmt.Fprintf(&retryMsg, "- %s\n", e)
+					}
+					if len(missing) > 0 {
+						fmt.Fprintf(&retryMsg, "\nYou MUST include these missing check IDs in your response: %v\n", missing)
+					}
+					if len(extra) > 0 {
+						fmt.Fprintf(&retryMsg, "You included unexpected IDs: %v\n", extra)
+					}
+					fmt.Fprintf(&retryMsg, "\nPlease return a COMPLETE response with exactly these IDs: %s\n", formatIDList(checks))
+					currentPrompt = retryMsg.String()
+					slog.Debug("Retry prompt prepared", "model", model, "attempt", attempt, "missing", missing, "extra", extra)
+					continue
+				}
+				// Max retries exceeded: synthesize failing checks for missing IDs instead of dropping reviewer
+				slog.Warn("reviewer failed to return valid criteria after 3 retries, synthesizing failures for missing checks",
+					"model", model,
+					"validation_errors", validationErrors)
+				
+				// Determine which IDs are missing
+				expectedIDs := make(map[string]bool)
+				for _, c := range checks {
+					expectedIDs[c.ID] = true
+				}
+				returnedIDs := make(map[string]bool)
+				if result != nil {
+					for _, c := range result.Scores.Criteria {
+						returnedIDs[c.ID] = true
+					}
+				}
+				
+				// Synthesize failures for missing IDs
+				if result == nil {
+					result = &ReviewResult{
+						Model: model,
+						Scores: ReviewScores{
+							Criteria: []CriterionResult{},
+						},
+					}
+				}
+				for _, check := range checks {
+					if !returnedIDs[check.ID] {
+						result.Scores.Criteria = append(result.Scores.Criteria, CriterionResult{
+							ID:     check.ID,
+							Name:   check.Text,
+							Passed: false,
+							Reason: "reviewer failed to return a vote after 3 attempts",
+						})
+					}
+				}
+			}
+		}
+
+		if errs := validateReviewerResponse(result); len(errs) > 0 {
+			if attempt < maxRetries {
+				currentPrompt = fmt.Sprintf("Your response had validation errors: %s\n\nPlease respond again with ONLY a valid JSON object. Every criterion must have a non-empty name.", strings.Join(errs, "; "))
+				continue
+			}
+			slog.Warn("Review response validation failed after retries", "model", model, "errors", errs)
+		}
+		break
 	}
 
-	responseText, capturedEvents := collector.response()
-
-	result, err := parseReviewResponse(responseText)
-	if err != nil {
-		return nil, err
-	}
+	_, capturedEvents := collector.response()
 	result.Events = capturedEvents
 	return result, nil
 }
 
-// consolidate uses the first model to synthesize all individual reviews into a consensus.
-func (p *PanelReviewer) consolidate(ctx context.Context, originalPrompt string, generatedFiles map[string]string, panel []ReviewResult) (*ReviewResult, error) {
-	consolidatorModel := p.models[0]
-	slog.Debug("Starting consolidation", "consolidator_model", consolidatorModel, "panel_size", len(panel))
 
-	prompt := buildConsolidationPrompt(originalPrompt, panel)
-
-	slog.Debug("Sending consolidation prompt", "consolidator_model", consolidatorModel)
-	result, err := p.runSingleReview(ctx, consolidatorModel, prompt, "")
-	if err != nil {
-		return nil, fmt.Errorf("consolidation failed: %w", err)
-	}
-	slog.Debug("Consolidation complete", "overall_score", result.OverallScore, "max_score", result.MaxScore)
-	return result, nil
-}
-
-// averageReview computes average pass rates across a panel as a fallback.
-// For each criterion, it passes if the majority of reviewers marked it passed.
-func averageReview(panel []ReviewResult) *ReviewResult {
+// averageReview computes deterministic voting across a panel.
+// For each criterion, it FAILS if ANY reviewer marked it failed (strict voting).
+// This ensures no false passes when reviewers disagree.
+// Criteria are keyed by ID (bucket::check_id for bucketed, check_id for combined).
+func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 	if len(panel) == 0 {
 		return &ReviewResult{Summary: "No reviews to consolidate"}
 	}
 
-	// Collect all criteria by name, track pass counts
+	// Build id → canonical label lookup from expected
+	expectedLabels := make(map[string]string)
+	for _, c := range expected {
+		expectedLabels[c.ID] = c.Text
+	}
+
+	// Collect all criteria by stable ID, track fail counts
 	type criterionAgg struct {
-		passCount int
-		total     int
-		reasons   []string
+		id         string
+		bucketName string   // extracted from prefixed Name
+		label      string   // canonical label from expected
+		failCount  int
+		total      int
+		reasons    []string
 	}
 	criteriaMap := make(map[string]*criterionAgg)
-	var criteriaOrder []string
+	var observedOrder []string // for legacy path when expected is empty
 
+	// First pass: collect votes from all reviewers
 	for _, r := range panel {
 		for _, c := range r.Scores.Criteria {
-			agg, exists := criteriaMap[c.Name]
+			// Extract bucket name if present in Name
+			bucketName := ""
+			if strings.HasPrefix(c.Name, "[") {
+				closeIdx := strings.Index(c.Name, "]")
+				if closeIdx > 0 {
+					bucketName = c.Name[1:closeIdx]
+				}
+			}
+
+			// Build vote key: bucket::id or just id
+			var voteKey string
+			if bucketName != "" && c.ID != "" {
+				voteKey = bucketName + "::" + c.ID
+			} else if c.ID != "" {
+				voteKey = c.ID
+			} else {
+				// Fallback for legacy path: key by name
+				voteKey = c.Name
+			}
+
+			agg, exists := criteriaMap[voteKey]
 			if !exists {
-				agg = &criterionAgg{}
-				criteriaMap[c.Name] = agg
-				criteriaOrder = append(criteriaOrder, c.Name)
+				label := c.Name // default to display name
+				if c.ID != "" && expectedLabels[c.ID] != "" {
+					label = expectedLabels[c.ID]
+					// Prefix with bucket if applicable
+					if bucketName != "" {
+						label = fmt.Sprintf("[%s] %s", bucketName, label)
+					}
+				}
+				agg = &criterionAgg{
+					id:         c.ID,
+					bucketName: bucketName,
+					label:      label,
+				}
+				criteriaMap[voteKey] = agg
+				observedOrder = append(observedOrder, voteKey)
 			}
 			agg.total++
-			if c.Passed {
-				agg.passCount++
+			if !c.Passed {
+				agg.failCount++
 			}
 			if c.Reason != "" {
 				agg.reasons = append(agg.reasons, c.Reason)
@@ -471,20 +721,87 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 		}
 	}
 
-	// Build consensus criteria — passed if majority passed
+	// Build consensus criteria
 	var criteria []CriterionResult
 	passedCount := 0
-	for _, name := range criteriaOrder {
-		agg := criteriaMap[name]
-		passed := agg.passCount > agg.total/2 // majority
-		reason := fmt.Sprintf("%d/%d reviewers passed", agg.passCount, agg.total)
-		criteria = append(criteria, CriterionResult{
-			Name:   name,
-			Passed: passed,
-			Reason: reason,
-		})
-		if passed {
-			passedCount++
+
+	if len(expected) > 0 {
+		// New path: anchor to expected checks (in expected order)
+		// This ensures MaxScore is deterministic even if reviewers skip checks
+		for _, exp := range expected {
+			// Check for votes on this expected ID (may be bucketed or not)
+			foundVotes := false
+			
+			// First, check for non-bucketed vote (direct ID match)
+			if agg, hasVotes := criteriaMap[exp.ID]; hasVotes {
+				foundVotes = true
+				passed := agg.failCount == 0 // strict: any fail = fail
+				reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
+				criteria = append(criteria, CriterionResult{
+					ID:     agg.id,
+					Name:   agg.label,
+					Passed: passed,
+					Reason: reason,
+				})
+				if passed {
+					passedCount++
+				}
+			}
+			
+			// Then, check for bucketed votes (bucket::ID pattern)
+			// This handles cases where the same check appears in multiple buckets
+			for voteKey, agg := range criteriaMap {
+				// Extract ID from bucket::id pattern
+				var checkID string
+				if strings.Contains(voteKey, "::") {
+					parts := strings.SplitN(voteKey, "::", 2)
+					if len(parts) == 2 {
+						checkID = parts[1]
+					}
+				}
+				
+				// If this vote matches the expected ID and wasn't already counted
+				if checkID == exp.ID && voteKey != exp.ID {
+					foundVotes = true
+					passed := agg.failCount == 0 // strict: any fail = fail
+					reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
+					criteria = append(criteria, CriterionResult{
+						ID:     agg.id,
+						Name:   agg.label,
+						Passed: passed,
+						Reason: reason,
+					})
+					if passed {
+						passedCount++
+					}
+				}
+			}
+			
+			if !foundVotes {
+				// No reviewer voted on this check → mark as failed
+				criteria = append(criteria, CriterionResult{
+					ID:     exp.ID,
+					Name:   exp.Text,
+					Passed: false,
+					Reason: "no reviewer returned a vote for this check",
+				})
+			}
+		}
+	} else {
+		// Legacy path: walk observed votes (when expected is empty)
+		for _, voteKey := range observedOrder {
+			agg := criteriaMap[voteKey]
+			passed := agg.failCount == 0 // strict: any fail = fail
+			reason := fmt.Sprintf("%d/%d reviewers passed", agg.total-agg.failCount, agg.total)
+			criteria = append(criteria, CriterionResult{
+				ID:     agg.id,
+				Name:   agg.label, // canonical label (bucket-prefixed if applicable)
+				Passed: passed,
+				Reason: reason,
+			})
+			if passed {
+				passedCount++
+			}
 		}
 	}
 
@@ -509,16 +826,23 @@ func averageReview(panel []ReviewResult) *ReviewResult {
 	}
 
 	return &ReviewResult{
-		Model: "consensus (average)",
+		Model: "consensus (strict-vote)",
 		Scores: ReviewScores{
 			Criteria: criteria,
 		},
 		OverallScore: passedCount,
 		MaxScore:     len(criteria),
-		Summary:      fmt.Sprintf("Average consensus from %d reviewers: %d/%d criteria passed", len(panel), passedCount, len(criteria)),
+		Summary:      fmt.Sprintf("Strict consensus from %d reviewers: %d/%d reviewer checks passed (any-fail voting)", len(panel), passedCount, len(criteria)),
 		Issues:       issues,
 		Strengths:    strengths,
 	}
+}
+
+// deterministicVote computes a consensus result using strict any-fail voting.
+// For each criterion, if ANY reviewer says it failed, the criterion fails.
+// This replaces AI consolidation with deterministic, reproducible logic.
+func deterministicVote(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
+	return averageReview(panel, expected)
 }
 
 func copyDirToTemp(src string, pattern string) (string, error) {
@@ -535,7 +859,7 @@ func copyDirToTemp(src string, pattern string) (string, error) {
 			if strings.HasPrefix(name, ".") && path != src {
 				return filepath.SkipDir
 			}
-			if utils.IsBuildArtifactDir(name) {
+			if utils.IsDefaultExcludedDir(name) {
 				return filepath.SkipDir
 			}
 		}

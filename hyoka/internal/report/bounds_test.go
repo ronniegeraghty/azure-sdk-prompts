@@ -130,6 +130,7 @@ func TestWriteReport_LargeReportWrittenCorrectly(t *testing.T) {
 	}
 
 	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion, // Set current schema version
 		PromptID:       "large-report",
 		ConfigName:     "baseline",
 		Timestamp:      "2024-06-01T00:00:00Z",
@@ -187,6 +188,7 @@ func TestWriteReport_TruncationAppliedAboveThreshold(t *testing.T) {
 	}
 
 	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion, // Set current schema version
 		PromptID:       "huge-report",
 		ConfigName:     "baseline",
 		Timestamp:      "2024-06-01T00:00:00Z",

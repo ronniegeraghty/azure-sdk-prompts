@@ -1,0 +1,200 @@
+# Test-language criteria — exercises all canonical grader kinds.
+# Paired with prompts/test/hello-markdown.prompt.md (writes a small hello.md
+# using the markdown-headings + markdown-lists skills).
+#
+# Uses only canonical kinds: prompt, workspace, tool, activity, program.
+when:
+  language: test
+graders:
+  # ---------------------------------------------------------------------------
+  # 1. prompt — LLM-judged checks. Uses both `prompt` (preamble) and `checks`
+  #    (each becomes one pass/fail point).
+  # ---------------------------------------------------------------------------
+  - name: Markdown Structure
+    type: prompt
+    weight: 1.0
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md exists and contains a level-1 heading (starts with single #).
+      - File contains exactly three bullet list items.
+      # Intentionally failing — demonstrates failed-check rendering.
+      - File hello.md contains a fenced code block tagged with the language `rust`.
+
+  # Differential check — only passes when the markdown-headings skill is loaded
+  # AND invoked. The skill instructs the agent to emit a provenance marker
+  # comment above the H1; a bare LLM would never add this on its own. This
+  # creates a visible pass/fail delta on the pairwise page across with/without
+  # markdown-headings variants.
+  - name: Markdown Headings Skill Marker
+    type: prompt
+    weight: 1.0
+    when:
+      tool:
+        - name: markdown-headings
+          source: skill
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md contains the literal HTML comment `<!-- markdown-headings-skill -->` on the line immediately before the level-1 heading (with a single blank line between them).
+
+  # ---------------------------------------------------------------------------
+  # 2. workspace — workspace-delta boolean checks. Exercises all six check kinds.
+  # ---------------------------------------------------------------------------
+  - name: Workspace Check
+    type: workspace
+    weight: 1.0
+    checks:
+      - kind: require_to_create
+        files: [hello.md]
+      - kind: forbidden_to_create
+        files: [.env, secrets.txt]
+      - kind: forbidden_to_delete
+        files: ["*"]
+      - kind: file
+        name: hello.md
+        state: present
+        min_bytes: 10
+        contains: "#"
+
+  # ---------------------------------------------------------------------------
+  # 3. tool — unified tool checks.
+  #
+  # Per-skill `tool_used` graders are gated with structured `tool:` filters
+  # on the config's loaded tools so they only run on variants that actually
+  # load the skill. With `pairwise: deep` on test-skills, the without-{skill}
+  # variants strip a skill from the loadout — without gating, those variants
+  # would always fail the per-skill check. (See decisions.md
+  # 2026-05-02 "Config-Aware Grader `when:` Phase 2".)
+  # ---------------------------------------------------------------------------
+  - name: Markdown Headings Tool Usage
+    type: tool
+    weight: 1.0
+    when:
+      tool:
+        - name: markdown-headings
+          source: skill
+    checks:
+      - kind: tool_used
+        tool: markdown-headings
+        source: skill
+        min_calls: 1
+
+  - name: Markdown Lists Tool Usage
+    type: tool
+    weight: 1.0
+    when:
+      tool:
+        - name: markdown-lists
+          source: skill
+    checks:
+      - kind: tool_used
+        tool: markdown-lists
+        source: skill
+        min_calls: 1
+
+  # Skill-agnostic tool checks — apply to every variant.
+  - name: Tool Usage
+    type: tool
+    weight: 1.0
+    checks:
+      - kind: tool_not_used
+        tool: bash
+        source: builtin
+      - kind: any_from_group
+        group: test-skills
+      - kind: none_from_group
+        group: test-skills
+        except: [markdown-headings, markdown-lists]
+
+  # ---------------------------------------------------------------------------
+  # 4. activity — action log and session activity checks. Exercises multiple check kinds.
+  # ---------------------------------------------------------------------------
+  - name: Activity Check
+    type: activity
+    weight: 1.0
+    checks:
+      - kind: turn_limit
+        max: 25
+      - kind: action_count
+        min: 1
+        max: 100
+      - kind: tool_call_count
+        min: 1
+      - kind: contains_action
+        type: message
+      - kind: excludes_action
+        type: error
+      - kind: terminated_by
+        equals: completed
+
+  # ---------------------------------------------------------------------------
+  # 5. program — runs a command check in the workspace; exit 0 = pass.
+  # ---------------------------------------------------------------------------
+  - name: Hello.md Exists (program)
+    type: program
+    weight: 0.3
+    checks:
+      - kind: command
+        command: test
+        args:
+          - -f
+          - hello.md
+        timeout: 5
+
+  # ---------------------------------------------------------------------------
+  # 6. NEW SYNTAX DEMO — per-property negation + tag matching.
+  #    Validates the MatchSet polymorphism (is:/not:) and tag filtering added
+  #    in commit 3a78909a. The hello-markdown-with-code prompt carries the
+  #    `code-block` tag; the original hello-markdown prompt does not.
+  # ---------------------------------------------------------------------------
+
+  # Tag IS — runs only on prompts tagged `code-block`. Should PASS on
+  # hello-markdown-with-code and be SKIPPED on hello-markdown.
+  - name: Rust Code Block (tag-gated)
+    type: prompt
+    weight: 1.0
+    when:
+      tags:
+        is: [code-block]
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md contains a fenced code block tagged with the language `rust`.
+
+  # Tag NOT — runs only on prompts NOT tagged `code-block`. Should PASS on
+  # hello-markdown and be SKIPPED on hello-markdown-with-code.
+  - name: No Code Block (tag-negated)
+    type: prompt
+    weight: 1.0
+    when:
+      tags:
+        not: [code-block]
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md does NOT contain any fenced code blocks (no triple-backtick fences).
+
+  # Tag IS (positive include) — runs on every prompt tagged `markdown`.
+  # Both test prompts share this tag, so this grader runs on both. Useful
+  # demo of a tag filter that *includes* work rather than gating it away.
+  - name: Markdown File Present (tag-filtered)
+    type: prompt
+    weight: 0.5
+    when:
+      tags:
+        is: [markdown]
+    prompt: "Check the following criterion:"
+    checks:
+      - The agent produced a file named hello.md in the working directory.
+
+  # Property NEGATION — demonstrates `is:`/`not:` object form on a scalar
+  # property. Both test prompts have difficulty=basic, so both match the
+  # `is` constraint; neither has difficulty=advanced, so both pass the
+  # `not` constraint. Validates the parse + match path runs cleanly.
+  - name: Difficulty Sanity (object-form when)
+    type: prompt
+    weight: 0.5
+    when:
+      difficulty:
+        is:  [basic, intermediate]
+        not: [advanced, expert]
+    prompt: "Check the following criteria:"
+    checks:
+      - File hello.md exists.

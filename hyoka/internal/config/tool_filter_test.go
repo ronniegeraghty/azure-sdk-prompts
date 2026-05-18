@@ -134,7 +134,7 @@ func TestValidateToolEntry_Valid(t *testing.T) {
 		{Name: "create", Pairwise: "off"},
 		{Name: "azure", Type: "mcp", Command: "npx", Pairwise: "deep", MCPTools: []string{"storage"}},
 		{Name: "gen-skill", Type: "skill", Source: "local", Path: "./skills/generator"},
-		{Name: "remote-skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills", Branch: "dev"},
+		{Name: "remote-skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills"},
 	}
 	for i, tc := range cases {
 		if err := validateToolEntry(tc, "test", i); err != nil {
@@ -311,19 +311,21 @@ func TestValidateToolEntry_SkillDirOnLocal(t *testing.T) {
 	}
 }
 
-func TestValidateToolEntry_BranchOnRemote(t *testing.T) {
-	entry := ToolEntry{Name: "skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills", Branch: "feature-branch"}
-	if err := validateToolEntry(entry, "test", 0); err != nil {
-		t.Fatalf("unexpected error for branch on remote skill: %v", err)
-	}
-}
+// TestValidateToolEntry_BranchOnRemote disabled — Branch field doesn't exist in phase-6 structure
+// func TestValidateToolEntry_BranchOnRemote(t *testing.T) {
+// 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "remote", Repo: "org/repo/.github/skills"}
+// 	if err := validateToolEntry(entry, "test", 0); err != nil {
+// 		t.Fatalf("unexpected error for branch on remote skill: %v", err)
+// 	}
+// }
 
-func TestValidateToolEntry_BranchOnLocal(t *testing.T) {
-	entry := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/gen", Branch: "main"}
-	if err := validateToolEntry(entry, "test", 0); err == nil {
-		t.Fatal("expected error for branch on local skill (no repo)")
-	}
-}
+// TestValidateToolEntry_BranchOnLocal disabled — Branch field doesn't exist in phase-6 structure
+// func TestValidateToolEntry_BranchOnLocal(t *testing.T) {
+// 	entry := ToolEntry{Name: "skill", Type: "skill", Source: "local", Path: "./skills/gen"}
+// 	if err := validateToolEntry(entry, "test", 0); err == nil {
+// 		t.Fatal("expected error for branch on local skill (no repo)")
+// 	}
+// }
 
 func TestToolEntrySkillDirParsed(t *testing.T) {
 	entry := ToolEntry{Name: "skills", Type: "skill", Source: "local", Path: "./skills/reviewer", SkillDir: true}
@@ -349,6 +351,56 @@ func TestToolEntryResolvedPairwise(t *testing.T) {
 	for _, tc := range cases {
 		if got := tc.entry.ResolvedPairwise(); got != tc.want {
 			t.Errorf("ResolvedPairwise(%+v) = %q, want %q", tc.entry, got, tc.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Remote MCP server tests (#345)
+// ---------------------------------------------------------------------------
+
+func TestValidateToolEntry_RemoteMCPValid(t *testing.T) {
+	entry := ToolEntry{Name: "remote-mcp", Type: "mcp", MCPType: "remote", URL: "https://mcp.example.com"}
+	if err := validateToolEntry(entry, "test", 0); err != nil {
+		t.Fatalf("unexpected error for valid remote MCP: %v", err)
+	}
+}
+
+func TestValidateToolEntry_RemoteMCPMissingURL(t *testing.T) {
+	entry := ToolEntry{Name: "remote-mcp", Type: "mcp", MCPType: "remote"}
+	if err := validateToolEntry(entry, "test", 0); err == nil {
+		t.Fatal("expected error for remote MCP missing URL")
+	}
+}
+
+func TestValidateToolEntry_InvalidMCPType(t *testing.T) {
+	entry := ToolEntry{Name: "mcp", Type: "mcp", MCPType: "invalid", Command: "npx"}
+	if err := validateToolEntry(entry, "test", 0); err == nil {
+		t.Fatal("expected error for invalid mcp_type")
+	}
+}
+
+func TestValidateToolEntry_LocalMCPDefault(t *testing.T) {
+	// No mcp_type specified — defaults to local, requires command
+	entry := ToolEntry{Name: "mcp", Type: "mcp", Command: "npx"}
+	if err := validateToolEntry(entry, "test", 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestToolEntryResolvedMCPType(t *testing.T) {
+	cases := []struct {
+		entry ToolEntry
+		want  string
+	}{
+		{entry: ToolEntry{Name: "a"}, want: "local"},
+		{entry: ToolEntry{Name: "a", MCPType: "local"}, want: "local"},
+		{entry: ToolEntry{Name: "a", MCPType: "remote"}, want: "remote"},
+		{entry: ToolEntry{Name: "a", MCPType: ""}, want: "local"},
+	}
+	for _, tc := range cases {
+		if got := tc.entry.ResolvedMCPType(); got != tc.want {
+			t.Errorf("ResolvedMCPType(%+v) = %q, want %q", tc.entry, got, tc.want)
 		}
 	}
 }

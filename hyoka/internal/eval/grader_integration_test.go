@@ -13,25 +13,24 @@ import (
 )
 
 func TestEngineRunWithGraders(t *testing.T) {
-	// Create a temporary graders directory with a config file
+	// Create a temporary criteria directory with a unified-schema YAML file.
 	gradersDir := t.TempDir()
 	graderYAML := `graders:
-  - kind: file
+  - type: file
     name: "main_exists"
-    config:
+    details:
       path: "stub_output.txt"
     weight: 1.0
-    gate: true
 `
 	if err := os.WriteFile(filepath.Join(gradersDir, "test.yaml"), []byte(graderYAML), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
-		Workers:    1,
-		OutputDir:  outputDir,
-		GradersDir: gradersDir,
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:     1,
+		OutputDir:   outputDir,
+		CriteriaDir: gradersDir,
 	}))
 
 	prompts := []*prompt.Prompt{
@@ -63,32 +62,35 @@ func TestEngineRunWithGraders(t *testing.T) {
 	if gr.GraderType != "file" {
 		t.Errorf("expected type 'file', got %q", gr.GraderType)
 	}
-	// StubEvaluator returns GeneratedFiles: ["stub_output.txt"]
+	// StubRunner returns GeneratedFiles: ["stub_output.txt"]
 	// The file grader checks path: "stub_output.txt" — should pass
 	if !r.Success {
 		t.Errorf("expected eval to succeed, got failure: %s", r.FailureReason)
 	}
 }
 
-func TestEngineRunWithGraderGateFails(t *testing.T) {
+func TestEngineRunWithGraderFailureFailsEval(t *testing.T) {
+	// Phase 2 cutover (#625) removed the gate short-circuit; any grader
+	// whose Pass=false still flips the aggregate Pass to false, so the
+	// engine reports the eval as failed. This test replaces the old
+	// "gate grader failure" semantics with the no-gate equivalent.
 	gradersDir := t.TempDir()
 	graderYAML := `graders:
-  - kind: file
+  - type: file
     name: "missing_file"
-    config:
+    details:
       path: "does_not_exist.py"
     weight: 1.0
-    gate: true
 `
 	if err := os.WriteFile(filepath.Join(gradersDir, "test.yaml"), []byte(graderYAML), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
-		Workers:    1,
-		OutputDir:  outputDir,
-		GradersDir: gradersDir,
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:     1,
+		OutputDir:   outputDir,
+		CriteriaDir: gradersDir,
 	}))
 
 	prompts := []*prompt.Prompt{
@@ -108,29 +110,26 @@ func TestEngineRunWithGraderGateFails(t *testing.T) {
 		t.Fatal("expected GraderResults to be populated")
 	}
 	if r.Success {
-		t.Error("expected eval to fail when gate grader fails")
+		t.Error("expected eval to fail when a grader fails")
 	}
 	if r.FailureReason == "" {
-		t.Error("expected failure reason to be set for gate failure")
-	}
-	if r.Success {
-		t.Error("expected eval to fail when gate grader fails")
+		t.Error("expected failure reason to be set on grader failure")
 	}
 }
 
 func TestEngineRunWithGraderWhenFilter(t *testing.T) {
 	gradersDir := t.TempDir()
 	graderYAML := `graders:
-  - kind: file
+  - type: file
     name: "python_only"
-    config:
+    details:
       path: "stub_output.txt"
     weight: 1.0
     when:
       language: python
-  - kind: file
+  - type: file
     name: "go_only"
-    config:
+    details:
       path: "go_output.go"
     weight: 1.0
     when:
@@ -141,10 +140,10 @@ func TestEngineRunWithGraderWhenFilter(t *testing.T) {
 	}
 
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
-		Workers:    1,
-		OutputDir:  outputDir,
-		GradersDir: gradersDir,
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
+		Workers:     1,
+		OutputDir:   outputDir,
+		CriteriaDir: gradersDir,
 	}))
 
 	// Python prompt — only python_only grader should apply
@@ -173,9 +172,9 @@ func TestEngineRunWithGraderWhenFilter(t *testing.T) {
 }
 
 func TestEngineRunNoGradersConfigured(t *testing.T) {
-	// No GradersDir set — should fall back to reviewer pipeline only
+	// No CriteriaDir set — should fall back to reviewer pipeline only.
 	outputDir := t.TempDir()
-	engine := NewEngine(&StubEvaluator{}, quietOpts(EngineOptions{
+	engine := NewEngine(&StubRunner{}, quietOpts(EngineOptions{
 		Workers:   1,
 		OutputDir: outputDir,
 	}))

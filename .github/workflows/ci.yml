@@ -3,11 +3,10 @@ name: CI
 on:
   pull_request:
     branches:
-      - '**'  # All branches
+      - main
   push:
     branches:
       - main
-      - ronniegeraghty/dev
 
 jobs:
   build-and-test:
@@ -32,3 +31,26 @@ jobs:
 
       - name: Test with race detector
         run: go test -race ./hyoka/... -timeout 2m
+
+  site-build-and-test:
+    name: Site Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install dependencies
+        run: cd site && npm ci
+
+      - name: Build
+        run: cd site && npm run build
+
+      - name: Test
+        run: cd site && npm test

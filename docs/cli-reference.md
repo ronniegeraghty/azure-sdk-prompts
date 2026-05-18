@@ -58,11 +58,11 @@ hyoka run --config baseline --dry-run
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--workers` | CPU count (max 8) | Parallel evaluation workers |
+| `--workers` | `1` | Parallel evaluation workers (clamped to 8). Also drives `--progress auto` mode selection. |
 | `--max-sessions` | workers × 3 | Maximum concurrent Copilot sessions |
 | `--session-timeout` | 600s | Maximum time in seconds for any single session phase to complete |
 | `--output` | `./reports` | Report output directory |
-| `--progress` | `auto` | Progress display: `auto`, `live`, `log`, `off` |
+| `--progress` | `auto` | Progress display: `auto`, `interactive`, `ci`, `live` (alias for `interactive`), `log` (alias for `ci`), `off`. `auto` picks `interactive` when `workers == 1`, `ci` when `workers > 1`, and `off` for non-TTY stdout. |
 | `--stub` | false | Use stub evaluator (no Copilot SDK) |
 | `-y`, `--yes` | false | Skip large run confirmation |
 
@@ -73,7 +73,7 @@ hyoka run --config baseline --dry-run
 | `--pairwise` / `-P` | false | Expand each config into N+1 pairwise tool-ablation variants for regression testing |
 | `--skip-tests` | false | Skip test generation |
 | `--skip-review` | false | Skip code review phase |
-| `--skip-trends` | false | Skip trend analysis after run |
+| `--with-trends` | false | Generate trend analysis after run (opt-in) |
 | `--dry-run` | false | List matches without running |
 | `--monitor-resources` | false | Track CPU/memory of Copilot sessions |
 | `--strict-cleanup` | false | Fail if orphaned processes remain after cleanup |
@@ -85,7 +85,6 @@ hyoka run --config baseline --dry-run
 |------|---------|-------------|
 | `--max-turns` | 25 | Maximum assistant turns per generation |
 | `--max-files` | 50 | Maximum generated files per evaluation |
-| `--max-output-size` | 1MB | Maximum total output size (e.g., `512KB`, `2MB`) |
 | `--max-session-actions` | 50 | Maximum actions per Copilot session (reasoning, response, or tool call each count as 1) |
 
 #### Criteria Flags
@@ -153,17 +152,19 @@ hyoka compare --config baseline/claude-opus-4.6 --since 2025-01-15
 
 ### `hyoka tools`
 
-Manage and list tools available to the generator agent.
+List available tools and plugins. Scans the `plugins/` and `skills/` directories.
 
 ```bash
-# List all available tools
-hyoka tools list
+# List all available tools and plugins
+hyoka tools
 
-# Add a new tool configuration
-hyoka tools add --name my-tool --description "Tool description"
+# Alias
+hyoka plugins
 ```
 
-### `hyoka configs`
+### `hyoka configs` (deprecated)
+
+**Deprecated:** Use `hyoka list` instead, which shows configs alongside prompts and criteria.
 
 List and describe available configurations.
 
@@ -199,7 +200,7 @@ hyoka trends --reports-dir ./reports
 
 ### `hyoka report`
 
-Re-render reports from a previous run.
+Re-render Markdown reports from existing JSON data.
 
 ```bash
 hyoka report 20260327-113302

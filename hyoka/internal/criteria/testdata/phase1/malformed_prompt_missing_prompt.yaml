@@ -1,0 +1,4 @@
+graders:
+  - name: Prompt Grader Missing Prompt Field
+    type: prompt
+    weight: 1.0

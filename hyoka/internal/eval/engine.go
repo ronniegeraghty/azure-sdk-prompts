@@ -9,22 +9,22 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/comparison"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/graders"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria/graders"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pairwise"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
 // EvalResult holds the raw output from a Copilot evaluation.
@@ -37,28 +37,47 @@ type EvalResult struct {
 	Success        bool
 	Error          string
 	ErrorDetails   string
+	ErrorCategory  string // e.g., "tool_load_failure", "timeout", "sdk_error"
 	IsStub         bool
 	StarterFiles   []string
+	// FinalResponse is the last assistant message from the session. For
+	// prompts that evaluate the agent's reasoning or explanation rather
+	// than files, this is the primary artifact under review.
+	FinalResponse string
+	// ToolReport carries the post-validation tool-load topology — flat list
+	// of leaves with Parent/ParentKind back-pointers — so engine_eval can
+	// persist parent linkage into report.ToolLoadResult and the new
+	// EnvironmentInfo.SkillGroups field (#schema_v3). Nil for stub runs and
+	// any caller that does not perform tool validation.
+	ToolReport *tool.ToolLoadReport
 	// CleanupFn deletes session state after the caller has consumed the
 	// workspace files. Must be called after copying generated files out
 	// of the workspace directory (#261). Nil for stub evaluators.
 	CleanupFn func()
 }
 
-// CopilotEvaluator defines the interface for running evaluations.
-type CopilotEvaluator interface {
-	Evaluate(ctx context.Context, prompt *prompt.Prompt, config *config.ToolConfig, workDir string) (*EvalResult, error)
+// PromptRunner defines the interface for running evaluations.
+type PromptRunner interface {
+	Run(ctx context.Context, prompt *prompt.Prompt, config *config.ToolConfig, workDir string) (*EvalResult, error)
+}
+
+// LimitConfigurable is an optional interface that runners can implement to
+// receive per-eval resolved limits for real-time enforcement. The engine will
+// call SetLimitsForEval before each Run() call if the runner implements this
+// interface (#bugfix-maxturns).
+type LimitConfigurable interface {
+	SetLimitsForEval(maxTurns, maxFiles, maxSessionActions int)
 }
 
 // ReviewerFactory creates a reviewer for a specific config.
 // Returns nil if no reviewer should be created (e.g., stub mode or review disabled).
 type ReviewerFactory func(cfg *config.ToolConfig) (review.Reviewer, *review.PanelReviewer, error)
 
-// StubEvaluator returns placeholder results for testing.
-type StubEvaluator struct{}
+// StubRunner returns placeholder results for testing.
+type StubRunner struct{}
 
 // Evaluate returns a stub result and creates a stub output file in the workspace.
-func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+func (s *StubRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	// Write a stub file so file graders can find it on disk.
 	if workDir != "" {
 		if err := os.WriteFile(filepath.Join(workDir, "stub_output.txt"), []byte("stub"), 0644); err != nil {
@@ -79,9 +98,7 @@ func (s *StubEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *con
 // EngineOptions configures the evaluation engine.
 type EngineOptions struct {
 	Workers      int
-	MaxSessions  int // Maximum concurrent Copilot sessions (0 = workers × 2).
 	OutputDir    string
-	SkipTests    bool
 	SkipReview   bool
 	DryRun       bool
 	ProgressMode string // "auto", "live", "log", "off"
@@ -89,11 +106,16 @@ type EngineOptions struct {
 	// Fan-out visibility (#34)
 	ConfirmLargeRuns bool
 	AutoConfirm      bool
-	// Generator guardrails (#35)
+	// Generator guardrails (#35). Phase 3.5 (#566) dropped the byte-size
+	// guardrail entirely — review no longer inlines file contents, and the
+	// review-side caps in internal/utils prevent runaway memory.
 	MaxTurns          int
 	MaxSessionActions int
 	MaxFiles          int
-	MaxOutputSize     int64
+	// Tiered limits (#347): separate generator and reviewer guardrails.
+	// Reviewer limits default to half of generator limits when zero.
+	ReviewerMaxTurns   int
+	ReviewerMaxActions int
 	// Process lifecycle (#46)
 	StrictCleanup bool // Fail run if orphaned processes detected after cleanup.
 	// Session timeout — maximum duration for a single SendAndWait call
@@ -104,10 +126,13 @@ type EngineOptions struct {
 	MonitorResources bool
 	// Tiered criteria (#30)
 	CriteriaDir string // Directory containing attribute-matched criteria YAML files.
-	// Pluggable graders (#136)
-	GradersDir string // Directory containing grader config YAML files.
+	// Review session splitting (#580). When "isolated", graders/groups marked
+	// with isolate: true are reviewed in their own Copilot session per panel
+	// model. Empty string or "combined" preserves legacy single-session
+	// behavior. Validated at the CLI layer.
+	ReviewMode string
 	// Generator safety (#36)
-	AllowCloud bool // Allow generated code to provision real Azure resources.
+	AllowCloud bool // Allow agent output to provision real Azure resources.
 	// Directory exclusion (#63)
 	ExcludeDirs []string // Directories to exclude from generated_files output.
 	// Pre-flight model availability check (#264).
@@ -119,35 +144,34 @@ type EngineOptions struct {
 	Stdout io.Writer
 	// Tracker overrides the default process tracker (used in tests to avoid
 	// killing real Copilot CLI processes during orphan scans).
-	Tracker *ProcessTracker
+	Tracker *process.ProcessTracker
 }
 
 // Engine orchestrates evaluation runs.
 type Engine struct {
-	evaluator       CopilotEvaluator
+	evaluator       PromptRunner
 	reviewerFactory ReviewerFactory
 	opts            EngineOptions
-	tracker         *ProcessTracker
-	graderConfigs   []criteria.GraderConfig // attribute-matched grader configs (#30)
-	pluginGraders   []graders.GraderConfig  // pluggable grader configs (#136)
+	tracker         *process.ProcessTracker
+	// graderBundle holds the unified grader configuration loaded from
+	// CriteriaDir. It replaces the pre-#625 dual storage of
+	// criteria.GraderConfig (prompt-review criteria) and
+	// graders.GraderConfig (typed graders). Every matched entry — prompt
+	// or typed — flows through the same Bundle.
+	graderBundle *criteria.Bundle
 }
 
 // NewEngine creates a new Engine with the given evaluator and options.
-func NewEngine(evaluator CopilotEvaluator, opts EngineOptions) *Engine {
+func NewEngine(evaluator PromptRunner, opts EngineOptions) *Engine {
 	return NewEngineWithReviewerFactory(evaluator, nil, opts)
 }
 
 // NewEngineWithReviewerFactory creates a new Engine with an evaluator and reviewer factory.
-func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFactory, opts EngineOptions) *Engine {
+func NewEngineWithReviewerFactory(evaluator PromptRunner, factory ReviewerFactory, opts EngineOptions) *Engine {
 	if opts.Workers <= 0 {
-		w := runtime.NumCPU()
-		if w > 8 {
-			w = 8
-		}
-		opts.Workers = w
-	}
-	if opts.MaxSessions <= 0 {
-		opts.MaxSessions = opts.Workers * 2
+		opts.Workers = 1
+	} else if opts.Workers > 8 {
+		opts.Workers = 8
 	}
 	if opts.OutputDir == "" {
 		opts.OutputDir = "./reports"
@@ -162,8 +186,18 @@ func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFa
 	if opts.MaxFiles <= 0 {
 		opts.MaxFiles = 50
 	}
-	if opts.MaxOutputSize <= 0 {
-		opts.MaxOutputSize = 1048576 // 1MB
+	// Tiered reviewer limits: default to half of generator limits (#347)
+	if opts.ReviewerMaxTurns <= 0 {
+		opts.ReviewerMaxTurns = opts.MaxTurns / 2
+		if opts.ReviewerMaxTurns < 5 {
+			opts.ReviewerMaxTurns = 5
+		}
+	}
+	if opts.ReviewerMaxActions <= 0 {
+		opts.ReviewerMaxActions = opts.MaxSessionActions / 2
+		if opts.ReviewerMaxActions < 10 {
+			opts.ReviewerMaxActions = 10
+		}
 	}
 	if opts.SessionTimeout <= 0 {
 		opts.SessionTimeout = 10 * time.Minute
@@ -179,7 +213,7 @@ func NewEngineWithReviewerFactory(evaluator CopilotEvaluator, factory ReviewerFa
 	}
 	tracker := opts.Tracker
 	if tracker == nil {
-		tracker = DefaultTracker
+		tracker = process.DefaultTracker
 	}
 	return &Engine{
 		evaluator:       evaluator,
@@ -194,64 +228,116 @@ func (e *Engine) printf(format string, args ...any) {
 	fmt.Fprintf(e.opts.Stdout, format, args...)
 }
 
-// loadCriteria loads grader configs if CriteriaDir is configured.
-func (e *Engine) loadCriteria() {
+// loadBundle loads the unified grader bundle from CriteriaDir (#625).
+// Per-file parse/validation failures are captured in Bundle.FileErrors and
+// only surface when a specific eval's properties would have selected the
+// malformed file (Q4 deferred-error semantics).
+func (e *Engine) loadBundle() {
 	if e.opts.CriteriaDir == "" {
+		slog.Debug("No criteria directory configured, skipping bundle load")
 		return
 	}
 	if _, err := os.Stat(e.opts.CriteriaDir); os.IsNotExist(err) {
 		slog.Debug("Criteria directory does not exist, skipping", "dir", e.opts.CriteriaDir)
 		return
 	}
-	configs, err := criteria.LoadDir(e.opts.CriteriaDir)
+	bundle, err := criteria.LoadUnifiedDir(e.opts.CriteriaDir)
 	if err != nil {
-		slog.Warn("Failed to load grader configs", "dir", e.opts.CriteriaDir, "error", err)
+		slog.Warn("Failed to walk criteria directory", "dir", e.opts.CriteriaDir, "error", err)
 		return
 	}
-	e.graderConfigs = configs
-	slog.Info("Loaded grader configs", "configs", len(configs), "dir", e.opts.CriteriaDir)
+	e.graderBundle = bundle
+	slog.Info("Loaded unified grader bundle",
+		"dir", e.opts.CriteriaDir,
+		"files", len(bundle.Configs),
+		"file_errors", len(bundle.FileErrors),
+	)
 }
 
-// loadGraders loads pluggable grader configs if GradersDir is configured (#136).
-func (e *Engine) loadGraders() {
-	if e.opts.GradersDir == "" {
-		return
+// matchedForEval returns the grader entries whose file/group/grader `when`
+// blocks match the eval's prompt properties and config. Thin wrapper kept for
+// call-site symmetry with reviewBuckets.
+func (e *Engine) matchedForEval(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) []criteria.MatchedUnifiedEntry {
+	// Lowercase tags for case-insensitive matching.
+	tags := make([]string, len(p.Tags))
+	for i, t := range p.Tags {
+		tags[i] = strings.ToLower(t)
 	}
-	if _, err := os.Stat(e.opts.GradersDir); os.IsNotExist(err) {
-		slog.Debug("Graders directory does not exist, skipping", "dir", e.opts.GradersDir)
-		return
+	ctx := criteria.MatchContext{
+		Props: props,
+		Tags:  tags,
+		Tools: buildToolIdentities(cfg, env),
 	}
-	gcf, err := graders.LoadDir(e.opts.GradersDir)
-	if err != nil {
-		slog.Warn("Failed to load grader configs", "dir", e.opts.GradersDir, "error", err)
-		return
+	return criteria.MatchingUnifiedEntries(e.graderBundle, ctx)
+}
+
+// reviewBuckets builds the set of review buckets for a prompt under the
+// configured ReviewMode. In combined mode (default) it returns one bucket
+// per matched prompt-type grader entry plus a bucket for prompt criteria.
+// In isolated mode it returns one bucket per isolated grader/group plus a
+// shared "combined" bucket for the rest. When isolated mode is requested but
+// nothing is marked isolate, it falls back to combined mode (per-entry buckets).
+func (e *Engine) reviewBuckets(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) []graders.ReviewBucket {
+	mode := e.opts.ReviewMode
+	if mode == "" {
+		mode = criteria.ReviewModeCombined
 	}
-	e.pluginGraders = gcf.Graders
-	slog.Info("Loaded pluggable grader configs", "graders", len(gcf.Graders), "dir", e.opts.GradersDir)
+	matched := e.matchedForEval(p, props, cfg, env)
+	promptMatched, _ := criteria.PartitionMatched(matched)
+	if mode == criteria.ReviewModeIsolated && !criteria.HasUnifiedIsolation(promptMatched) {
+		slog.Warn("review-mode=isolated requested but no graders or groups are marked isolate; falling back to combined",
+			"prompt_id", p.ID)
+	}
+	// Format parsed criteria if available, otherwise use raw EvaluationCriteria
+	criteriaText := prompt.FormatParsedCriteria(p.ParsedCriteria)
+	if criteriaText == "" {
+		criteriaText = p.EvaluationCriteria
+	}
+	// Include inline graders from prompt frontmatter
+	return criteria.BuildUnifiedReviewBuckets(promptMatched, criteriaText, mode, p.Graders)
 }
 
 // mergedCriteria returns the combined attribute-matched + prompt-specific
-// evaluation criteria text for the given prompt.
-func (e *Engine) mergedCriteria(p *prompt.Prompt) string {
-	props := map[string]string{
-		"language": p.Language(),
-		"service":  p.Service(),
-		"plane":    p.Plane(),
-		"category": p.Category(),
-		"sdk":      p.SDKPackage(),
+// evaluation criteria text, using only the prompt-type entries from the
+// Bundle. Kept on Engine for back-compat with the GraderInput.EvalCriteria
+// field consumed by review-aware graders in the single-bucket path.
+func (e *Engine) mergedCriteria(p *prompt.Prompt, props map[string]string, cfg config.ToolConfig, env *report.EnvironmentInfo) string {
+	// Lowercase tags for case-insensitive matching.
+	tags := make([]string, len(p.Tags))
+	for i, t := range p.Tags {
+		tags[i] = strings.ToLower(t)
 	}
-	matched := criteria.MatchingGraders(e.graderConfigs, props)
-	merged := criteria.MergeCriteria(matched, p.EvaluationCriteria)
+	ctx := criteria.MatchContext{
+		Props: props,
+		Tags:  tags,
+		Tools: buildToolIdentities(cfg, env),
+	}
+	matched := criteria.MatchingUnifiedEntries(e.graderBundle, ctx)
+	promptMatched, _ := criteria.PartitionMatched(matched)
+	entries := make([]criteria.UnifiedGraderEntry, 0, len(promptMatched))
+	for _, m := range promptMatched {
+		entries = append(entries, m.Entry)
+	}
+	// Include inline graders from prompt frontmatter
+	entries = append(entries, p.Graders...)
+	// Format parsed criteria if available, otherwise use raw EvaluationCriteria
+	criteriaText := prompt.FormatParsedCriteria(p.ParsedCriteria)
+	if criteriaText == "" {
+		criteriaText = p.EvaluationCriteria
+	}
+	merged := criteria.MergeUnifiedCriteria(entries, criteriaText)
 	if merged == "" {
-		return p.EvaluationCriteria
+		return criteriaText
 	}
 	return merged
 }
 
 // EvalTask represents a single prompt+config evaluation to run.
 type EvalTask struct {
-	Prompt *prompt.Prompt
-	Config config.ToolConfig
+	Prompt          *prompt.Prompt
+	Config          config.ToolConfig
+	BaseConfigName  string // Original config name before model fan-out (empty for single-model configs)
+	PairwiseVariant string // Pairwise variant suffix (e.g., "baseline", "without-azure", "without-azure/storage_blob_list")
 }
 
 // resolvedLimits holds the effective guardrail limits for a single eval,
@@ -259,12 +345,70 @@ type EvalTask struct {
 type resolvedLimits struct {
 	maxTurns          int
 	maxFiles          int
-	maxOutputSize     int64
 	maxSessionActions int
 }
 
-func expandGeneratorModels(configs []config.ToolConfig) ([]config.ToolConfig, error) {
-	var expanded []config.ToolConfig
+// expandedConfig wraps a ToolConfig with metadata about the expansion.
+type expandedConfig struct {
+	Config         config.ToolConfig
+	BaseConfigName string // Original config name before fan-out (empty for single-model)
+}
+
+// extractPairwiseVariant extracts the pairwise variant suffix from a config name.
+// Returns empty string if the config name doesn't follow pairwise naming convention.
+// Examples:
+//   - "python-pairwise/baseline/claude-opus-4.6" -> "baseline"
+//   - "python-pairwise/without-azure/claude-opus-4.6" -> "without-azure"
+//   - "python-pairwise/without-azure/storage_blob_list/claude-opus-4.6" -> "without-azure/storage_blob_list"
+//   - "baseline" -> "" (not a pairwise config)
+func extractPairwiseVariant(configName string) string {
+	// First, we need to identify if this follows pairwise naming.
+	// Pairwise names are: {base}/baseline[/{model}] or {base}/without-{tool}[/{model}]
+	// The challenge is the model suffix can contain slashes too (e.g., "claude-opus-4.6").
+
+	// Check for baseline variant
+	if idx := strings.LastIndex(configName, "/baseline"); idx != -1 {
+		// Verify this is actually /baseline and not just a substring
+		rest := configName[idx+len("/baseline"):]
+		if rest == "" || rest[0] == '/' {
+			return "baseline"
+		}
+	}
+
+	// Check for without- variant
+	if idx := strings.Index(configName, "/without-"); idx != -1 {
+		// Extract everything after the leading slash, including "without-"
+		variant := configName[idx+1:]
+		// The variant continues until we hit a model-like suffix
+		// Models typically look like "claude-opus-4.6" or "gpt-5.3-codex"
+		// Deep MCP variants look like "without-azure/storage_blob_list/claude-opus-4.6"
+
+		// Strategy: look for the last slash-delimited segment that looks like a model name
+		// (contains hyphens and dots or numbers)
+		parts := strings.Split(variant, "/")
+		if len(parts) == 0 {
+			return ""
+		}
+
+		// Check if the last part looks like a model name (has . or multiple -)
+		lastPart := parts[len(parts)-1]
+		if strings.Contains(lastPart, ".") || strings.Count(lastPart, "-") >= 2 {
+			// Last part is likely a model, strip it
+			if len(parts) == 1 {
+				// No variant, just model (shouldn't happen in valid pairwise names)
+				return ""
+			}
+			variant = strings.Join(parts[:len(parts)-1], "/")
+		}
+
+		return variant
+	}
+
+	return ""
+}
+
+func expandGeneratorModels(configs []config.ToolConfig) ([]expandedConfig, error) {
+	var expanded []expandedConfig
 	for _, cfg := range configs {
 		if cfg.Generator == nil {
 			return nil, fmt.Errorf("config %q: generator.model or generator.models is required", cfg.Name)
@@ -273,12 +417,19 @@ func expandGeneratorModels(configs []config.ToolConfig) ([]config.ToolConfig, er
 		if len(models) == 0 {
 			return nil, fmt.Errorf("config %q: generator.model or generator.models is required", cfg.Name)
 		}
+		baseConfigName := ""
+		if len(models) > 1 {
+			baseConfigName = cfg.Name
+		}
 		for _, model := range models {
 			clone := cloneToolConfigForModel(cfg, model)
 			if len(models) > 1 {
 				clone.Name = fmt.Sprintf("%s/%s", cfg.Name, model)
 			}
-			expanded = append(expanded, clone)
+			expanded = append(expanded, expandedConfig{
+				Config:         clone,
+				BaseConfigName: baseConfigName,
+			})
 		}
 	}
 	return expanded, nil
@@ -307,9 +458,6 @@ func cloneToolConfigForModel(src config.ToolConfig, model string) config.ToolCon
 			rev.Models = append([]string(nil), src.Reviewer.Models...)
 		}
 		dst.Reviewer = &rev
-	}
-	if len(src.Plugins) > 0 {
-		dst.Plugins = append([]string(nil), src.Plugins...)
 	}
 	return dst
 }
@@ -346,7 +494,6 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 	rl := resolvedLimits{
 		maxTurns:          e.opts.MaxTurns,
 		maxFiles:          e.opts.MaxFiles,
-		maxOutputSize:     e.opts.MaxOutputSize,
 		maxSessionActions: e.opts.MaxSessionActions,
 	}
 	if cfg.Limits != nil {
@@ -355,9 +502,6 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 		}
 		if cfg.Limits.MaxFiles > 0 {
 			rl.maxFiles = cfg.Limits.MaxFiles
-		}
-		if cfg.Limits.MaxOutputSize > 0 {
-			rl.maxOutputSize = cfg.Limits.MaxOutputSize
 		}
 		if cfg.Limits.MaxSessionActions > 0 {
 			rl.maxSessionActions = cfg.Limits.MaxSessionActions
@@ -377,23 +521,24 @@ func (e *Engine) resolveLimits(cfg config.ToolConfig, p *prompt.Prompt) resolved
 
 // Run executes evaluations for the given prompts crossed with configs.
 func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []config.ToolConfig) (*report.RunSummary, error) {
-	// Load grader configs (#30) if configured.
-	e.loadCriteria()
-
-	// Load pluggable grader configs (#136) if configured.
-	e.loadGraders()
+	// Load the unified grader bundle (#625) from CriteriaDir.
+	e.loadBundle()
 
 	expandedConfigs, err := expandGeneratorModels(configs)
 	if err != nil {
 		return nil, err
 	}
-	configs = expandedConfigs
 
 	// Build task list (cross product: prompts × configs)
 	var tasks []EvalTask
 	for _, p := range prompts {
-		for _, c := range configs {
-			tasks = append(tasks, EvalTask{Prompt: p, Config: c})
+		for _, ec := range expandedConfigs {
+			tasks = append(tasks, EvalTask{
+				Prompt:          p,
+				Config:          ec.Config,
+				BaseConfigName:  ec.BaseConfigName,
+				PairwiseVariant: extractPairwiseVariant(ec.Config.Name),
+			})
 		}
 	}
 
@@ -427,7 +572,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	// This prevents mid-eval failures from unavailable reviewer models
 	// (e.g. gemini-3-pro-preview).
 	if e.opts.CheckModels {
-		if checker, ok := e.evaluator.(*CopilotSDKEvaluator); ok {
+		if checker, ok := e.evaluator.(*CopilotPromptRunner); ok {
 			e.printf("🔍 Checking model availability...\n")
 			if err := checker.ValidateModelAvailability(ctx, configs); err != nil {
 				return nil, fmt.Errorf("pre-flight check failed: %w", err)
@@ -452,13 +597,13 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	if e.opts.DryRun {
-		return e.dryRun(tasks)
+		return e.dryRun(ctx, tasks)
 	}
 
 	// Resource monitor (#45) — opt-in via --monitor-resources.
-	var resMonitor *ResourceMonitor
+	var resMonitor *process.ResourceMonitor
 	if e.opts.MonitorResources {
-		resMonitor = NewResourceMonitor(e.tracker, 5*time.Second)
+		resMonitor = process.NewResourceMonitor(e.tracker, 5*time.Second)
 		resMonitor.Start()
 		defer resMonitor.Stop()
 	}
@@ -478,7 +623,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	// Set up signal handler so SIGINT/SIGTERM terminates spawned processes.
 	sigCh := make(chan os.Signal, 1)
-	notifyShutdownSignals(sigCh)
+	process.NotifyShutdownSignals(sigCh)
 	// Unregister signal handler before closing the channel to prevent
 	// a send-on-closed-channel panic (defers execute LIFO).
 	defer close(sigCh)
@@ -515,7 +660,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		TotalEvals:   len(tasks),
 	}
 
-	slog.Info("Starting run", "workers", e.opts.Workers, "max_sessions", e.opts.MaxSessions)
+	slog.Info("Starting run", "workers", e.opts.Workers)
 
 	start := time.Now()
 
@@ -523,8 +668,13 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 
 	// Progress display — mode is controlled by --progress flag.
 	// When --log-level debug/info, main.go sets ProgressMode to "log" automatically.
+	uniqueConfigs := make(map[string]struct{}, len(tasks))
+	for _, t := range tasks {
+		uniqueConfigs[t.Config.Name] = struct{}{}
+	}
 	display := progress.NewDisplay(progress.DisplayConfig{
 		Total:     len(tasks),
+		Configs:   len(uniqueConfigs),
 		Workers:   e.opts.Workers,
 		ReportDir: runDir + "/",
 		Mode:      progress.ProgressMode(e.opts.ProgressMode),
@@ -536,7 +686,6 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	}
 
 	sem := make(chan struct{}, e.opts.Workers)
-	sessionSem := make(chan struct{}, e.opts.MaxSessions) // limits total concurrent Copilot sessions
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -545,16 +694,8 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		go func(t EvalTask) {
 			defer wg.Done()
 
-			// Acquire session semaphore first to limit total Copilot sessions.
-			// Use select so context cancellation unblocks waiting goroutines
-			// instead of leaking them (#129).
-			select {
-			case sessionSem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			defer func() { <-sessionSem }()
-
+			// Acquire worker semaphore. Use select so context cancellation
+			// unblocks waiting goroutines instead of leaking them (#129).
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
@@ -568,6 +709,24 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			if resMonitor != nil {
 				resMonitor.RegisterEval(taskName)
 			}
+
+			// Tracks whether a terminal event (Passed/Failed/Error) was sent.
+			// If the goroutine exits abnormally (context cancel, panic), the
+			// deferred handler below ensures the progress display transitions
+			// out of "Running" state (#819).
+			terminalEventSent := false
+			defer func() {
+				if !terminalEventSent {
+					// Force-send an error event so Agent Attempt doesn't stay stuck
+					display.HandleEvent(progress.ProgressEvent{
+						EvalID:     taskName,
+						PromptID:   t.Prompt.ID,
+						ConfigName: t.Config.Name,
+						Type:       progress.EventError,
+						Message:    "eval cancelled or interrupted",
+					})
+				}
+			}()
 
 			display.HandleEvent(progress.ProgressEvent{
 				EvalID:     taskName,
@@ -589,8 +748,23 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 					Type: evtType, Message: msg,
 				})
 			}
+			// sendRawEvent lets callers emit ProgressEvents with richer fields
+			// (e.g. GraderID/GraderKind/Result/Score) while still auto-filling
+			// identity fields so downstream renderers can match events to evals.
+			sendRawEvent := func(evt progress.ProgressEvent) {
+				if evt.EvalID == "" {
+					evt.EvalID = taskName
+				}
+				if evt.PromptID == "" {
+					evt.PromptID = t.Prompt.ID
+				}
+				if evt.ConfigName == "" {
+					evt.ConfigName = t.Config.Name
+				}
+				display.HandleEvent(evt)
+			}
 
-			evalReport := e.runSingleEval(ctx, t, runID, sendPhase, sendEvent)
+			evalReport := e.runSingleEval(ctx, t, runID, sendPhase, sendEvent, sendRawEvent)
 
 			// Attach per-eval resource stats (#45)
 			if resMonitor != nil {
@@ -609,24 +783,44 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 			if evalReport.Review != nil {
 				reviewScore = evalReport.Review.OverallScore
 			}
+			// Populate guardrail reason if present
+			guardrailReason := ""
+			if evalReport.GuardrailAbortReason != "" {
+				// Extract a short version of the guardrail reason for display
+				// Format is like: "guardrail: turn count 26 exceeded limit of 25"
+				// We want to show: "turn limit (25)"
+				guardrailReason = extractGuardrailShortReason(evalReport.GuardrailAbortReason)
+			}
+			// Compute grader points totals for both pass and fail events
+			graderChecksPassed, graderChecksTotal := report.TotalGraderChecks(evalReport.GraderResults)
 			if evalReport.Error != "" {
 				evtType = progress.EventError
 				msg = "ERROR"
 			} else if !evalReport.Success {
 				evtType = progress.EventFailed
-				if evalReport.Review != nil {
-					msg = fmt.Sprintf("%d/%d criteria", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
+				if graderChecksTotal > 0 {
+					msg = fmt.Sprintf("%d/%d checks", graderChecksPassed, graderChecksTotal)
+				} else if evalReport.Review != nil {
+					msg = fmt.Sprintf("%d/%d checks", evalReport.Review.OverallScore, evalReport.Review.MaxScore)
 				}
 			}
 			display.HandleEvent(progress.ProgressEvent{
-				EvalID:      taskName,
-				PromptID:    t.Prompt.ID,
-				ConfigName:  t.Config.Name,
-				Type:        evtType,
-				Message:     msg,
-				FileCount:   len(evalReport.GeneratedFiles),
-				ReviewScore: reviewScore,
+				EvalID:             taskName,
+				PromptID:           t.Prompt.ID,
+				ConfigName:         t.Config.Name,
+				Type:               evtType,
+				Message:            msg,
+				FileCount:          len(evalReport.GeneratedFiles),
+				ReviewScore:        reviewScore,
+				GuardrailReason:    guardrailReason,
+				GraderChecksPassed: graderChecksPassed,
+				GraderChecksTotal:  graderChecksTotal,
 			})
+			terminalEventSent = true
+
+			// Per-eval grader breakdown for non-interactive modes (interactive
+			// renderer already prints graders inline grouped by source).
+			display.WriteEvalBreakdown(t.Prompt.ID, t.Config.Name, report.RenderGraderBreakdown(evalReport.GraderResults))
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -650,7 +844,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	// Only scan when using the DefaultTracker (production). Test-injected
 	// trackers have no registrations, so every real copilot process looks
 	// like an orphan — which would kill the user's Copilot CLI.
-	if e.tracker == DefaultTracker {
+	if e.tracker == process.DefaultTracker {
 		if orphans := e.tracker.TerminateOrphans(); orphans > 0 {
 			slog.Warn("Terminated orphaned copilot processes", "count", orphans)
 			if e.opts.StrictCleanup {
@@ -700,16 +894,27 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 		}
 	}
 
+	// Auto-generate pairwise comparisons for multi-config runs (#357). Written
+	// to {runDir}/comparisons.json so the site comparison surface can render
+	// without recomputing and is guaranteed to match what `hyoka compare`
+	// prints for the same inputs.
+	if len(summary.Results) > 0 {
+		runDir := filepath.Join(e.opts.OutputDir, runID)
+		derefReports := make([]report.EvalReport, 0, len(summary.Results))
+		for _, r := range summary.Results {
+			if r != nil {
+				derefReports = append(derefReports, *r)
+			}
+		}
+		if _, err := comparison.WriteForRun(runDir, derefReports); err != nil {
+			slog.Warn("Failed to write auto-generated comparisons", "error", err)
+		}
+	}
+
 	// Write JSON summary
 	if _, err := report.WriteSummary(summary, e.opts.OutputDir); err != nil {
 		slog.Error("Failed to write run summary", "error", err)
 	}
-
-	// Write HTML summary
-	if _, err := report.WriteSummaryHTML(summary, e.opts.OutputDir); err != nil {
-		slog.Error("Failed to write HTML summary", "error", err)
-	}
-
 	// Write Markdown summary
 	if _, err := report.WriteSummaryMarkdown(summary, e.opts.OutputDir); err != nil {
 		slog.Error("Failed to write Markdown summary", "error", err)
@@ -718,699 +923,7 @@ func (e *Engine) Run(ctx context.Context, prompts []*prompt.Prompt, configs []co
 	return summary, nil
 }
 
-func (e *Engine) runSingleEval(ctx context.Context, task EvalTask, runID string, sendPhase func(progress.Phase), sendEvent func(progress.EventType, string)) *report.EvalReport {
-	// Each phase gets its own independent timeout so a slow generation
-	// doesn't starve build or review (fixes issue #3).
-	genCtx, genCancel := context.WithCancel(ctx)
-	defer genCancel()
-
-	debugPrefix := task.Prompt.ID + "/" + task.Config.Name
-	// Structured logger with eval context fields (#42)
-	lg := logging.EvalLogger(task.Prompt.ID, task.Config.Name, "generation", 0)
-	start := time.Now()
-
-	evalReport := &report.EvalReport{
-		SchemaVersion: report.CurrentSchemaVersion,
-		PromptID:      task.Prompt.ID,
-		ConfigName:    task.Config.Name,
-		Timestamp:     time.Now().UTC().Format(time.RFC3339),
-		PromptMeta: map[string]any{
-			"service":     task.Prompt.Service(),
-			"plane":       task.Prompt.Plane(),
-			"language":    task.Prompt.Language(),
-			"category":    task.Prompt.Category(),
-			"description": task.Prompt.Description(),
-			"difficulty":  task.Prompt.Difficulty(),
-			"sdk_package": task.Prompt.SDKPackage(),
-		},
-		ConfigUsed: map[string]any{
-			"name":  task.Config.Name,
-			"model": task.Config.Generator.Model,
-		},
-	}
-
-	// Resolve effective limits: prompt > per-config > engine defaults (#125, #284)
-	lim := e.resolveLimits(task.Config, task.Prompt)
-	evalReport.GuardrailMaxTurns = lim.maxTurns
-	evalReport.GuardrailMaxFiles = lim.maxFiles
-	evalReport.GuardrailMaxOutputSize = lim.maxOutputSize
-	evalReport.GuardrailMaxSessionActions = lim.maxSessionActions
-
-	if len(task.Prompt.Tags) > 0 {
-		evalReport.PromptMeta["tags"] = strings.Join(task.Prompt.Tags, ", ")
-	}
-
-	lg.Info("Starting Copilot session")
-
-	// Build the report directory path early — workspace lives in the report tree (Issue 2)
-	reportDir := filepath.Join(report.ReportDir(e.opts.OutputDir, runID, task.Prompt), task.Config.Name)
-	codeDir := filepath.Join(reportDir, "generated-code")
-
-	ws, err := NewWorkspaceAt(codeDir)
-	if err != nil {
-		evalReport.Error = fmt.Sprintf("workspace setup failed: %v", err)
-		evalReport.ErrorDetails = err.Error()
-		evalReport.ErrorCategory = "generation_failure"
-		evalReport.FailureReason = fmt.Sprintf("Could not create workspace directory: %v", err)
-		evalReport.Duration = time.Since(start).Seconds()
-		return evalReport
-	}
-
-	// Create an isolated temporary workspace for the generator (#26, #126).
-	// The agent writes files here — not directly to the report tree.
-	// After generation, files are copied to the persistent report directory.
-	genWs, err := NewWorkspace(task.Prompt.ID, task.Config.Name)
-	if err != nil {
-		evalReport.Error = fmt.Sprintf("generator workspace setup failed: %v", err)
-		evalReport.ErrorDetails = err.Error()
-		evalReport.ErrorCategory = "generation_failure"
-		evalReport.FailureReason = fmt.Sprintf("Could not create isolated eval workspace: %v", err)
-		evalReport.Duration = time.Since(start).Seconds()
-		return evalReport
-	}
-	defer genWs.Cleanup()
-	genDir := genWs.Dir
-
-	// Copy starter files into the generator workspace before evaluation (#127).
-	starterFiles, starterErr := genWs.CopyStarterFiles(task.Prompt)
-	if starterErr != nil {
-		evalReport.Error = fmt.Sprintf("starter file copy failed: %v", starterErr)
-		evalReport.ErrorDetails = starterErr.Error()
-		evalReport.ErrorCategory = "generation_failure"
-		evalReport.FailureReason = fmt.Sprintf("Could not copy starter project: %v", starterErr)
-		evalReport.Duration = time.Since(start).Seconds()
-		return evalReport
-	}
-	evalReport.StarterFiles = starterFiles
-
-	// Snapshot starter-file sizes so guardrails can charge the agent only for
-	// the bytes/files it actually contributed, not the starter project it was
-	// handed (#565).
-	starterSnapshot := snapshotStarterSizes(genDir, starterFiles)
-
-	lg.Debug("Workspace created", "workspace", ws.Dir, "gen_dir", genDir,
-		"starter_files", len(starterFiles))
-
-	// Snapshot home directory and CWD before eval so we can recover misplaced files after
-	homeDir, _ := os.UserHomeDir()
-	var preEvalHomeFiles map[string]bool
-	if homeDir != "" {
-		preEvalHomeFiles = snapshotDir(homeDir)
-	}
-	// Also snapshot CWD — agents may write files relative to the process working directory
-	cwdDir, _ := os.Getwd()
-	var preEvalCwdFiles map[string]bool
-	if cwdDir != "" && cwdDir != homeDir && cwdDir != ws.Dir {
-		preEvalCwdFiles = snapshotDir(cwdDir)
-	}
-
-	// Run evaluation (generation phase — uses its own timeout)
-	sendPhase(progress.PhaseGenerating)
-
-	genStart := time.Now()
-	result, err := e.evaluator.Evaluate(genCtx, task.Prompt, &task.Config, genDir)
-	genCtxErr := genCtx.Err() // capture before cancel to distinguish real cancellation from cleanup
-	genCancel()               // release generation context immediately
-	evalReport.GenerationDuration = time.Since(genStart).Seconds()
-	evalFailed := err != nil
-	if evalFailed {
-		if genCtxErr == context.Canceled {
-			evalReport.Error = "generation cancelled (action limit reached)"
-			evalReport.ErrorDetails = "context cancelled — the session exceeded the --max-session-actions limit"
-			evalReport.ErrorCategory = "timeout"
-			evalReport.FailureReason = "Generation cancelled due to action limit"
-		} else {
-			evalReport.Error = fmt.Sprintf("evaluation failed: %v", err)
-			evalReport.ErrorDetails = err.Error()
-			evalReport.ErrorCategory = "sdk_error"
-			evalReport.FailureReason = fmt.Sprintf("SDK evaluation error: %v", err)
-		}
-		// Capture whatever session events were collected before failure
-		if result != nil {
-			evalReport.SessionEvents = result.SessionEvents
-			evalReport.EventCount = result.EventCount
-			evalReport.ToolCalls = result.ToolCalls
-			evalReport.IsStub = result.IsStub
-			if result.ActionTimeline != nil {
-				evalReport.ActionTimeline = result.ActionTimeline.ToReport()
-			}
-		}
-		// Don't return early — continue to collect files and run review for diagnostics
-	}
-
-	if result != nil && !evalFailed {
-		evalReport.EventCount = result.EventCount
-		evalReport.ToolCalls = result.ToolCalls
-		evalReport.SessionEvents = result.SessionEvents
-		evalReport.IsStub = result.IsStub
-		evalReport.Success = result.Success
-		if result.ActionTimeline != nil {
-			evalReport.ActionTimeline = result.ActionTimeline.ToReport()
-		}
-	}
-
-	// Collect generated files — workspace listing is the primary source since
-	// ForceStop preserves files on disk.
-	// First, recover any files the agent wrote to the home directory instead of the workspace.
-	// The Copilot CLI sometimes creates files in ~ when the agent omits the path parameter.
-	if homeDir != "" && preEvalHomeFiles != nil {
-		recovered := recoverMisplacedFiles(homeDir, preEvalHomeFiles, genDir, debugPrefix)
-		if recovered > 0 {
-			lg.Info("Recovered misplaced files from home dir", "count", recovered)
-		}
-		// Post-recovery validation: flag anything recovery couldn't handle (#26)
-		if remaining := ValidateWorkspaceContainment(homeDir, preEvalHomeFiles); len(remaining) > 0 {
-			lg.Warn("Items still outside workspace after recovery (home)", "count", len(remaining), "items", remaining)
-		}
-	}
-	// Also recover from CWD
-	if cwdDir != "" && preEvalCwdFiles != nil {
-		recovered := recoverMisplacedFiles(cwdDir, preEvalCwdFiles, genDir, debugPrefix)
-		if recovered > 0 {
-			lg.Info("Recovered misplaced files from CWD", "count", recovered)
-		}
-		if remaining := ValidateWorkspaceContainment(cwdDir, preEvalCwdFiles); len(remaining) > 0 {
-			lg.Warn("Items still outside workspace after recovery (CWD)", "count", len(remaining), "items", remaining)
-		}
-	}
-
-	// Copy generated files from isolated workspace to persistent report directory (#26)
-	if err := copyDir(genDir, ws.Dir); err != nil {
-		lg.Warn("Failed to copy generated files to report dir", "error", err)
-	}
-
-	// Release session state AFTER workspace files are safely copied (#261).
-	// Previously, Evaluate's defer called DeleteSession before returning,
-	// which removed workspace artifacts before copyDir could read them.
-	// Baseline configs (no MCP) were affected because there were no MCP
-	// server processes keeping files alive during cleanup.
-	if result != nil && result.CleanupFn != nil {
-		result.CleanupFn()
-	}
-
-	generatedFiles, listErr := ws.ListFiles()
-	if listErr != nil {
-		lg.Warn("Failed to list workspace files", "error", listErr)
-	}
-	if len(generatedFiles) == 0 && result != nil && len(result.GeneratedFiles) > 0 {
-		generatedFiles = result.GeneratedFiles
-	}
-	// Apply directory exclusion filter (#63)
-	if len(e.opts.ExcludeDirs) > 0 {
-		before := len(generatedFiles)
-		generatedFiles = filterExcludedDirs(generatedFiles, e.opts.ExcludeDirs)
-		if excluded := before - len(generatedFiles); excluded > 0 {
-			lg.Debug("Excluded files by directory filter", "excluded", excluded, "remaining", len(generatedFiles))
-		}
-	}
-	evalReport.GeneratedFiles = generatedFiles
-
-	// Diagnostic: if 0 files generated, check if agent attempted file creation
-	if len(generatedFiles) == 0 && !evalFailed {
-		fileToolAttempts := 0
-		for _, ev := range evalReport.SessionEvents {
-			if ev.Type == "tool.execution_start" && isFileWriteTool(ev.ToolName) {
-				fileToolAttempts++
-			}
-		}
-		if fileToolAttempts > 0 {
-			lg.Warn("0 files generated despite file-write tool attempts", "attempts", fileToolAttempts)
-			if evalReport.Error == "" {
-				evalReport.Error = fmt.Sprintf("0 files generated despite %d file-write tool attempts", fileToolAttempts)
-				evalReport.ErrorCategory = "no_files"
-				evalReport.FailureReason = fmt.Sprintf("Generator made %d file-write attempts but no files appeared in the workspace — files may have been written to the wrong location", fileToolAttempts)
-				evalReport.Success = false
-			}
-		} else {
-			lg.Warn("0 files generated — agent did not use any file-write tools")
-			if evalReport.Error == "" {
-				evalReport.Error = "0 files generated — agent did not create any files"
-				evalReport.ErrorCategory = "no_files"
-				evalReport.FailureReason = "Generator produced no files — the agent did not invoke any file-write tools"
-				evalReport.Success = false
-			}
-		}
-	}
-
-	lg.Debug("Session complete",
-		"tool_calls", len(evalReport.ToolCalls),
-		"files_generated", len(generatedFiles),
-		"elapsed", time.Since(start).Truncate(time.Millisecond).String())
-
-	// Per-phase generation duration already captured above (evalReport.GenerationDuration).
-	// Overall Duration is set at the end of the function after all phases complete.
-
-	// Populate environment info from config and captured events.
-	// Use ResolveSkillDirs for accurate directory resolution (#291).
-	// Resolve relative to .hyoka root so paths like "./skills/generator" work.
-	proj := config.DiscoverFromCWD()
-	skillBase := ""
-	if proj.Found() {
-		skillBase = proj.Root
-	}
-	var skillDirectories []string
-	if task.Config.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(task.Config.Generator.Tools, skillBase)
-		if err != nil {
-			slog.Warn("Failed to resolve skill directories for report", "error", err)
-		} else {
-			skillDirectories = resolved
-		}
-	}
-	// Resolve tools for reporting — mirrors the resolution in buildSessionConfig.
-	var toolEntries []config.ToolEntry
-	for _, entry := range task.Config.Generator.Tools {
-		if entry.ResolvedType() == "tool" {
-			toolEntries = append(toolEntries, entry)
-		}
-	}
-	reportAvailableTools := config.ResolveTools(toolEntries, mergePromptProperties(task.Prompt))
-	env := &report.EnvironmentInfo{
-		Model:            task.Config.Generator.Model,
-		SkillDirectories: skillDirectories,
-		AvailableTools:   reportAvailableTools,
-		ExcludedTools:    task.Config.Generator.ExcludedTools,
-		SafetyBoundaries: !e.opts.AllowCloud,
-		AllowCloud:       e.opts.AllowCloud,
-		WorkingDirectory: ws.Dir,
-	}
-	// Extract MCP server names
-	for _, entry := range task.Config.Generator.Tools {
-		if entry.ResolvedType() == "mcp" {
-			env.MCPServers = append(env.MCPServers, entry.Name)
-		}
-	}
-	// Derive token usage, turn count, truncation, skills from events
-	for _, ev := range evalReport.SessionEvents {
-		switch ev.Type {
-		case "assistant.usage":
-			env.TotalInputTokens += ev.InputTokens
-			env.TotalOutputTokens += ev.OutputTokens
-		case "assistant.turn_start":
-			env.TurnCount++
-		case "session.truncation":
-			env.ContextTruncated = true
-		case "skill.invoked":
-			if ev.SkillName != "" {
-				env.SkillsInvoked = append(env.SkillsInvoked, ev.SkillName)
-			}
-		case "session.skills_loaded":
-			if ev.Content != "" {
-				env.SkillsLoaded = strings.Split(ev.Content, ", ")
-			}
-		}
-	}
-	// Derive MCP tools invoked from action timeline events.
-	if evalReport.ActionTimeline != nil {
-		seen := map[string]bool{}
-		for _, ev := range evalReport.ActionTimeline.Events {
-			if ev.MCPServer != "" && ev.Tool != "" && ev.Action == "start" {
-				if !seen[ev.Tool] {
-					seen[ev.Tool] = true
-					env.MCPToolsInvoked = append(env.MCPToolsInvoked, ev.Tool)
-				}
-			}
-		}
-	}
-	evalReport.Environment = env
-
-	// Build SessionSetup from config and starter files (#219).
-	setup := &report.SessionSetupEvent{
-		Tools:        reportAvailableTools,
-		StarterFiles: evalReport.StarterFiles,
-	}
-	// Record configured MCP servers with details.
-	for _, entry := range task.Config.Generator.Tools {
-		if entry.ResolvedType() != "mcp" {
-			continue
-		}
-		details := entry.Command
-		if len(entry.Args) > 0 {
-			details += " " + strings.Join(entry.Args, " ")
-		}
-		setup.MCPServers = append(setup.MCPServers, report.ToolLoadResult{
-			Name:    entry.Name,
-			Status:  "configured",
-			Details: details,
-		})
-	}
-	// Record configured skills with details.
-	for _, entry := range task.Config.Generator.Tools {
-		if entry.ResolvedType() != "skill" {
-			continue
-		}
-		name := entry.Name
-		if name == "" {
-			if entry.Path != "" {
-				name = entry.Path
-			} else {
-				name = entry.Repo
-			}
-		}
-		details := entry.SkillSource()
-		setup.Skills = append(setup.Skills, report.ToolLoadResult{
-			Name:    name,
-			Status:  "configured",
-			Details: details,
-		})
-	}
-	// Determine system prompt status.
-	if task.Config.Generator.SystemPrompt != "" {
-		setup.SystemPrompt = fmt.Sprintf("custom (%d chars)", len(task.Config.Generator.SystemPrompt))
-	} else {
-		setup.SystemPrompt = "none (default)"
-	}
-	evalReport.SessionSetup = setup
-
-	// Generator guardrail checks (#35, #125)
-	if !evalFailed {
-		// Check turn count (assistant.message events = conversation turns)
-		turnCount := 0
-		for _, ev := range evalReport.SessionEvents {
-			if ev.Type == "assistant.message" {
-				turnCount++
-			}
-		}
-		if turnCount > lim.maxTurns {
-			reason := fmt.Sprintf("guardrail: turn count %d exceeded limit of %d", turnCount, lim.maxTurns)
-			evalReport.GuardrailAbortReason = reason
-			evalReport.Error = reason
-			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "turns", turnCount, "max_turns", lim.maxTurns)
-		}
-
-		// Check action count — soft cap: note but don't error, let review decide pass/fail
-		actionCount := 0
-		for _, ev := range evalReport.SessionEvents {
-			if ev.Type == "assistant.reasoning" || ev.Type == "assistant.message" || ev.Type == "tool.execution_start" {
-				actionCount++
-			}
-		}
-		if actionCount > lim.maxSessionActions {
-			evalReport.ActionLimitReached = true
-			evalReport.ActionCount = actionCount
-			lg.Warn("Action limit reached (soft cap — review will proceed with partial results)",
-				"actions", actionCount, "max_session_actions", lim.maxSessionActions)
-		}
-
-		// Check file count — charge the agent only for files it created or
-		// deleted, not starter files it was handed (#565).
-		agentFileCount := computeAgentFileCount(generatedFiles, starterSnapshot)
-		if agentFileCount > lim.maxFiles {
-			reason := fmt.Sprintf("guardrail: agent file count %d exceeded limit of %d", agentFileCount, lim.maxFiles)
-			evalReport.GuardrailAbortReason = reason
-			evalReport.Error = reason
-			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "agent_files", agentFileCount, "total_files", len(generatedFiles), "max_files", lim.maxFiles)
-		}
-
-		// Check total output size — starter-aware (#565).
-		totalSize := computeAgentOutputSize(ws.Dir, generatedFiles, starterSnapshot)
-		if totalSize > lim.maxOutputSize {
-			reason := fmt.Sprintf("guardrail: agent output size %d bytes exceeded limit of %d bytes", totalSize, lim.maxOutputSize)
-			evalReport.GuardrailAbortReason = reason
-			evalReport.Error = reason
-			evalReport.Success = false
-			lg.Warn("Guardrail triggered", "reason", reason, "agent_output_size", totalSize, "max_size", lim.maxOutputSize)
-		}
-	}
-
-	// Pluggable grader execution (#136) — runs after generation, before review.
-	if len(e.pluginGraders) > 0 && len(generatedFiles) > 0 {
-		glg := logging.WithPhase(lg, "grading")
-
-		props := map[string]string{
-			"language": task.Prompt.Language(),
-			"service":  task.Prompt.Service(),
-			"plane":    task.Prompt.Plane(),
-			"category": task.Prompt.Category(),
-			"sdk":      task.Prompt.SDKPackage(),
-		}
-
-		applicable := graders.ApplicableGraders(e.pluginGraders, props)
-		glg.Debug("Applicable graders", "total", len(e.pluginGraders), "applicable", len(applicable))
-
-		if len(applicable) > 0 {
-			instances, err := graders.InstantiateGraders(applicable)
-			if err != nil {
-				glg.Error("Failed to instantiate graders", "error", err)
-			} else {
-				input := graders.GraderInput{
-					WorkspacePath: genWs.Dir,
-				}
-				// Populate ActionLog from the structured action timeline (#139)
-				if result != nil && result.ActionTimeline != nil {
-					input.ActionLog = result.ActionTimeline.ToGraderActionLog()
-				}
-
-				results := graders.RunGraders(ctx, instances, applicable, input)
-				agg, aggErr := graders.AggregateResults(results)
-				if aggErr != nil {
-					glg.Error("Failed to aggregate grader results", "error", aggErr)
-				} else {
-					reportResults := make([]report.GraderResult, len(agg.Results))
-					for i, r := range agg.Results {
-						pass := r.Pass
-						rr := report.GraderResult{
-							GraderName: r.Name,
-							GraderType: r.Kind,
-							Summary:    r.Message,
-							Score:      r.Score,
-							Weight:     r.Weight,
-							Pass:       &pass,
-							Gate:       r.Gate,
-						}
-						if r.FileDetails != nil {
-							checks := make([]report.FileCheckDetail, len(r.FileDetails.CheckedFiles))
-							for j, c := range r.FileDetails.CheckedFiles {
-								checks[j] = report.FileCheckDetail{
-									Path: c.Path, Exists: c.Exists,
-									PatternMatched: c.PatternMatched, Pattern: c.Pattern,
-								}
-							}
-							rr.FileDetails = &report.FileGraderDetail{CheckedFiles: checks}
-						}
-						if r.ProgramDetails != nil {
-							rr.ProgramDetails = &report.ProgramGraderDetail{
-								Command: r.ProgramDetails.Command, ExitCode: r.ProgramDetails.ExitCode,
-								Stdout: r.ProgramDetails.Stdout, Stderr: r.ProgramDetails.Stderr,
-							}
-						}
-						if r.PromptDetails != nil {
-							rr.PromptDetails = &report.PromptGraderDetail{
-								Model: r.PromptDetails.Model, Rubric: r.PromptDetails.Rubric,
-								Reasoning: r.PromptDetails.Reasoning,
-								RawScore:  r.PromptDetails.RawScore, MaxScore: r.PromptDetails.MaxScore,
-							}
-						}
-						if r.BehaviorDetails != nil {
-							rr.BehaviorDetails = &report.BehaviorGraderDetail{
-								ToolsUsed: r.BehaviorDetails.ToolsUsed, MissingTools: r.BehaviorDetails.MissingTools,
-								ForbiddenUsed: r.BehaviorDetails.ForbiddenUsed,
-								TurnCount:     r.BehaviorDetails.TurnCount, MaxTurns: r.BehaviorDetails.MaxTurns,
-								ActualTurns: r.BehaviorDetails.ActualTurns, TotalActions: r.BehaviorDetails.TotalActions,
-								TurnLimitHit: r.BehaviorDetails.TurnLimitHit, Violations: r.BehaviorDetails.Violations,
-								SequenceMatch:    r.BehaviorDetails.SequenceMatch,
-								ExpectedSequence: r.BehaviorDetails.ExpectedSequence,
-								ActualSequence:   r.BehaviorDetails.ActualSequence,
-								MatchedActions:   r.BehaviorDetails.MatchedActions,
-								ConstraintsMet:   r.BehaviorDetails.ConstraintsMet,
-								ToolCounts:       r.BehaviorDetails.ToolCounts,
-							}
-						}
-						reportResults[i] = rr
-					}
-					evalReport.GraderResults = reportResults
-					evalReport.ScoreBreakdown = report.BuildScoreBreakdown(reportResults)
-
-					if !agg.Pass && !evalFailed {
-						evalReport.Success = false
-						if agg.GateFailed {
-							evalReport.FailureReason = "gate grader(s) failed"
-						}
-					}
-
-					glg.Info("Grader execution complete",
-						"graders", len(results),
-						"score", fmt.Sprintf("%.2f", agg.Score),
-						"passed", agg.Pass,
-						"gate_failed", agg.GateFailed)
-					sendEvent(progress.EventToolComplete, fmt.Sprintf("Graders: %.0f%% (%d/%d passed)",
-						agg.Score*100, countPassed(results), len(results)))
-				}
-			}
-		}
-	}
-
-	// Code review — use panel reviewer if available, otherwise single reviewer
-	// Uses its own independent timeout context (fixes issue #3).
-	if !e.opts.SkipReview && len(generatedFiles) > 0 {
-		reviewStart := time.Now()
-		sendPhase(progress.PhaseReviewing)
-		rlg := logging.WithPhase(lg, "review")
-
-		// Create an isolated reviewer workspace with a copy of the generated
-		// files. Reviewers operate on this copy and cannot modify the original
-		// output in the report directory (#26).
-		reviewWorkDir, err := NewReviewerWorkspace(ws.Dir)
-		if err != nil {
-			rlg.Warn("Reviewer workspace creation failed, using original", "error", err)
-			reviewWorkDir = ws.Dir
-		} else {
-			defer os.RemoveAll(reviewWorkDir)
-		}
-
-		referenceDir := ""
-		if task.Prompt.ReferenceAnswer != "" {
-			referenceDir = task.Prompt.ReferenceAnswer
-		}
-
-		// Merge evaluation criteria (#30)
-		evalCriteria := e.mergedCriteria(task.Prompt)
-
-		// Create reviewer for this specific config using the factory (#92)
-		var reviewer review.Reviewer
-		var panelReviewer *review.PanelReviewer
-		if e.reviewerFactory != nil {
-			reviewer, panelReviewer, err = e.reviewerFactory(&task.Config)
-			if err != nil {
-				rlg.Warn("Reviewer creation failed, skipping review", "error", err)
-			}
-		}
-
-		if panelReviewer != nil {
-			models := panelReviewer.Models()
-			rlg.Debug("Starting review panel")
-			sendEvent(progress.EventToolStart, fmt.Sprintf("Review panel: %v", models))
-			panel, consolidated, skipped, err := panelReviewer.ReviewPanel(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
-			if len(skipped) > 0 {
-				evalReport.SkippedReviewers = skipped
-				rlg.Warn("Some reviewers were skipped", "skipped_count", len(skipped))
-			}
-			if err != nil {
-				rlg.Error("Review panel failed", "error", err)
-				sendEvent(progress.EventReasoning, fmt.Sprintf("Review panel failed: %v", err))
-			} else {
-				evalReport.ReviewPanel = panel
-				evalReport.Review = consolidated
-				evalReport.GraderResults = report.GraderResultsFromReview(consolidated, panel)
-				// With criteria-based scoring, success = all criteria passed
-				if !evalFailed {
-					evalReport.Success = consolidated.Scores.AllPassed()
-				}
-				sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed", consolidated.OverallScore, consolidated.MaxScore))
-				rlg.Debug("Review panel complete",
-					"reviewers", len(panel),
-					"score", consolidated.OverallScore,
-					"max_score", consolidated.MaxScore)
-			}
-		} else if reviewer != nil {
-			rlg.Debug("Starting single review session")
-			sendEvent(progress.EventToolStart, "Single model review")
-			reviewResult, err := reviewer.Review(ctx, task.Prompt.PromptText, reviewWorkDir, referenceDir, evalCriteria)
-			if err != nil {
-				rlg.Error("Code review failed", "error", err)
-				sendEvent(progress.EventReasoning, fmt.Sprintf("Review failed: %v", err))
-			} else {
-				evalReport.Review = reviewResult
-				evalReport.GraderResults = report.GraderResultsFromReview(reviewResult, nil)
-				// With criteria-based scoring, success = all criteria passed
-				if !evalFailed {
-					evalReport.Success = reviewResult.Scores.AllPassed()
-				}
-				sendEvent(progress.EventToolComplete, fmt.Sprintf("Review complete: %d/%d criteria passed", reviewResult.OverallScore, reviewResult.MaxScore))
-				rlg.Debug("Review complete",
-					"score", reviewResult.OverallScore,
-					"max_score", reviewResult.MaxScore)
-			}
-		}
-
-		// Capture reviewed (annotated) files from the reviewer workspace
-		reviewedFiles, err := readReviewedFiles(reviewWorkDir)
-		if err == nil && len(reviewedFiles) > 0 {
-			evalReport.ReviewedFiles = reviewedFiles
-			rlg.Debug("Captured reviewed files", "count", len(reviewedFiles))
-		}
-		evalReport.ReviewDuration = time.Since(reviewStart).Seconds()
-	}
-
-	// Tool usage evaluation (compare expected vs actual tools)
-	if len(task.Prompt.ExpectedTools) > 0 {
-		evalReport.ToolUsage = evaluateToolUsage(task.Prompt.ExpectedTools, evalReport.ToolCalls)
-		lg.Debug("Tool usage evaluated",
-			"match", evalReport.ToolUsage.Match,
-			"matched", evalReport.ToolUsage.MatchedTools,
-			"missing", evalReport.ToolUsage.MissingTools)
-	}
-
-	// Copy reviewed (annotated) files into report under reviewed-code/
-	if len(evalReport.ReviewedFiles) > 0 {
-		reviewedDir := filepath.Join(reportDir, "reviewed-code")
-		if err := writeReviewedFiles(reviewedDir, evalReport.ReviewedFiles); err != nil {
-			lg.Error("Failed to write reviewed files", "error", err)
-		} else {
-			lg.Debug("Wrote reviewed files", "count", len(evalReport.ReviewedFiles), "dir", reviewedDir)
-		}
-	}
-
-	// Build re-run command so users can reproduce this evaluation
-	evalReport.RerunCommand = buildRerunCommand(task.Prompt.ID, task.Config.Name, e.opts)
-
-	// Capture overall duration after all phases (generation, build, review) complete.
-	evalReport.Duration = time.Since(start).Seconds()
-
-	// Write JSON report
-	reportPath, err := report.WriteReport(evalReport, e.opts.OutputDir, runID, task.Prompt)
-	if err != nil {
-		lg.Error("Failed to write report", "error", err)
-	} else {
-		lg.Debug("Report written", "path", reportPath)
-	}
-
-	// Write HTML report
-	if _, err := report.WriteHTMLReport(evalReport, e.opts.OutputDir, runID,
-		task.Prompt.Service(), task.Prompt.Plane(), task.Prompt.Language(), task.Prompt.Category()); err != nil {
-		lg.Error("Failed to write HTML report", "error", err)
-	}
-
-	// Write Markdown report
-	if _, err := report.WriteMarkdownReport(evalReport, e.opts.OutputDir, runID,
-		task.Prompt.Service(), task.Prompt.Plane(), task.Prompt.Language(), task.Prompt.Category()); err != nil {
-		lg.Error("Failed to write Markdown report", "error", err)
-	}
-
-	lg.Info("Evaluation complete",
-		"success", evalReport.Success,
-		"files_generated", len(evalReport.GeneratedFiles),
-		"elapsed", fmt.Sprintf("%.2fs", evalReport.Duration))
-
-	return evalReport
-}
-
-// buildRerunCommand constructs the CLI command to reproduce a single evaluation.
-func buildRerunCommand(promptID, configName string, opts EngineOptions) string {
-	parts := []string{"hyoka run"}
-	parts = append(parts, "--prompt-id", promptID)
-	parts = append(parts, "--config", configName)
-
-	if opts.SkipTests {
-		parts = append(parts, "--skip-tests")
-	}
-	if opts.SkipReview {
-		parts = append(parts, "--skip-review")
-	}
-	if opts.MonitorResources {
-		parts = append(parts, "--monitor-resources")
-	}
-
-	if opts.MaxSessionActions != 50 {
-		parts = append(parts, fmt.Sprintf("--max-session-actions=%d", opts.MaxSessionActions))
-	}
-
-	return strings.Join(parts, " ")
-}
-
-func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
+func (e *Engine) dryRun(ctx context.Context, tasks []EvalTask) (*report.RunSummary, error) {
 	summary := &report.RunSummary{
 		RunID:        "dry-run",
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
@@ -1433,11 +946,6 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 	// Validate skill directories for each unique config (#291).
 	// This surfaces warnings about empty/missing skill dirs during dry run.
 	validatedConfigs := make(map[string]bool)
-	validProj := config.DiscoverFromCWD()
-	validSkillBase := ""
-	if validProj.Found() {
-		validSkillBase = validProj.Root
-	}
 	for _, t := range tasks {
 		if validatedConfigs[t.Config.Name] {
 			continue
@@ -1445,24 +953,24 @@ func (e *Engine) dryRun(tasks []EvalTask) (*report.RunSummary, error) {
 		validatedConfigs[t.Config.Name] = true
 		if t.Config.Generator != nil {
 			entries := countSkillEntries(t.Config.Generator.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Generator.Tools, validSkillBase)
+			resolved, err := tool.ResolveSkills(ctx, t.Config.Generator.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve generator skills", "config", t.Config.Name, "error", err)
 				continue
 			}
-			count := skills.CountSkills(resolved)
+			count := tool.CountSkills(resolved)
 			if entries > 0 {
 				e.printf("   Config %q: %d generator dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
 			}
 		}
 		if t.Config.Reviewer != nil {
 			entries := countSkillEntries(t.Config.Reviewer.Tools)
-			resolved, err := skills.ResolveSkillDirs(t.Config.Reviewer.Tools, validSkillBase)
+			resolved, err := tool.ResolveSkills(ctx, t.Config.Reviewer.Tools, "")
 			if err != nil {
 				slog.Warn("Failed to resolve reviewer skills", "config", t.Config.Name, "error", err)
 				continue
 			}
-			count := skills.CountSkills(resolved)
+			count := tool.CountSkills(resolved)
 			if entries > 0 {
 				e.printf("   Config %q: %d reviewer dir(s) searched, %d skill(s) found\n", t.Config.Name, entries, count)
 			}
@@ -1482,7 +990,6 @@ func countSkillEntries(entries []config.ToolEntry) int {
 	}
 	return n
 }
-
 func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseReport, []pairwise.ToolImpact) {
 	type key struct {
 		promptID string
@@ -1490,6 +997,7 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 	}
 
 	byKey := make(map[key][]pairwise.VariantResult)
+	reportsByKey := make(map[key][]*report.EvalReport)
 
 	for _, r := range results {
 		model := ""
@@ -1511,6 +1019,7 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 			MaxScore:    maxScore,
 			Success:     r.Success,
 		})
+		reportsByKey[k] = append(reportsByKey[k], r)
 	}
 
 	if len(byKey) == 0 {
@@ -1524,6 +1033,26 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 			slog.Warn("Pairwise impact computation failed", "prompt", k.promptID, "config", k.baseName, "error", err)
 			continue
 		}
+		
+		// Compute per-check diffs
+		evalReports := reportsByKey[k]
+		var baseline *pairwise.EvalReportData
+		var variantReports []*pairwise.EvalReportData
+		
+		for _, r := range evalReports {
+			_, removedTool, _ := parsePairwiseConfigName(r.ConfigName, "")
+			data := evalReportToData(r)
+			if removedTool == "" {
+				baseline = data
+			} else {
+				variantReports = append(variantReports, data)
+			}
+		}
+		
+		if baseline != nil && len(variantReports) > 0 {
+			report.CheckDiffs = pairwise.ComputeCheckDiffs(baseline, variantReports)
+		}
+		
 		reports = append(reports, report)
 	}
 
@@ -1542,6 +1071,31 @@ func collectPairwiseReports(results []*report.EvalReport) ([]*pairwise.PairwiseR
 	return reports, impacts
 }
 
+// evalReportToData converts an EvalReport to the minimal EvalReportData needed for check diffs.
+func evalReportToData(r *report.EvalReport) *pairwise.EvalReportData {
+	data := &pairwise.EvalReportData{
+		ConfigName: r.ConfigName,
+		Graders:    make([]pairwise.GraderData, 0, len(r.GraderResults)),
+	}
+	
+	for _, grader := range r.GraderResults {
+		points := make([]pairwise.PointData, 0, len(grader.Checks))
+		for _, check := range grader.Checks {
+			points = append(points, pairwise.PointData{
+				Label:   check.Label,
+				Pass:    check.Pass,
+				Message: check.Message,
+			})
+		}
+		data.Graders = append(data.Graders, pairwise.GraderData{
+			Name:   grader.GraderName,
+			Type:   grader.GraderType,
+			Checks: points,
+		})
+	}
+	
+	return data
+}
 func parsePairwiseConfigName(configName, model string) (string, string, bool) {
 	suffix := ""
 	if model != "" && strings.HasSuffix(configName, "/"+model) {
@@ -1562,7 +1116,6 @@ func parsePairwiseConfigName(configName, model string) (string, string, bool) {
 
 	return "", "", false
 }
-
 func pairwiseScore(r *report.EvalReport) (int, int) {
 	if r.Review != nil {
 		return r.Review.OverallScore, r.Review.MaxScore
@@ -1574,96 +1127,38 @@ func pairwiseScore(r *report.EvalReport) (int, int) {
 	return 0, 0
 }
 
-// evaluateToolUsage compares expected tools from prompt frontmatter with actual tool calls.
-func evaluateToolUsage(expected, actual []string) *report.ToolUsageResult {
-	actualSet := make(map[string]bool, len(actual))
-	for _, t := range actual {
-		actualSet[t] = true
+// extractGuardrailShortReason converts a verbose guardrail reason like
+// "guardrail: turn count 26 exceeded limit of 25" to a short display form
+// like "turn limit (25)". Used by progress display rendering.
+func extractGuardrailShortReason(reason string) string {
+	// Format from engine_eval.go:387, 414:
+	// "guardrail: turn count %d exceeded limit of %d"
+	// "guardrail: agent file count %d exceeded limit of %d"
+	if strings.Contains(reason, "turn count") && strings.Contains(reason, "exceeded limit of") {
+		// Extract the limit number
+		parts := strings.Split(reason, "exceeded limit of ")
+		if len(parts) == 2 {
+			limit := strings.TrimSpace(parts[1])
+			return fmt.Sprintf("turn limit (%s)", limit)
+		}
+		return "turn limit"
 	}
-
-	var matched, missing []string
-	expectedSet := make(map[string]bool, len(expected))
-	for _, t := range expected {
-		expectedSet[t] = true
-		if actualSet[t] {
-			matched = append(matched, t)
-		} else {
-			missing = append(missing, t)
+	if strings.Contains(reason, "file count") && strings.Contains(reason, "exceeded limit of") {
+		parts := strings.Split(reason, "exceeded limit of ")
+		if len(parts) == 2 {
+			limit := strings.TrimSpace(parts[1])
+			return fmt.Sprintf("file limit (%s)", limit)
 		}
+		return "file limit"
 	}
-
-	var extra []string
-	for _, t := range actual {
-		if !expectedSet[t] {
-			extra = append(extra, t)
+	if strings.Contains(reason, "output size") && strings.Contains(reason, "exceeded limit of") {
+		parts := strings.Split(reason, "exceeded limit of ")
+		if len(parts) == 2 {
+			limit := strings.TrimSpace(parts[1])
+			return fmt.Sprintf("output size (%s)", limit)
 		}
+		return "output size limit"
 	}
-
-	return &report.ToolUsageResult{
-		ExpectedTools: expected,
-		ActualTools:   actual,
-		MatchedTools:  matched,
-		MissingTools:  missing,
-		ExtraTools:    extra,
-		Match:         len(missing) == 0,
-	}
-}
-
-// readReviewedFiles reads all files from the workspace and returns them as ReviewedFile entries.
-// Files that contain "REVIEW:" comments are considered annotated.
-func readReviewedFiles(dir string) ([]report.ReviewedFile, error) {
-	var reviewed []report.ReviewedFile
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			if info != nil && info.IsDir() && strings.HasPrefix(info.Name(), ".") && path != dir {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.HasPrefix(filepath.Base(path), ".") || info.Size() > 1<<20 {
-			return nil
-		}
-		rel, err := filepath.Rel(dir, path)
-		if err != nil {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		content := string(data)
-		if strings.Contains(content, "REVIEW:") {
-			reviewed = append(reviewed, report.ReviewedFile{
-				Path:    rel,
-				Content: content,
-			})
-		}
-		return nil
-	})
-	return reviewed, err
-}
-
-// writeReviewedFiles writes annotated files to the reviewed-code directory.
-func writeReviewedFiles(dir string, files []report.ReviewedFile) error {
-	for _, f := range files {
-		dst := filepath.Join(dir, f.Path)
-		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-			return fmt.Errorf("creating dir for %s: %w", f.Path, err)
-		}
-		if err := os.WriteFile(dst, []byte(f.Content), 0644); err != nil {
-			return fmt.Errorf("writing %s: %w", f.Path, err)
-		}
-	}
-	return nil
-}
-
-// countPassed returns the number of passed results in a grader result list.
-func countPassed(results []graders.GraderResult) int {
-	n := 0
-	for _, r := range results {
-		if r.Pass {
-			n++
-		}
-	}
-	return n
+	// Fallback: return the reason as-is if we can't parse it
+	return reason
 }

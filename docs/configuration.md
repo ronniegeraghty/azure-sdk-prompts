@@ -6,6 +6,33 @@ hyoka uses YAML configuration files to define evaluation setups. Each config spe
 
 By default, configs are loaded from `./configs/`. Use `--config-dir` to specify a different location.
 
+## Custom Prompt Directory
+
+By default, hyoka looks for prompts in this order:
+
+1. `./.hyoka/prompts/` (created by `hyoka init`)
+2. `./prompts/` (legacy fallback)
+3. `../prompts/` (legacy fallback)
+
+You can override this by setting `prompt_directory:` at the **top level** of any config YAML file:
+
+```yaml
+prompt_directory: ../shared-prompt-library
+configs:
+  - name: baseline/claude-opus-4.6
+    generator:
+      model: claude-opus-4.6
+```
+
+Notes:
+
+- The path is resolved **relative to the config file** that contains it (so `../shared-prompt-library` from `.hyoka/configs/foo.yaml` points at `.hyoka/../shared-prompt-library`). Absolute paths are honored as-is.
+- When loading multiple config files via `--config-dir`, only one file may set `prompt_directory`; conflicting values across files are an error.
+- The `--prompts` CLI flag still wins over the config-driven value, so a one-off `--prompts ./other` takes precedence.
+- If you don't set `prompt_directory`, behavior is identical to previous releases — existing repos require no changes.
+
+Resolution priority: `--prompts` flag → `prompt_directory:` in config YAML → `.hyoka/prompts/` → `./prompts/` → `../prompts/`.
+
 ## Config Names vs Filenames
 
 The `name` field in a config is what you pass to the `--config` CLI flag. It is **not** the filename. For example, a config file called `azure-mcp-opus.yaml` might define `name: azure-mcp/claude-opus-4.6`. You'd run it with: `--config azure-mcp/claude-opus-4.6`.
@@ -133,6 +160,7 @@ generator:
       type: skill
       source: remote
       repo: microsoft/skills
+      version: "v1.2.0"        # optional: pin to git ref (branch, tag, or SHA)
 ```
 
 | Field | Required | Description |
@@ -141,6 +169,7 @@ generator:
 | `source` | yes | Must be `"remote"` |
 | `repo` | yes | GitHub repository in `owner/repo` format |
 | `name` | no | Specific skill name within the repo |
+| `version` | no | Git ref to pin to (branch, tag, or commit SHA); empty = repo default branch. Overridable by top-level `tool_version_override` (see [Tool Versioning](#tool-versioning--custom-fetchers)) |
 
 Under the hood, hyoka runs:
 
@@ -224,19 +253,178 @@ generator:
 
 > **Important:** The `mcp_tools` field must be set (typically `["*"]`) for the MCP server's tools to be registered with the agent. Without it, the server starts but its tools won't be available.
 
+### Plugins
+
+Plugins bundle related skills, MCP servers, and hooks into a single reusable YAML definition. Declare plugins as tool entries with `type: plugin` under `generator.tools` or `reviewer.tools`. Each plugin can contain:
+
+- **Skills** — Local or remote Copilot skills
+- **MCP Servers** — MCP server configurations
+- **Hooks** — Pre/post tool-use hooks for custom logic
+
+#### Plugin Declaration
+
+```yaml
+generator:
+  tools:
+    - name: azure-sdk-python
+      type: plugin
+      source: remote
+      repo: microsoft/skills
+    - name: my-plugin
+      type: plugin
+      source: local
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Plugin identifier (filename without `.yaml` for local; the plugin folder name within the repo for remote) |
+| `type` | yes | — | Must be `"plugin"` |
+| `source` | yes | — | `local` or `remote` |
+| `repo` | for `source: remote` | — | Source repository. Canonical form is `owner/repo` (e.g. `microsoft/skills`); GitHub is assumed, so the `github.com/` prefix is redundant but accepted for backward compatibility. hyoka has no implicit marketplace — declare it explicitly. |
+| `version` | no | repo default | Git ref (branch, tag, or commit) to pin |
+
+#### Local Plugins
+
+Local plugins are YAML files placed in the `.hyoka/plugins/` directory. Each plugin file defines a bundle of tools (skills + MCPs).
+
+```yaml
+generator:
+  tools:
+    - name: my-plugin
+      type: plugin
+      source: local
+```
+
+hyoka resolves this by looking for `.hyoka/plugins/my-plugin.yaml`. If found, the plugin is parsed and its child tools (skills and MCP servers) are registered with the generator session.
+
+#### Remote Plugins
+
+Remote plugins live in a Git repository (commonly the GitHub Copilot CLI plugin marketplace at `microsoft/skills`, but any repo following the same layout works). The `repo:` field tells hyoka exactly where to fetch from.
+
+```yaml
+generator:
+  tools:
+    - name: azure-sdk-python
+      type: plugin
+      source: remote
+      repo: microsoft/skills
+```
+
+hyoka resolves remote plugins from `~/.hyoka/cache/default/<owner>/<repo>/...` (populated by your prior `/plugin install` or by hyoka's fetch flow). To pin to a specific git ref, add `version: <branch-tag-or-sha>`.
+
+> **No implicit marketplace.** Earlier versions accepted a bare `name: foo@skills` shorthand that resolved to `microsoft/skills`. That magic has been removed — every remote plugin entry must declare `repo:` explicitly.
+
+#### Dual-Role Plugins
+
+If you want a plugin available to both the generator and reviewer environments, declare it in both `generator.tools` and `reviewer.tools`:
+
+```yaml
+generator:
+  tools:
+    - name: my-plugin
+      type: plugin
+      source: local
+reviewer:
+  tools:
+    - name: my-plugin
+      type: plugin
+      source: local
+```
+
+There is no automatic sharing between generator and reviewer tools — each environment receives only the tools explicitly declared for it.
+
+#### Hard-Fail Semantics
+
+- **Fetch errors** (remote plugins) fail before session creation, preventing partial or incorrect evaluations.
+- **Missing tools** in a plugin are reported at pre-session validation time (`EventToolsVerified`), not during eval.
+- The evaluation aborts immediately if any plugin fails to load.
+
+### Tool Load Validation
+
+All tools declared in `generator.tools` or `reviewer.tools` are **implicitly required**. Before attempting code generation, hyoka performs a **pre-session static validation** to resolve every declared plugin, skill directory, and MCP server. If any tool fails to resolve, the evaluation aborts immediately with a `tool_load_failure` error — the generator is never invoked.
+
+#### Hard-Fail Contract
+
+hyoka hard-fails (with `error_category: "tool_load_failure"`) when:
+
+- **Plugin not found** — A configured plugin is not in the plugin registry and hasn't been installed locally
+- **Skill path missing** — A local skill's `path` points to a non-existent directory
+- **Missing `SKILL.md`** — A configured skill directory exists but doesn't contain a required `SKILL.md` file
+- **Empty skill directory** — A skill directory glob pattern (`glob: "..."`) matches zero SKILL.md files
+- **MCP server unavailable** — The `command` (for local) or `url` (for remote) specified for an MCP server is invalid or unreachable
+
+#### Tools Progress Output
+
+During `hyoka run`, each configured tool is resolved and reported in the **Tools** progress section. Plugins and skill directories are **expanded into their children** — each child (individual skill or tool from a plugin) reports its load status individually:
+
+```
+Tools:
+  ✓ Loaded      azure-sdk-python (plugin)
+  ✓ Loaded        ├── skill-azure-sdk-patterns
+  ✓ Loaded        └── mcp-azure-resource-tools
+  ✓ Loaded      generator-skills (skills dir)
+  ✓ Loaded        ├── coding-standards
+  ✗ Failed         └── sdk-version-check (missing SKILL.md)
+  ✓ Loaded      azure-mcp
+```
+
+This grouped display lets you see at a glance which children succeeded and which failed, making diagnostics faster.
+
+#### Error Reporting in EvalReport JSON
+
+When a tool load fails, the evaluation report includes:
+
+```json
+{
+  "error": "tool_load_failure: skill directory './skills/gen' missing SKILL.md in ./skills/gen/my-skill",
+  "error_category": "tool_load_failure",
+  "error_details": "skill directory './skills/gen' missing SKILL.md in ./skills/gen/my-skill"
+}
+```
+
+#### Config Scoping
+
+Reviewer tool validation is **scoped per-config**. When running multiple configs in a single `hyoka run` invocation (e.g., `--config "config-a,config-b"`), each config's `reviewer.tools` are validated independently. This prevents skills configured for one config from accidentally leaking into another.
+
+#### Diagnosing Tool Load Failures
+
+Re-run your evaluation with debug logging:
+
+```bash
+hyoka run --prompt-id <prompt-id> --config <config> \
+  --log-level debug --log-file hyoka-debug.log
+```
+
+Then check the report and logs for details:
+
+```bash
+# View the error in the eval report
+cat reports/<eval-id>/report.json | jq '.error, .error_category'
+
+# Grep logs for tool-resolution details
+grep -i "tool\|skill\|mcp" hyoka-debug.log
+```
+
+#### Post-Session Tool Verification
+
+After the generator session completes code generation, hyoka performs a **post-session verification** to confirm that all configured tools successfully loaded. Rather than using a fixed timeout, hyoka waits for the SDK's `AssistantTurnStart` event — the model's first turn — as the definitive signal that tool registration is complete. This approach avoids false failures when loading many tools (e.g., 45+ skills or MCP servers) where the SDK may take longer than a typical fixed timeout to confirm all registrations. A 5-minute absolute ceiling remains as a fail-safe for sessions that never reach their first turn due to authentication or network issues. If the ceiling is reached, the evaluation terminates with a "session never reached first turn" error.
+
+#### Future: Optional Tools
+
+In a future release, you may be able to mark specific tools as optional using `optional: true`. For now, all configured tools are required.
+
 ## Limits
 
 Guardrail limits can be set at multiple levels with the following resolution order:
 
 **prompt frontmatter > config YAML > CLI flag > engine default**
 
-This allows fine-grained control at the prompt level while maintaining sensible defaults.
+This allows fine-grained control at the prompt level while maintaining sensible defaults. These resolved limits are enforced in real-time during code generation, ensuring that session actions, turns, and file creation respect the merged priority order.
 
 | Field | Type | Default | CLI Flag | Description |
 |-------|------|---------|----------|-------------|
 | `max_turns` | int | 25 | `--max-turns` | Maximum assistant turns per generation |
 | `max_files` | int | 50 | `--max-files` | Maximum generated files per evaluation |
-| `max_output_size` | string | "1MB" | `--max-output-size` | Maximum total output size (supports KB, MB suffixes) |
 | `max_session_actions` | int | 50 | `--max-session-actions` | Maximum actions per Copilot session |
 
 ### Config-Level Limits
@@ -251,7 +439,6 @@ configs:
     limits:
       max_turns: 15
       max_files: 30
-      max_output_size: "512KB"
       max_session_actions: 25
 ```
 
@@ -262,11 +449,12 @@ Override limits for a specific prompt via frontmatter (highest priority). This i
 ```yaml
 ---
 id: storage-dp-python-batch
-service: storage
-language: python
-plane: data-plane
-category: crud
-difficulty: advanced
+properties:
+  service: storage
+  language: python
+  plane: data-plane
+  category: crud
+  difficulty: advanced
 max_session_actions: 100  # This prompt needs more reasoning steps
 max_turns: 40             # Allow more back-and-forth turns
 ---
@@ -274,10 +462,145 @@ max_turns: 40             # Allow more back-and-forth turns
 
 Prompts with unset limit fields fall through to config > CLI > default, ensuring backward compatibility.
 
+## Tool Versioning & Custom Fetchers
+
+Remote skills (and other future remote tools) are pinned and fetched through hyoka's pluggable **Fetcher** system. By default, hyoka uses an `npx skills add`-backed fetcher that follows the repo's default branch.
+
+### Pinning versions
+
+Each remote tool entry can pin a specific version via the `version:` field (accepts a git branch name, tag, or commit SHA):
+
+```yaml
+configs:
+  - name: baseline/sonnet
+    generator:
+      model: claude-sonnet-4.5
+      tools:
+        - name: azure-sdk-java
+          type: skill
+          source: remote
+          repo: Azure/azure-sdk-skills
+          version: "v1.4.2"         # pin to git tag
+        - name: copilot-kb
+          type: skill
+          source: remote
+          repo: microsoft/skills
+          version: "main"            # pin to branch
+        - name: unpinned
+          type: skill
+          source: remote
+          repo: x/y
+          # empty or omitted → fetcher default (latest)
+```
+
+For monorepos (multiple skills from the same repo), or to apply a pin to all entries from a repo without repeating it, use `tool_version_override` at the top of the config file. Map it by repository in `owner/repo` format (the `github.com/` prefix is optional and normalized away):
+
+```yaml
+tool_version_override:
+  microsoft/skills: "v1.2.0"           # all entries using microsoft/skills
+  Azure/azure-sdk-skills: "v1.4.2"     # tag
+  someorg/plugins: "abc123def"         # commit SHA
+  # Full GitHub URL prefix is stripped: "github.com/Azure/example" → "Azure/example"
+
+configs:
+  - name: baseline/sonnet
+    generator:
+      model: claude-sonnet-4.5
+      tools:
+        - name: general-skills
+          type: skill
+          source: remote
+          repo: microsoft/skills
+          # Picks up v1.2.0 from override
+        - name: auth-skill
+          type: skill
+          source: remote
+          repo: microsoft/skills
+          # Also picks up v1.2.0 from override
+        - name: pinned-explicitly
+          type: skill
+          source: remote
+          repo: Azure/azure-sdk-skills
+          version: "v2.0.0"            # per-entry pin wins over override
+```
+
+**Resolution order:** per-entry `version:` field > `tool_version_override` (by repo key) > fetcher default (latest).
+
+When loading multiple config files from a directory, `tool_version_override` maps **merge** across files. If two files pin the same repository to different versions, hyoka returns a hard error (identical values merge silently). This prevents silent override conflicts when configs are split across files.
+
+The version is forwarded to the fetcher; the default `npx` fetcher appends it as a git ref (`repo@version`) and caches each version under a separate directory (`.skills-cache/<version>/<repo>/<name>/`) so toggling pins doesn't poison the cache.
+
+#### Migrating from name-keyed overrides
+
+Earlier versions of hyoka keyed `tool_version_override` by tool **name** instead of repository. If you see an error like:
+
+```
+tool_version_override now keys by repo (e.g. "microsoft/skills"), not by tool name.
+Found name-shaped key "my-skill-name". Migration:
+  - Replace each tool-name key with the repo it points to.
+  - If multiple tools shared the same repo, collapse them to one entry.
+```
+
+Update your config: replace the tool name keys with their corresponding repository names. For example:
+
+```yaml
+# Old (no longer supported)
+tool_version_override:
+  azure-sdk-java: "v1.4.2"
+  azure-keyvault: "v1.4.2"
+
+# New
+tool_version_override:
+  Azure/azure-sdk-skills: "v1.4.2"  # covers both azure-sdk-java and azure-keyvault
+```
+
+### Custom fetchers
+
+The `tool.Fetcher` interface (in `hyoka/internal/config/tool/`) lets embedders register additional fetchers — useful for internal mirror caches, alternate package managers, or custom version-pinning rules:
+
+```go
+import "github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+
+type artifactoryFetcher struct{ /* ... */ }
+
+func (artifactoryFetcher) Name() string { return "artifactory" }
+func (artifactoryFetcher) CanFetch(e tool.Entry) bool {
+    return e.ResolvedType() == tool.TypeSkill && e.Source == "remote" &&
+           strings.HasPrefix(e.Repo, "internal/")
+}
+func (artifactoryFetcher) Fetch(ctx context.Context, req tool.FetchRequest) (tool.FetchResult, error) {
+    // download from internal Artifactory, return FetchResult{Dir, Version}
+}
+
+func init() { _ = tool.Register(artifactoryFetcher{}) }
+```
+
+**Lookup order:** custom fetchers are consulted before the built-in `npx` default; the first whose `CanFetch` returns true wins. This means custom fetchers can shadow the default for specific entries while leaving everything else on the default path.
+
+Hyoka calls `tool.ValidateFetchers(...)` at the start of every run, so any remote skill without a matching registered fetcher fails fast — before a session is spawned.
+
 ## Multiple Config Files
 
 Place multiple `.yaml` files in the config directory. All are loaded automatically. Use `--config <name>` to select specific configs, or `--all-configs` to run all.
 
-## Tiered Evaluation Criteria
+## Evaluation Criteria
 
-Use `--criteria-dir` to point to a directory of attribute-matched criteria YAML files. These are matched against prompt metadata (language, service, plane) and merged with prompt-specific criteria at review time. See [prompt-authoring.md](prompt-authoring.md) for details.
+Use `--criteria-dir` to point to a directory of criteria YAML files. These define graders that evaluate generated outputs across multiple dimensions: file output, build success, LLM-based code review, tool usage constraints, and more.
+
+**Grader types:** Each criteria file contains a list of graders. Graders are matched against prompt metadata (language, service, plane) and evaluated independently. See [graders/index.md](graders/index.md) for complete reference and type documentation.
+
+**Criteria files are merged** across the criteria directory. Graders can be conditional (via `when:` properties), weighted for scoring, and configured per-type with specific checks.
+
+For authoring criteria files, hierarchical organization, and advanced patterns, see [criteria-authoring.md](criteria-authoring.md).
+
+## Plugins
+
+**For declaring plugins in your config, see [Plugins](#plugins) under Configuration Fields above.**
+
+Plugin YAML definitions are stored in the `.hyoka/plugins/` directory for local plugins. Each plugin file (e.g., `.hyoka/plugins/my-plugin.yaml`) declares:
+
+- **Skills** — Local or remote Copilot skills
+- **MCP Servers** — MCP server configurations
+- **Hooks** — Pre/post tool-use hooks for custom logic
+
+Use `hyoka tools` (or `hyoka plugins`) to list all discovered plugins, skills, and MCP servers.

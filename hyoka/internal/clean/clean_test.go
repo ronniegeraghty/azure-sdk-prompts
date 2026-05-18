@@ -184,6 +184,24 @@ func TestIsHyokaSession(t *testing.T) {
 	}
 }
 
+func TestIsHyokaSession_MarkerFile(t *testing.T) {
+	// Session with marker file but no workspace.yaml referencing hyoka
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "workspace.yaml"), []byte("cwd: /home/user/myproject"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".hyoka-session"), []byte("hyoka\n"), 0o644)
+
+	if !isHyokaSession(dir) {
+		t.Error("expected marker file to identify hyoka session")
+	}
+
+	// Session with only marker file, no workspace files
+	dir2 := t.TempDir()
+	os.WriteFile(filepath.Join(dir2, ".hyoka-session"), []byte("hyoka\n"), 0o644)
+	if !isHyokaSession(dir2) {
+		t.Error("expected marker-only session to be identified")
+	}
+}
+
 func TestHumanBytes(t *testing.T) {
 	tests := []struct {
 		input  int64

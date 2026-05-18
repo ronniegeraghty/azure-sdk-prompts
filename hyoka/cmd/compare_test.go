@@ -126,7 +126,7 @@ func writeTestReport(t *testing.T, dir, runID, promptID, config, timestamp strin
 t.Helper()
 pass := score >= 0.5
 graders := []report.GraderResult{
-{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: &pass},
+{GraderName: "correctness", GraderType: "prompt", Score: score, Weight: 1.0, Pass: pass, Checks: []report.GraderPoint{{Label: "check", Pass: pass, Weight: 1.0}}},
 }
 r := report.EvalReport{
 SchemaVersion:  2,
@@ -197,8 +197,14 @@ var result map[string]any
 if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
 }
-if result["config_a"] != "config-a" {
-t.Errorf("expected config_a = config-a, got %v", result["config_a"])
+if result["kind"] != "configs" {
+t.Errorf("expected kind = configs, got %v", result["kind"])
+}
+if result["label_a"] != "config-a" {
+t.Errorf("expected label_a = config-a, got %v", result["label_a"])
+}
+if result["label_b"] != "config-b" {
+t.Errorf("expected label_b = config-b, got %v", result["label_b"])
 }
 }
 

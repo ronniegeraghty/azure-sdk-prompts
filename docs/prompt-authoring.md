@@ -75,13 +75,20 @@ properties:
 prompt_text: |
   Write a Python script that uploads a file to Azure Blob Storage
   using the azure-storage-blob SDK with DefaultAzureCredential.
-evaluation_criteria: |
-  - Uses BlobServiceClient with DefaultAzureCredential
-  - Creates container if it doesn't exist
-  - Uploads file with proper content type detection
+
+# graders: Inline evaluation criteria using the unified grader schema
+# See docs/graders/ for full schema reference (prompt, program, workspace, tool, activity types)
+graders:
+  - type: prompt
+    name: Correctness
+    weight: 1.0
+    checks:
+      - Uses BlobServiceClient with DefaultAzureCredential
+      - Creates container if it doesn't exist
+      - Uploads file with proper content type detection
 ```
 
-The YAML format uses the same `id`, `tags`, and `properties:` structure as Markdown. The `prompt_text` field replaces the `## Prompt` section and `evaluation_criteria` replaces `## Evaluation Criteria`.
+The YAML format uses the same `id`, `tags`, and `properties:` structure as Markdown. The `prompt_text` field replaces the `## Prompt` section and the `graders:` field replaces the `## Evaluation Criteria` section.
 
 ### Required Fields
 
@@ -132,9 +139,70 @@ hyoka supports three tiers of evaluation criteria:
 
 2. **Tier 2 — Attribute-Matched** (conditional): YAML files in a `criteria/` directory that activate based on prompt language, service, or other metadata. For example, `criteria/language/java.yaml` adds Java-specific criteria to all Java prompts.
 
-3. **Tier 3 — Prompt-Specific** (per-prompt): The `## Evaluation Criteria` section in each prompt file.
+3. **Tier 3 — Prompt-Specific** (per-prompt): Either the `## Evaluation Criteria` section in each `.prompt.md` file, or the `graders:` field in `.prompt.yaml` files.
 
 All tiers are merged and sent to the reviewer as a unified criteria list. Use `--criteria-dir criteria/` to enable Tier 2 criteria.
+
+### Inline Graders in Prompts
+
+Both `.prompt.md` (frontmatter) and `.prompt.yaml` (top-level) support inline `graders:` using the unified grader schema. Inline graders are evaluated after implicit criteria (from `## Evaluation Criteria` markdown sections) and before matched criteria-file graders.
+
+**Example: Inline grader in `.prompt.md` frontmatter:**
+
+```markdown
+---
+id: storage-dp-python-crud
+tags:
+  - blob
+  - crud
+graders:
+  - type: prompt
+    name: Correctness
+    weight: 1.0
+    checks:
+      - Uses BlobServiceClient with DefaultAzureCredential
+      - Proper error handling for network failures
+---
+
+# Storage Blob Upload (Python)
+
+## Prompt
+
+Write a Python script that uploads a file to Azure Blob Storage...
+
+## Evaluation Criteria
+
+- Uses BlobServiceClient with DefaultAzureCredential
+- Creates container if it doesn't exist
+```
+
+**Important:** Inline graders **forbid `when:` clauses** (hard error). Inline graders apply only to their specific prompt file and always execute. See [docs/graders/](./docs/graders/) for full schema reference.
+
+### Tags for Grader Matching
+
+Prompts can define a `tags:` field at the top level of frontmatter (both `.prompt.md` and `.prompt.yaml`). Criteria-file graders can match against these tags using the `when: { tags: { is: [...], not: [...] } }` condition:
+
+```yaml
+# Prompt file
+id: identity-dp-python-auth
+tags:
+  - msal
+  - multi-tenant
+```
+
+```yaml
+# criteria/language/python.yaml — matches only multi-tenant prompts
+graders:
+  - type: prompt
+    name: MSAL Best Practices
+    when:
+      tags:
+        is: [multi-tenant]
+    checks:
+      - Uses MSAL 1.0+ for multi-tenant flow
+```
+
+Tags are case-insensitive for matching purposes.
 
 ### Criteria YAML Format
 
@@ -148,6 +216,8 @@ criteria:
   - name: Context Manager for Clients
     description: SDK clients are used with `with` statements.
 ```
+
+For advanced grader configuration including conditions (`when:`) and complex matching, see [docs/graders/index.md](./docs/graders/index.md).
 
 ## Near-Miss Detection
 

@@ -1,0 +1,71 @@
+# Example: Pure YAML Prompt Format
+#
+# This demonstrates the .prompt.yaml format — an alternative to .prompt.md
+# that uses pure YAML instead of Markdown with frontmatter.
+#
+# Both formats are supported by hyoka:
+# - .prompt.md:   YAML frontmatter (between ---) + Markdown body with ## sections
+# - .prompt.yaml: Pure YAML with all fields at top level
+
+id: cosmos-db-dp-python-crud-yaml-example
+
+properties:
+  service: cosmos-db
+  plane: data-plane
+  language: python
+  category: crud
+  difficulty: basic
+  description: >
+    Write a Python script that performs CRUD operations on Azure Cosmos DB
+    using the Python SDK. This YAML format example demonstrates read, create,
+    update, and delete operations on container items.
+  sdk_package: azure-cosmos
+  doc_url: https://learn.microsoft.com/en-us/python/api/overview/azure/cosmos-readme
+  created: '2025-04-18'
+  author: ronniegeraghty
+
+tags:
+  - cosmos-db
+  - crud
+  - yaml-format
+
+# Optional: override session limits for this specific prompt
+max_session_actions: 50
+max_turns: 40
+
+# prompt_text: The instruction text for the AI to generate code
+# (In .prompt.md, this would be the "## Prompt" section)
+prompt_text: |
+  Write a Python script that demonstrates CRUD operations on Azure Cosmos DB:
+
+  1. **Create:** Insert a new document into a container with a valid partition key.
+  2. **Read:** Query a document by ID and partition key.
+  3. **Update:** Modify an existing document in place.
+  4. **Delete:** Remove a document from the container.
+
+  Use the `azure-cosmos` Python SDK with:
+  - `CosmosClient` for connection management
+  - `database_client` and `container_client` for database/container access
+  - Proper exception handling for `CosmosHttpResponseError`
+  - Valid connection string or credential (use environment variables)
+
+  Structure the code as helper functions: `create_item()`, `read_item()`,
+  `update_item()`, and `delete_item()`.
+
+# graders: Inline graders using the unified schema (same as criteria/**.yaml)
+# This replaces the deprecated evaluation_criteria field.
+graders:
+  - type: prompt
+    name: crud-correctness
+    weight: 2
+    prompt: |
+      The generated code should demonstrate:
+    checks:
+      - Correct import statements from azure.cosmos (CosmosClient, PartitionKey)
+      - Connection using CosmosClient with valid connection string
+      - CRUD operations using container_client methods (create_item, read_item, upsert_item, delete_item)
+      - Proper partition key usage in read/delete operations
+      - Exception handling for CosmosHttpResponseError or HttpResponseError
+      - Item structure includes required id and partition key fields
+      - Connection/client cleanup (context manager or explicit close)
+      - No hardcoded credentials (uses environment variables)

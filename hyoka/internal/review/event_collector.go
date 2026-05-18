@@ -2,9 +2,7 @@ package review
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	copilot "github.com/github/copilot-sdk/go"
@@ -121,29 +119,3 @@ func (c *eventCollector) response() (string, []ReviewEvent) {
 	return c.assistantContent, events
 }
 
-// buildConsolidationPrompt constructs the prompt sent to the consolidator model.
-func buildConsolidationPrompt(originalPrompt string, panel []ReviewResult) string {
-	var b strings.Builder
-	b.WriteString("You are a senior review consolidator. Multiple independent reviewers have scored the same generated code.\n")
-	b.WriteString("Synthesize their feedback into a single consensus review.\n\n")
-
-	b.WriteString("## Original Prompt\n\n")
-	b.WriteString(originalPrompt)
-	b.WriteString("\n\n")
-
-	b.WriteString("## Individual Reviews\n\n")
-	for i, r := range panel {
-		reviewJSON, _ := json.MarshalIndent(r, "", "  ")
-		fmt.Fprintf(&b, "### Reviewer %d (%s)\n```json\n%s\n```\n\n", i+1, r.Model, string(reviewJSON))
-	}
-
-	b.WriteString("## Instructions\n\n")
-	b.WriteString("Produce a consensus review using the criteria-based pass/fail system. ")
-	b.WriteString("For each criterion, it PASSES if the majority of reviewers marked it as passed. ")
-	b.WriteString("Use the union of all criteria across reviewers. ")
-	b.WriteString("Combine the best issues and strengths from all reviewers. ")
-	b.WriteString("Write a summary that captures the consensus view.\n\n")
-	b.WriteString("Respond with ONLY a JSON object in the same format as the individual reviews.\n")
-
-	return b.String()
-}

@@ -1,6 +1,18 @@
 package serve
 
-import "embed"
+import (
+	"io/fs"
 
-//go:embed all:site
-var embeddedSite embed.FS
+	siteembed "github.com/ronniegeraghty/hyoka/site"
+)
+
+// embeddedSite is the served-from root (the contents of site/dist/).
+var embeddedSite fs.FS = mustSub(siteembed.FS, "dist")
+
+func mustSub(f fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(f, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
+}

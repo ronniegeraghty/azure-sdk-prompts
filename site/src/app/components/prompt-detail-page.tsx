@@ -4,6 +4,7 @@ import { fetchPrompt, fetchRuns, type PromptInfo } from "../data/api";
 import type { RunSummary, EvalResult, Environment } from "../data/types";
 import { ArrowLeft, CheckCircle2, XCircle, Clock, BarChart3, TrendingUp, Cpu, Wrench, ArrowUpRight, ArrowDownRight, Minus, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { evalPassFromPoints, evalPointTotals, pointsPassRate } from "../lib/evalPass";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -13,7 +14,16 @@ interface HistoryEntry {
   success: boolean;
   duration: number;
   file_count: number;
+  // Fractional grader-point score (0–100). 100 = every Point passed.
+  // Replaces the legacy `review.overall_score` (review-grader only).
   score: number;
+  // Raw point totals for "N/M" display (e.g. "12/15 points").
+  points_passed: number;
+  points_total: number;
+  // True when the eval finished and has a detail page. Mirrors the
+  // gate used on the run-detail page; in-progress evals don't yet have
+  // their per-eval JSON written, so the detail link would 404.
+  is_complete: boolean;
 }
 
 interface ConfigStat {
@@ -21,6 +31,9 @@ interface ConfigStat {
   runs: number;
   passed: number;
   pass_rate: number;
+  points_rate: number;
+  points_passed: number;
+  points_total: number;
   avg_duration: number;
 }
 
@@ -31,6 +44,9 @@ interface CorrelationStat {
   failed: number;
   rate: number;
   avgScore: number;
+  pointsPassed: number;
+  pointsTotal: number;
+  pointsRate: number;
   avgDuration: number;
 }
 
@@ -102,7 +118,7 @@ function CorrelationTable({ title, icon: Icon, data, baseline, showDuration }: {
               <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Evals</th>
               <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Pass Rate</th>
               <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>vs Baseline</th>
-              <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Avg Score</th>
+              <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Points %</th>
               {showDuration && <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Avg Duration</th>}
             </tr>
           </thead>
@@ -126,7 +142,7 @@ function CorrelationTable({ title, icon: Icon, data, baseline, showDuration }: {
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={d.avgScore >= 80 ? "text-emerald-400/70" : d.avgScore >= 60 ? "text-amber-400/70" : "text-red-400/70"} style={{ ...mono, fontSize: 11 }}>
-                      {d.avgScore}
+                      {d.avgScore}%
                     </span>
                   </td>
                   {showDuration && <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{d.avgDuration}s</td>}
@@ -145,14 +161,17 @@ function computeGrouped(
   evals: { result: EvalResult; run: RunSummary }[],
   keyFn: (result: EvalResult, run: RunSummary) => string[]
 ): CorrelationStat[] {
-  const map: Record<string, { total: number; passed: number; scoreSum: number; durationSum: number }> = {};
+  const map: Record<string, { total: number; passed: number; scoreSum: number; pointsPassed: number; pointsTotal: number; durationSum: number }> = {};
   for (const { result, run } of evals) {
     for (const key of keyFn(result, run)) {
       if (!key) continue;
-      if (!map[key]) map[key] = { total: 0, passed: 0, scoreSum: 0, durationSum: 0 };
+      if (!map[key]) map[key] = { total: 0, passed: 0, scoreSum: 0, pointsPassed: 0, pointsTotal: 0, durationSum: 0 };
       map[key].total++;
-      if (result.success) map[key].passed++;
-      map[key].scoreSum += result.review?.overall_score || 0;
+      if (evalPassFromPoints(result)) map[key].passed++;
+      const pt = evalPointTotals(result);
+      map[key].pointsPassed += pt.passed;
+      map[key].pointsTotal += pt.total;
+      map[key].scoreSum += pointsPassRate(result);
       map[key].durationSum += result.duration_seconds || 0;
     }
   }
@@ -164,6 +183,9 @@ function computeGrouped(
       failed: v.total - v.passed,
       rate: parseFloat(((v.passed / v.total) * 100).toFixed(1)),
       avgScore: parseFloat((v.scoreSum / v.total).toFixed(1)),
+      pointsPassed: v.pointsPassed,
+      pointsTotal: v.pointsTotal,
+      pointsRate: v.pointsTotal > 0 ? parseFloat(((v.pointsPassed / v.pointsTotal) * 100).toFixed(1)) : 0,
       avgDuration: parseFloat((v.durationSum / v.total).toFixed(1)),
     }))
     .sort((a, b) => b.rate - a.rate);
@@ -176,6 +198,7 @@ export function PromptDetailPage() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEnvToolsOnly, setShowEnvToolsOnly] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,13 +229,17 @@ export function PromptDetailPage() {
     for (const run of runs) {
       for (const result of run.results || []) {
         if (result.prompt_id === decodedId) {
+          const pt = evalPointTotals(result);
           entries.push({
             run_id: run.run_id,
             config_name: result.config_name,
-            success: result.success,
+            success: evalPassFromPoints(result),
             duration: result.duration_seconds || 0,
             file_count: result.generated_files?.length || 0,
-            score: result.review?.overall_score || 0,
+            score: parseFloat(pointsPassRate(result).toFixed(1)),
+            points_passed: pt.passed,
+            points_total: pt.total,
+            is_complete: result.duration_seconds != null && result.duration_seconds > 0,
           });
           evalsWithContext.push({ result, run });
         }
@@ -223,13 +250,18 @@ export function PromptDetailPage() {
     const totalRuns = entries.length;
     const passRate = totalRuns > 0 ? parseFloat(((passed / totalRuns) * 100).toFixed(1)) : 0;
     const avgDuration = totalRuns > 0 ? parseFloat((entries.reduce((s, e) => s + e.duration, 0) / totalRuns).toFixed(1)) : 0;
+    const totalPointsPassed = entries.reduce((s, e) => s + e.points_passed, 0);
+    const totalPointsTotal = entries.reduce((s, e) => s + e.points_total, 0);
+    const pointsPassRatePct = totalPointsTotal > 0 ? parseFloat(((totalPointsPassed / totalPointsTotal) * 100).toFixed(1)) : 0;
 
     // Config breakdown
-    const configMap: Record<string, { runs: number; passed: number; totalDuration: number }> = {};
+    const configMap: Record<string, { runs: number; passed: number; pointsPassed: number; pointsTotal: number; totalDuration: number }> = {};
     for (const e of entries) {
-      if (!configMap[e.config_name]) configMap[e.config_name] = { runs: 0, passed: 0, totalDuration: 0 };
+      if (!configMap[e.config_name]) configMap[e.config_name] = { runs: 0, passed: 0, pointsPassed: 0, pointsTotal: 0, totalDuration: 0 };
       configMap[e.config_name].runs++;
       if (e.success) configMap[e.config_name].passed++;
+      configMap[e.config_name].pointsPassed += e.points_passed;
+      configMap[e.config_name].pointsTotal += e.points_total;
       configMap[e.config_name].totalDuration += e.duration;
     }
     const configs: ConfigStat[] = Object.entries(configMap).map(([config, c]) => ({
@@ -237,6 +269,9 @@ export function PromptDetailPage() {
       runs: c.runs,
       passed: c.passed,
       pass_rate: parseFloat(((c.passed / c.runs) * 100).toFixed(1)),
+      points_rate: c.pointsTotal > 0 ? parseFloat(((c.pointsPassed / c.pointsTotal) * 100).toFixed(1)) : 0,
+      points_passed: c.pointsPassed,
+      points_total: c.pointsTotal,
       avg_duration: parseFloat((c.totalDuration / c.runs).toFixed(1)),
     }));
 
@@ -246,9 +281,17 @@ export function PromptDetailPage() {
       return model ? [model] : [r.config_name];
     });
 
-    const byTool = computeGrouped(evalsWithContext, (r) => {
+    const byToolAll = computeGrouped(evalsWithContext, (r) => {
       const tools = (r as unknown as { tool_calls?: string[] }).tool_calls;
       return tools && tools.length > 0 ? [...new Set(tools)] : [];
+    });
+
+    // Filter to environment tools only (exclude standard CLI tools)
+    const standardTools = new Set(["bash", "view", "create", "edit", "grep", "glob"]);
+    const byToolEnv = computeGrouped(evalsWithContext, (r) => {
+      const tools = (r as unknown as { tool_calls?: string[] }).tool_calls;
+      if (!tools || tools.length === 0) return [];
+      return [...new Set(tools)].filter(t => !standardTools.has(t));
     });
 
     const overallRate = passRate;
@@ -257,8 +300,19 @@ export function PromptDetailPage() {
       : 0;
 
     return {
-      history: { prompt_id: decodedId, total_runs: totalRuns, passed, pass_rate: passRate, avg_duration_seconds: avgDuration, entries, configs },
-      correlations: { byModel, byTool, overallRate, overallAvgScore },
+      history: {
+        prompt_id: decodedId,
+        total_runs: totalRuns,
+        passed,
+        pass_rate: passRate,
+        points_passed: totalPointsPassed,
+        points_total: totalPointsTotal,
+        points_pass_rate: pointsPassRatePct,
+        avg_duration_seconds: avgDuration,
+        entries,
+        configs,
+      },
+      correlations: { byModel, byToolAll, byToolEnv, overallRate, overallAvgScore },
     };
   }, [runs, decodedId]);
 
@@ -292,22 +346,25 @@ export function PromptDetailPage() {
   const configChartData = history.configs.map(c => ({
     name: c.config.replace("baseline-", "").replace("copilot-", "cp-"),
     rate: c.pass_rate,
+    pointsRate: c.points_rate,
     runs: c.runs,
     avgDuration: c.avg_duration,
   }));
 
-  // Entries over time (by run_id)
-  const timelineData = history.entries.reduce<Record<string, { run: string; passed: number; failed: number; avgScore: number; count: number }>>((acc, e) => {
-    if (!acc[e.run_id]) acc[e.run_id] = { run: e.run_id.slice(0, 8), passed: 0, failed: 0, avgScore: 0, count: 0 };
+  // Entries over time (by run_id). `pointsRate` = fractional grader-point
+  // pass rate (e.g. 5/7 → 71%). `rate` = binary pass rate (perfect-only).
+  const timelineData = history.entries.reduce<Record<string, { run: string; passed: number; failed: number; pointsPassed: number; pointsTotal: number; count: number }>>((acc, e) => {
+    if (!acc[e.run_id]) acc[e.run_id] = { run: e.run_id.slice(0, 8), passed: 0, failed: 0, pointsPassed: 0, pointsTotal: 0, count: 0 };
     acc[e.run_id].count++;
-    acc[e.run_id].avgScore += e.score;
+    acc[e.run_id].pointsPassed += e.points_passed;
+    acc[e.run_id].pointsTotal += e.points_total;
     if (e.success) acc[e.run_id].passed++;
     else acc[e.run_id].failed++;
     return acc;
   }, {});
   const timelineChartData = Object.values(timelineData).map(d => ({
     ...d,
-    avgScore: Math.round(d.avgScore / d.count),
+    pointsRate: d.pointsTotal > 0 ? Math.round((d.pointsPassed / d.pointsTotal) * 100) : 0,
     rate: Math.round((d.passed / d.count) * 100),
   }));
 
@@ -338,12 +395,40 @@ export function PromptDetailPage() {
           )}
         </div>
 
+        {/* Prompt Content */}
+        {(promptInfo?.prompt_text || promptInfo?.evaluation_criteria) && (
+          <details className="mb-8 rounded-xl border border-white/8 bg-white/[0.03]">
+            <summary className="cursor-pointer px-5 py-4 text-white/60 transition hover:text-white/80" style={{ fontSize: 13 }}>
+              Prompt Content & Evaluation Criteria
+            </summary>
+            <div className="border-t border-white/8 px-5 py-4 space-y-4">
+              {promptInfo.prompt_text && (
+                <div>
+                  <h3 className="mb-2 text-white/50" style={{ fontSize: 12 }}>PROMPT TEXT</h3>
+                  <pre className="overflow-x-auto rounded-lg bg-black/30 p-4 text-white/70" style={{ ...mono, fontSize: 12, lineHeight: 1.6 }}>
+                    {promptInfo.prompt_text}
+                  </pre>
+                </div>
+              )}
+              {promptInfo.evaluation_criteria && (
+                <div>
+                  <h3 className="mb-2 text-white/50" style={{ fontSize: 12 }}>EVALUATION CRITERIA</h3>
+                  <pre className="overflow-x-auto rounded-lg bg-black/30 p-4 text-white/70" style={{ ...mono, fontSize: 12, lineHeight: 1.6 }}>
+                    {promptInfo.evaluation_criteria}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+
         {/* Summary cards */}
-        <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-5">
           {[
             { label: "Total Runs", value: history.total_runs, icon: BarChart3, color: "text-blue-400" },
             { label: "Pass Rate", value: `${history.pass_rate}%`, icon: CheckCircle2, color: history.pass_rate >= 80 ? "text-emerald-400" : history.pass_rate >= 60 ? "text-amber-400" : "text-red-400" },
-            { label: "Passed", value: history.passed, icon: CheckCircle2, color: "text-emerald-400" },
+            { label: "Points", value: `${history.points_passed}/${history.points_total}`, icon: TrendingUp, color: history.points_pass_rate >= 80 ? "text-emerald-400" : history.points_pass_rate >= 60 ? "text-amber-400" : "text-red-400" },
+            { label: "Points %", value: `${history.points_pass_rate}%`, icon: TrendingUp, color: history.points_pass_rate >= 80 ? "text-emerald-400" : history.points_pass_rate >= 60 ? "text-amber-400" : "text-red-400" },
             { label: "Avg Duration", value: `${history.avg_duration_seconds}s`, icon: Clock, color: "text-purple-400" },
           ].map(s => (
             <div key={s.label} className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
@@ -359,30 +444,41 @@ export function PromptDetailPage() {
         {/* Charts */}
         <div className="mb-8 grid gap-6 lg:grid-cols-2">
           <div className="rounded-xl border border-white/8 bg-white/[0.03] p-6">
-            <h3 className="mb-4 text-white" style={{ fontSize: 15 }}>Pass Rate by Config</h3>
+            <h3 className="mb-1 text-white" style={{ fontSize: 15 }}>Pass Rate by Config</h3>
+            <p className="mb-4 text-white/40" style={{ fontSize: 11 }}>Binary pass rate (perfect-only) vs. fractional grader-point rate.</p>
             <ResponsiveContainer width="100%" height={230}>
               <BarChart data={configChartData}>
                 <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 12 }} />
-                <Bar dataKey="rate" fill="#10b981" radius={[4, 4, 0, 0]} name="Pass Rate %" />
+                <Bar dataKey="pointsRate" fill="#10b981" radius={[4, 4, 0, 0]} name="Points %" />
+                <Bar dataKey="rate" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Pass Rate %" />
               </BarChart>
             </ResponsiveContainer>
+            <div className="mt-3 flex justify-center gap-5">
+              {[{ label: "Points %", color: "#10b981" }, { label: "Binary Pass", color: "#8b5cf6" }].map(l => (
+                <div key={l.label} className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full" style={{ background: l.color }} />
+                  <span className="text-white/40" style={{ fontSize: 11 }}>{l.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-xl border border-white/8 bg-white/[0.03] p-6">
-            <h3 className="mb-4 text-white" style={{ fontSize: 15 }}>Score Trend Across Runs</h3>
+            <h3 className="mb-1 text-white" style={{ fontSize: 15 }}>Score Trend Across Runs</h3>
+            <p className="mb-4 text-white/40" style={{ fontSize: 11 }}>Fractional grader-point pass rate per run (e.g. 5/7 graders → 71%).</p>
             <ResponsiveContainer width="100%" height={230}>
               <LineChart data={timelineChartData}>
                 <XAxis dataKey="run" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 12 }} />
-                <Line type="monotone" dataKey="avgScore" stroke="#10b981" strokeWidth={2} dot={{ fill: "#10b981", r: 3 }} name="Avg Score" />
-                <Line type="monotone" dataKey="rate" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: "#8b5cf6", r: 3 }} name="Pass Rate %" />
+                <Line type="monotone" dataKey="pointsRate" stroke="#10b981" strokeWidth={2} dot={{ fill: "#10b981", r: 3 }} name="Points %" />
+                <Line type="monotone" dataKey="rate" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: "#8b5cf6", r: 3 }} name="Binary Pass %" />
               </LineChart>
             </ResponsiveContainer>
             <div className="mt-3 flex justify-center gap-5">
-              {[{ label: "Avg Score", color: "#10b981" }, { label: "Pass Rate", color: "#8b5cf6" }].map(l => (
+              {[{ label: "Points %", color: "#10b981" }, { label: "Binary Pass", color: "#8b5cf6" }].map(l => (
                 <div key={l.label} className="flex items-center gap-1.5">
                   <div className="h-2 w-2 rounded-full" style={{ background: l.color }} />
                   <span className="text-white/40" style={{ fontSize: 11 }}>{l.label}</span>
@@ -414,12 +510,167 @@ export function PromptDetailPage() {
               baseline={correlations.overallRate}
               showDuration
             />
-            <CorrelationTable
-              title="Pass Rate by Tool Used"
-              icon={Wrench}
-              data={correlations.byTool}
-              baseline={correlations.overallRate}
-            />
+            
+            {/* Tool usage with toggle */}
+            <div className="rounded-xl border border-white/8 bg-white/[0.03] p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-white/40" />
+                  <h3 className="text-white" style={{ fontSize: 14 }}>Pass Rate by Tool Used</h3>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 transition hover:bg-white/10">
+                  <input
+                    type="checkbox"
+                    checked={showEnvToolsOnly}
+                    onChange={e => setShowEnvToolsOnly(e.target.checked)}
+                    className="h-3 w-3 accent-emerald-500"
+                  />
+                  <span className="text-white/60" style={{ fontSize: 11 }}>Env tools only</span>
+                </label>
+              </div>
+              
+              {(showEnvToolsOnly ? correlations.byToolEnv : correlations.byToolAll).length > 0 ? (
+                <>
+                  <p className="mb-4 text-white/25" style={{ fontSize: 11 }}>
+                    How this prompt's pass rate changes based on which tools are used.
+                    {showEnvToolsOnly && " (Excluding standard CLI tools like bash, view, create, edit.)"}
+                    {" "}Overall baseline: <span style={mono}>{correlations.overallRate}%</span>
+                  </p>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="w-full" style={{ fontSize: 12 }}>
+                      <thead>
+                        <tr className="border-b border-white/8">
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Tool</th>
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Evals</th>
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>Pass Rate</th>
+                          <th className="px-3 py-2 text-left text-white/30" style={{ fontWeight: 500, fontSize: 10 }}>vs Baseline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          // Phase 6.6: group sibling tools (e.g. azure.sdk_get_*,
+                          // azure.sdk_list_*) under their parent prefix so the
+                          // table reads as 'azure (8 tools, 78%) → individual
+                          // tools indented'. Parent is derived from the first
+                          // path segment (split on '.', '/', or '_'). When a
+                          // parent has only one child we render the child flat
+                          // — no point in a one-child group.
+                          //
+                          // Note: tool_calls today are flat strings on the wire.
+                          // Once Go ToolAvailabilityEntry carries parent linkage
+                          // we should switch this aggregator to use those
+                          // fields instead of prefix splitting.
+                          const data = (showEnvToolsOnly ? correlations.byToolEnv : correlations.byToolAll);
+
+                          const parentOf = (name: string): string | null => {
+                            const dotIdx = name.indexOf(".");
+                            if (dotIdx > 0) return name.slice(0, dotIdx);
+                            const slashIdx = name.indexOf("/");
+                            if (slashIdx > 0) return name.slice(0, slashIdx);
+                            const underIdx = name.indexOf("_");
+                            // Heuristic: only treat underscore as a separator
+                            // when the prefix is short-ish (looks like a server
+                            // name). Skips false positives like
+                            // 'azure_storage_blob_py'.
+                            if (underIdx > 1 && underIdx <= 12) return name.slice(0, underIdx);
+                            return null;
+                          };
+
+                          // Group children under each parent.
+                          type Row = typeof data[number];
+                          const groups = new Map<string, { children: Row[]; total: number; passed: number }>();
+                          const orphans: Row[] = [];
+                          for (const d of data) {
+                            const parent = parentOf(d.name);
+                            if (!parent) {
+                              orphans.push(d);
+                              continue;
+                            }
+                            if (!groups.has(parent)) groups.set(parent, { children: [], total: 0, passed: 0 });
+                            const g = groups.get(parent)!;
+                            g.children.push(d);
+                            g.total += d.total;
+                            g.passed += d.passed;
+                          }
+
+                          // Single-child groups → re-orphan so we don't render
+                          // a useless header for them.
+                          for (const [parent, g] of [...groups.entries()]) {
+                            if (g.children.length < 2) {
+                              orphans.push(...g.children);
+                              groups.delete(parent);
+                            }
+                          }
+
+                          const rows: React.ReactNode[] = [];
+                          const renderRow = (d: Row, indent = false) => {
+                            const rateColor = d.rate >= 80 ? "text-emerald-400" : d.rate >= 60 ? "text-amber-400" : "text-red-400";
+                            return (
+                              <tr key={`row-${d.name}`} className="border-b border-white/5 transition hover:bg-white/[0.02]">
+                                <td className={`px-3 py-2.5 text-white/70 ${indent ? "pl-8" : ""}`} style={{ ...mono, fontSize: 11 }}>
+                                  {indent && <span className="text-white/20 mr-1.5">└</span>}
+                                  {d.name}
+                                </td>
+                                <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{d.total}</td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/10">
+                                      <div className={`h-full rounded-full ${d.rate >= 80 ? "bg-emerald-500" : d.rate >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.rate}%` }} />
+                                    </div>
+                                    <span className={rateColor} style={{ ...mono, fontSize: 11 }}>{d.rate}%</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <DeltaIndicator rate={d.rate} baseline={correlations.overallRate} />
+                                </td>
+                              </tr>
+                            );
+                          };
+
+                          // Grouped first, sorted by parent name.
+                          for (const [parent, g] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+                            const aggRate = g.total > 0 ? parseFloat(((g.passed / g.total) * 100).toFixed(1)) : 0;
+                            const rateColor = aggRate >= 80 ? "text-emerald-400" : aggRate >= 60 ? "text-amber-400" : "text-red-400";
+                            rows.push(
+                              <tr key={`parent-${parent}`} className="border-b border-white/10 bg-white/[0.02]">
+                                <td className="px-3 py-2.5 text-white/80" style={{ ...mono, fontSize: 11 }}>
+                                  {parent}
+                                  <span className="ml-2 text-white/30" style={{ fontSize: 10 }}>
+                                    ({g.children.length} tools)
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-white/40" style={{ ...mono, fontSize: 11 }}>{g.total}</td>
+                                <td className="px-3 py-2.5">
+                                  <span className={rateColor} style={{ ...mono, fontSize: 11 }}>{aggRate}%</span>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <DeltaIndicator rate={aggRate} baseline={correlations.overallRate} />
+                                </td>
+                              </tr>
+                            );
+                            for (const child of g.children.sort((a, b) => a.name.localeCompare(b.name))) {
+                              rows.push(renderRow(child, true));
+                            }
+                          }
+
+                          // Then orphans.
+                          for (const d of orphans.sort((a, b) => b.rate - a.rate)) {
+                            rows.push(renderRow(d, false));
+                          }
+
+                          return rows;
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-32 items-center justify-center text-white/30" style={{ fontSize: 13 }}>
+                  {showEnvToolsOnly ? "No environment tools detected" : "No tool usage data"}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -470,10 +721,15 @@ export function PromptDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {history.entries.map((e, i) => (
+                {history.entries.map((e, i) => {
+                  const scorePct = e.points_total > 0 ? (e.points_passed / e.points_total) * 100 : 0;
+                  const scoreTone = scorePct >= 80 ? "emerald" : scorePct >= 60 ? "amber" : "red";
+                  const barColor = scoreTone === "emerald" ? "bg-emerald-500" : scoreTone === "amber" ? "bg-amber-500" : "bg-red-500";
+                  const textColor = scoreTone === "emerald" ? "text-emerald-400" : scoreTone === "amber" ? "text-amber-400" : "text-red-400";
+                  return (
                   <tr key={`${e.run_id}-${e.config_name}-${i}`} className="border-b border-white/5 transition hover:bg-white/[0.02]">
                     <td className="px-4 py-3">
-                      {e.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}
+                      {!e.is_complete ? <Loader2 className="h-4 w-4 animate-spin text-white/40" /> : e.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}
                     </td>
                     <td className="px-4 py-3">
                       <Link to={`/runs/${e.run_id}`} className="text-blue-400/70 no-underline hover:text-blue-400" style={{ ...mono, fontSize: 11 }}>
@@ -481,24 +737,37 @@ export function PromptDetailPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-white/50" style={{ ...mono, fontSize: 12 }}>{e.config_name}</td>
-                    <td className="px-4 py-3">
-                      <span className={e.score >= 80 ? "text-emerald-400" : e.score >= 60 ? "text-amber-400" : "text-red-400"} style={{ ...mono, fontSize: 13 }}>
-                        {e.score}
-                      </span>
+                    <td className="px-4 py-3" style={{ minWidth: 140 }}>
+                      {e.points_total > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <span className={textColor} style={{ ...mono, fontSize: 12 }}>{e.points_passed}/{e.points_total}</span>
+                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${scorePct}%` }} />
+                          </div>
+                          <span className="text-white/40" style={{ ...mono, fontSize: 11 }}>{Math.round(scorePct)}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-white/30" style={{ ...mono, fontSize: 12 }}>—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-white/40" style={{ ...mono, fontSize: 12 }}>{e.duration.toFixed(1)}s</td>
                     <td className="px-4 py-3 text-white/40" style={{ fontSize: 12 }}>{e.file_count}</td>
                     <td className="px-4 py-3">
-                      <Link
-                        to={`/runs/${encodeURIComponent(e.run_id)}/eval/${encodeURIComponent(decodedId)}/${encodeURIComponent(e.config_name)}`}
-                        className="text-white/30 no-underline transition hover:text-emerald-400"
-                        style={{ fontSize: 12 }}
-                      >
-                        Detail →
-                      </Link>
+                      {e.is_complete ? (
+                        <Link
+                          to={`/runs/${encodeURIComponent(e.run_id)}/eval/${encodeURIComponent(decodedId)}/${encodeURIComponent(e.config_name)}`}
+                          className="text-white/30 no-underline transition hover:text-emerald-400"
+                          style={{ fontSize: 12 }}
+                        >
+                          Detail →
+                        </Link>
+                      ) : (
+                        <span className="text-white/20" style={{ fontSize: 12 }}>Running…</span>
+                      )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -17,3 +17,200 @@ Agent Scribe initialized as session logger for hyoka. Maintains decisions.md, or
 ## Learnings
 
 Initial setup complete.
+
+### Inbox-to-Decisions Merge Patterns (2026-04-17)
+
+**Handling Phase 4 Kickoff Brief:**
+1. **Condensation:** Morpheus's full 181-line brief (detailed architecture, per-agent guidance, risk register rationale) was summarized to ~70 lines in decisions.md, capturing:
+   - Phase 4 North Star + dependency graph (critical path + parallel tracks)
+   - Key decisions (3 major items: #566 Option A, Trinity workload, architectural contract)
+   - Per-agent launch (bullet points, 4 agents)
+   - Risk register (5 items, condensed rows)
+   - Go-live gates (7 criteria)
+2. **Cross-reference:** Condensed entry references archived full brief at `.squad/decisions/archive/morpheus-phase4-kickoff.md` for readers needing full rationale.
+3. **Chronological ordering:** New decision inserted at top of "## Active Decisions" section (newest-first convention).
+4. **Session logging:** Phase 4 fan-out recorded to `.squad/sessions/2026-04-17.md` with:
+   - Phase 3 completion details (PR #562 commit, hotfix integration merge chain)
+   - Phase 4 kickoff context (Morpheus delivery, Ronnie approval)
+   - Agent assignments and model selections
+   - Risk profile and go-live criteria
+5. **Archive pattern:** Full-text briefs stored in `.squad/decisions/archive/` with filename matching inbox document; condensed summary in main decisions.md acts as index.
+6. **Commit discipline:** Squad changes committed directly to `ronniegeraghty/dev` (no PR) with full trailers. Session logs in `.squad/sessions/` are gitignored (local tracking only); decisions and archives are committed.
+
+**Patterns observed from other inbox files:**
+- Previous decisions deduped by checking decisions.md for existing entries before merging
+- Archive convention established: inbox files moved to archive after merge into decisions
+- Session logs use daily files (YYYY-MM-DD.md) to track events, not timestamped JSON
+
+**Future application:**
+- When merging large briefing documents, always condense to 60–80 lines in decisions.md
+- Use 3–4 key decision bullets + per-agent bullets for clarity
+- Archive full text for traceability
+- Cross-link archived doc from decisions.md summary
+
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
+
+### Session 2026-04-20 (Phase 5 Coordination & Orchestration)
+
+**Role:** Coordinator (Ronnie's session managing Phase 5)
+
+**Phase 5 Mission:** Docs & Polish on new per-phase integration branch workflow
+
+**Workflow Innovation:**
+- Departed from per-issue PRs
+- Introduced shared `phase-5` integration branch (off `ronniegeraghty/dev`)
+- Owners work in parallel, merge directly (no per-issue PRs)
+- Shared review on-branch (Switch)
+- Live verification gate (Morpheus)
+- Single rollup PR when all done
+
+**Issues Scheduled:**
+- Wave 1: #364, #367, #369 + TDD tests
+- Wave 2: #366, #368
+- Deferred: #365 (A/B compare, XL scope, Phase 6)
+
+**Execution Summary:**
+- All 5 issues delivered to `phase-5`
+- One escalation (Trinity/Oracle locked out on #364, Morpheus rescued)
+- Switch review cycle: 3 clean approvals, 2 re-reviews
+- Morpheus live verification: All UI features working
+- Rollup PR #592 opened
+
+**Outcomes:**
+- ✅ 5 issues approved and merged to `phase-5`
+- ✅ Reviewer-protocol enforcement successful
+- ✅ Live verification gate established
+- ✅ Per-phase workflow validated
+- ⏸️ #365 deferred to Phase 6 (scope management)
+
+**Phase 5 Status:** COMPLETE. Rollup PR #592 open for Ronnie's review.
+
+**Key Learning:** Per-phase workflow with shared integration branch + live verification gate significantly accelerates delivery compared to per-issue PRs. Reviewer-protocol escalation chain worked as designed: locked agents step back, escalation brings fresh eyes, root causes fixed instead of worked around.
+
+## Team Updates
+
+### CLI Output UX Sprint — Complete (2026-04-23T00:05:04Z)
+
+Sprint closed at HEAD `2d38533f` on `ronniegeraghty/dev`. 15 commits total across three rounds, 48 new test cases.
+
+**Your merges this sprint:** `60cc90bf` round-2 merge (schema + emitters consolidation, 5 inbox entries) · final wrap merge 2026-04-23T00:05:04Z (6 inbox entries including 2 bug reports: one resolved, one moved to Known Issues).
+
+**Key reconciliation:** Updated the round-1/2 table in `.squad/decisions.md` to reflect that `82cd8590` (Neo's original ToolsVerified emission) never merged; behavior re-landed via Switch's `25ce00a7`. Added a Known Issues section containing the preexisting `hyoka clean` non-interactive-stdin bug.
+
+See `.squad/orchestration-log/2026-04-23T00-05-04Z-sprint-wrap.md`.
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+
+### 2026-04-23T19:42Z: Decision-log discipline — extend, don't SUPERSEDE, when a follow-up adds a contract rather than reversing one
+
+When commit `4a8c4a0d` landed (container plugin fan-out), the temptation was to mark the prior `repo:`-required entry as superseded. Wrong instinct. The earlier decision fixed the *locator* shape; this one fixes the *content* shape. Both contracts now hold simultaneously. Rule: only mark SUPERSEDED when the new decision *replaces* or *reverses* the earlier one. When it adds an orthogonal contract, the entry should explicitly say "extends, does not supersede" and cross-reference the prior commit. Readers a year later need to know both rules still apply.
+
+---
+
+## 2026-04-24: Session Complete — Orchestration, Decision Merge, History Updates ✅
+
+**Session:** 2026-04-24T05:58:18Z  
+**Status:** ✅ Complete
+
+Merged feature-shipped state across team:
+
+- ✅ Orchestration logs: Switch (ff38a7ec) + Coordinator merge (4 commits)
+- ✅ Session log: prompt-grader-checks feature shipped
+- ✅ Decision merge: Switch's tool-grader decision + work-on-dev directive → decisions.md (inbox deleted)
+- ✅ Cross-agent history: Feature notes appended to Switch, Tank, Neo, Morpheus + work-on-dev directive to all active agents
+- ✅ Ready for git commit of .squad/ state
+
+**Work-on-dev directive:** All active agents notified of new branch strategy (no transient feature branches for squad work — merge to dev).
+
+
+---
+
+## 2026-04-24: 🚨 Team default model is now claude-opus-4.7
+
+Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing policy at the top of `.squad/decisions.md`:
+
+- **Every agent spawn defaults to `claude-opus-4.7`.**
+- **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
+- **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
+- This affects what every future spawn looks like — expect opus-4.7 as your model.
+
+---
+
+## 2026-04-24: Oracle Cleanup — Unimplemented Examples → Issues
+
+**Decision:** Ronnie → Oracle: delete unimplemented doc sketches, file as GitHub issues  
+**Outcome:** ✅ COMPLETED
+
+**Execution:**
+- Deleted `examples/prompts/graders-frontmatter-example.prompt.md`
+- Removed "Option B" section from `docs/starter-files.md`
+- Removed graders-frontmatter refs from `examples/README.md`
+- Filed **#636**: graders frontmatter feature
+- Filed **#637**: starter_files list feature
+
+**Commits:** `09cf17f0` (cleanup) · `a41616fe` (Oracle history)  
+**Branch:** ronniegeraghty/dev
+
+**Rationale:** Documentation debt — unimplemented features belong in issues, not in shipped examples. Examples now match parser reality.
+
+**Decision archive:** `.squad/decisions/archive/oracle-unimplemented-examples-to-issues.md`
+
+---
+
+## 2026-04-28: Tool-Load Consolidation — Decision Merge + Commit Hygiene ✅
+
+**Session:** scribe finalize Wave 1-3 (Items A/B/C/D/E + Switch tests + Item F already at `c72ac831`)
+**Status:** ✅ Complete
+
+Took ~16 uncommitted files spanning 6 logical work items + 9 inbox decisions and produced 7 commits on `ronniegeraghty/dev`:
+
+- `7d750d4f` (tank, Item A — `internal/toolload` package)
+- `54fedbab` (neo, Item D — pre-session aggregation)
+- `a65ac8e5` (neo, Item B — plugin remote fetcher tests)
+- `2cec4f85` (tank, Item C — freshness + flock + cache-root threading in `fetcher.go`)
+- `55d25601` (neo, Item E — post-session gate, closes #347)
+- `20c9e502` (switch, Item G — cacheroot warning tests)
+- `<hash>` (scribe, decision merge — single dated section in `decisions.md`)
+
+All 9 inbox decision files archived under `.squad/decisions/archive/`. Orchestration entry written. Histories preserved.
+
+**Pushed to `origin/ronniegeraghty/dev`.**
+
+## Learnings
+
+- **Scribe must reconstruct authorship from agent decision files, not just `git blame`.** When agents ship without committing, the decision file is the only ground truth for who wrote which lines. Tank's Item F commit (`c72ac831`) bundled Neo's `validate.go` + Tank's `installed.go` Item A bits because the working tree was sprawling. Authorship was reconstructed from `tank-item-f-*.md` + `neo-item-d-*.md` + `tank-item-a-*.md` cross-referenced against the diff hunks.
+- **Build-green-per-commit is achievable even when files mix Items.** Group the file with the most-impacted Item, mention the other Items' contributions in the commit body, run `go build ./...` after every commit. Took 6 build checks for 6 commits — zero red builds.
+- **`fetcher.go` and `copilot.go` were the worst offenders for Item-mixing.** `fetcher.go`: A (cache root) + B (plugin reg) + C (ensureRepoCloned). `copilot.go`: D (`\n` separator) + E (gate). Splitting via `git add -p` would have given cleaner per-Item commits but cost ~30min and three merge errors. Pragmatic group-with-most-impacted got the same end-state diff with 6 commits in ~10min.
+- **Stripping a test file via `cp` + `sed` then restoring is safer than `git add -p` for splitting tests.** Did this for `cacheroot_test.go` to land Tank's tests in commit 1 and Switch's tests in commit 6. Backup file lived in repo root with `.scribe-` prefix (NOT in `/tmp` — environment forbids `/tmp`).
+- **One section in `decisions.md`, not eight.** Charter is explicit: Scribe consolidates fan-out work into a single dated entry with sub-sections (cache layout / no-TTL / freshness / flock / fetcher / format contract / post-session gate / dedup / legacy fallback / open follow-ups). Eight separate entries for one logical refactor would be a charter violation.
+- **Open Ronnie-action items belong in the decisions section under "Open follow-ups", not in the orchestration log.** The legacy `~/.copilot/installed-plugins/` drop window is the only Ronnie-pending item from this session — surfaced in `decisions.md` so future contributors see it during normal decision review, not buried in a session-specific log.
+
+
+---
+
+## 2026-05-02: Two-inbox-drops + skill cleanup → single decisions section ✅
+
+**Session:** Config-aware `when:` Phase 1 + Switch skill audit cleanup
+**Status:** ✅ Complete
+
+Folded two inbox drops (`morpheus-config-aware-when.md` scope + `neo-config-aware-when-phase1.md` impl) into **one** dated decisions.md section with explicit Phase 1 SHIPPED / Phase 2 DEFERRED structure. Switch's skill audit cleanup got its own short section since it was an independent thread.
+
+Three orchestration log entries (morpheus / neo / switch) at `2026-05-02T07-30-00Z`. Session log appended to `.squad/sessions/log.md`. Cross-agent histories already self-updated by each agent — no scribe edits needed.
+
+### Learnings
+
+- **When scope-doc + impl-doc land in the same session, merge them into ONE dated decisions section, not two.** The reader's mental model is "what did we decide?" — they don't care that the scope landed at 2026-05-02T03:00 and the impl at 2026-05-02T07:00. Use a single header with sub-sections (What shipped / Implementation / Tests / Docs / Deferred). Mirrors the "one section in decisions.md, not eight" learning from 2026-04-28 tool-load consolidation, but applies even to a 2-doc fan-in.
+- **An independent thread that overlaps in time still gets its own section.** Switch's skill audit was ambient cleanup, not part of the `when:` design — folding it into the same section would imply causal connection that doesn't exist. Two sections, same dated stamp, different titles. Don't conflate threads just because they share a session.
+- **Working-tree code from a previously-logged thread can ride along in the same scribe commit.** This batch included Neo's grader-isolation code (`workspace.go`, `grader_isolation_test.go`, `prompt_review_grader*.go`) which had been *logged* at `26145607` but not *committed* (that commit was .squad-only). The brief explicitly said "this batch covers everything since" — meaning all working-tree changes ride together. Don't try to backfill into the prior commit; just sweep current state forward.
+- **Agents self-updating their own histories is the new normal.** Both Neo and Switch already wrote their own history entries before scribe spawned. Scribe's job in those cases is just to cross-reference (don't duplicate the content) and confirm via `tail` rather than re-write. Saves churn and prevents merge conflicts.
+- **`.squad/skills/skill-authoring/SKILL.md` was authored by Switch as a reusable artifact** — that's a domain-knowledge SKILL living under `.squad/skills/`, not under repo `skills/` (which is for generator/reviewer skills the eval engine loads). Two namespaces: agent-team skills (`.squad/skills/`) vs hyoka-runtime skills (`skills/`). When committing, both can ride in one commit but should be mentioned as separate concerns in the message body.

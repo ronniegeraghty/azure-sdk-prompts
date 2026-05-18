@@ -8,42 +8,6 @@ import (
 
 const testPromptContent = `---
 id: storage-auth-dotnet
-service: storage
-plane: data-plane
-language: dotnet
-category: authentication
-difficulty: beginner
-description: "Authenticate to Azure Blob Storage using DefaultAzureCredential"
-sdk_package: Azure.Storage.Blobs
-doc_url: https://learn.microsoft.com/en-us/dotnet/api/azure.storage.blobs
-tags:
-  - authentication
-  - blob
-  - identity
-created: "2024-01-15"
-author: test
-expected_packages:
-  - Azure.Storage.Blobs
-  - Azure.Identity
-expected_tools:
-  - create_file
-  - run_terminal_command
----
-
-# Storage Authentication (.NET)
-
-## Prompt
-
-Write a C# console application that authenticates to Azure Blob Storage
-using DefaultAzureCredential and lists all containers in the storage account.
-
-## Notes
-
-This is a beginner-level prompt for testing.
-`
-
-const testPromptContentNested = `---
-id: storage-auth-dotnet
 properties:
   service: storage
   plane: data-plane
@@ -80,7 +44,7 @@ This is a beginner-level prompt for testing.
 `
 
 func TestParsePromptFileNested(t *testing.T) {
-	p, err := ParsePromptFile([]byte(testPromptContentNested), "test-nested.prompt.md")
+	p, err := ParsePromptFile([]byte(testPromptContent), "test-nested.prompt.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,7 +129,7 @@ func TestParsePromptFileMissingFrontmatter(t *testing.T) {
 }
 
 func TestParsePromptFileMissingID(t *testing.T) {
-	content := []byte("---\nservice: storage\n---\n## Prompt\nHello\n")
+	content := []byte("---\nproperties:\n  service: storage\n---\n## Prompt\nHello\n")
 	_, err := ParsePromptFile(content, "no-id.prompt.md")
 	if err == nil {
 		t.Fatal("expected error for missing ID")
@@ -413,20 +377,21 @@ func containsSubstring(s, sub string) bool {
 }
 
 const testYAMLPromptContent = `id: storage-auth-dotnet
-service: storage
-plane: data-plane
-language: dotnet
-category: authentication
-difficulty: beginner
-description: "Authenticate to Azure Blob Storage using DefaultAzureCredential"
-sdk_package: Azure.Storage.Blobs
-doc_url: https://learn.microsoft.com/en-us/dotnet/api/azure.storage.blobs
+properties:
+  service: storage
+  plane: data-plane
+  language: dotnet
+  category: authentication
+  difficulty: beginner
+  description: "Authenticate to Azure Blob Storage using DefaultAzureCredential"
+  sdk_package: Azure.Storage.Blobs
+  doc_url: https://learn.microsoft.com/en-us/dotnet/api/azure.storage.blobs
+  created: "2024-01-15"
+  author: test
 tags:
   - authentication
   - blob
   - identity
-created: "2024-01-15"
-author: test
 expected_packages:
   - Azure.Storage.Blobs
   - Azure.Identity

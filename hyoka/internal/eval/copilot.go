@@ -13,79 +13,147 @@ import (
 
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotperm"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/process"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/report"
-	"github.com/ronniegeraghty/hyoka/hyoka/internal/skills"
 )
 
-// CopilotSDKEvaluator uses the Copilot SDK to run real evaluations.
-type CopilotSDKEvaluator struct {
+// CopilotPromptRunner uses the Copilot SDK to run real evaluations.
+type CopilotPromptRunner struct {
 	clientOpts        *copilot.ClientOptions
 	allowCloud        bool
 	maxSessionActions int
+	maxTurns          int
+	maxFiles          int
 	sessionTimeout    time.Duration
 	progressFn        progress.ProgressFunc
+
+	// Per-eval resolved limits (set by SetLimitsForEval before each Run call).
+	// Protected by evalLimitsMu for concurrent eval safety (#bugfix-maxturns).
+	evalLimitsMu          sync.RWMutex
+	evalMaxTurns          int
+	evalMaxFiles          int
+	evalMaxSessionActions int
 }
 
 // SetProgressFunc registers a callback for live progress updates.
-func (e *CopilotSDKEvaluator) SetProgressFunc(fn progress.ProgressFunc) {
+func (e *CopilotPromptRunner) SetProgressFunc(fn progress.ProgressFunc) {
 	e.progressFn = fn
 }
 
 // SetSessionTimeout configures the maximum duration for a single generation
 // SendAndWait call. Zero means use the default (10 minutes). Per-prompt
 // Timeout frontmatter still overrides this value.
-func (e *CopilotSDKEvaluator) SetSessionTimeout(d time.Duration) {
+func (e *CopilotPromptRunner) SetSessionTimeout(d time.Duration) {
 	e.sessionTimeout = d
 }
 
-// CopilotEvalOptions configures the CopilotSDKEvaluator.
-type CopilotEvalOptions struct {
+// SetLimitsForEval updates the per-eval resolved limits before each Run call.
+// These values override the CLI-level defaults during real-time enforcement.
+// Safe for concurrent calls — the engine may run multiple evals in parallel
+// against the same runner instance (#bugfix-maxturns).
+func (e *CopilotPromptRunner) SetLimitsForEval(maxTurns, maxFiles, maxSessionActions int) {
+	e.evalLimitsMu.Lock()
+	e.evalMaxTurns = maxTurns
+	e.evalMaxFiles = maxFiles
+	e.evalMaxSessionActions = maxSessionActions
+	e.evalLimitsMu.Unlock()
+}
+
+// PromptRunnerOptions configures the CopilotPromptRunner.
+type PromptRunnerOptions struct {
 	// GitHubToken for SDK authentication (optional; falls back to logged-in user).
 	GitHubToken string
 	// CLIPath overrides the Copilot CLI executable path.
 	CLIPath string
-	// AllowCloud permits generated code to provision real cloud resources (#36).
+	// AllowCloud permits agent output to provision real cloud resources (#36).
 	AllowCloud bool
 	// MaxSessionActions limits the total number of actions (reasoning, message,
 	// tool execution start) during generation. When reached, the session context
 	// is cancelled to stop the run immediately.
 	MaxSessionActions int
+	// MaxTurns limits the number of assistant turns during generation (#347).
+	MaxTurns int
+	// MaxFiles limits the number of files created during generation (#347).
+	MaxFiles int
 }
 
-// NewCopilotSDKEvaluator creates a new evaluator backed by the Copilot SDK.
-func NewCopilotSDKEvaluator(opts CopilotEvalOptions) *CopilotSDKEvaluator {
-	clientOpts := &copilot.ClientOptions{}
+// NewCopilotPromptRunner creates a new evaluator backed by the Copilot SDK.
+func NewCopilotPromptRunner(opts PromptRunnerOptions) *CopilotPromptRunner {
+	clientOpts := BuildBaseClientOpts()
 	if opts.GitHubToken != "" {
 		clientOpts.GitHubToken = opts.GitHubToken
 	}
 	if opts.CLIPath != "" {
 		clientOpts.CLIPath = opts.CLIPath
 	}
-	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-		clientOpts.LogLevel = "debug"
-	}
-	// Tag SDK-spawned processes with HYOKA_SESSION env var (#70).
-	clientOpts.Env = HyokaBaseEnv()
-	return &CopilotSDKEvaluator{
+	return &CopilotPromptRunner{
 		clientOpts:        clientOpts,
 		allowCloud:        opts.AllowCloud,
 		maxSessionActions: opts.MaxSessionActions,
+		maxTurns:          opts.MaxTurns,
+		maxFiles:          opts.MaxFiles,
 	}
 }
 
 // Evaluate runs a prompt through a real Copilot session and returns generated files and events.
-func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
+func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	// Starter files are copied by the engine before Evaluate is called (#127).
+
+	// Build session config from tool config
+	// Create isolated config directory to prevent user-level skills from
+	// leaking into the eval session (#21). Only skills explicitly listed
+	// in the eval config's SkillDirectories are loaded.
+	configDir, err := NewIsolatedConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("creating isolated config dir: %w", err)
+	}
+
+	// Pre-session tool validation (WU-1): resolve every declared plugin,
+	// skill directory, and MCP server BEFORE the copilot client is started.
+	// A missing plugin, missing skill path, or empty skill_dir aborts the
+	// eval with error_category=tool_load_failure. Progress events are emitted
+	// here so the interactive renderer can show the Tools block before the
+	// Agent Attempt header — buildSessionConfigForEval consumes the
+	// resulting report without re-resolving. Validation runs BEFORE
+	// client.Start so a missing copilot binary or auth failure cannot
+	// mask a tool-load failure (the hard-fail contract).
+	taggedEmit := e.buildTaggedEmit(cfg, p.ID+"/"+cfg.Name, p.ID)
+	toolReport, toolErr := tool.ValidateAndExpand(ctx, tool.ValidationInput{
+		GeneratorTools: cfgGeneratorTools(cfg),
+		// Reviewer tools are validated separately in cmd/run.go per-config
+		// (WU-2) so missing reviewer skills fail fast there; including them
+		// here would double-validate and couple engine runs to CLI flags.
+		ReviewerTools: nil,
+		ConfigDir:     configDir,
+		PluginsDir:    config.ResolvePluginsDir(),
+		Emit:          taggedEmit,
+	})
+	if toolErr != nil {
+		_ = os.RemoveAll(configDir)
+		return &EvalResult{
+			Success: false,
+			// toolErr.Error() is the multi-line summary produced by
+			// tool.SummarizeToolLoadErrors — every failed tool, not just
+			// the first. Surface it verbatim so operators can fix all
+			// broken tools in one pass.
+			Error:         "tool_load_failure:\n" + toolErr.Error(),
+			ErrorDetails:  toolErr.Error(),
+			ErrorCategory: "tool_load_failure",
+		}, fmt.Errorf("tool load failure: %w", toolErr)
+	}
+	defer os.RemoveAll(configDir)
 
 	// Create Copilot client
 	opts := *e.clientOpts
 	opts.Cwd = workDir
 	// Enrich env with prompt/config metadata for this specific eval (#70).
-	opts.Env = HyokaEvalEnv(p.ID, cfg.Name)
+	opts.Env = process.HyokaEvalEnv(p.ID, cfg.Name)
 	client := copilot.NewClient(&opts)
 
 	if err := client.Start(ctx); err != nil {
@@ -99,7 +167,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	// The PID is written to a file so the clean command can find orphaned
 	// processes even if hyoka crashes.
 	var trackedPIDs []int
-	for _, cpid := range findChildCopilotPIDs() {
+	for _, cpid := range process.FindChildCopilotPIDs() {
 		if err := pidfile.Write(pidfile.Info{PID: cpid, PromptID: p.ID, Config: cfg.Name}); err != nil {
 			slog.Debug("failed to write PID file", "pid", cpid, "error", err)
 		} else {
@@ -149,17 +217,10 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		}
 	}()
 
-	// Build session config from tool config
-	// Create isolated config directory to prevent user-level skills from
-	// leaking into the eval session (#21). Only skills explicitly listed
-	// in the eval config's SkillDirectories are loaded.
-	configDir, err := NewIsolatedConfigDir()
-	if err != nil {
-		return nil, fmt.Errorf("creating isolated config dir: %w", err)
-	}
-	defer os.RemoveAll(configDir)
-
-	sessionCfg := e.buildSessionConfig(cfg, workDir, configDir, mergePromptProperties(p))
+	// Build session config from tool config. configDir, taggedEmit and
+	// toolReport were resolved before client.Start above (pre-session
+	// hard-fail contract); reuse them here.
+	sessionCfg := e.buildSessionConfigForEval(ctx, cfg, workDir, configDir, mergePromptProperties(p), p.ID+"/"+cfg.Name, p.ID, toolReport)
 
 	// Subscribe to events with detailed capture and debug logging.
 	// This MUST be set before CreateSession — the SDK reads OnEvent during
@@ -174,16 +235,59 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	// Capture turn counter for expanded events
 	var turnCounter int
 	var actionCounter int
+	var fileCounter int // tracks files created during session (#347)
 
 	// Mid-generation action limit. Create a cancellable child context
 	// so the OnEvent callback can stop runaway sessions in real time.
 	genCtx, genCancel := context.WithCancel(ctx)
 	defer genCancel()
 	var actionLimitHit bool
+	var turnLimitHit bool
+	var fileLimitHit bool
+
+	// Resolve effective limits for real-time enforcement.
+	// Prefer per-eval resolved values (set by engine via SetLimitsForEval),
+	// fall back to CLI defaults from runner construction, then hardcoded defaults.
+	e.evalLimitsMu.RLock()
+	maxTurnsLimit := e.evalMaxTurns
+	if maxTurnsLimit <= 0 {
+		maxTurnsLimit = e.maxTurns
+	}
+	if maxTurnsLimit <= 0 {
+		maxTurnsLimit = 25
+	}
+
+	maxFilesLimit := e.evalMaxFiles
+	if maxFilesLimit <= 0 {
+		maxFilesLimit = e.maxFiles
+	}
+	if maxFilesLimit <= 0 {
+		maxFilesLimit = 50
+	}
+
+	maxSessionActionsLimit := e.evalMaxSessionActions
+	if maxSessionActionsLimit <= 0 {
+		maxSessionActionsLimit = e.maxSessionActions
+	}
+	e.evalLimitsMu.RUnlock()
+
+	// Build expected tool sets for verification after session creation (#347)
+	expectedMCPServers := make(map[string]bool)
+	for _, entry := range cfg.Generator.Tools {
+		if entry.ResolvedType() == "mcp" {
+			expectedMCPServers[entry.Name] = true
+		}
+	}
+	// verifier accumulates SDK-reported tool loads and produces exactly one
+	// bulk EventToolsVerified per eval once every configured kind has fired.
+	// Emission is gated on a non-nil progressFn; the slice is built under the
+	// OnEvent mutex below but dispatched after unlock.
+	verifier := newToolVerifier(sessionCfg.SkillDirectories, expectedMCPServers)
 
 	sessionCfg.OnEvent = func(event copilot.SessionEvent) {
 		mu.Lock()
 		events = append(events, event)
+		var verifiedTools []progress.ToolStatus
 
 		// Build serializable event record
 		rec := report.SessionEventRecord{
@@ -236,6 +340,23 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 			turnCounter++
 			rec.TurnNumber = turnCounter
 			lg.Info("Turn started", "turn", turnCounter)
+			// Tool loading MUST be complete by first turn start — the SDK won't
+			// begin generation until tools are loaded or definitively failed.
+			// Signal the verifier so postSessionToolVerification doesn't wait
+			// forever for events that will never arrive (#347 / Option A).
+			verifier.onSessionReady()
+			if e.progressFn != nil {
+				if t := verifier.emitIfReady(); t != nil {
+					verifiedTools = t
+				}
+			}
+			// Real-time turn limit enforcement (#347)
+			if maxTurnsLimit > 0 && turnCounter > maxTurnsLimit && !turnLimitHit {
+				turnLimitHit = true
+				lg.Warn("Turn limit reached, cancelling session",
+					"turns", turnCounter, "max_turns", maxTurnsLimit)
+				genCancel()
+			}
 		case copilot.SessionEventTypeAssistantTurnEnd:
 			rec.TurnNumber = turnCounter
 			if event.Data.Duration != nil {
@@ -243,9 +364,9 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 			}
 		case copilot.SessionEventTypeAssistantReasoning:
 			actionCounter++
-			if e.maxSessionActions > 0 && actionCounter > e.maxSessionActions && !actionLimitHit {
+			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
 				actionLimitHit = true
-				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", e.maxSessionActions)
+				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", maxSessionActionsLimit)
 				genCancel()
 			}
 			// Content already captured above
@@ -263,6 +384,16 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		case copilot.SessionEventTypeSessionWorkspaceFileChanged:
 			if event.Data.Operation != nil {
 				rec.FileOperation = string(*event.Data.Operation)
+				// Real-time file count enforcement (#347)
+				if string(*event.Data.Operation) == "create" {
+					fileCounter++
+					if maxFilesLimit > 0 && fileCounter > maxFilesLimit && !fileLimitHit {
+						fileLimitHit = true
+						lg.Warn("File limit reached, cancelling session",
+							"files", fileCounter, "max_files", maxFilesLimit)
+						genCancel()
+					}
+				}
 			}
 		case copilot.SessionEventTypeCommandExecute:
 			if event.Data.Command != nil {
@@ -295,26 +426,76 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		case copilot.SessionEventTypeAbort:
 			lg.Error("Session aborted")
 		case copilot.SessionEventTypePermissionRequested:
-			// Audit trail
+			tn, tc := "", ""
+			if event.Data.ToolName != nil {
+				tn = *event.Data.ToolName
+			}
+			if event.Data.ToolCallID != nil {
+				tc = *event.Data.ToolCallID
+			}
+			lg.Debug("Permission requested", "toolName", tn, "toolCallID", tc)
 		case copilot.SessionEventTypePermissionCompleted:
-			// Audit trail
+			tn, tc, rsn, ern, msg := "", "", "", "", ""
+			if event.Data.ToolName != nil {
+				tn = *event.Data.ToolName
+			}
+			if event.Data.ToolCallID != nil {
+				tc = *event.Data.ToolCallID
+			}
+			if event.Data.Reason != nil {
+				rsn = *event.Data.Reason
+			}
+			if event.Data.ErrorReason != nil {
+				ern = *event.Data.ErrorReason
+			}
+			if event.Data.Message != nil {
+				msg = *event.Data.Message
+			}
+			lg.Debug("Permission completed", "toolName", tn, "toolCallID", tc, "reason", rsn, "errorReason", ern, "message", msg)
 		case copilot.SessionEventTypeSessionSkillsLoaded:
-			if len(event.Data.Skills) > 0 {
-				names := make([]string, 0, len(event.Data.Skills))
-				for _, s := range event.Data.Skills {
-					names = append(names, s.Name)
-				}
+			names := make([]string, 0, len(event.Data.Skills))
+			for _, s := range event.Data.Skills {
+				names = append(names, s.Name)
+			}
+			if len(names) > 0 {
 				rec.Content = strings.Join(names, ", ")
 				lg.Info("Skills loaded", "skills", rec.Content)
+			} else if tool.CountSkills(sessionCfg.SkillDirectories) > 0 {
+				lg.Warn("No skills loaded despite configured skill directories",
+					"expected_dirs", len(sessionCfg.SkillDirectories))
+			}
+			verifier.onSkillsLoaded(names)
+			if e.progressFn != nil {
+				if t := verifier.emitIfReady(); t != nil {
+					verifiedTools = t
+				}
 			}
 		case copilot.SessionEventTypeSessionMcpServersLoaded:
-			if len(event.Data.Servers) > 0 {
-				names := make([]string, 0, len(event.Data.Servers))
-				for _, s := range event.Data.Servers {
-					names = append(names, s.Name)
-				}
+			names := make([]string, 0, len(event.Data.Servers))
+			loadedNames := make(map[string]bool, len(event.Data.Servers))
+			for _, s := range event.Data.Servers {
+				names = append(names, s.Name)
+				loadedNames[s.Name] = true
+			}
+			if len(names) > 0 {
 				rec.Content = strings.Join(names, ", ")
 				lg.Info("MCP servers loaded", "servers", rec.Content)
+				// Verify all expected MCP servers loaded (#347)
+				for expected := range expectedMCPServers {
+					if !loadedNames[expected] {
+						lg.Warn("Expected MCP server not loaded",
+							"server", expected, "loaded", names)
+					}
+				}
+			} else if len(expectedMCPServers) > 0 {
+				lg.Warn("No MCP servers loaded despite configuration",
+					"expected", len(expectedMCPServers))
+			}
+			verifier.onMCPLoaded(names)
+			if e.progressFn != nil {
+				if t := verifier.emitIfReady(); t != nil {
+					verifiedTools = t
+				}
 			}
 		case copilot.SessionEventTypeSessionToolsUpdated:
 			lg.Info("Tools updated")
@@ -330,6 +511,19 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 
 		sessionRecords = append(sessionRecords, rec)
 		mu.Unlock()
+
+		// Emit the bulk tool-verification event outside the lock (matches the
+		// rest of the progress-forwarding in this handler; avoids any risk of
+		// deadlock with renderers that take their own locks in progressFn).
+		if verifiedTools != nil && e.progressFn != nil {
+			e.progressFn(progress.ProgressEvent{
+				EvalID:     debugPrefix,
+				PromptID:   p.ID,
+				ConfigName: cfg.Name,
+				Type:       progress.EventToolsVerified,
+				Tools:      verifiedTools,
+			})
+		}
 
 		// Forward progress events to display
 		if e.progressFn != nil {
@@ -409,9 +603,9 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		switch event.Type {
 		case copilot.SessionEventTypeToolExecutionStart:
 			actionCounter++
-			if e.maxSessionActions > 0 && actionCounter > e.maxSessionActions && !actionLimitHit {
+			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
 				actionLimitHit = true
-				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", e.maxSessionActions)
+				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", maxSessionActionsLimit)
 				genCancel()
 			}
 			toolName := ""
@@ -431,9 +625,9 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 			lg.Debug("Tool done", "tool", toolName, "result", content)
 		case copilot.SessionEventTypeAssistantMessage:
 			actionCounter++
-			if e.maxSessionActions > 0 && actionCounter > e.maxSessionActions && !actionLimitHit {
+			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
 				actionLimitHit = true
-				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", e.maxSessionActions)
+				lg.Warn("Action limit reached, cancelling session", "actions", actionCounter, "max_session_actions", maxSessionActionsLimit)
 				genCancel()
 			}
 			content := ""
@@ -488,7 +682,7 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	slog.Info("Creating Copilot session",
 		"model", cfg.Generator.Model,
 		"skill_dirs", len(sessionCfg.SkillDirectories),
-		"skills", skills.CountSkills(sessionCfg.SkillDirectories),
+		"skills", tool.CountSkills(sessionCfg.SkillDirectories),
 		"mcp_servers", len(sessionCfg.MCPServers),
 		"work_dir", workDir,
 	)
@@ -553,6 +747,8 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 				SessionEvents:  captured,
 				ActionTimeline: BuildActionTimeline(captured),
 				Success:        true, // Let engine.go guardrail set the proper failure
+				FinalResponse:  extractLastAssistantMessage(captured),
+				ToolReport:     toolReport,
 				CleanupFn:      buildCleanupFn(),
 			}, nil
 		}
@@ -564,6 +760,8 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 			ToolCalls:      extractToolCalls(capturedEvts),
 			Error:          fmt.Sprintf("prompt send failed: %v", err),
 			ErrorDetails:   err.Error(),
+			FinalResponse:  extractLastAssistantMessage(captured),
+			ToolReport:     toolReport,
 			CleanupFn:      buildCleanupFn(),
 		}, fmt.Errorf("sending prompt: %w", err)
 	}
@@ -575,6 +773,49 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 	capturedRecords := make([]report.SessionEventRecord, len(sessionRecords))
 	copy(capturedRecords, sessionRecords)
 	mu.Unlock()
+
+	// Post-session tool verification gate (#347 / Item E / Option A).
+	// The SDK emits SessionSkillsLoaded / SessionMcpServersLoaded only after
+	// the first message round-trip, so this gate runs AFTER SendAndWait
+	// returned — by which point the verifier's readyChan has typically already
+	// closed from inside the OnEvent callback (either from normal tool events
+	// OR from onSessionReady when AssistantTurnStart fired).
+	//
+	// waitForToolVerification now uses a 5-minute absolute ceiling as a
+	// fail-safe in case the session never reached first turn (auth hang,
+	// network failure, SDK bug). This is NOT the primary gate — the real
+	// signal is AssistantTurnStart, which marks tool registration as
+	// definitively complete. The ceiling is ONLY for broken sessions.
+	//
+	// Failure here is fatal to the eval: grading code that ran without the
+	// configured tools produces false-positive scores. Match the
+	// pre-session error format (Item D) by using
+	// tool.SummarizeToolLoadErrors so operators see consistent messaging
+	// regardless of which validation layer caught the breakage.
+	if summary := postSessionToolVerification(ctx, verifier, 5*time.Minute); summary != "" {
+		lg.Warn("Post-session tool verification failed; aborting before grading",
+			"summary", summary)
+		generatedFiles, listErr := listFiles(workDir)
+		if listErr != nil {
+			lg.Warn("Failed to list generated files after tool verification failure",
+				"dir", workDir, "error", listErr)
+		}
+		cleanupCalled = true
+		return &EvalResult{
+			GeneratedFiles: generatedFiles,
+			EventCount:     len(capturedEvents),
+			ToolCalls:      extractToolCalls(capturedEvents),
+			SessionEvents:  capturedRecords,
+			ActionTimeline: BuildActionTimeline(capturedRecords),
+			Success:        false,
+			Error:          "tool_load_failure:\n" + summary,
+			ErrorDetails:   summary,
+			ErrorCategory:  "tool_load_failure",
+			FinalResponse:  extractLastAssistantMessage(capturedRecords),
+			ToolReport:     toolReport,
+			CleanupFn:      buildCleanupFn(),
+		}, fmt.Errorf("post-session tool verification: %s", summary)
+	}
 
 	generatedFiles, listErr := listFiles(workDir)
 	if listErr != nil {
@@ -597,6 +838,8 @@ func (e *CopilotSDKEvaluator) Evaluate(ctx context.Context, p *prompt.Prompt, cf
 		ActionTimeline: BuildActionTimeline(capturedRecords),
 		Success:        !hasError,
 		Error:          "",
+		FinalResponse:  extractLastAssistantMessage(capturedRecords),
+		ToolReport:     toolReport,
 		CleanupFn:      buildCleanupFn(),
 	}, nil
 }
@@ -643,7 +886,7 @@ func detectFileCreation(content string) string {
 
 // Client returns a new Copilot client for the given working directory.
 // Exported for use by the review package.
-func (e *CopilotSDKEvaluator) Client(ctx context.Context, workDir string) (*copilot.Client, error) {
+func (e *CopilotPromptRunner) Client(ctx context.Context, workDir string) (*copilot.Client, error) {
 	opts := *e.clientOpts
 	opts.Cwd = workDir
 	client := copilot.NewClient(&opts)
@@ -662,27 +905,72 @@ func mergePromptProperties(p *prompt.Prompt) map[string]string {
 	return make(map[string]string)
 }
 
-func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
-	// Resolve skill directories from Generator.Tools using the skills package.
-	// This handles glob patterns, validates directories exist and contain skills,
-	// and warns about empty/missing directories (#291).
-	//
-	// Local skill paths (e.g. "./skills/generator") are relative to the .hyoka
-	// project root, not the isolated configDir. The configDir is an ephemeral
-	// temp directory used only to prevent user-level skills from leaking
-	// into the session (#21); it contains no skill files.
-	proj := config.DiscoverFromCWD()
-	skillBaseDir := ""
-	if proj.Found() {
-		skillBaseDir = proj.Root
+func (e *CopilotPromptRunner) buildSessionConfig(ctx context.Context, cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string) *copilot.SessionConfig {
+	return e.buildSessionConfigForEval(ctx, cfg, workDir, configDir, promptProps, "", "", nil)
+}
+
+// buildTaggedEmit constructs the ProgressEmitter used by both the
+// pre-session validator (WU-1) and buildSessionConfigForEval for any
+// legacy emission path. Each event is tagged with evalID/promptID/
+// configName so the interactive renderer routes it to the right block.
+// Returns nil when progressFn is unset (e.g. tests).
+func (e *CopilotPromptRunner) buildTaggedEmit(cfg *config.ToolConfig, evalID, promptID string) tool.ProgressEmitter {
+	if e.progressFn == nil {
+		return nil
 	}
+	fn := e.progressFn
+	configName := ""
+	if cfg != nil {
+		configName = cfg.Name
+	}
+	return func(evt progress.ProgressEvent) {
+		if evt.EvalID == "" {
+			evt.EvalID = evalID
+			evt.PromptID = promptID
+			evt.ConfigName = configName
+		}
+		fn(evt)
+	}
+}
+
+// cfgGeneratorTools returns the generator tool entries, or nil if absent.
+func cfgGeneratorTools(cfg *config.ToolConfig) []tool.Entry {
+	if cfg == nil || cfg.Generator == nil {
+		return nil
+	}
+	return cfg.Generator.Tools
+}
+
+// buildSessionConfigForEval is the same as buildSessionConfig but tags
+// tool-resolution progress events with the given evalID/promptID so the
+// interactive renderer can route them to the active eval block.
+//
+// When toolReport is non-nil (the WU-1 path from Run), the session config
+// is populated from the pre-validated report — no re-resolution, no
+// duplicate progress emission. When toolReport is nil (the legacy
+// buildSessionConfig path used by tests), the old emit + resolve code
+// path runs as a fallback.
+func (e *CopilotPromptRunner) buildSessionConfigForEval(ctx context.Context, cfg *config.ToolConfig, workDir string, configDir string, promptProps map[string]string, evalID, promptID string, toolReport *tool.ToolLoadReport) *copilot.SessionConfig {
 	var skillDirs []string
-	if cfg.Generator != nil {
-		resolved, err := skills.ResolveSkillDirs(cfg.Generator.Tools, skillBaseDir)
-		if err != nil {
-			slog.Warn("Failed to resolve generator skill directories", "error", err)
-		} else {
-			skillDirs = resolved
+	if toolReport != nil {
+		skillDirs = toolReport.GeneratorSkillDirs()
+	} else {
+		// Legacy path: replicate the pre-WU-1 behavior (emit + resolve)
+		// so existing tests that call buildSessionConfig directly keep
+		// producing the same SessionConfig.
+		taggedEmit := e.buildTaggedEmit(cfg, evalID, promptID)
+		if taggedEmit != nil {
+			if cfg.Generator != nil {
+				tool.EmitMCPResolutions(cfg.Generator.Tools, taggedEmit)
+			}
+		}
+		if cfg.Generator != nil {
+			resolved, err := tool.ResolveSkillsWithReporter(ctx, cfg.Generator.Tools, configDir, taggedEmit)
+			if err != nil {
+				slog.Warn("Failed to resolve generator skill directories", "error", err)
+			} else {
+				skillDirs = resolved
+			}
 		}
 	}
 	// Use the config-driven system prompt (#115, #116). The default is zero
@@ -692,23 +980,37 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 		systemMsg = cfg.Generator.SystemPrompt
 	}
 
-	// Instruct the agent to use available skills before generating code.
-	// Without this hint, models tend to go straight to code generation
+	// Safety boundaries (#36): when --allow-cloud is false (default), instruct
+	// the generator to avoid provisioning real Azure resources. The agent should
+	// use mock data, local emulators, environment variable placeholders, and IaC
+	// templates instead of live CLI commands.
+	if !e.allowCloud {
+		systemMsg += "\n\nSAFETY BOUNDARIES:\n" +
+			"Do NOT provision, create, modify, or delete real Azure resources. " +
+			"Do NOT run `az`, `azd`, or ARM/Bicep deployment commands that target live Azure subscriptions. " +
+			"Instead, use mock/fake connection strings, environment variable placeholders (e.g., " +
+			"os.environ[\"AZURE_STORAGE_CONNECTION_STRING\"]), local emulators (Azurite, CosmosDB emulator), " +
+			"and Infrastructure-as-Code templates (Bicep/Terraform) that define resources declaratively " +
+			"without deploying them. All code must be runnable in a local-only, offline environment."
+	}
+
+	// Instruct the agent to use available skills before producing output.
+	// Without this hint, models tend to go straight to producing output
 	// and never invoke the skill tool, even when skills are loaded.
 	// Only add if there are actual skills, not just empty directories (#291).
-	if skills.CountSkills(skillDirs) > 0 {
+	if tool.CountSkills(skillDirs) > 0 {
 		systemMsg += "\n\nSKILLS:\n" +
 			"You have Azure SDK skills available. BEFORE writing any code, invoke the relevant skill " +
 			"using the skill tool to get SDK-specific patterns, API examples, and acceptance criteria. " +
 			"Also read the skill's reference files (acceptance-criteria.md, examples.md) for detailed guidance. " +
-			"Then use that information to generate correct, modern Azure SDK code."
+			"Then use that information to produce correct, modern Azure SDK output."
 	}
 
 	sc := &copilot.SessionConfig{
 		Model:               cfg.Generator.Model,
 		ConfigDir:           configDir,
 		WorkingDirectory:    workDir,
-		OnPermissionRequest: copilot.PermissionHandler.ApproveAll,
+		OnPermissionRequest: copilotperm.ApproveAll,
 		Hooks: &copilot.SessionHooks{
 			OnPreToolUse: func(input copilot.PreToolUseHookInput, invocation copilot.HookInvocation) (*copilot.PreToolUseHookOutput, error) {
 				toolName := input.ToolName
@@ -716,12 +1018,19 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 				if isFileWriteTool(toolName) {
 					if args, ok := input.ToolArgs.(map[string]interface{}); ok {
 						if p, ok := args["path"].(string); ok {
-							if !strings.HasPrefix(p, workDir) {
+							resolved := p
+							if !filepath.IsAbs(resolved) {
+								resolved = filepath.Join(workDir, resolved)
+							}
+							resolved = filepath.Clean(resolved)
+							absWork := filepath.Clean(workDir)
+							rel, err := filepath.Rel(absWork, resolved)
+							if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 								slog.Warn("File path outside workspace",
-									"tool", toolName, "path", p, "workspace", workDir)
+									"tool", toolName, "path", p, "resolved", resolved, "workspace", absWork)
 								return &copilot.PreToolUseHookOutput{
 									PermissionDecision:       "deny",
-									PermissionDecisionReason: fmt.Sprintf("path %q is outside workspace %q", p, workDir),
+									PermissionDecisionReason: fmt.Sprintf("path %q is outside workspace %q", p, absWork),
 								}, nil
 							}
 						}
@@ -790,10 +1099,19 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 	if len(mcpEntries) > 0 {
 		sc.MCPServers = make(map[string]copilot.MCPServerConfig, len(mcpEntries))
 		for _, entry := range mcpEntries {
-			mcpCfg := copilot.MCPServerConfig{
-				"type":    "local",
-				"command": entry.Command,
-				"args":    entry.Args,
+			mcpType := entry.ResolvedMCPType()
+			var mcpCfg copilot.MCPServerConfig
+			if mcpType == "remote" {
+				mcpCfg = copilot.MCPServerConfig{
+					"type": "remote",
+					"url":  entry.URL,
+				}
+			} else {
+				mcpCfg = copilot.MCPServerConfig{
+					"type":    "local",
+					"command": entry.Command,
+					"args":    entry.Args,
+				}
 			}
 			if len(entry.MCPTools) > 0 {
 				mcpCfg["tools"] = entry.MCPTools
@@ -801,8 +1119,9 @@ func (e *CopilotSDKEvaluator) buildSessionConfig(cfg *config.ToolConfig, workDir
 			sc.MCPServers[entry.Name] = mcpCfg
 			slog.Info("MCP server configured",
 				"name", entry.Name,
-				"type", "local",
+				"type", mcpType,
 				"command", entry.Command,
+				"url", entry.URL,
 				"args", entry.Args,
 				"tools", entry.MCPTools,
 			)
@@ -854,6 +1173,17 @@ func hasSessionError(events []copilot.SessionEvent) bool {
 	return false
 }
 
+// extractLastAssistantMessage returns the content of the last assistant message
+// from session event records. Returns empty string if no assistant messages found.
+func extractLastAssistantMessage(records []report.SessionEventRecord) string {
+	for i := len(records) - 1; i >= 0; i-- {
+		if records[i].Type == "assistant.message" && records[i].Content != "" {
+			return records[i].Content
+		}
+	}
+	return ""
+}
+
 // isFileWriteTool returns true for tools that create or modify files.
 func isFileWriteTool(name string) bool {
 	switch name {
@@ -862,6 +1192,23 @@ func isFileWriteTool(name string) bool {
 		return true
 	}
 	return false
+}
+
+// extractAbsPathsFromCommand extracts absolute paths from a shell command string.
+// Used for containment checking of bash/shell tool invocations.
+func extractAbsPathsFromCommand(cmd string) []string {
+	var paths []string
+	for _, part := range strings.Fields(cmd) {
+		if strings.HasPrefix(part, "/") && len(part) > 1 {
+			abs, err := filepath.Abs(part)
+			if err == nil {
+				paths = append(paths, abs)
+			} else {
+				paths = append(paths, part)
+			}
+		}
+	}
+	return paths
 }
 
 // toolArgSummary extracts a short summary of the tool's primary argument.
@@ -884,4 +1231,30 @@ func toolArgSummary(event copilot.SessionEvent) string {
 		}
 	}
 	return ""
+}
+
+// isolateSkills copies each resolved skill directory into the per-session
+// configDir so sessions don't share mutable skill state. Returns the new
+// isolated paths. If a copy fails, the original path is kept.
+func isolateSkills(resolved []string, configDir string) []string {
+	if len(resolved) == 0 {
+		return nil
+	}
+	skillsBase := filepath.Join(configDir, "skills")
+	if err := os.MkdirAll(skillsBase, 0755); err != nil {
+		slog.Warn("Failed to create per-session skills dir, using originals", "error", err)
+		return resolved
+	}
+	isolated := make([]string, 0, len(resolved))
+	for _, src := range resolved {
+		name := filepath.Base(src)
+		dst := filepath.Join(skillsBase, name)
+		if err := copyDir(src, dst); err != nil {
+			slog.Warn("Failed to isolate skill, using original", "skill", name, "error", err)
+			isolated = append(isolated, src)
+			continue
+		}
+		isolated = append(isolated, dst)
+	}
+	return isolated
 }
