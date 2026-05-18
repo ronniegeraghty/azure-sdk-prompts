@@ -2,11 +2,25 @@ package pairwise
 
 import (
 	"math"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 )
+
+// repoRootForTest returns the repo root by walking up from this test file's location.
+// This avoids hardcoded absolute paths that break in CI.
+func repoRootForTest(t *testing.T) string {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	// thisFile is <root>/hyoka/internal/pairwise/pairwise_test.go -> repo root is 3 levels up
+	return filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", "..", ".."))
+}
 
 func TestComputeImpacts(t *testing.T) {
 	results := []VariantResult{
@@ -320,7 +334,7 @@ func TestExpandPairwise_DeepSkillDir(t *testing.T) {
 	}
 
 	// Use repo root as baseDir
-	variants := ExpandPairwise(cfg, "/home/rgeraghty/projects/hyoka")
+	variants := ExpandPairwise(cfg, repoRootForTest(t))
 	if len(variants) != 3 {
 		t.Fatalf("expected 3 variants (baseline + 2 skills), got %d", len(variants))
 	}
@@ -407,7 +421,7 @@ func TestExpandPairwise_ShallowSkillDir(t *testing.T) {
 		},
 	}
 
-	variants := ExpandPairwise(cfg, "/home/rgeraghty/projects/hyoka")
+	variants := ExpandPairwise(cfg, repoRootForTest(t))
 	// Shallow mode: baseline + remove entire entry
 	if len(variants) != 2 {
 		t.Fatalf("expected 2 variants (baseline + without-entry), got %d", len(variants))

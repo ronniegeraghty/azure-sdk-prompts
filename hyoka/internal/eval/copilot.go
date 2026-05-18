@@ -105,6 +105,50 @@ func NewCopilotPromptRunner(opts PromptRunnerOptions) *CopilotPromptRunner {
 func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *config.ToolConfig, workDir string) (*EvalResult, error) {
 	// Starter files are copied by the engine before Evaluate is called (#127).
 
+	// Build session config from tool config
+	// Create isolated config directory to prevent user-level skills from
+	// leaking into the eval session (#21). Only skills explicitly listed
+	// in the eval config's SkillDirectories are loaded.
+	configDir, err := NewIsolatedConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("creating isolated config dir: %w", err)
+	}
+
+	// Pre-session tool validation (WU-1): resolve every declared plugin,
+	// skill directory, and MCP server BEFORE the copilot client is started.
+	// A missing plugin, missing skill path, or empty skill_dir aborts the
+	// eval with error_category=tool_load_failure. Progress events are emitted
+	// here so the interactive renderer can show the Tools block before the
+	// Agent Attempt header — buildSessionConfigForEval consumes the
+	// resulting report without re-resolving. Validation runs BEFORE
+	// client.Start so a missing copilot binary or auth failure cannot
+	// mask a tool-load failure (the hard-fail contract).
+	taggedEmit := e.buildTaggedEmit(cfg, p.ID+"/"+cfg.Name, p.ID)
+	toolReport, toolErr := tool.ValidateAndExpand(ctx, tool.ValidationInput{
+		GeneratorTools: cfgGeneratorTools(cfg),
+		// Reviewer tools are validated separately in cmd/run.go per-config
+		// (WU-2) so missing reviewer skills fail fast there; including them
+		// here would double-validate and couple engine runs to CLI flags.
+		ReviewerTools: nil,
+		ConfigDir:     configDir,
+		PluginsDir:    config.ResolvePluginsDir(),
+		Emit:          taggedEmit,
+	})
+	if toolErr != nil {
+		_ = os.RemoveAll(configDir)
+		return &EvalResult{
+			Success: false,
+			// toolErr.Error() is the multi-line summary produced by
+			// tool.SummarizeToolLoadErrors — every failed tool, not just
+			// the first. Surface it verbatim so operators can fix all
+			// broken tools in one pass.
+			Error:         "tool_load_failure:\n" + toolErr.Error(),
+			ErrorDetails:  toolErr.Error(),
+			ErrorCategory: "tool_load_failure",
+		}, fmt.Errorf("tool load failure: %w", toolErr)
+	}
+	defer os.RemoveAll(configDir)
+
 	// Create Copilot client
 	opts := *e.clientOpts
 	opts.Cwd = workDir
@@ -173,47 +217,9 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		}
 	}()
 
-	// Build session config from tool config
-	// Create isolated config directory to prevent user-level skills from
-	// leaking into the eval session (#21). Only skills explicitly listed
-	// in the eval config's SkillDirectories are loaded.
-	configDir, err := NewIsolatedConfigDir()
-	if err != nil {
-		return nil, fmt.Errorf("creating isolated config dir: %w", err)
-	}
-	defer os.RemoveAll(configDir)
-
-	// Pre-session tool validation (WU-1): resolve every declared plugin,
-	// skill directory, and MCP server BEFORE the model is invoked. A missing
-	// plugin, missing skill path, or empty skill_dir aborts the eval with
-	// error_category=tool_load_failure. Progress events are emitted here so
-	// the interactive renderer can show the Tools block before the Agent
-	// Attempt header — buildSessionConfigForEval consumes the resulting
-	// report without re-resolving.
-	taggedEmit := e.buildTaggedEmit(cfg, p.ID+"/"+cfg.Name, p.ID)
-	toolReport, toolErr := tool.ValidateAndExpand(ctx, tool.ValidationInput{
-		GeneratorTools: cfgGeneratorTools(cfg),
-		// Reviewer tools are validated separately in cmd/run.go per-config
-		// (WU-2) so missing reviewer skills fail fast there; including them
-		// here would double-validate and couple engine runs to CLI flags.
-		ReviewerTools: nil,
-		ConfigDir:     configDir,
-		PluginsDir:    config.ResolvePluginsDir(),
-		Emit:          taggedEmit,
-	})
-	if toolErr != nil {
-		return &EvalResult{
-			Success: false,
-			// toolErr.Error() is the multi-line summary produced by
-			// tool.SummarizeToolLoadErrors — every failed tool, not just
-			// the first. Surface it verbatim so operators can fix all
-			// broken tools in one pass.
-			Error:         "tool_load_failure:\n" + toolErr.Error(),
-			ErrorDetails:  toolErr.Error(),
-			ErrorCategory: "tool_load_failure",
-		}, fmt.Errorf("tool load failure: %w", toolErr)
-	}
-
+	// Build session config from tool config. configDir, taggedEmit and
+	// toolReport were resolved before client.Start above (pre-session
+	// hard-fail contract); reuse them here.
 	sessionCfg := e.buildSessionConfigForEval(ctx, cfg, workDir, configDir, mergePromptProperties(p), p.ID+"/"+cfg.Name, p.ID, toolReport)
 
 	// Subscribe to events with detailed capture and debug logging.

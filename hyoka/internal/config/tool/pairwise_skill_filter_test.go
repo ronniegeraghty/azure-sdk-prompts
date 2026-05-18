@@ -3,9 +3,23 @@ package tool
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+// repoRootForTest returns the repo root by walking up from this test file's
+// location. Avoids hardcoded absolute paths that break in CI.
+func repoRootForTest(t *testing.T) string {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	// thisFile is <root>/hyoka/internal/config/tool/pairwise_skill_filter_test.go
+	// -> repo root is 4 levels up
+	return filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".."))
+}
 
 // TestPairwiseDeepVariantSkillsLoadedFilter verifies that when a pairwise
 // deep variant excludes a skill via ExcludedSkills, that skill's path does
@@ -30,7 +44,7 @@ import (
 // this test will PASS.
 func TestPairwiseDeepVariantSkillsLoadedFilter(t *testing.T) {
 	// Use absolute path from repo root for test skills
-	repoRoot := filepath.Clean("/home/rgeraghty/projects/hyoka")
+	repoRoot := repoRootForTest(t)
 
 	tests := []struct {
 		name            string
