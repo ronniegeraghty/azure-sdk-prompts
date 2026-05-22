@@ -412,6 +412,16 @@ func runCmd() *cobra.Command {
 					return fmt.Errorf("copilot SDK unavailable: %w", err)
 				}
 				defer client.Stop() // #65: ensure cleanup on any exit path
+
+				// Verify authentication before proceeding (#72)
+				authStatus, err := client.GetAuthStatus(context.Background())
+				if err != nil {
+					return fmt.Errorf("failed to get copilot authentication status. Use copilot login: %w", err)
+				}
+				if !authStatus.IsAuthenticated {
+					return fmt.Errorf("copilot is not authenticated. Run copilot login first")
+				}
+
 				slog.Info("Using Copilot SDK evaluator")
 				fmt.Println("Using Copilot SDK evaluator")
 
