@@ -3,6 +3,7 @@ package prompt
 import (
 "bytes"
 "fmt"
+"log/slog"
 "regexp"
 "strings"
 
@@ -129,8 +130,11 @@ if s, ok := sections["Prompt"]; ok {
 p.PromptText = s
 }
 if s, ok := sections["Evaluation Criteria"]; ok {
-p.EvaluationCriteria = s
-p.ParsedCriteria = ParseEvaluationCriteria(s)
+	slog.Warn("DEPRECATED: '## Evaluation Criteria' markdown section is deprecated and will be removed in a future release. Migrate to 'graders:' frontmatter with 'type: prompt'.",
+		"file", filePath,
+		"migration_guide", "Replace '## Evaluation Criteria' section with frontmatter 'graders:' field using 'type: prompt'")
+	p.EvaluationCriteria = s
+	p.ParsedCriteria = ParseEvaluationCriteria(s)
 }
 
 p.FilePath = filePath
@@ -166,7 +170,10 @@ if len(fm.Graders) > 0 {
 p.PromptText = fm.PromptTextField
 p.EvaluationCriteria = fm.EvaluationCriteriaField
 if p.EvaluationCriteria != "" {
-p.ParsedCriteria = ParseEvaluationCriteria(p.EvaluationCriteria)
+	slog.Warn("DEPRECATED: 'evaluation_criteria:' frontmatter field is deprecated and will be removed in a future release. Migrate to 'graders:' frontmatter with 'type: prompt'.",
+		"file", filePath,
+		"migration_guide", "Replace 'evaluation_criteria:' field with 'graders:' using 'type: prompt'")
+	p.ParsedCriteria = ParseEvaluationCriteria(p.EvaluationCriteria)
 }
 p.FilePath = filePath
 
