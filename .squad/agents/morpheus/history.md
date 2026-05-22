@@ -101,6 +101,39 @@ Full history archived. Recent entries below.
 
 ---
 
+## Learnings (Issue Triage — Quick-Win Backlog Shape, 2026-05-22)
+
+**Date:** 2026-05-22  
+**Task:** Review 32 open issues for quick-win recommendations post-dev-branch merge prep
+
+**Current Backlog Shape:**
+
+- **Merge blockers resolved**: Dev-branch review blockers (#644 evaluation_criteria, #645 review-bucket type filtering) — #645 closed, #644 remains XS-size fix
+- **Plugin/skill loader saga**: Fully closed (#639 identified as container-plugin child loading issue — needs verification if still valid post-4a8c4a0d)
+- **Frontend cleanup debt**: Duplicate useRuns hooks (#595), schema drift corrections already handled in earlier Trinity work
+- **Engine hygiene**: Auth check (#72), session teardown (#71) both follow Waza patterns — small surface area
+- **Config consolidation proposals**: #585 (tools: unification), #630 (system prompt), #621 (YAML multi-doc) — all feature requests, not quick wins
+- **DX improvements**: #632 (plugin install command), #633 (error message refinement) — low ROI compared to functional fixes
+- **Context overload bug**: #75 (filter deps from review prompt) — high value but 3-5 files, cross-cutting, not "quick"
+
+**Top 3 Quick Wins Identified:**
+1. **#644** (evaluation_criteria enforcement) — XS, dev-merge blocker carryover, Neo's scope
+2. **#595** (extract useRuns hook) — XS, pure React refactor, Trinity's domain
+3. **#72** (auth check) — S, Waza pattern documented, prevents user-visible eval failures
+
+**Honorable Mentions (Cut):**
+- **#71** (session.Disconnect) — correct but working without it; lower ROI than #72
+- **#633** (plugin error messages) — cosmetic per issue label; functional path works
+- **#75** (filter node_modules) — bigger than it looks; save for dedicated cleanup sprint
+
+**Sequencing Rationale:**
+Start with #644 — closes a known blocker from dev-branch review, sets clean baseline before other eval-engine changes. Then #72 (auth check) for UX win. #595 can run in parallel (Trinity, frontend-only).
+
+**Process Note:**
+Several issues (e.g., #639 plugin child loading) may be stale post-4a8c4a0d (plugin fan-out fix). Before starting #639, verify the symptom still reproduces — the container plugin resolver already expanded to handle `skills/<child>/SKILL.md` paths.
+
+---
+
 ## Learnings (Per-Reviewer Vote Display Investigation — 2026-04-28)
 
 **Date:** 2026-04-28  
