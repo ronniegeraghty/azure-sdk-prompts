@@ -1065,3 +1065,19 @@ Trinity should note that `ReviewResult` now includes a `SkippedReviewers []Skipp
 - Updated `site/src/app/data/types.ts` so `extras.review.panel_results[]` matches Go's `ReviewPanelResult` wire shape (`score`, `pass`, `issues`, `strengths`, `criteria`) while preserving the legacy `review_panel` type separately.
 - Updated site consumers to read `environment.availableTools` (with legacy fallback), render the new panel-result fields, and refreshed the related test fixtures.
 - Verification: `go test ./hyoka/internal/report/...` ✅, `cd site && npm run build` ✅.
+
+## 2026-05-22: Issue #595 — Extract useRuns Hook (COMPLETE)
+
+**Task:** Refactor duplicated fetch+cancel pattern from dashboard/prompts pages into shared hook.
+
+**Implementation:**
+- Created `site/src/app/hooks/useRuns.ts` — encapsulates the fetch-runs-with-cancellation pattern
+- Refactored `dashboard-page.tsx` — replaced inline useEffect with `useRuns()` call
+- Refactored `prompts-page.tsx` — replaced inline useEffect + Promise.all with `useRuns()` + dependency-aware effect
+
+**Key Learning:** The site build is embedded in Go via `site/embed.go` — when site/ source changes, `npm run build` must be run to rebuild `site/dist/`, then commit both source AND dist/ changes. The husky pre-commit hook handles this automatically when committing site/src/ changes.
+
+**Testing:** All 18 test files passed (164 tests). Go build succeeded with embedded assets.
+
+**Outcome:** PR #648 created and pushed. Pure refactor — zero behavior change, cancellation semantics preserved exactly.
+
