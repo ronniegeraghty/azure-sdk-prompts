@@ -2025,3 +2025,47 @@ Test prompts were reframed (commit b1769058):
 
 **Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-neo.md`
 
+---
+
+## 2026-05-22 — Issue #72: Early Auth Check with GetAuthStatus()
+
+**Branch:** `squad/72-early-auth-check`  
+**PR:** #647  
+**Status:** ✅ Complete
+
+**What shipped:**
+- Added early authentication check in `hyoka/cmd/run.go` after the SDK verification `client.Start()` call
+- Follows the Waza pattern from `microsoft/waza` (calls `client.GetAuthStatus()` immediately after `client.Start()`)
+- Fails fast with clear, actionable error message if auth check fails
+- Catches auth issues before config loading, prompt filtering, or any evaluation work begins
+
+**Changes:**
+- `hyoka/cmd/run.go:415-421` — After `client.Start()` succeeds, call `GetAuthStatus()` and check `IsAuthenticated`
+- Two error paths:
+  1. If `GetAuthStatus()` returns an error: `"failed to get copilot authentication status. Use copilot login: %w"`
+  2. If `IsAuthenticated` is false: `"copilot is not authenticated. Run copilot login first"`
+
+**Verification:**
+- ✅ Build: `go build ./...` succeeds
+- ✅ Tests: `go test ./hyoka/internal/eval/...` passes (28.8s)
+- ✅ Code change: 10 lines (within the ~10-line estimate from issue triage)
+
+**Commit:** `187ab8c5`  
+**Verification location:** `cmd/run.go` lines 407-416 (verification client for early fail-fast)
+
+### Learnings
+
+#### Auth Check Placement
+
+The auth check goes in the **verification client** (`cmd/run.go`), not the per-eval client (`internal/eval/copilot.go`). The verification client runs once upfront before any evaluation work begins — this is the right place for early fail-fast. The per-eval client in `copilot.go` runs once per evaluation and already has a comprehensive error path for `client.Start()` failures; adding `GetAuthStatus()` there would be defense-in-depth but not the primary fail-fast layer.
+
+#### Waza Pattern
+
+The Waza pattern (from `microsoft/waza`) is a clean template for early auth checking:
+1. Call `client.Start()`
+2. Immediately call `GetAuthStatus()`
+3. Check both error and `IsAuthenticated`
+4. If either fails, call `client.Stop()` and return a clear error
+
+This pattern catches auth issues at initialization time, before any work begins.
+
