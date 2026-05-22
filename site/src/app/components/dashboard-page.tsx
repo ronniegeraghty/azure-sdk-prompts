@@ -1,35 +1,16 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { CheckCircle2, XCircle, Clock, FileCode2, Cpu, TrendingUp, Loader2, Calendar } from "lucide-react";
-import { fetchRuns } from "../data/api";
 import type { RunSummary } from "../data/types";
 import { evalPassFromPoints, pointsPassRate, evalPointTotals } from "../lib/evalPass";
+import { useRuns } from "../hooks/useRuns";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
 export function DashboardPage() {
-  const [runs, setRuns] = useState<RunSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { runs, loading, error } = useRuns();
   const [activeChart, setActiveChart] = useState<"service" | "language">("service");
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const data = await fetchRuns();
-        if (cancelled) return;
-        setRuns(data);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load runs");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
 
   // Compute dashboard metrics from real run data
   const metrics = useMemo(() => {
