@@ -130,9 +130,6 @@ if s, ok := sections["Prompt"]; ok {
 p.PromptText = s
 }
 if s, ok := sections["Evaluation Criteria"]; ok {
-	slog.Warn("DEPRECATED: '## Evaluation Criteria' markdown section is deprecated and will be removed in a future release. Migrate to 'graders:' frontmatter with 'type: prompt'.",
-		"file", filePath,
-		"migration_guide", "Replace '## Evaluation Criteria' section with frontmatter 'graders:' field using 'type: prompt'")
 	p.EvaluationCriteria = s
 	p.ParsedCriteria = ParseEvaluationCriteria(s)
 }

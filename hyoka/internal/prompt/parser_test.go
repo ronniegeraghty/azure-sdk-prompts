@@ -373,10 +373,12 @@ t.Error("expected ParsedCriteria to be populated from deprecated field")
 // (verified by running tests with -v to see stderr output)
 }
 
-// TestDeprecatedEvaluationCriteriaMarkdown verifies that ParsePromptFile emits
-// a deprecation warning when the ## Evaluation Criteria section is present, but
-// still parses the prompt successfully for backward compatibility.
-func TestDeprecatedEvaluationCriteriaMarkdown(t *testing.T) {
+// TestMarkdownEvaluationCriteriaSectionSupported verifies that ParsePromptFile
+// continues to support the ## Evaluation Criteria markdown section without any
+// deprecation warning. The markdown body section remains a first-class way to
+// declare criteria in .prompt.md files; only the YAML/frontmatter
+// `evaluation_criteria:` field is deprecated in favor of `graders:`.
+func TestMarkdownEvaluationCriteriaSectionSupported(t *testing.T) {
 content := []byte(`---
 id: test-md-legacy
 properties:
@@ -401,14 +403,11 @@ t.Fatalf("ParsePromptFile should not error on legacy ## Evaluation Criteria sect
 }
 
 if p.EvaluationCriteria == "" {
-t.Error("expected EvaluationCriteria to be populated from deprecated section")
+t.Error("expected EvaluationCriteria to be populated from markdown section")
 }
 if len(p.ParsedCriteria) == 0 {
-t.Error("expected ParsedCriteria to be populated from deprecated section")
+t.Error("expected ParsedCriteria to be populated from markdown section")
 }
-
-// Warning is logged via slog.Warn but doesn't break parsing
-// (verified by running tests with -v to see stderr output)
 }
 
 // TestGradersNoDeprecationWarning verifies that prompts using the new
