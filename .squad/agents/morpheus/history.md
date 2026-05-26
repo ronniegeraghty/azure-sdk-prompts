@@ -219,3 +219,23 @@ Initial setup complete.
 
 **Issue created:** #284 — "feat: Move session limits to prompt frontmatter with config/CLI fallback"
 **Assigned to:** Neo 💊 via `squad:neo 💊` label
+
+### PR #649 Review: Documentation-Code Divergence (2026-05-22)
+
+**Task:** Reviewed PR #649 (feat(prompt): warn on legacy evaluation_criteria) at Ronnie's request. PR has 4 commits with scope evolution — commit 1 warned on both markdown sections and YAML frontmatter, commit 4 (439b6adb) narrowed to YAML frontmatter only.
+
+**Key finding:** `.squad/` memory artifacts (neo/history.md, decisions.md) describe commit 1 state, not the final code after commit 4. Specific contradictions:
+- history.md claims "Two warning locations" but final diff has ONE (ParsePromptYAML only, not ParsePromptFile)
+- history.md claims "91 deprecation warnings from manual testing" but final code wouldn't produce those (markdown sections don't warn)
+- decisions.md claims "PRs #649 merged" when PR is still open/draft
+- decisions.md claims "Issue #650, pending" but PR description says "#650 closed as not planned"
+
+**Root cause:** History written based on intermediate commit state, never updated when scope was narrowed. Manual testing claims reflect earlier code path that was removed.
+
+**Review verdict:** REQUEST CHANGES — code is clean and correct, but memory artifacts will mislead future work. Recommended sending to non-Neo agent (lockout protocol) to fix .squad/ docs.
+
+**Review pattern identified:** When PRs evolve through multiple commits that reverse or narrow scope, `.squad/` docs MUST reflect the final state after ALL commits. "What shipped" sections should describe final diff, not intermediate experiments. Test result claims must be achievable with shipped code.
+
+**Why this matters for hyoka:** Squad memory artifacts guide future work. If history.md says "we warn on markdown sections" but code doesn't, future developers waste time debugging phantom behaviors. These docs are our institutional memory — accuracy is non-negotiable.
+
+**Learning captured to decisions inbox:** Would create `morpheus-review-standards.md` if this pattern recurs.
