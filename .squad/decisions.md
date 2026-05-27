@@ -1,5 +1,47 @@
 # Squad Decisions
 
+## 2026-05-27 — Morpheus PR #647 Review
+
+**Merged from:** `.squad/decisions/inbox/morpheus-pr-647-review.md`  
+**Merged at:** 2026-05-27T00:36:01Z  
+**Verdict:** REQUEST CHANGES
+
+---
+
+# Morpheus PR #647 Review
+
+**PR:** #647 — `feat(eval): fail fast on missing auth via GetAuthStatus`  
+**Date:** 2026-05-27  
+**Reviewer:** Morpheus 🕶️  
+**Verdict:** REQUEST CHANGES
+
+## Blocking issues (🔴)
+
+1. **Mixed-scope PR:** The PR is framed as closing #72, but it also adds an unrelated frontend hook for #595 and multiple `.squad/` history/decision changes. The #595 hook should be removed from this PR or split into a Trinity-owned frontend PR. #72 should not carry unrelated issue closure work.
+
+2. **Dead/incomplete frontend change:** `site/src/app/hooks/useRuns.ts` is added but not imported or used by `dashboard-page.tsx` or `prompts-page.tsx`. The commit also claims both components were refactored and `site/dist/` was rebuilt, but neither appears in the diff. That leaves dead code and a misleading commit history.
+
+3. **PR description overstates the auth timing:** The diff adds `GetAuthStatus()` after `client.Start()`, but the existing run command reaches SDK setup only after config loading and prompt filtering. The body says auth issues are caught before config loading/prompt filtering; that is not true unless the preflight is moved earlier.
+
+4. **No direct test for the new fail-fast behavior:** The claimed tests are eval-package tests, but the behavior lives in `cmd/run.go`. Add a command-level seam or small helper around the auth preflight so both paths are covered without a live Copilot SDK: `GetAuthStatus` error and `IsAuthenticated == false`.
+
+## Should-fix (🟡)
+
+- Use `cmd.Context()` (or a shared command context) for the new auth check instead of a fresh `context.Background()`. Existing code uses `Background()`, but new preflight work should not deepen cancellation blind spots.
+- Tighten the user-facing errors for consistency and Go style. Prefer one pattern, e.g. `failed to get copilot authentication status; run "copilot login": %w` and `copilot is not authenticated; run "copilot login" first`.
+- Keep the cleanup ordering: deferring `client.Stop()` before auth validation is the right shape because auth failures still clean up the verification client.
+
+## Nits (🟢)
+
+- If the `useRuns` hook is split out, the hook itself is reasonable, but it needs real consumers and regenerated site assets if it changes embedded UI behavior.
+- The auth check belongs in a small named helper once tested; that would keep `runCmd()` from absorbing another SDK concern.
+
+## Revision assignment
+
+Because this is a rejection, Neo is locked out of revising the rejected #72 artifact. Tank should own the Go auth/test revision. Trinity should own the #595 frontend hook only if it is split into a separate PR.
+
+---
+
 ## Active Decisions
 
 ### Decision: Plan Directory Created (2026-04-04)

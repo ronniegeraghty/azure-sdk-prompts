@@ -239,3 +239,20 @@ Initial setup complete.
 **Why this matters for hyoka:** Squad memory artifacts guide future work. If history.md says "we warn on markdown sections" but code doesn't, future developers waste time debugging phantom behaviors. These docs are our institutional memory — accuracy is non-negotiable.
 
 **Learning captured to decisions inbox:** Would create `morpheus-review-standards.md` if this pattern recurs.
+
+### PR #647 Review: Mixed-Scope Auth Preflight (2026-05-27)
+
+**Task:** Reviewed draft PR #647 (`feat(eval): fail fast on missing auth via GetAuthStatus`) at Ronnie's request. Review-only: no source files changed and no GitHub review posted.
+
+**Final verdict:** REQUEST CHANGES.
+
+**Key findings:**
+- The core Waza-pattern auth preflight is architecturally sensible: check Copilot auth immediately after SDK startup and before evaluation sessions are created.
+- The PR is not scope-honest as presented: a #72 auth fix is bundled with an unrelated #595 frontend hook, `.squad/` triage/history updates, and commit messages that claim frontend consumers/dist rebuilds not present in the diff.
+- The new `useRuns` hook is dead code unless the dashboard/prompts pages are changed to consume it, and `site/dist/` must be regenerated if the site behavior changes.
+- Auth failure behavior needs a direct test seam; passing `go test ./hyoka/internal/eval/...` does not exercise `cmd/run.go`'s new fail-fast path.
+- New command-time SDK calls should prefer `cmd.Context()` over fresh `context.Background()` so cancellation can flow through preflight work.
+
+**Reviewer protocol:** Because this is a rejection, Neo is locked out of revising the rejected #72 artifact. Tank should own the Go auth/test revision; Trinity should own any #595 frontend hook work in a separate PR if it still belongs.
+
+**Review artifact:** `.squad/decisions/inbox/morpheus-pr-647-review.md`.
