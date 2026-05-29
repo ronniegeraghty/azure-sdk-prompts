@@ -1,5 +1,44 @@
 # Squad Decisions
 
+## 2026-05-29 — Morpheus PR #648 Review
+
+**Merged from:** `.squad/decisions/inbox/morpheus-pr-648-review.md`  
+**Merged at:** 2026-05-29T19:02:03Z  
+**Verdict:** REQUEST CHANGES
+
+---
+
+# Morpheus PR #648 Review
+
+**PR:** #648 — `refactor(site): extract useRuns hook`  
+**Date:** 2026-05-29  
+**Reviewer:** Morpheus 🕶️  
+**Verdict:** REQUEST CHANGES
+
+## Blocking issues (🔴)
+
+1. **Mixed-scope `.squad/` payload is still bundled into a #595 frontend PR.** The source change is the `useRuns` refactor, but the PR also carries Morpheus issue-triage history/decisions and Neo's #72 auth-check completion entry. Those artifacts are unrelated to the `Closes #595` hook extraction and repeat the scope creep already rejected in PR #647. Remove the unrelated `.squad/agents/morpheus/history.md`, `.squad/decisions.md`, and `.squad/agents/neo/history.md` changes from this PR or move them to a dedicated Scribe/meta PR. Trinity's #595 history entry can remain only if it accurately reflects the final shipped behavior.
+
+2. **`PromptsPage` is no longer behavior-preserving: `fetchPrompts()` now waits for `fetchRuns()` to finish.** Before this PR, `prompts-page.tsx` used `Promise.all([fetchPrompts(), fetchRuns()])`, so both requests started together. After the refactor, `useRuns()` completes first, then the page effect calls `fetchPrompts()` (`site/src/app/components/prompts-page.tsx:44-59`). That is a real latency regression and contradicts the PR's “No behavior change” / “cancellation semantics preserved exactly” claim. A pure refactor must preserve concurrency or explicitly justify the behavior change. Prefer an independent prompts fetch plus a memoized merge, or a higher-level hook that loads prompts and runs concurrently.
+
+## Should-fix (🟡)
+
+- **The hook abstraction is only partially applied.** `dashboard-page.tsx` is a clean extraction, but other simple `fetchRuns()` consumers still exist (`runs-page.tsx`, `comparison-page.tsx`) and still lack cancellation. Either expand `useRuns()` to the simple fetch-runs pages or document why this hook is intentionally limited to dashboard/prompts.
+- **No tests were added or changed for the new hook/state machine.** Existing dashboard tests exercise the hook indirectly through the mocked API, but `prompts-page.test.tsx` is a smoke test that only waits for the heading. Add focused coverage for the prompt/run load path, run-load failure, prompt-load failure, and ideally the non-serialized fetch expectation if parallelism is restored.
+- **Correct the Trinity history entry after code changes.** It currently says “zero behavior change” and “cancellation semantics preserved exactly”; that is not true while prompts loading is serialized.
+
+## Nits / confirmations (🟢)
+
+- `useRuns()` itself is small and matches the dashboard's previous cancellation pattern.
+- Static inspection did not find an unmount setState race introduced by the split hook/page cancellation flags.
+- The rebuilt site asset is present: `site/dist/index.html` references `assets/index-DQA0ZpG8.js`, and that asset exists in the PR branch.
+
+## Revision assignment
+
+Because this is a rejection, Trinity is locked out of revising the rejected #595 implementation. Tank should own the frontend behavior fix, Switch should add/adjust focused tests, and Scribe should clean the unrelated `.squad/` history/decision artifacts.
+
+---
+
 ## 2026-05-27 — Morpheus PR #647 Review
 
 **Merged from:** `.squad/decisions/inbox/morpheus-pr-647-review.md`  

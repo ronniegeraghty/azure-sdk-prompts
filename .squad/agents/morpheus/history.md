@@ -256,3 +256,20 @@ Initial setup complete.
 **Reviewer protocol:** Because this is a rejection, Neo is locked out of revising the rejected #72 artifact. Tank should own the Go auth/test revision; Trinity should own any #595 frontend hook work in a separate PR if it still belongs.
 
 **Review artifact:** `.squad/decisions/inbox/morpheus-pr-647-review.md`.
+
+### PR #648 Review: Hook Extraction Scope and Concurrency (2026-05-29)
+
+**Task:** Reviewed draft PR #648 (`refactor(site): extract useRuns hook`) at Ronnie's request. Review-only: no source files changed and no GitHub review posted.
+
+**Final verdict:** REQUEST CHANGES.
+
+**Key findings:**
+- The dashboard extraction is clean, and the rebuilt `site/dist/` asset is actually present this time.
+- The prompts-page refactor changes request timing: the old `Promise.all([fetchPrompts(), fetchRuns()])` path started both requests together, while the new `useRuns()` dependency flow waits for runs before fetching prompts. That is a latency/behavior regression for a PR claiming pure refactor parity.
+- The hook is not a shared cache or central data layer; each caller still fetches independently, and several simple `fetchRuns()` consumers remain outside the hook. The abstraction only earns its keep if its scope is honest or adoption is broadened.
+- Scope creep recurred: the PR bundles unrelated Morpheus triage and Neo #72 history/decision artifacts under a #595 frontend change. `.squad/` memory must stay aligned with the PR's actual scope, not nearby team activity.
+- Existing tests were not changed; dashboard coverage exercises the hook indirectly, but prompts coverage is only a smoke test and does not catch the parallel-to-sequential regression.
+
+**Reviewer protocol:** Because this is a rejection, Trinity is locked out of revising the rejected #595 implementation. Tank should own the frontend behavior fix, Switch should add focused tests, and Scribe should clean the unrelated `.squad/` artifacts.
+
+**Review artifact:** `.squad/decisions/inbox/morpheus-pr-648-review.md`.
