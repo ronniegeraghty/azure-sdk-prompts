@@ -1,0 +1,17 @@
+when:
+  language: python
+graders:
+  - name: TokenCredential Authentication
+    weight: 1.0
+    prompt: >
+      Authentication uses a credential from azure.identity (such as
+      DefaultAzureCredential) rather than connection strings, shared
+      access signatures, or hardcoded keys. The credential is passed
+      to the service client constructor.
+  - name: Official Azure SDK Package Usage
+    weight: 1.0
+    prompt: >
+      Code imports from official azure-* packages published by the Azure
+      SDK team (e.g., azure-identity, azure-keyvault-secrets,
+      azure-storage-blob, azure-cosmos). Must NOT use deprecated or
+      unofficial Azure packages.

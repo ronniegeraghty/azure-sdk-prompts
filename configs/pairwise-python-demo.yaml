@@ -1,9 +1,13 @@
-# Azure MCP with Claude Opus 4.6 — Azure MCP server attached
+# Pairwise testing config — multiple generator models, Azure MCP + local skills.
+# Designed for use with `--pairwise` to ablate each tool across a panel of models.
 configs:
-  - name: azure-mcp-skills/claude-opus-4.6
-    description: "Azure MCP — Claude Opus 4.6"
+  - name: pairwise/python-demo
+    description: "Pairwise demo — multi-model generator panel with Azure MCP + local skills"
     generator:
-      model: "claude-opus-4.6"
+      models:
+        - "claude-opus-4.6"
+        - "claude-sonnet-4.5"
+        - "gpt-5.3-codex"
       tools:
         - name: azure
           type: mcp
@@ -26,4 +30,4 @@ configs:
           skill_dir: true
           path: "./skills/reviewer"
     limits:
-      max_turns: 100
+      max_turns: 75
