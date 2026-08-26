@@ -27,6 +27,26 @@ properties:
 Write auth code for Azure Blob Storage.
 `
 
+const validAIAgentsPrompt = `---
+id: ai-agents-dp-python-basic
+properties:
+  service: ai-agents
+  plane: data-plane
+  language: python
+  category: agents
+  difficulty: basic
+  description: "Create a basic Azure AI Agents application"
+  created: "2026-08-26"
+  author: test
+---
+
+# Basic Azure AI agent
+
+## Prompt
+
+Create an Azure AI Agents application.
+`
+
 const invalidServicePrompt = `---
 id: unknown-dp-dotnet-test
 properties:
@@ -120,6 +140,19 @@ t.Errorf("expected validation to pass, got errors: %v", result.Errors)
 }
 if result.TotalFiles != 1 {
 t.Errorf("expected 1 file, got %d", result.TotalFiles)
+}
+}
+
+func TestValidateAIAgentsValues(t *testing.T) {
+dir := t.TempDir()
+writePromptFile(t, dir, "ai-agents.prompt.md", validAIAgentsPrompt)
+
+result, err := Validate(dir)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if !result.OK() {
+t.Errorf("expected validation to pass, got errors: %v", result.Errors)
 }
 }
 
