@@ -1,0 +1,50 @@
+{
+  "run_id": "20260826-223641",
+  "timestamp": "2026-08-26T15:04:37Z",
+  "reports": [
+    {
+      "prompt_id": "ai-agents-dp-dotnet-basic-agent-lifecycle",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 11,
+        "max_score": 11,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-dotnet-file-search",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 9,
+        "max_score": 9,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-dotnet-function-tool",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 12,
+        "max_score": 12,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-projects-dp-dotnet-project-resource-inventory",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 9,
+        "max_score": 9,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

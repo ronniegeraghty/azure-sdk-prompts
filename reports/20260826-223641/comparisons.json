@@ -1,0 +1,79 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "dotnet-azure-tools/baseline",
+    "label_b": "dotnet-azure-tools/with-azure-tools",
+    "per_prompt": [
+      {
+        "prompt_id": "ai-agents-dp-dotnet-basic-agent-lifecycle",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-agents-dp-dotnet-file-search",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-agents-dp-dotnet-function-tool",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-projects-dp-dotnet-project-resource-inventory",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0,
+      "improved": 0,
+      "regressed": 0,
+      "unchanged": 4
+    }
+  }
+]

@@ -1,0 +1,41 @@
+{
+  "prompt_id": "ai-projects-dp-dotnet-project-resource-inventory",
+  "config_name": "dotnet-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable .NET console application that uses `Azure.AI.Projects`\r\nto inspect connections and model deployments in a Microsoft Foundry project.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read `FOUNDRY_PROJECT_ENDPOINT`, `CONNECTION_NAME`, and `DEPLOYMENT_NAME`.\r\n- Enumerate every project connection through the SDK's pageable API and print each\r\n  connection's name, type, target, and default status.\r\n- Retrieve `CONNECTION_NAME` without requesting credentials and print the same typed\r\n  metadata.\r\n- Enumerate every project deployment through the SDK's pageable API. For each model\r\n  deployment, print its name, model publisher, model name, and model version.\r\n- Retrieve `DEPLOYMENT_NAME`, require it to be a model deployment, and print the same\r\n  typed model metadata.\r\n- Include the project manifest and concise restore, build, and run commands.\r\n\r\nUse asynchronous SDK operations throughout.",
+  "final_response": "Created a complete runnable .NET 8 console application in the workspace:\n\n- `FoundryProjectInventory.csproj` — pins `Azure.AI.Projects 2.0.1` and `Azure.Identity 1.21.0`\n- `Program.cs` — asynchronously enumerates and retrieves typed connections and model deployments\n- `README.md` — environment configuration plus concise restore, build, and run commands\n\nThe application retrieves connections with `includeCredentials: false` and rejects a named deployment unless it is a `ModelDeployment`.",
+  "workspace_delta": {
+    "bytes_added": 3912,
+    "bytes_removed": 0,
+    "bytes_net": 3912,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "FoundryProjectInventory.csproj",
+        "size": 420
+      },
+      {
+        "path": "Program.cs",
+        "size": 2811
+      },
+      {
+        "path": "README.md",
+        "size": 681
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 14,
+    "tool_calls": 0,
+    "reasoning_steps": 14,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T22:36:41.6598636+08:00",
+  "ended_at": "2026-08-26T22:40:07.6081423+08:00",
+  "duration_ms": 205948,
+  "terminated_by": "completed"
+}
