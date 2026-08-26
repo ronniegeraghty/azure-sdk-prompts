@@ -1,0 +1,41 @@
+{
+  "prompt_id": "resource-manager-mp-python-rg-crud",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that manages Azure Resource Groups using the management plane SDK.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n3. List all resource groups in the subscription\r\n4. Get details of the created resource group\r\n5. Add a tag to the resource group\r\n6. Delete the resource group\r\n\r\nShow required pip packages and include proper error handling.",
+  "final_response": "Created:\n\n- `resource_groups.py` — CLI for listing, retrieving, tagging, and deleting Resource Groups using `DefaultAzureCredential`\n- `requirements.txt` — `azure-identity` and `azure-mgmt-resource`\n- `README.md` — installation, authentication, command examples, and Microsoft documentation references\n\nDeletion requires explicit `--yes`, tag updates preserve existing tags, and Azure authentication, networking, missing-resource, and HTTP failures return clear errors and distinct exit codes. No Azure operations were executed.",
+  "workspace_delta": {
+    "bytes_added": 8884,
+    "bytes_removed": 0,
+    "bytes_net": 8884,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "resource_groups.py",
+        "size": 7110
+      },
+      {
+        "path": "README.md",
+        "size": 1706
+      },
+      {
+        "path": "requirements.txt",
+        "size": 68
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T16:19:20.8061039+08:00",
+  "ended_at": "2026-08-26T16:21:46.3820408+08:00",
+  "duration_ms": 145575,
+  "terminated_by": "completed"
+}

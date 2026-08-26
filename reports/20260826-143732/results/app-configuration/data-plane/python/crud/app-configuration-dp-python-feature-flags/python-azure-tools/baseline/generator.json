@@ -1,0 +1,65 @@
+{
+  "prompt_id": "app-configuration-dp-python-feature-flags",
+  "config_name": "python-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that implements a feature flag and configuration management system backed by Azure App Configuration.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **configuration service module** (both sync and async versions) that retrieves settings from App Configuration. It should support fetching a single setting by key, fetching a setting with a specific label (to distinguish between environments like \"production\" vs \"staging\"), and listing all settings that match a key prefix (returned as a dictionary). It should also avoid re-downloading values that haven't changed since the last read — minimize unnecessary network traffic when polling for config changes.\r\n\r\n- A **feature flag evaluator module** that reads feature flags from App Configuration. Feature flags in App Configuration use the `.appconfig.featureflag/` key prefix and store their state as a JSON payload. The evaluator should be able to check if a flag is enabled, and also support percentage-based rollout — if a flag is configured for a percentage rollout (e.g., 30% of users), the evaluator should deterministically decide whether a given user ID falls within the rollout percentage using a consistent hash, so the same user always gets the same result.\r\n\r\n- A **configuration watcher module** that periodically polls for configuration changes. It should accept a list of \"sentinel\" keys to watch and a polling interval. When a sentinel key's value changes, the watcher should trigger a full refresh of all cached configuration. This is the recommended pattern for coordinating config updates in App Configuration.\r\n\r\n- A **main script** that demos both implementations: connecting to App Configuration (endpoint from environment variable, authenticated with `DefaultAzureCredential`), reading some config values with labels, evaluating feature flags for a few sample user IDs with percentage rollout, and starting the config watcher to detect a change. Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Python project with:\n\n- Sync and async Azure App Configuration services with ETag caching and labeled/prefix lookups\n- Deterministic percentage-based feature flag evaluation\n- Sync and async sentinel watchers that refresh cached configuration\n- `main.py` demonstrating both implementations with `DefaultAzureCredential`\n- Azure SDK dependencies in `requirements.txt`\n- Setup instructions in `README.md`\n- Offline unit tests using fake Azure clients\n\nRun with:\n\n```powershell\n$env:AZURE_APPCONFIG_ENDPOINT = \"https://\u003cstore\u003e.azconfig.io\"\npython main.py\n```",
+  "workspace_delta": {
+    "bytes_added": 32544,
+    "bytes_removed": 0,
+    "bytes_net": 32544,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "tests\\test_appconfig_manager.py",
+        "size": 6385
+      },
+      {
+        "path": "README.md",
+        "size": 946
+      },
+      {
+        "path": "appconfig_manager\\__init__.py",
+        "size": 473
+      },
+      {
+        "path": "appconfig_manager\\configuration.py",
+        "size": 11619
+      },
+      {
+        "path": "appconfig_manager\\feature_flags.py",
+        "size": 3544
+      },
+      {
+        "path": "appconfig_manager\\watcher.py",
+        "size": 5327
+      },
+      {
+        "path": "main.py",
+        "size": 4179
+      },
+      {
+        "path": "requirements.txt",
+        "size": 71
+      },
+      {
+        "path": "tests\\__init__.py",
+        "size": 0
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 16,
+    "tool_calls": 0,
+    "reasoning_steps": 16,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T14:53:26.9409475+08:00",
+  "ended_at": "2026-08-26T14:56:57.4798106+08:00",
+  "duration_ms": 210538,
+  "terminated_by": "completed"
+}

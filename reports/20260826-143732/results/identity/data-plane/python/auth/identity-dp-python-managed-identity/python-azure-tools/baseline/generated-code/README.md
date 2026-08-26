@@ -1,0 +1,129 @@
+# Azure Managed Identity with Python
+
+This project constructs Azure Blob Storage and Key Vault clients with
+`azure-identity`. The default command only creates client objects, so it is
+safe to run offline and does not contact Azure.
+
+## System-assigned and user-assigned identities
+
+| Characteristic | System-assigned | User-assigned |
+|---|---|---|
+| Lifecycle | Created and deleted with one Azure resource | Independent Azure resource |
+| Sharing | Belongs to one host resource | Can be attached to multiple hosts |
+| Credential selection | `ManagedIdentityCredential()` | `ManagedIdentityCredential(client_id=...)` |
+| Configuration | No identity ID is supplied | Use the identity's **client ID**, not object/principal ID |
+| Typical use | One workload with a tightly coupled identity | Stable or shared identity across deployments |
+
+In both cases, enabling an identity does not grant data access. Assign the
+least-privileged Azure RBAC role or Key Vault access policy separately and
+allow time for role assignments to propagate.
+
+## Install and run
+
+Python 3.10 or later is required.
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+managed-identity-demo
+pytest
+```
+
+The default `local` mode tries `EnvironmentCredential` followed by
+`AzureCliCredential`. Client creation is lazy; successful output does not
+prove that Azure granted a token or authorized a data operation.
+
+## System-assigned identity
+
+Enable a system-assigned identity on the Azure host and configure:
+
+```powershell
+$env:AZURE_IDENTITY_MODE = "system"
+Remove-Item Env:AZURE_CLIENT_ID -ErrorAction SilentlyContinue
+$env:AZURE_STORAGE_ACCOUNT_URL = "https://<account>.blob.core.windows.net"
+$env:AZURE_KEY_VAULT_URL = "https://<vault>.vault.azure.net"
+managed-identity-demo
+python .\examples\system_assigned.py
+```
+
+The important construction is `ManagedIdentityCredential()` with no client
+ID. The Azure host selects its system-assigned identity.
+
+## User-assigned identity
+
+Attach the user-assigned identity to the Azure host and use its application
+(client) ID:
+
+```powershell
+$env:AZURE_IDENTITY_MODE = "user"
+$env:AZURE_CLIENT_ID = "<user-assigned-identity-client-id>"
+$env:AZURE_STORAGE_ACCOUNT_URL = "https://<account>.blob.core.windows.net"
+$env:AZURE_KEY_VAULT_URL = "https://<vault>.vault.azure.net"
+managed-identity-demo
+python .\examples\user_assigned.py
+```
+
+This constructs `ManagedIdentityCredential(client_id=AZURE_CLIENT_ID)`.
+Supplying the principal/object ID instead is a common configuration error.
+
+`src/managed_identity_demo/clients.py` passes one credential to
+`BlobServiceClient` and `SecretClient`. The same pattern works with other
+Azure SDK clients that accept a `TokenCredential`.
+
+## Local development
+
+Managed identity endpoints exist only on supported Azure hosts. Do not attempt
+to emulate managed identity or store a managed identity secret locally;
+managed identities have no client secret.
+
+The project's explicit local chain supports:
+
+1. A service principal through `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and
+   `AZURE_CLIENT_SECRET` (`EnvironmentCredential`). All three must be set.
+2. An existing Azure CLI login (`AzureCliCredential`).
+
+For broader developer-tool support, an application can instead use
+`DefaultAzureCredential`. It can discover managed identity in Azure and local
+developer credentials on a workstation. Explicit modes, as used here, are
+often easier to troubleshoot and prevent an unexpected local credential from
+being selected in production.
+
+Never commit `.env`, client secrets, tokens, or connection strings. Prefer a
+separate development identity with only the permissions needed for testing.
+
+## Performing operations and handling errors
+
+`operations.py` contains `list_container_names` and `get_secret` examples.
+They make real read requests only when called. They distinguish authentication
+failures (`ClientAuthenticationError`) from service/RBAC failures
+(`HttpResponseError`) and preserve the original exception as the cause.
+
+Troubleshoot in this order:
+
+1. Confirm the identity is enabled and, for user-assigned identity, attached
+   to the host. Verify that `AZURE_CLIENT_ID` is the client ID.
+2. Confirm the workload is actually running on a supported Azure host. A
+   local process cannot use `ManagedIdentityCredential`.
+3. Check host networking, proxies, and firewall rules for the platform's
+   managed identity endpoint. Do not hard-code or call that endpoint directly.
+4. Inspect the exception chain. Token acquisition errors indicate identity or
+   endpoint configuration; HTTP 403 usually indicates missing data-plane
+   permissions; HTTP 404 often indicates the wrong resource URL or name.
+5. Verify least-privileged data-plane roles, such as Storage Blob Data Reader
+   or Key Vault Secrets User. Management-plane Contributor alone may not grant
+   access to data.
+6. Allow for RBAC propagation after a new assignment. Enable Azure SDK logging
+   only temporarily, and avoid logging tokens or secrets.
+
+For diagnostic logging:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("azure.identity").setLevel(logging.DEBUG)
+```
+
+Use DEBUG output carefully because logs can contain sensitive request
+metadata.

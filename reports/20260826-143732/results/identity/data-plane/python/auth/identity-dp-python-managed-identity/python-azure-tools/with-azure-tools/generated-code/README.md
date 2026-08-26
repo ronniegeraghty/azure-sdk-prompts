@@ -1,0 +1,132 @@
+# Azure SDK authentication with managed identity
+
+This runnable Python project authenticates an Azure Blob Storage client with a
+system-assigned managed identity, a user-assigned managed identity, or a local
+developer credential. Its default command is an offline-safe dry run; Azure is
+contacted only when `--list-containers` is supplied.
+
+## System-assigned and user-assigned identities
+
+| Characteristic | System-assigned | User-assigned |
+|---|---|---|
+| Lifecycle | Created and deleted with one Azure resource | Independent Azure resource |
+| Sharing | Used only by its parent resource | Can be attached to multiple resources |
+| Selection | `ManagedIdentityCredential()` | `ManagedIdentityCredential(client_id=...)` |
+| Best fit | One workload with a matching lifecycle | Shared identity, stable permissions, or multiple identities on one host |
+
+Enabling an identity and assigning Azure roles are separate operations. For the
+read-only sample, grant `Storage Blob Data Reader` at the narrowest practical
+scope. Role changes can take time to propagate.
+
+## Install and run
+
+Python 3.10 or newer is required.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
+python -m managed_identity_demo --identity system
+pytest
+```
+
+The first command invocation is a dry run and performs no network operation.
+Package versions are pinned for reproducible installation.
+
+## Azure-hosted examples
+
+Set the Blob service endpoint without a SAS token, account key, or other secret:
+
+```powershell
+$env:AZURE_BLOB_ACCOUNT_URL = "https://your-account.blob.core.windows.net"
+```
+
+For a **system-assigned identity**, enable it on the Azure host, grant its
+principal the required data-plane role, and run:
+
+```powershell
+python -m managed_identity_demo --identity system --list-containers
+# Equivalent dedicated example:
+python .\examples\system_assigned.py
+```
+
+For a **user-assigned identity**, attach it to the host and select it by client
+ID:
+
+```powershell
+$env:MANAGED_IDENTITY_CLIENT_ID = "00000000-0000-0000-0000-000000000000"
+python -m managed_identity_demo --identity user --list-containers
+# Equivalent dedicated example:
+python .\examples\user_assigned.py
+```
+
+Use the managed identity's **client ID**, not its object/principal ID. The code
+passes that value to `ManagedIdentityCredential(client_id=...)`.
+
+## Local development fallbacks
+
+Managed identity endpoints are available only in supported Azure hosting
+environments. Choose one of these local strategies:
+
+1. `--identity local` uses `DefaultAzureCredential` and explicitly skips the
+   managed identity endpoint. It can use a signed-in Azure CLI, Azure Developer
+   CLI, Azure PowerShell, VS Code, or environment-based service principal.
+2. `--identity auto` uses one unchanged credential chain locally and in Azure.
+   With `MANAGED_IDENTITY_CLIENT_ID`, its managed identity step targets that
+   user-assigned identity. Without it, the step targets the system identity.
+3. For unattended local automation, set `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
+   and `AZURE_CLIENT_SECRET` outside source control. `DefaultAzureCredential`
+   will use `EnvironmentCredential`. Prefer certificate or workload federation
+   over a long-lived secret for real automation.
+
+Run the local example after signing in with one of the supported developer
+tools:
+
+```powershell
+python -m managed_identity_demo --identity local --list-containers
+# Equivalent dedicated example:
+python .\examples\local_development.py
+```
+
+In production, set `AZURE_TOKEN_CREDENTIALS=prod` when using `auto` to constrain
+`DefaultAzureCredential` to production-safe credentials. Use explicit
+`system` or `user` mode when fail-fast managed identity behavior is preferred.
+Never deploy developer credentials, storage keys, or connection strings.
+
+## Error handling and troubleshooting
+
+The CLI distinguishes configuration, credential availability, authentication,
+network, authorization, and other service response failures. It returns `0` on
+success, `1` for an Azure operation failure, and `2` for invalid configuration.
+
+| Symptom | Check |
+|---|---|
+| No credential available | Managed identity is enabled on a supported host; locally use `local` |
+| Authentication failed | Correct identity is attached and the user-assigned client ID is correct |
+| HTTP 403 | Assign a Blob **data-plane** role, verify scope, and allow propagation time |
+| Endpoint unreachable | DNS, proxy, firewall, private endpoint routing, and account URL |
+| Slow local startup | Use `local` so the managed identity endpoint is not probed |
+
+Add `--debug` or set `AZURE_LOG_LEVEL=debug` for Azure Identity diagnostics.
+Debug output can contain tenant, account, endpoint, and other sensitive
+metadata; capture and share it carefully. Access tokens are never printed.
+
+## Design notes
+
+- Credentials and SDK clients use context managers so transports are closed.
+- One credential instance is reused by the SDK client.
+- The account URL must be HTTPS and cannot contain embedded credentials, a SAS
+  query string, or a fragment.
+- The SDK's retry policy is bounded to three retries with exponential backoff
+  and explicit connection/read timeouts.
+- Tests mock the Azure client and make no Azure or network calls.
+
+## References
+
+- [ManagedIdentityCredential API](https://learn.microsoft.com/python/api/azure-identity/azure.identity.managedidentitycredential)
+- [DefaultAzureCredential overview](https://aka.ms/azsdk/python/identity/credential-chains#defaultazurecredential-overview)
+- [Authenticate Python apps to Azure services](https://learn.microsoft.com/azure/developer/python/sdk/authentication-overview)
+- [Managed identities overview](https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/overview)
+- [BlobServiceClient API](https://learn.microsoft.com/python/api/azure-storage-blob/azure.storage.blob.blobserviceclient)
+- [azure-identity on PyPI](https://pypi.org/project/azure-identity/)
+- [azure-storage-blob on PyPI](https://pypi.org/project/azure-storage-blob/)

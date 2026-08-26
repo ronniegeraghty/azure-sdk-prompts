@@ -1,0 +1,45 @@
+{
+  "prompt_id": "identity-dp-python-service-principal",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a runnable Python project that authenticates to Azure using a Service Principal with a client secret.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n1. Required pip packages\r\n2. How to create a ClientSecretCredential with tenant_id, client_id, and client_secret\r\n3. Using it with an Azure SDK client\r\n4. Best practices for secret management (environment variables, .env files)\r\n5. Error handling for authentication failures\r\n\r\nProvide a complete example with proper exception handling.",
+  "final_response": "Created a runnable Python project with:\n\n- `main.py` — `ClientSecretCredential`, Blob SDK usage, configuration validation, resource cleanup, and distinct authentication/service/network error handling\n- `requirements.txt` — pinned Azure Identity, Blob Storage, and dotenv packages\n- `.env.example` and `.gitignore` — safe local secret configuration\n- `test_main.py` — offline mocked tests\n- `README.md` — setup, execution, least-privilege guidance, secret rotation, Key Vault, managed identity, and reference links\n\nThe example performs only a read-only container listing and never logs the client secret.",
+  "workspace_delta": {
+    "bytes_added": 9782,
+    "bytes_removed": 0,
+    "bytes_net": 9782,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 2630
+      },
+      {
+        "path": "main.py",
+        "size": 4045
+      },
+      {
+        "path": "requirements.txt",
+        "size": 75
+      },
+      {
+        "path": "test_main.py",
+        "size": 3032
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T15:53:38.133833+08:00",
+  "ended_at": "2026-08-26T15:55:47.1296648+08:00",
+  "duration_ms": 128995,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,2 @@
+[console_scripts]
+managed-identity-demo = managed_identity_demo.cli:main

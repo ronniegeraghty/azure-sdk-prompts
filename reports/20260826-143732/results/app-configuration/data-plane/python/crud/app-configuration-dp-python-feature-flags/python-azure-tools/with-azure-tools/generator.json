@@ -1,0 +1,61 @@
+{
+  "prompt_id": "app-configuration-dp-python-feature-flags",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that implements a feature flag and configuration management system backed by Azure App Configuration.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **configuration service module** (both sync and async versions) that retrieves settings from App Configuration. It should support fetching a single setting by key, fetching a setting with a specific label (to distinguish between environments like \"production\" vs \"staging\"), and listing all settings that match a key prefix (returned as a dictionary). It should also avoid re-downloading values that haven't changed since the last read — minimize unnecessary network traffic when polling for config changes.\r\n\r\n- A **feature flag evaluator module** that reads feature flags from App Configuration. Feature flags in App Configuration use the `.appconfig.featureflag/` key prefix and store their state as a JSON payload. The evaluator should be able to check if a flag is enabled, and also support percentage-based rollout — if a flag is configured for a percentage rollout (e.g., 30% of users), the evaluator should deterministically decide whether a given user ID falls within the rollout percentage using a consistent hash, so the same user always gets the same result.\r\n\r\n- A **configuration watcher module** that periodically polls for configuration changes. It should accept a list of \"sentinel\" keys to watch and a polling interval. When a sentinel key's value changes, the watcher should trigger a full refresh of all cached configuration. This is the recommended pattern for coordinating config updates in App Configuration.\r\n\r\n- A **main script** that demos both implementations: connecting to App Configuration (endpoint from environment variable, authenticated with `DefaultAzureCredential`), reading some config values with labels, evaluating feature flags for a few sample user IDs with percentage rollout, and starting the config watcher to detect a change. Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "The offline suite passes. I’m doing the final SDK-compatibility pass now, including installed signatures/version bounds and generated-artifact cleanup.",
+  "workspace_delta": {
+    "bytes_added": 40285,
+    "bytes_removed": 0,
+    "bytes_net": 40285,
+    "new_file_count": 8,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "tests\\test_appconfig_demo.py",
+        "size": 8205
+      },
+      {
+        "path": "README.md",
+        "size": 2175
+      },
+      {
+        "path": "appconfig_demo\\__init__.py",
+        "size": 534
+      },
+      {
+        "path": "appconfig_demo\\configuration_service.py",
+        "size": 12870
+      },
+      {
+        "path": "appconfig_demo\\feature_flags.py",
+        "size": 5144
+      },
+      {
+        "path": "appconfig_demo\\watcher.py",
+        "size": 6077
+      },
+      {
+        "path": "main.py",
+        "size": 5211
+      },
+      {
+        "path": "requirements.txt",
+        "size": 69
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 19,
+    "tool_calls": 0,
+    "reasoning_steps": 19,
+    "truncated": true
+  },
+  "started_at": "2026-08-26T14:58:30.8063886+08:00",
+  "ended_at": "2026-08-26T15:02:26.5399678+08:00",
+  "duration_ms": 235733,
+  "terminated_by": "completed"
+}

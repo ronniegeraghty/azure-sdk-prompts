@@ -1,0 +1,2 @@
+azure-appconfiguration>=1.7.1,<2.0.0
+azure-core>=1.35.0,<2.0.0

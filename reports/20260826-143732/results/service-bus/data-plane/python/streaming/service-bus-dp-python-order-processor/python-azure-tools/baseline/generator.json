@@ -1,0 +1,57 @@
+{
+  "prompt_id": "service-bus-dp-python-order-processor",
+  "config_name": "python-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that implements an order processing system using Azure Service Bus.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **model** for an Order with fields for order ID, customer name, product, quantity, total price, and status (pending/processing/completed/failed). It should be serializable to and from JSON. Use a dataclass or dictionary.\r\n\r\n- A **sender module** (both sync and async versions) that publishes order messages to a Service Bus queue. It should support sending individual orders and sending a batch of orders efficiently (using `ServiceBusMessageBatch` and checking `add_message()` to respect the maximum batch size so messages aren't rejected). Each message should carry the order ID as a correlation property, and orders above a certain dollar threshold should be sent as high-priority with a scheduled delivery time of 30 seconds in the future (to allow for fraud review before processing).\r\n\r\n- A **processor module** (both sync and async versions) that receives and processes orders from the queue. It should handle messages as they arrive, deserialize them, and log the results. If processing fails (e.g., a deserialization error), the message should be sent to the dead-letter queue with a reason string using `dead_letter_message()` rather than being silently abandoned. The processor should also be able to read from the dead-letter queue so failed messages can be inspected and reprocessed. It should guarantee that orders from the same customer are processed in sequence, not interleaved with other customers' orders.\r\n\r\n- A **main script** that demos both implementations: connects to the Service Bus namespace (from an environment variable) with `DefaultAzureCredential`, runs the full send/receive/dead-letter cycle using the sync implementation first, then repeats with the async implementation.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Azure Service Bus order-processing project with:\n\n- JSON-serializable `Order` dataclass and validated statuses.\n- Synchronous and asynchronous senders with individual sends, size-aware batching, correlation IDs, customer sessions, priority metadata, and 30-second scheduling.\n- Session-based sync/async processors with dead-lettering, inspection, and reprocessing.\n- `DefaultAzureCredential` demo covering sync then async workflows.\n- Azure SDK dependencies and session-enabled queue setup documentation.\n\nSet `SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE` and `SERVICE_BUS_QUEUE_NAME`, then run `python main.py`.",
+  "workspace_delta": {
+    "bytes_added": 24113,
+    "bytes_removed": 0,
+    "bytes_net": 24113,
+    "new_file_count": 7,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "order_processor\\__init__.py",
+        "size": 130
+      },
+      {
+        "path": "order_processor\\model.py",
+        "size": 2175
+      },
+      {
+        "path": "order_processor\\processor.py",
+        "size": 12418
+      },
+      {
+        "path": "order_processor\\sender.py",
+        "size": 4759
+      },
+      {
+        "path": "requirements.txt",
+        "size": 64
+      },
+      {
+        "path": "README.md",
+        "size": 1092
+      },
+      {
+        "path": "main.py",
+        "size": 3475
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T16:23:03.3645251+08:00",
+  "ended_at": "2026-08-26T16:26:13.1123119+08:00",
+  "duration_ms": 189747,
+  "terminated_by": "completed"
+}

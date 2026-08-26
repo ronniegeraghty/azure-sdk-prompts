@@ -1,0 +1,53 @@
+{
+  "prompt_id": "storage-dp-python-blob-event-notifier",
+  "config_name": "python-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that processes Azure Blob Storage lifecycle events delivered via Event Grid.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- An **event receiver module** (both sync and async versions) that accepts a JSON payload (as if received from an Event Grid webhook endpoint) and deserializes it into structured event objects using the Azure Event Grid SDK's built-in deserialization helpers — not manual JSON parsing. It should support both Event Grid native schema and CloudEvents 1.0 schema (since Event Grid supports both and the configured schema may vary). It should route events by type — blob-created events get processed one way, blob-deleted another, and unrecognized types are logged as warnings.\r\n\r\n- A **blob event handler module** that processes individual blob events. For blob-created events, it should parse the blob's container and name from the event subject, download the blob, and print a summary (name, size, content type, and the blob's access tier). For blob-deleted events, it should just log the deletion. It should handle race conditions gracefully — the blob may have already been deleted or moved to a different tier by the time we try to read it.\r\n\r\n- An **event publisher module** (both sync and async versions) that can publish custom events to an Event Grid topic. Given a topic endpoint and a list of custom event objects, it should send them to Event Grid using the SDK's publisher client. This would be used for downstream notifications (e.g., \"document processed\" events). It should support setting a subject hierarchy for event filtering (e.g., \"/documents/invoices/processed\"). Handle publishing errors gracefully with proper exception handling.\r\n\r\n- A **configuration module** that connects to Azure Blob Storage and Event Grid securely. Authentication should use `DefaultAzureCredential` — no access keys or SAS tokens.\r\n\r\n- A **main script** that demos both implementations: constructs a sample Event Grid JSON payload (with both CloudEvents and EventGrid-schema examples) containing mock blob-created and blob-deleted events with realistic structure, feeds them through the receiver and handler, and publishes a custom downstream event. Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the complete Python project with:\n\n- Sync and async Event Grid receivers supporting native Event Grid and CloudEvents 1.0 schemas via SDK deserialization helpers\n- Sync and async blob-created/deleted handlers with race-condition handling\n- Sync and async custom event publishers with hierarchical subjects and Azure error handling\n- Secure `DefaultAzureCredential` configuration for Blob Storage and Event Grid\n- Offline `main.py` demo covering both schemas and implementations without contacting Azure\n- Azure SDK dependencies in `requirements.txt`\n\nRun the demo with:\n\n```text\npython main.py\n```",
+  "workspace_delta": {
+    "bytes_added": 21213,
+    "bytes_removed": 0,
+    "bytes_net": 21213,
+    "new_file_count": 6,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "blob_event_handler.py",
+        "size": 5001
+      },
+      {
+        "path": "configuration.py",
+        "size": 2843
+      },
+      {
+        "path": "event_publisher.py",
+        "size": 2763
+      },
+      {
+        "path": "event_receiver.py",
+        "size": 3156
+      },
+      {
+        "path": "main.py",
+        "size": 7343
+      },
+      {
+        "path": "requirements.txt",
+        "size": 107
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 13,
+    "tool_calls": 0,
+    "reasoning_steps": 13,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T16:38:37.1449864+08:00",
+  "ended_at": "2026-08-26T16:43:11.8645808+08:00",
+  "duration_ms": 274719,
+  "terminated_by": "completed"
+}

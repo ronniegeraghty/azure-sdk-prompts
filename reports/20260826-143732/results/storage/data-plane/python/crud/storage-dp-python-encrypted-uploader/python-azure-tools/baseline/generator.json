@@ -1,0 +1,49 @@
+{
+  "prompt_id": "storage-dp-python-encrypted-uploader",
+  "config_name": "python-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that uploads files to Azure Blob Storage with client-side encryption, where the encryption key material is managed in Azure Key Vault.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **key management module** (both sync and async versions) that interacts with Azure Key Vault's Keys service (not Secrets) to perform cryptographic operations. It should implement envelope encryption: generate a data encryption key locally, use Key Vault to protect (wrap) it, and store the protected key alongside the encrypted blob. For decryption, have Key Vault recover (unwrap) the data key, then decrypt locally. The raw data key should never be persisted anywhere, and the vault's key material should never leave Key Vault.\r\n\r\n- A **blob uploader/downloader module** (both sync and async versions) that handles the actual encryption and storage. For upload: generate a data key, encrypt the data locally using **AES-GCM** (authenticated encryption), protect the data key via Key Vault, then upload the ciphertext to Blob Storage with the protected key and any necessary cryptographic parameters (nonce/IV) stored as blob metadata. For download: read the blob and its metadata, recover the data key via Key Vault, and decrypt. Should handle errors from both services (e.g., the vault key may have been disabled, or the blob may not exist).\r\n\r\n- A **configuration module** that builds the necessary Azure connections for both Blob Storage and Key Vault. It should read endpoints from environment variables and authenticate with `DefaultAzureCredential`. All connections should share a single credential instance.\r\n\r\n- A **main script** that demos both implementations: runs the full encrypt-upload-download-decrypt round-trip using the sync implementation first, then repeats with the async implementation. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Python project with:\n\n- `config.py` — environment-based Azure configuration with shared credentials\n- `key_management.py` — sync/async Key Vault Keys envelope encryption using RSA-OAEP-256\n- `blob_crypto.py` — sync/async AES-256-GCM encrypted blob upload/download\n- `main.py` — sync and async round-trip demonstrations\n- `requirements.txt` — required Azure SDK and cryptography dependencies\n\nRequired environment variables:\n\n```text\nAZURE_STORAGE_ACCOUNT_URL\nAZURE_STORAGE_CONTAINER_NAME\nAZURE_KEY_VAULT_URL\nAZURE_KEY_NAME\n```\n\nRun with `python main.py`. The demo prints the versioned Key Vault key ID, base64-wrapped DEK, and decrypted output for both implementations. Raw DEKs remain ephemeral and are zeroed after use; Key Vault key material never leaves the service.",
+  "workspace_delta": {
+    "bytes_added": 18951,
+    "bytes_removed": 0,
+    "bytes_net": 18951,
+    "new_file_count": 5,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "key_management.py",
+        "size": 5338
+      },
+      {
+        "path": "main.py",
+        "size": 2301
+      },
+      {
+        "path": "requirements.txt",
+        "size": 117
+      },
+      {
+        "path": "blob_crypto.py",
+        "size": 7720
+      },
+      {
+        "path": "config.py",
+        "size": 3475
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T17:02:30.3404159+08:00",
+  "ended_at": "2026-08-26T17:05:17.6446031+08:00",
+  "duration_ms": 167304,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,4 @@
+azure-core>=1.38.3,<2
+azure-eventgrid>=4.22.1,<5
+azure-identity>=1.17,<2
+azure-storage-blob>=12.22,<13

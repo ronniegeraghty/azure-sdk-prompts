@@ -1,0 +1,65 @@
+{
+  "prompt_id": "identity-dp-python-credential-chain",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that demonstrates how to correctly build Azure credential chains tailored to different deployment environments — local development, CI/CD pipelines, and production.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **credential factory module** that builds the appropriate Azure credential for each environment. For local development, it should chain together credentials that work from developer tools (CLI, VS Code, etc.). For CI pipelines, it should support credentials sourced from pipeline environment variables or Azure Pipelines service connections. For production, it should prefer managed identity (supporting both system-assigned and user-assigned, where the user-assigned identity's client ID comes from an environment variable), with workload identity as a fallback for Kubernetes scenarios. The factory should also support enabling Continuous Access Evaluation (CAE) on token requests, which lets Azure revoke tokens mid-session for security events.\r\n\r\n- An **environment detector module** that auto-detects which environment the app is running in by probing for well-known environment variables (e.g., CI pipeline workspace variables, managed identity endpoint availability). It should classify the environment as dev, CI, or production.\r\n\r\n- A **connectivity tester module** (both sync and async versions) that verifies a credential works by requesting a token for a given Azure scope. It should print success/failure, the token's expiry time, and whether CAE was requested. It should handle and report the specific failure reason if authentication fails (expired cert, wrong tenant, no identity available, etc.) rather than just printing a generic error.\r\n\r\n- A **main script** that detects the current environment, builds the right credential, and runs the connectivity test against Azure Resource Manager using the sync tester first, then repeats with the async tester. Print the detected environment, the selected credential strategy, and the test results from both.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Python project with:\n\n- Environment detection for dev, CI/CD, managed identity, and Kubernetes workload identity.\n- Explicit sync/async credential factories for developer tools, Azure Pipelines, environment credentials, and production identities.\n- CAE-enabled token requests and detailed authentication failure diagnostics.\n- Sync and async Azure Resource Manager connectivity tests.\n- `main.py`, `requirements.txt`, usage documentation, and 12 unit tests using fake tokens only.\n\nReference: [Azure Identity client library for Python](https://learn.microsoft.com/python/api/overview/azure/identity-readme).",
+  "workspace_delta": {
+    "bytes_added": 26583,
+    "bytes_removed": 0,
+    "bytes_net": 26583,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 2015
+      },
+      {
+        "path": "credential_factory.py",
+        "size": 8055
+      },
+      {
+        "path": "environment_detector.py",
+        "size": 3158
+      },
+      {
+        "path": "requirements.txt",
+        "size": 92
+      },
+      {
+        "path": "connectivity_tester.py",
+        "size": 4959
+      },
+      {
+        "path": "main.py",
+        "size": 1984
+      },
+      {
+        "path": "tests\\test_connectivity_tester.py",
+        "size": 2528
+      },
+      {
+        "path": "tests\\test_credential_factory.py",
+        "size": 2572
+      },
+      {
+        "path": "tests\\test_environment_detector.py",
+        "size": 1220
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 17,
+    "tool_calls": 0,
+    "reasoning_steps": 17,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T15:27:57.3578253+08:00",
+  "ended_at": "2026-08-26T15:31:15.1739379+08:00",
+  "duration_ms": 197816,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,5 @@
+azure-identity==1.25.3
+azure-storage-blob==12.30.0
+
+[test]
+pytest<10,>=8.0

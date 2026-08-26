@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-mp-python-account-mgmt",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that manages\r\nAzure Storage Accounts using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new Storage Account with Standard_LRS SKU in \"eastus\"\r\n3. List all Storage Accounts in a resource group\r\n4. Get the properties of the created Storage Account\r\n5. Update the account to enable blob versioning\r\n6. Delete the Storage Account\r\n\r\nShow required pip packages and include proper error handling.",
+  "final_response": "Implemented `manage_storage_account.py` with:\n\n- `DefaultAzureCredential` authentication\n- `Standard_LRS` StorageV2 account creation in `eastus`\n- Resource-group account listing and property retrieval\n- Blob versioning enabled through blob-service properties\n- Guaranteed deletion in `finally`\n- Specific authentication, HTTP, SDK, validation, and cleanup error handling\n- Secure defaults: TLS 1.2, HTTPS-only, and public blob access disabled\n\nDependencies are pinned in `requirements.txt`:\n\n```text\nazure-identity==1.25.3\nazure-mgmt-storage==25.1.0\n```\n\nRun with PowerShell:\n\n```powershell\npython -m pip install -r requirements.txt\n\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\n$env:AZURE_RESOURCE_GROUP = \"\u003cexisting-resource-group\u003e\"\n$env:AZURE_STORAGE_ACCOUNT_NAME = \"\u003cglobally-unique-lowercase-name\u003e\"\n\npython .\\manage_storage_account.py\n```\n\nThe authenticated identity needs storage-account management permissions, such as **Storage Account Contributor**, on the resource group.\n\nReferences: [Azure Identity](https://learn.microsoft.com/python/api/overview/azure/identity-readme), [StorageManagementClient](https://learn.microsoft.com/python/api/azure-mgmt-storage/azure.mgmt.storage.storagemanagementclient), [BlobServiceProperties](https://learn.microsoft.com/python/api/azure-mgmt-storage/azure.mgmt.storage.models.blobserviceproperties).",
+  "workspace_delta": {
+    "bytes_added": 7204,
+    "bytes_removed": 0,
+    "bytes_net": 7204,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "manage_storage_account.py",
+        "size": 7152
+      },
+      {
+        "path": "requirements.txt",
+        "size": 52
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 16,
+    "tool_calls": 0,
+    "reasoning_steps": 16,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T14:37:32.2814881+08:00",
+  "ended_at": "2026-08-26T14:41:18.5456721+08:00",
+  "duration_ms": 226264,
+  "terminated_by": "completed"
+}
