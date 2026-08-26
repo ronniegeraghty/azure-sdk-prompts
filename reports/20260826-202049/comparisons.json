@@ -1,0 +1,593 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "js-ts-azure-tools/baseline",
+    "label_b": "js-ts-azure-tools/with-azure-tools",
+    "per_prompt": [
+      {
+        "prompt_id": "ai-agents-dp-js-ts-basic-agent-lifecycle",
+        "score_a": 0.6363636363636364,
+        "score_b": 0.6363636363636364,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Correct @azure/ Scoped Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "@azure/identity for Authentication",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Client Constructor with Endpoint and Credential",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async/Await Pattern",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Pagination with for-await-of",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "LRO Pattern (beginXxx + pollUntilDone)",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "RestError Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "No Deprecated Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Logging via @azure/logger",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "package.json with Correct Dependencies",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-agents-dp-js-ts-file-search",
+        "score_a": 0.6363636363636364,
+        "score_b": 0.7272727272727273,
+        "delta": 0.09090909090909094,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Correct @azure/ Scoped Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "@azure/identity for Authentication",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Client Constructor with Endpoint and Credential",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async/Await Pattern",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Pagination with for-await-of",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "LRO Pattern (beginXxx + pollUntilDone)",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "RestError Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "No Deprecated Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Logging via @azure/logger",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "package.json with Correct Dependencies",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-agents-dp-js-ts-function-tool",
+        "score_a": 0.5454545454545454,
+        "score_b": 0.6363636363636364,
+        "delta": 0.09090909090909094,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Correct @azure/ Scoped Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "@azure/identity for Authentication",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Client Constructor with Endpoint and Credential",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async/Await Pattern",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "Pagination with for-await-of",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "LRO Pattern (beginXxx + pollUntilDone)",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "RestError Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "No Deprecated Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Logging via @azure/logger",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "package.json with Correct Dependencies",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-projects-dp-js-ts-project-resource-inventory",
+        "score_a": 0.7272727272727273,
+        "score_b": 0.7272727272727273,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Correct @azure/ Scoped Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "@azure/identity for Authentication",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Client Constructor with Endpoint and Credential",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async/Await Pattern",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Pagination with for-await-of",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "LRO Pattern (beginXxx + pollUntilDone)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "RestError Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "No Deprecated Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Logging via @azure/logger",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "package.json with Correct Dependencies",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0.04545454545454547,
+      "improved": 2,
+      "regressed": 0,
+      "unchanged": 2,
+      "top_improved": [
+        {
+          "prompt_id": "ai-agents-dp-js-ts-file-search",
+          "score_a": 0.6363636363636364,
+          "score_b": 0.7272727272727273,
+          "delta": 0.09090909090909094,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Correct @azure/ Scoped Packages",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "@azure/identity for Authentication",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Client Constructor with Endpoint and Credential",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Async/Await Pattern",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Pagination with for-await-of",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "LRO Pattern (beginXxx + pollUntilDone)",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "RestError Exception Handling",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "No Deprecated Packages",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Logging via @azure/logger",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "package.json with Correct Dependencies",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            }
+          ]
+        },
+        {
+          "prompt_id": "ai-agents-dp-js-ts-function-tool",
+          "score_a": 0.5454545454545454,
+          "score_b": 0.6363636363636364,
+          "delta": 0.09090909090909094,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Correct @azure/ Scoped Packages",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "@azure/identity for Authentication",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Client Constructor with Endpoint and Credential",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Async/Await Pattern",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "Pagination with for-await-of",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "LRO Pattern (beginXxx + pollUntilDone)",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "RestError Exception Handling",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "No Deprecated Packages",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Logging via @azure/logger",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "package.json with Correct Dependencies",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

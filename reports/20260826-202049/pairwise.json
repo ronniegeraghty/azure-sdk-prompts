@@ -1,0 +1,50 @@
+{
+  "run_id": "20260826-202049",
+  "timestamp": "2026-08-26T13:20:43Z",
+  "reports": [
+    {
+      "prompt_id": "ai-agents-dp-js-ts-basic-agent-lifecycle",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-js-ts-file-search",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-js-ts-function-tool",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-projects-dp-js-ts-project-resource-inventory",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

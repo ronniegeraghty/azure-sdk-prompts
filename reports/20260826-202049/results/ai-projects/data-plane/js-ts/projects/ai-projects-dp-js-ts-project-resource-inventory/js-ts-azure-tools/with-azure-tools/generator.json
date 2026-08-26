@@ -1,0 +1,49 @@
+{
+  "prompt_id": "ai-projects-dp-js-ts-project-resource-inventory",
+  "config_name": "js-ts-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable TypeScript console application that uses\r\n`@azure/ai-projects` to inspect connections and model deployments in a Microsoft\r\nFoundry project.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read `FOUNDRY_PROJECT_ENDPOINT`, `CONNECTION_NAME`, and `DEPLOYMENT_NAME`.\r\n- Enumerate every project connection through the SDK's pageable API and print each\r\n  connection's name, type, target, and default status.\r\n- Retrieve `CONNECTION_NAME` without requesting credentials and print the same typed\r\n  metadata.\r\n- Enumerate every project deployment through the SDK's pageable API. For each model\r\n  deployment, print its name, model publisher, model name, and model version.\r\n- Retrieve `DEPLOYMENT_NAME`, require it to be a model deployment, and print the same\r\n  typed model metadata.\r\n- Include the project manifest and concise install, build, and run commands.\r\n\r\nUse async/await throughout.",
+  "final_response": "Created a complete runnable TypeScript application in the workspace.\n\n- `src\\index.ts` — pageable connection/deployment enumeration, typed retrieval, model type guard, and environment validation\n- `package.json` / `package-lock.json` — pinned Azure SDK dependencies and build scripts\n- `tsconfig.json` — strict TypeScript configuration\n- `README.md` — concise configuration, install, build, and run instructions\n\nThe app uses `connections.get()` without credentials and requires retrieved deployments to have type `ModelDeployment`.",
+  "workspace_delta": {
+    "bytes_added": 50583,
+    "bytes_removed": 0,
+    "bytes_net": 50583,
+    "new_file_count": 5,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "package-lock.json",
+        "size": 45618
+      },
+      {
+        "path": "package.json",
+        "size": 524
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 2931
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 521
+      },
+      {
+        "path": "README.md",
+        "size": 989
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 13,
+    "tool_calls": 0,
+    "reasoning_steps": 13,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T20:20:49.3754097+08:00",
+  "ended_at": "2026-08-26T20:24:16.9468981+08:00",
+  "duration_ms": 207571,
+  "terminated_by": "completed"
+}

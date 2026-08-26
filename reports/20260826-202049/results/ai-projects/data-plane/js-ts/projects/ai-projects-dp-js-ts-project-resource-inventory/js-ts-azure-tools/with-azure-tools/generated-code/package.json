@@ -1,0 +1,22 @@
+{
+  "name": "foundry-project-resource-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Inspect connections and model deployments in a Microsoft Foundry project.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@azure/ai-projects": "^2.5.0",
+    "@azure/identity": "^4.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
+  }
+}

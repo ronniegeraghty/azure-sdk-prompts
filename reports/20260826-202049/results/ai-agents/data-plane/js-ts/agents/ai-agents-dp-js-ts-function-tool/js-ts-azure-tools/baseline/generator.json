@@ -1,0 +1,46 @@
+{
+  "prompt_id": "ai-agents-dp-js-ts-function-tool",
+  "config_name": "js-ts-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable TypeScript console application that uses\r\n`@azure/ai-agents` to answer a weather question through a local function tool.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read `PROJECT_ENDPOINT` and `MODEL_DEPLOYMENT_NAME`.\r\n- Define a function tool named `get_weather` with required string parameters\r\n  `location` and `unit`; `unit` must allow only `c` or `f`.\r\n- Implement the local function deterministically: for Seattle, return temperature\r\n  `21` for `c` or `70` for `f`, including the location and unit in the JSON result.\r\n- Create an agent named `hyoka-weather-agent` whose instructions require using the\r\n  function for weather questions.\r\n- Create a thread with the exact user message\r\n  `What is the weather in Seattle in celsius?`, then create and poll a run.\r\n- When the run requires action, iterate its function tool calls, decode the JSON\r\n  arguments, invoke `get_weather`, create an output correlated with each tool call ID,\r\n  and submit all outputs through the SDK.\r\n- Continue polling until terminal status. After successful completion, list messages\r\n  in chronological order and print assistant text.\r\n- Delete the thread and agent.\r\n- Include the project manifest and concise restore, build, and run commands.\r\n\r\nUse async/await throughout.",
+  "final_response": "The failure is network TLS rather than application code. I’m using npm’s local cache where possible and aligning the compiler version with an already cached release before retrying restore.",
+  "workspace_delta": {
+    "bytes_added": 7115,
+    "bytes_removed": 0,
+    "bytes_net": 7115,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "tsconfig.json",
+        "size": 364
+      },
+      {
+        "path": "README.md",
+        "size": 525
+      },
+      {
+        "path": "package.json",
+        "size": 404
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 5822
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 15,
+    "tool_calls": 0,
+    "reasoning_steps": 15,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T20:52:39.704609+08:00",
+  "ended_at": "2026-08-26T21:02:49.7252491+08:00",
+  "duration_ms": 610020,
+  "terminated_by": "error",
+  "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded"
+}

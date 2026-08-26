@@ -1,0 +1,4 @@
+node_modules/
+dist/
+trail-guide.txt
+.env
