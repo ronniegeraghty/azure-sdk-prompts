@@ -93,13 +93,13 @@ Both formats produce identical `Prompt` structs. The `properties:` format is pre
 
 ### Valid Values
 
-**Services:** `storage`, `key-vault`, `cosmos-db`, `event-hubs`, `app-configuration`, `purview`, `digital-twins`, `identity`, `resource-manager`, `service-bus`
+**Services:** `storage`, `key-vault`, `cosmos-db`, `event-hubs`, `app-configuration`, `purview`, `digital-twins`, `identity`, `resource-manager`, `service-bus`, `ai-agents`, `ai-projects`, `text-translation`
 
 **Languages:** `dotnet`, `java`, `js-ts`, `python`, `go`, `rust`, `cpp`
 
 **Planes:** `data-plane`, `management-plane`
 
-**Categories:** `authentication`, `pagination`, `polling`, `retries`, `error-handling`, `crud`, `batch`, `streaming`, `auth`, `provisioning`
+**Categories:** `authentication`, `best-practices`, `pagination`, `polling`, `retries`, `error-handling`, `crud`, `batch`, `streaming`, `auth`, `provisioning`, `agents`, `projects`, `translation`
 
 **Difficulties:** `basic`, `intermediate`, `advanced`
 

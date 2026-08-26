@@ -16,6 +16,7 @@ var ValidServices = []string{
 "storage", "key-vault", "cosmos-db", "event-hubs",
 "app-configuration", "purview", "digital-twins",
 "identity", "resource-manager", "service-bus", "ai-agents", "ai-projects",
+"text-translation",
 "test", // Test fixture service
 }
 
@@ -29,6 +30,7 @@ var ValidLanguages = []string{"dotnet", "java", "js-ts", "python", "go", "rust",
 var ValidCategories = []string{
 "authentication", "best-practices", "pagination", "polling", "retries",
 "error-handling", "crud", "batch", "streaming", "auth", "provisioning", "agents", "projects",
+"translation",
 "test", // Test fixture category
 }
 

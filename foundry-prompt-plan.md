@@ -199,6 +199,7 @@ Package family: `Azure.AI.Translation.Text`, `azure-ai-translation-text`,
    and print detected source language plus each target translation.
    - Evaluation focus: multiple target languages, detected-language result, and
      per-target translation traversal.
+   - Status: the four-language prompt and reference set is complete.
 2. **Transliteration** — Transliterate text between specified scripts and print the
    transliterated output with the script metadata.
    - Evaluation focus: language/from-script/to-script parameters and transliteration

@@ -67,6 +67,26 @@ properties:
 List project resources.
 `
 
+const validTextTranslationPrompt = `---
+id: text-translation-dp-python-multilingual-translation
+properties:
+  service: text-translation
+  plane: data-plane
+  language: python
+  category: translation
+  difficulty: intermediate
+  description: "Translate text into multiple languages"
+  created: "2026-08-27"
+  author: test
+---
+
+# Multilingual text translation
+
+## Prompt
+
+Translate text into French and Japanese.
+`
+
 const invalidServicePrompt = `---
 id: unknown-dp-dotnet-test
 properties:
@@ -187,6 +207,19 @@ t.Fatalf("unexpected error: %v", err)
 if !result.OK() {
 t.Errorf("expected validation to pass, got errors: %v", result.Errors)
 }
+}
+
+func TestValidateTextTranslationValues(t *testing.T) {
+	dir := t.TempDir()
+	writePromptFile(t, dir, "text-translation.prompt.md", validTextTranslationPrompt)
+
+	result, err := Validate(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.OK() {
+		t.Errorf("expected validation to pass, got errors: %v", result.Errors)
+	}
 }
 
 func TestValidateInvalidService(t *testing.T) {
