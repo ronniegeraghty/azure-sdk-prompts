@@ -87,6 +87,26 @@ properties:
 Translate text into French and Japanese.
 `
 
+const validDocumentTranslationPrompt = `---
+id: document-translation-dp-python-single-document
+properties:
+  service: document-translation
+  plane: data-plane
+  language: python
+  category: translation
+  difficulty: intermediate
+  description: "Translate one local document"
+  created: "2026-08-27"
+  author: test
+---
+
+# Single document translation
+
+## Prompt
+
+Translate one local document.
+`
+
 const invalidServicePrompt = `---
 id: unknown-dp-dotnet-test
 properties:
@@ -220,6 +240,19 @@ func TestValidateTextTranslationValues(t *testing.T) {
 	if !result.OK() {
 		t.Errorf("expected validation to pass, got errors: %v", result.Errors)
 	}
+}
+
+func TestValidateDocumentTranslationValues(t *testing.T) {
+dir := t.TempDir()
+writePromptFile(t, dir, "document-translation.prompt.md", validDocumentTranslationPrompt)
+
+result, err := Validate(dir)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if !result.OK() {
+t.Errorf("expected validation to pass, got errors: %v", result.Errors)
+}
 }
 
 func TestValidateInvalidService(t *testing.T) {

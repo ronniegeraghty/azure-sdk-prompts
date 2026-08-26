@@ -216,6 +216,7 @@ Package family: `Azure.AI.Translation.Document`,
    target language, and persist the returned translated document.
    - Evaluation focus: document content and media type, target language, binary
      response handling, and output-file integrity.
+   - Status: the four-language prompt and reference set is complete.
 2. **Batch container translation** — Start a source-to-target container translation,
    poll the batch operation, and enumerate each document's status and failure details.
    - Evaluation focus: source/target inputs, long-running operation, per-document

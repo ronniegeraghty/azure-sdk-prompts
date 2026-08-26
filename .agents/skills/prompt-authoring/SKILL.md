@@ -93,7 +93,7 @@ Both formats produce identical `Prompt` structs. The `properties:` format is pre
 
 ### Valid Values
 
-**Services:** `storage`, `key-vault`, `cosmos-db`, `event-hubs`, `app-configuration`, `purview`, `digital-twins`, `identity`, `resource-manager`, `service-bus`, `ai-agents`, `ai-projects`, `text-translation`
+**Services:** `storage`, `key-vault`, `cosmos-db`, `event-hubs`, `app-configuration`, `purview`, `digital-twins`, `identity`, `resource-manager`, `service-bus`, `ai-agents`, `ai-projects`, `text-translation`, `document-translation`
 
 **Languages:** `dotnet`, `java`, `js-ts`, `python`, `go`, `rust`, `cpp`
 

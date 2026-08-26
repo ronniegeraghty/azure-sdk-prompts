@@ -16,7 +16,7 @@ var ValidServices = []string{
 "storage", "key-vault", "cosmos-db", "event-hubs",
 "app-configuration", "purview", "digital-twins",
 "identity", "resource-manager", "service-bus", "ai-agents", "ai-projects",
-"text-translation",
+"text-translation", "document-translation",
 "test", // Test fixture service
 }
 
