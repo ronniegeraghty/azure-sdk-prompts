@@ -123,18 +123,29 @@ Package family: `Azure.AI.DocumentIntelligence`,
 `azure-ai-documentintelligence`, `@azure-rest/ai-document-intelligence`, and
 `azure-ai-documentintelligence`.
 
+Wave 3 status: skipped. The official JavaScript source tag
+`@azure-rest/ai-document-intelligence_1.1.0` identifies the released 1.1.0
+package, but that version isn't restorable from the required Azure SDK private
+npm registry. On 2026-08-27, registry metadata listed only 1.1.0 and 1.1.1
+alpha builds; `npm view` returned 404 for 1.1.0, and the registry's `latest`
+tag pointed to `1.1.1-alpha.20260826.1`. The four-language contract requires
+every package to restore from the mandated registry.
+
 1. **Prebuilt invoice extraction** — Analyze an invoice with `prebuilt-invoice` and
    print vendor, invoice ID, date, and total from typed document fields.
    - Evaluation focus: prebuilt model selection, poller use, document fields,
      typed values, and confidence.
+   - Status: skipped because the library-level JavaScript package restore failed.
 2. **Layout and Markdown extraction** — Analyze a document with the layout model and
    Markdown output, then print paragraphs, tables, and page information.
    - Evaluation focus: output-content format, layout result hierarchy, table cells,
      and page spans.
+   - Status: skipped because the library-level JavaScript package restore failed.
 3. **Custom classification** — Submit a document to a custom classifier, poll the
    operation, and print each classified document's type and confidence.
    - Evaluation focus: classifier ID, classification poller, per-document results,
      and confidence values.
+   - Status: skipped because the library-level JavaScript package restore failed.
 
 ### Azure AI Vision Image Analysis
 
@@ -228,4 +239,3 @@ Package family: `Azure.AI.Translation.Document`,
 - Text Analytics/Language Text, Language Conversations, Question Answering, Azure AI
   Discovery, Agent Server, Evaluation, ML, and Transcription: defer until supported
   package parity is confirmed across all four languages.
-
