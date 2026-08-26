@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-mp-dotnet-polling",
+  "config_name": "dotnet-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that creates\r\nan Azure Storage Account using the management plane SDK and properly handles the\r\nlong-running operation (LRO):\r\n1. Start the create operation using CreateOrUpdateAsync\r\n2. Poll for completion using WaitForCompletionAsync\r\n3. Show how to check the operation status while it's in progress\r\n4. Handle timeout scenarios where the operation takes too long\r\n5. Demonstrate the difference between WaitForCompletion and manual polling\r\n\r\nUse Azure.ResourceManager.Storage with DefaultAzureCredential. Show required\r\nNuGet packages and explain the ArmOperation\u003cT\u003e pattern.",
+  "final_response": "Created a complete console project with:\n\n- `Program.cs` — Storage Account creation with both SDK-managed and manual LRO polling\n- `hyoka-storage-mp-dotnet-polling-dotnet-azure-tools-with-azure-tools-1785303445.csproj`\n- `Azure.ResourceManager.Storage` **1.7.0**\n- `Azure.Identity` **1.21.0**\n\nRun with SDK-managed polling:\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\n$env:AZURE_RESOURCE_GROUP = \"\u003cexisting-resource-group\u003e\"\n$env:AZURE_STORAGE_ACCOUNT_NAME = \"\u003cglobally-unique-lowercase-name\u003e\"\n$env:AZURE_LOCATION = \"eastus\"\n$env:AZURE_LRO_TIMEOUT_SECONDS = \"600\"\n$env:AZURE_LRO_POLL_INTERVAL_SECONDS = \"10\"\n\ndotnet run\n```\n\nRun the same operation using manual polling:\n\n```powershell\ndotnet run -- --manual\n```\n\nThe sample starts creation with `CreateOrUpdateAsync(WaitUntil.Started, ...)`, returning an `ArmOperation\u003cStorageAccountResource\u003e`. This object represents the server-side LRO and exposes `Id`, `HasCompleted`, `HasValue`, `Value`, `GetRawResponse()`, and `UpdateStatusAsync()`.\n\n`WaitForCompletionAsync()` internally calls `UpdateStatusAsync()` until `HasCompleted` becomes true, honoring Azure retry guidance. Manual polling gives the application direct control over delays, logging, and status refreshes, but requires implementing that loop correctly. The synchronous equivalent is `WaitForCompletion()`.\n\nTimeouts are enforced with a cancellation token. Canceling local polling **does not cancel the Azure-side operation**; it may continue after the program exits.\n\nReferences: [CreateOrUpdateAsync](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.storage.storageaccountcollection.createorupdateasync), [ArmOperation\\\u003cT\\\u003e](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.armoperation-1), [WaitForCompletionAsync](https://learn.microsoft.com/dotnet/api/azure.operation-1.waitforcompletionasync).",
+  "workspace_delta": {
+    "bytes_added": 6587,
+    "bytes_removed": 0,
+    "bytes_net": 6587,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 6037
+      },
+      {
+        "path": "hyoka-storage-mp-dotnet-polling-dotnet-azure-tools-with-azure-tools-1785303445.csproj",
+        "size": 550
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 16,
+    "tool_calls": 0,
+    "reasoning_steps": 16,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T02:31:02.1566114+08:00",
+  "ended_at": "2026-08-27T02:33:45.3188492+08:00",
+  "duration_ms": 163162,
+  "terminated_by": "completed"
+}

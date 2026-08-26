@@ -1,0 +1,226 @@
+{
+  "run_id": "20260827-010715",
+  "timestamp": "2026-08-26T18:43:54Z",
+  "reports": [
+    {
+      "prompt_id": "app-configuration-dp-dotnet-crud",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 6,
+        "max_score": 7,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "cosmos-db-dp-dotnet-crud",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 7,
+        "max_score": 7,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "cosmos-db-dp-dotnet-error-handling",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 6,
+        "max_score": 8,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "cosmos-db-dp-dotnet-pagination",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 7,
+        "max_score": 8,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "event-hubs-dp-dotnet-streaming",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 7,
+        "max_score": 7,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-dotnet-default-credential",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 5,
+        "max_score": 5,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-dotnet-managed-identity",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 5,
+        "max_score": 6,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-dotnet-service-principal",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 5,
+        "max_score": 5,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-dp-dotnet-crud",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 5,
+        "max_score": 5,
+        "success": true
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-dp-dotnet-error-handling",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 5,
+        "max_score": 7,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-dp-dotnet-pagination",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 5,
+        "max_score": 7,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-mp-dotnet-polling",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 7,
+        "max_score": 8,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "resource-manager-mp-dotnet-rg-crud",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 2,
+        "max_score": 6,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "service-bus-dp-dotnet-crud",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 7,
+        "max_score": 8,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-auth",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 3,
+        "max_score": 5,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-batch",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 5,
+        "max_score": 8,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-error-handling",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 4,
+        "max_score": 6,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-retries",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 6,
+        "max_score": 8,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-mp-dotnet-account-mgmt",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 6,
+        "max_score": 7,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-mp-dotnet-polling",
+      "baseline": {
+        "config_name": "dotnet-azure-tools/baseline",
+        "score": 6,
+        "max_score": 7,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

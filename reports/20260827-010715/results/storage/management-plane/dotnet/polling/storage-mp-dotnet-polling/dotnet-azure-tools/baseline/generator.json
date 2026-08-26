@@ -1,0 +1,41 @@
+{
+  "prompt_id": "storage-mp-dotnet-polling",
+  "config_name": "dotnet-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that creates\r\nan Azure Storage Account using the management plane SDK and properly handles the\r\nlong-running operation (LRO):\r\n1. Start the create operation using CreateOrUpdateAsync\r\n2. Poll for completion using WaitForCompletionAsync\r\n3. Show how to check the operation status while it's in progress\r\n4. Handle timeout scenarios where the operation takes too long\r\n5. Demonstrate the difference between WaitForCompletion and manual polling\r\n\r\nUse Azure.ResourceManager.Storage with DefaultAzureCredential. Show required\r\nNuGet packages and explain the ArmOperation\u003cT\u003e pattern.",
+  "final_response": "Implemented a complete .NET 8 console sample:\n\n- `Program.cs` — creates a storage account using `CreateOrUpdateAsync(WaitUntil.Started, ...)`\n- Demonstrates `WaitForCompletionAsync` and manual `UpdateStatusAsync` polling\n- Displays `HasCompleted`, `HasValue`, and latest HTTP status during manual polling\n- Handles configurable polling intervals, client cancellation, Azure errors, and a 10-minute timeout\n- Clarifies that timing out stops local polling but does not cancel the Azure-side operation\n- `README.md` — documents required NuGet packages, configuration, execution, and the `ArmOperation\u003cT\u003e` pattern\n- `StorageAccountLroSample.csproj` — references `Azure.Identity` and `Azure.ResourceManager.Storage`\n\nUse SDK-managed polling with `dotnet run`, or manual polling with status output using:\n\n```powershell\ndotnet run -- --manual\n```\n\nThe project builds successfully with no warnings or errors. No Azure resources were created or modified.",
+  "workspace_delta": {
+    "bytes_added": 8994,
+    "bytes_removed": 0,
+    "bytes_net": 8994,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 5799
+      },
+      {
+        "path": "README.md",
+        "size": 2767
+      },
+      {
+        "path": "StorageAccountLroSample.csproj",
+        "size": 428
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T02:36:16.2566209+08:00",
+  "ended_at": "2026-08-27T02:37:37.3288151+08:00",
+  "duration_ms": 81072,
+  "terminated_by": "completed"
+}

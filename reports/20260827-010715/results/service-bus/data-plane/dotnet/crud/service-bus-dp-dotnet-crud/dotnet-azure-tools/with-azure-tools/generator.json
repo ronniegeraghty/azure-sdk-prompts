@@ -1,0 +1,41 @@
+{
+  "prompt_id": "service-bus-dp-dotnet-crud",
+  "config_name": "dotnet-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that demonstrates\r\nmessaging with Azure Service Bus:\r\n1. Create a ServiceBusClient using a connection string\r\n2. Create a ServiceBusSender for a queue and send a single message\r\n3. Send a batch of 5 messages using ServiceBusMessageBatch\r\n4. Create a ServiceBusReceiver and receive messages using ReceiveMessagesAsync\r\n5. Complete a message after processing with CompleteMessageAsync\r\n6. Create a ServiceBusProcessor for continuous processing with handlers\r\n7. Demonstrate sending to a topic and receiving from a subscription\r\n\r\nShow required NuGet packages and proper disposal with await using.",
+  "final_response": "Created a complete C# Azure Service Bus console sample:\n\n- `Program.cs` — queue send/receive, five-message batch, settlement, continuous processor, and topic/subscription messaging\n- `ServiceBusMessagingDemo.csproj` — references `Azure.Messaging.ServiceBus` v7.20.1\n- `README.md` — configuration, NuGet command, environment variables, and Microsoft references\n\nCredentials are read from `AZURE_SERVICEBUS_CONNECTION_STRING`, and all async SDK clients, senders, receivers, and processors use proper `await using` disposal.",
+  "workspace_delta": {
+    "bytes_added": 7143,
+    "bytes_removed": 0,
+    "bytes_net": 7143,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 5337
+      },
+      {
+        "path": "README.md",
+        "size": 1444
+      },
+      {
+        "path": "ServiceBusMessagingDemo.csproj",
+        "size": 362
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T02:13:28.8868539+08:00",
+  "ended_at": "2026-08-27T02:15:10.9993047+08:00",
+  "duration_ms": 102112,
+  "terminated_by": "completed"
+}

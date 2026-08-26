@@ -1,0 +1,41 @@
+{
+  "prompt_id": "event-hubs-dp-dotnet-streaming",
+  "config_name": "dotnet-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that demonstrates\r\nsending and receiving events with Azure Event Hubs:\r\n1. Create an EventHubProducerClient using a connection string\r\n2. Create a batch of events using CreateBatchAsync()\r\n3. Add 10 events with custom properties to the batch\r\n4. Send the batch to the event hub\r\n5. Create an EventProcessorClient with a BlobContainerClient for checkpointing\r\n6. Register ProcessEventAsync and ProcessErrorAsync handlers\r\n7. Start processing events and print received event bodies\r\n8. Implement proper checkpointing with ProcessEventArgs.UpdateCheckpointAsync()\r\n\r\nShow required NuGet packages (Azure.Messaging.EventHubs and\r\nAzure.Messaging.EventHubs.Processor) and proper disposal patterns.",
+  "final_response": "Implemented a complete .NET 8 Azure Event Hubs sample:\n\n- `Program.cs` — sends 10 events with custom properties, processes received events, prints bodies, checkpoints each successful event, handles errors, and shuts down cleanly.\n- `EventHubsSample.csproj` — references `Azure.Messaging.EventHubs`, `Azure.Messaging.EventHubs.Processor`, and `Azure.Storage.Blobs`.\n- `README.md` — documents required packages, environment variables, permissions, and execution.\n\nThe sample uses placeholder environment configuration and assumes the Event Hub and Blob checkpoint container already exist.",
+  "workspace_delta": {
+    "bytes_added": 5539,
+    "bytes_removed": 0,
+    "bytes_net": 5539,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "EventHubsSample.csproj",
+        "size": 524
+      },
+      {
+        "path": "Program.cs",
+        "size": 3787
+      },
+      {
+        "path": "README.md",
+        "size": 1228
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 6,
+    "tool_calls": 0,
+    "reasoning_steps": 6,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T01:28:50.1690187+08:00",
+  "ended_at": "2026-08-27T01:30:05.7506089+08:00",
+  "duration_ms": 75581,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-mp-dotnet-account-mgmt",
+  "config_name": "dotnet-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that manages\r\nAzure Storage Accounts using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new Storage Account with Standard_LRS SKU in \"eastus\"\r\n3. List all Storage Accounts in a resource group\r\n4. Get the properties of the created Storage Account\r\n5. Update the account to enable blob versioning\r\n6. Delete the Storage Account\r\n\r\nShow required NuGet packages and proper error handling.\r\nUse the Azure.ResourceManager.Storage SDK.",
+  "final_response": "Created a compile-ready C# sample:\n\n- `Program.cs` — authenticates with `DefaultAzureCredential`, creates a `Standard_LRS` StorageV2 account in `eastus`, lists accounts, retrieves properties, enables blob versioning, and deletes the account.\n- `AzureStorageAccountManager.csproj` — includes:\n  - `Azure.Identity` 1.17.0\n  - `Azure.ResourceManager.Storage` 1.4.0\n\nConfiguration is read from `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, and `AZURE_STORAGE_ACCOUNT_NAME`. Cleanup runs in `finally`, with distinct handling for authentication, Azure request, unexpected, and deletion errors. No Azure operations were executed.",
+  "workspace_delta": {
+    "bytes_added": 4469,
+    "bytes_removed": 0,
+    "bytes_net": 4469,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "AzureStorageAccountManager.csproj",
+        "size": 432
+      },
+      {
+        "path": "Program.cs",
+        "size": 4037
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 9,
+    "tool_calls": 0,
+    "reasoning_steps": 9,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T02:34:03.5797085+08:00",
+  "ended_at": "2026-08-27T02:35:57.4345412+08:00",
+  "duration_ms": 113854,
+  "terminated_by": "completed"
+}

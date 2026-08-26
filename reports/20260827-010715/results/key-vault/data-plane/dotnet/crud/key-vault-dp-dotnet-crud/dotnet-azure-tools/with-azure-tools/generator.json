@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-dp-dotnet-crud",
+  "config_name": "dotnet-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# console application that performs\r\nall four CRUD operations on Azure Key Vault secrets:\r\n1. Create a new secret called \"my-secret\" with value \"my-secret-value\"\r\n2. Read the secret back and print its value\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Include proper error handling\r\nand show required NuGet packages.",
+  "final_response": "Created a complete C# console application:\n\n- `Program.cs` — asynchronous create, read, update, delete, and purge operations using `DefaultAzureCredential`\n- `KeyVaultSecretsCrud.csproj` — includes:\n  - `Azure.Identity` 1.21.0\n  - `Azure.Security.KeyVault.Secrets` 4.11.0\n- `README.md` — setup, permissions, and execution instructions\n\nRun with:\n\n```powershell\n$env:KEY_VAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net/\"\ndotnet run\n```\n\nThe authenticated identity needs secret **get**, **set**, **delete**, and **purge** permissions. Immediate purge requires soft delete enabled and purge protection disabled.\n\nReference: [Azure Key Vault secret client library quickstart for .NET](https://learn.microsoft.com/azure/key-vault/secrets/quick-create-net)",
+  "workspace_delta": {
+    "bytes_added": 5971,
+    "bytes_removed": 0,
+    "bytes_net": 5971,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "KeyVaultSecretsCrud.csproj",
+        "size": 439
+      },
+      {
+        "path": "Program.cs",
+        "size": 4301
+      },
+      {
+        "path": "README.md",
+        "size": 1231
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T01:48:25.1536793+08:00",
+  "ended_at": "2026-08-27T01:50:49.1563776+08:00",
+  "duration_ms": 144002,
+  "terminated_by": "completed"
+}
