@@ -153,13 +153,24 @@ Package family: `Azure.AI.Vision.ImageAnalysis`,
 `azure-ai-vision-imageanalysis`, `@azure-rest/ai-vision-image-analysis`, and
 `azure-ai-vision-imageanalysis`.
 
+Wave 3 status: skipped. Official JavaScript source has no 1.0.0 release tag;
+its latest release is `1.0.0-beta.3` from 2024-07-18. On 2026-08-27, the
+required Azure SDK private npm registry likewise listed only 1.0.0 alpha and
+beta builds, and `npm view` returned 404 for 1.0.0. Although the registry's
+`latest` tag points to `1.0.0-beta.3`, both `npm install` and an isolated
+`npm pack` for that version returned `E401`, so the package isn't restorable
+from the mandated registry. The four-language contract requires every package
+to restore from that registry.
+
 1. **Caption, tags, and objects** — Analyze an image for caption, tags, and detected
    objects and print text, confidence, and object rectangles.
    - Evaluation focus: feature selection and traversal of three distinct typed
      result collections.
+   - Status: skipped because the library-level JavaScript package restore failed.
 2. **OCR** — Analyze an image with the read feature and print text grouped by block
    and line with bounding polygons.
    - Evaluation focus: read feature selection, block/line hierarchy, and geometry.
+   - Status: skipped because the library-level JavaScript package restore failed.
 
 ### Azure AI Vision Face
 
