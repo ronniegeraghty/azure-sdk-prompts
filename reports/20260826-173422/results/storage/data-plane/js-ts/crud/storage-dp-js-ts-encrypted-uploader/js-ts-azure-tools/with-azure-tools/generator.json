@@ -1,0 +1,65 @@
+{
+  "prompt_id": "storage-dp-js-ts-encrypted-uploader",
+  "config_name": "js-ts-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a TypeScript Node.js project that uploads files to Azure Blob Storage with client-side encryption, where the encryption key material is managed in Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **key management class** that interacts with Azure Key Vault's Keys service (not Secrets) to perform cryptographic operations. It should implement envelope encryption: generate a data encryption key locally, use Key Vault to protect (wrap) it, and store the protected key alongside the encrypted blob. For decryption, have Key Vault recover (unwrap) the data key, then decrypt locally. The raw data key should never be persisted anywhere, and the vault's key material should never leave Key Vault.\r\n\r\n- A **blob uploader/downloader class** that handles the actual encryption and storage. For upload: generate a data key, encrypt the data locally using AES-GCM, protect the data key via Key Vault, then upload the ciphertext to Blob Storage with the protected key and any necessary cryptographic parameters stored as blob metadata (including the initialization vector and the authentication tag, which in Node.js is separate from the ciphertext). For download: read the blob and its metadata, recover the data key via Key Vault, and decrypt. Should handle errors from both services (e.g., the vault key may have been disabled, or the blob may not exist).\r\n\r\n- A **configuration module** that builds the necessary Azure connections for both Blob Storage and Key Vault. It should read endpoints from environment variables and authenticate with managed identity. All connections should share a single credential instance.\r\n\r\n- A **main script** that demos the full encrypt-upload-download-decrypt round-trip: encrypts and uploads a sample string, then downloads and decrypts it back. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output to verify the round-trip.\r\n\r\nInclude a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.",
+  "final_response": "Created the complete TypeScript project with:\n\n- AES-256-GCM client-side encryption and separate IV/authentication-tag metadata\n- RSA-OAEP-256 DEK wrapping through Azure Key Vault **Keys**\n- Versioned Key Vault key IDs for rotation-safe decryption\n- Shared `ManagedIdentityCredential` across Blob Storage and Key Vault clients\n- Buffer and file upload/download methods with service-specific error handling\n- Demo round-trip printing the key ID, wrapped DEK, and decrypted output\n- Environment template, RBAC guidance, SDK references, and npm configuration\n\nSet the variables from `.env.example`, then run:\n\n```shell\nnpm run demo\n```\n\nSDK references are documented in [`README.md`](README.md), including the official [Key Vault Keys](https://learn.microsoft.com/javascript/api/overview/azure/keyvault-keys-readme) and [Blob Storage](https://learn.microsoft.com/javascript/api/overview/azure/storage-blob-readme) documentation.",
+  "workspace_delta": {
+    "bytes_added": 63268,
+    "bytes_removed": 0,
+    "bytes_net": 63268,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\key-management.ts",
+        "size": 2809
+      },
+      {
+        "path": "README.md",
+        "size": 2594
+      },
+      {
+        "path": "package-lock.json",
+        "size": 44010
+      },
+      {
+        "path": "src\\encrypted-blob-storage.ts",
+        "size": 7852
+      },
+      {
+        "path": "src\\errors.ts",
+        "size": 1456
+      },
+      {
+        "path": "src\\main.ts",
+        "size": 1366
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 439
+      },
+      {
+        "path": "package.json",
+        "size": 629
+      },
+      {
+        "path": "src\\config.ts",
+        "size": 2113
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T18:40:40.8206488+08:00",
+  "ended_at": "2026-08-26T18:44:18.2516592+08:00",
+  "duration_ms": 217431,
+  "terminated_by": "completed"
+}

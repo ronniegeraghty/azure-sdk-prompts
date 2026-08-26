@@ -1,0 +1,69 @@
+{
+  "prompt_id": "key-vault-dp-js-ts-secret-config",
+  "config_name": "js-ts-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a TypeScript Node.js project that implements an application configuration provider backed by Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **secret provider class** that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.\r\n\r\n- A **caching layer** on top of the provider that stores secret values in memory after first retrieval. It should support bulk-loading a predefined set of required config keys at startup, on-demand refresh of individual keys, and automatic re-fetch of any secret whose expiry date is within a configurable warning window (e.g., 7 days out).\r\n\r\n- A **configuration module** that connects securely to the Key Vault using the vault URL from an environment variable. The application runs in Azure and should authenticate using managed identity — no client secrets or certificates in code.\r\n\r\n- A **secret rotation helper** that safely rotates a secret: create a new version of the secret with an updated value and expiry date (since Key Vault supports multiple versions per secret name), then optionally clean up old versions by deleting and purging the previous secret if full name reuse is needed. The cleanup must be safe — use the long-running delete operation and wait for completion before purging, since Key Vault's soft-delete feature means the secret is not immediately gone.\r\n\r\n- A **main script** that demos the full flow: loading several config keys at startup, reading them from cache, refreshing one, printing a warning if any secret is near expiry, and performing a secret rotation (creating a new version, then demonstrating the delete-and-purge cleanup flow). Print results at each step.\r\n\r\nInclude a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.",
+  "final_response": "Created the complete TypeScript Node.js project with:\n\n- Azure Key Vault secret retrieval, version selection, defaults for missing secrets, and expiry inspection\n- In-memory caching, startup bulk loading, individual refresh, and expiry-window auto-refresh\n- Managed identity authentication via `ManagedIdentityCredential` and `KEY_VAULT_URL`\n- Safe secret rotation with optional delete polling, purge, and value recreation\n- Full offline demo using an in-memory Key Vault implementation\n- Azure SDK dependencies, strict TypeScript configuration, build and demo scripts\n\nRun the local demo with:\n\n```powershell\nnpm run demo\n```\n\nAzure mode is enabled with `DEMO_MODE=azure`; destructive delete-and-purge remains disabled in that mode.",
+  "workspace_delta": {
+    "bytes_added": 55386,
+    "bytes_removed": 0,
+    "bytes_net": 55386,
+    "new_file_count": 10,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main.ts",
+        "size": 3903
+      },
+      {
+        "path": "src\\secret-cache.ts",
+        "size": 2315
+      },
+      {
+        "path": "src\\secret-provider.ts",
+        "size": 1768
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 455
+      },
+      {
+        "path": "package-lock.json",
+        "size": 40291
+      },
+      {
+        "path": "package.json",
+        "size": 664
+      },
+      {
+        "path": "src\\config.ts",
+        "size": 1112
+      },
+      {
+        "path": "src\\in-memory-key-vault.ts",
+        "size": 2921
+      },
+      {
+        "path": "src\\secret-rotator.ts",
+        "size": 1409
+      },
+      {
+        "path": "src\\key-vault-client.ts",
+        "size": 548
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 13,
+    "tool_calls": 0,
+    "reasoning_steps": 13,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T17:52:37.5340513+08:00",
+  "ended_at": "2026-08-26T17:55:30.6253598+08:00",
+  "duration_ms": 173091,
+  "terminated_by": "completed"
+}

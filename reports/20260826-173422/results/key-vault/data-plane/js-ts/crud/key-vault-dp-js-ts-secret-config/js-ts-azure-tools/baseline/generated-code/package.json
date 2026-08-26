@@ -1,0 +1,26 @@
+{
+  "name": "azure-key-vault-config-provider",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A cached TypeScript application configuration provider backed by Azure Key Vault.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main.js",
+    "demo": "tsx src/main.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/core-rest-pipeline": "^1.22.1",
+    "@azure/identity": "^4.11.1",
+    "@azure/keyvault-secrets": "^4.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

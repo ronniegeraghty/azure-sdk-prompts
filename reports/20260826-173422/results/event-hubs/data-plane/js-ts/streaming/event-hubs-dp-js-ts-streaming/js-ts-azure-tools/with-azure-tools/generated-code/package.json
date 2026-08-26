@@ -1,0 +1,20 @@
+{
+  "name": "azure-event-hubs-batch-checkpoint-sample",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@azure/event-hubs": "6.0.4",
+    "@azure/eventhubs-checkpointstore-blob": "2.0.1",
+    "@azure/storage-blob": "12.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2"
+  }
+}

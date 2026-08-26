@@ -1,0 +1,45 @@
+{
+  "prompt_id": "event-hubs-dp-js-ts-streaming",
+  "config_name": "js-ts-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat demonstrates sending and receiving events with Azure Event Hubs:\r\n1. Create an EventHubProducerClient using a connection string\r\n2. Create a batch with createBatch() and add 10 events with custom properties\r\n3. Send the batch using sendBatch()\r\n4. Create an EventHubConsumerClient with a BlobCheckpointStore\r\n5. Subscribe to events using subscribe() with processEvents and processError handlers\r\n6. Print received event bodies and update checkpoints\r\n7. Implement graceful shutdown with close()\r\n\r\nShow required npm packages (@azure/event-hubs and\r\n@azure/eventhubs-checkpointstore-blob) and proper async/await patterns.",
+  "final_response": "Implemented a complete Azure Event Hubs TypeScript sample in `src/index.ts` with:\n\n- Producer batching and 10 events with custom properties\n- `sendBatch()` and checkpoint-backed `subscribe()`\n- `processEvents`, `processError`, and checkpoint updates\n- Graceful `SIGINT`/`SIGTERM` shutdown via `close()`\n- Environment-based credentials\n- Required dependencies and usage instructions in `package.json` and `README.md`\n\n`@azure/storage-blob` is also included because `BlobCheckpointStore` requires a `ContainerClient`.\n\nDependency installation/type-checking was blocked by the configured npm registry returning `E401` for an invalid authentication token. After correcting npm authentication, run:\n\n```powershell\nnpm install\nnpm run build\nnpm start\n```",
+  "workspace_delta": {
+    "bytes_added": 5738,
+    "bytes_removed": 0,
+    "bytes_net": 5738,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "tsconfig.json",
+        "size": 295
+      },
+      {
+        "path": "README.md",
+        "size": 928
+      },
+      {
+        "path": "package.json",
+        "size": 475
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 4040
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T19:24:50.3141987+08:00",
+  "ended_at": "2026-08-26T19:27:07.1826883+08:00",
+  "duration_ms": 136868,
+  "terminated_by": "completed"
+}

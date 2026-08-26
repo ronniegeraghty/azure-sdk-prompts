@@ -1,0 +1,17 @@
+{
+  "name": "azure-service-bus-typescript-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/service-bus-demo.ts"
+  },
+  "dependencies": {
+    "@azure/service-bus": "^7.9.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

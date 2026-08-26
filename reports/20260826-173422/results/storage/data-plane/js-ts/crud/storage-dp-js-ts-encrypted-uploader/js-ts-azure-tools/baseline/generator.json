@@ -1,0 +1,57 @@
+{
+  "prompt_id": "storage-dp-js-ts-encrypted-uploader",
+  "config_name": "js-ts-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a TypeScript Node.js project that uploads files to Azure Blob Storage with client-side encryption, where the encryption key material is managed in Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **key management class** that interacts with Azure Key Vault's Keys service (not Secrets) to perform cryptographic operations. It should implement envelope encryption: generate a data encryption key locally, use Key Vault to protect (wrap) it, and store the protected key alongside the encrypted blob. For decryption, have Key Vault recover (unwrap) the data key, then decrypt locally. The raw data key should never be persisted anywhere, and the vault's key material should never leave Key Vault.\r\n\r\n- A **blob uploader/downloader class** that handles the actual encryption and storage. For upload: generate a data key, encrypt the data locally using AES-GCM, protect the data key via Key Vault, then upload the ciphertext to Blob Storage with the protected key and any necessary cryptographic parameters stored as blob metadata (including the initialization vector and the authentication tag, which in Node.js is separate from the ciphertext). For download: read the blob and its metadata, recover the data key via Key Vault, and decrypt. Should handle errors from both services (e.g., the vault key may have been disabled, or the blob may not exist).\r\n\r\n- A **configuration module** that builds the necessary Azure connections for both Blob Storage and Key Vault. It should read endpoints from environment variables and authenticate with managed identity. All connections should share a single credential instance.\r\n\r\n- A **main script** that demos the full encrypt-upload-download-decrypt round-trip: encrypts and uploads a sample string, then downloads and decrypts it back. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output to verify the round-trip.\r\n\r\nInclude a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.",
+  "final_response": "Created the complete TypeScript Node.js project with:\n\n- Azure Key Vault **Keys** envelope encryption using RSA-OAEP-256\n- Local AES-256-GCM encryption/decryption with IV and authentication tag metadata\n- Wrapped DEK and versioned cryptographic metadata stored alongside each blob\n- Shared `ManagedIdentityCredential` across Blob Storage and Key Vault clients\n- Contextual handling for Key Vault, missing blob, metadata, and authentication failures\n- In-memory DEK zeroization after each operation\n- Full upload/download round-trip demo in `src/main.ts`\n\nConfigure the variables shown in `.env.example`, ensure the container and RSA Key Vault key already exist, then run:\n\n```powershell\nnpm run demo\n```\n\nThe managed identity requires blob data access plus Key Vault key `get`, `wrapKey`, and `unwrapKey` permissions.",
+  "workspace_delta": {
+    "bytes_added": 45210,
+    "bytes_removed": 0,
+    "bytes_net": 45210,
+    "new_file_count": 7,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\keyManagement.ts",
+        "size": 2736
+      },
+      {
+        "path": "src\\main.ts",
+        "size": 1133
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 429
+      },
+      {
+        "path": "package-lock.json",
+        "size": 31981
+      },
+      {
+        "path": "package.json",
+        "size": 643
+      },
+      {
+        "path": "src\\config.ts",
+        "size": 1440
+      },
+      {
+        "path": "src\\encryptedBlob.ts",
+        "size": 6848
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 7,
+    "tool_calls": 0,
+    "reasoning_steps": 7,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T18:47:33.8792805+08:00",
+  "ended_at": "2026-08-26T18:50:22.6728116+08:00",
+  "duration_ms": 168793,
+  "terminated_by": "completed"
+}

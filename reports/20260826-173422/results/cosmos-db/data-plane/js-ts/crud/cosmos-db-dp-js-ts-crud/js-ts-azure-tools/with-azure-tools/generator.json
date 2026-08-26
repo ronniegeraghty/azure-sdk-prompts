@@ -1,0 +1,49 @@
+{
+  "prompt_id": "cosmos-db-dp-js-ts-crud",
+  "config_name": "js-ts-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat performs CRUD operations on items in an Azure Cosmos DB NoSQL container:\r\n1. Create a CosmosClient using endpoint and key\r\n2. Create a database \"TestDB\" and container \"Items\" with partition key \"/category\"\r\n3. Create an item with properties: id, category, name, quantity\r\n4. Read the item back using item().read()\r\n5. Query items where category equals \"electronics\" using parameterized query\r\n6. Replace the item with updated quantity using item().replace()\r\n7. Delete the item using item().delete()\r\n\r\nShow required npm package and handle errors with appropriate status code checks.",
+  "final_response": "Implemented a complete TypeScript Cosmos DB CRUD sample in `src/index.ts`.\n\n- Uses `@azure/cosmos` 4.10.0 with endpoint/key environment variables.\n- Creates `TestDB` and `Items` with partition key `/category`.\n- Creates, reads, parameter-queries, replaces, and deletes an item.\n- Checks expected HTTP status codes and handles common Cosmos errors including 400, 401/403, 404, 409, 412, and 429.\n- Disposes `CosmosClient` reliably.\n- Includes project configuration and usage instructions in `README.md`.\n\nInstall and run:\n\n```powershell\nnpm install\nnpm run build\n$env:COSMOS_ENDPOINT = \"https://\u003caccount\u003e.documents.azure.com:443/\"\n$env:COSMOS_KEY = \"\u003caccount-key\u003e\"\nnpm start\n```\n\nReference: https://learn.microsoft.com/javascript/api/overview/azure/cosmos-readme",
+  "workspace_delta": {
+    "bytes_added": 19264,
+    "bytes_removed": 0,
+    "bytes_net": 19264,
+    "new_file_count": 5,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1079
+      },
+      {
+        "path": "package-lock.json",
+        "size": 12541
+      },
+      {
+        "path": "package.json",
+        "size": 381
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 4938
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 325
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T19:19:30.0330183+08:00",
+  "ended_at": "2026-08-26T19:22:37.121517+08:00",
+  "duration_ms": 187088,
+  "terminated_by": "completed"
+}

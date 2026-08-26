@@ -1,0 +1,160 @@
+{
+  "run_id": "20260826-173422",
+  "timestamp": "2026-08-26T11:58:23Z",
+  "reports": [
+    {
+      "prompt_id": "app-configuration-dp-js-ts-crud",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "cosmos-db-dp-js-ts-crud",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "event-hubs-dp-js-ts-streaming",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-js-ts-default-credential",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-js-ts-managed-identity",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-js-ts-service-principal",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-dp-js-ts-crud",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-dp-js-ts-secret-config",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "resource-manager-mp-js-ts-rg-crud",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "service-bus-dp-js-ts-crud",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-js-ts-blob-manager",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-js-ts-crud",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-js-ts-encrypted-uploader",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-mp-js-ts-account-mgmt",
+      "baseline": {
+        "config_name": "js-ts-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}
