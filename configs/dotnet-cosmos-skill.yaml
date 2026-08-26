@@ -1,0 +1,34 @@
+# Focused Cosmos DB .NET skill comparison.
+# Azure MCP remains constant; pairwise mode toggles only the .NET SDK plugin.
+#
+# The current microsoft/skills azure-sdk-dotnet plugin does not include a
+# Microsoft.Azure.Cosmos data-plane skill. It includes only the Cosmos DB
+# management-plane skill. This config is ready to run, but its results do not
+# measure Cosmos DB data-plane skill impact until that skill is added.
+configs:
+  - name: dotnet-cosmos-skill
+    description: "Cosmos DB .NET SDK skill comparison with GPT-5.6 Sol"
+    generator:
+      model: "gpt-5.6-sol"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start"]
+          mcp_tools: ["*"]
+          pairwise: off
+        - name: azure-sdk-dotnet
+          type: plugin
+          source: remote
+          repo: microsoft/skills
+    reviewer:
+      models:
+        - "gpt-5.6-sol"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    limits:
+      max_turns: 100

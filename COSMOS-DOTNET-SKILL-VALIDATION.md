@@ -179,19 +179,25 @@ typed session-event APIs; changing only the dependency version does not compile.
 After adding the missing assets, run the .NET comparison with:
 
 ```powershell
+$env:npm_config_registry = "https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-js/npm/registry/"
 go run .\hyoka run `
   --prompt-id cosmos-db-dp-dotnet-crud `
-  --config dotnet-pairwise `
+  --config dotnet-cosmos-skill `
   --pairwise `
-  --criteria-dir .\criteria
+  --criteria-dir .\criteria `
+  --progress off `
+  --yes
 ```
 
-For a focused skill comparison, mark unrelated tools `pairwise: off` in the
-.NET config. Leave only the Cosmos DB data-plane skill togglable so Hyoka
-produces two relevant variants:
+`configs/dotnet-cosmos-skill.yaml` uses `gpt-5.6-sol` for generation and review.
+It holds Azure MCP constant and produces two variants:
 
-1. `dotnet-pairwise/baseline`
-2. `dotnet-pairwise/without-<cosmos-skill>`
+1. `dotnet-cosmos-skill/baseline`
+2. `dotnet-cosmos-skill/without-azure-sdk-dotnet`
+
+The config is syntactically runnable now, but the current remote plugin has no
+`Microsoft.Azure.Cosmos` data-plane skill. Do not interpret its results as a
+Cosmos DB data-plane skill comparison until that skill is available.
 
 ## Required preparation
 
@@ -202,8 +208,7 @@ Before running the .NET evaluation:
 2. Add or identify a `Microsoft.Azure.Cosmos` data-plane .NET skill in
    `microsoft/skills`. Pin the config's `version:` when evaluating a branch,
    tag, or commit instead of the default branch.
-3. Add `configs/dotnet-pairwise.yaml`.
-4. Add `criteria/language/dotnet.yaml` with build, package, partition-key,
+3. Add `criteria/language/dotnet.yaml` with build, package, partition-key,
    parameterized-query, and Cosmos-specific error-handling checks.
-5. Run one prompt and one config first, then repeat enough times to account for
+4. Run one prompt and one config first, then repeat enough times to account for
    model variance.
