@@ -1,5 +1,7 @@
 # Focused Cosmos DB Python skill comparison.
 # Azure MCP remains constant; pairwise mode toggles only the SDK plugin.
+# This separate config is temporary: configs/python-pairwise.yaml references
+# models that are no longer available and cannot currently complete a run.
 configs:
   - name: python-cosmos-skill
     description: "Cosmos DB Python SDK skill comparison with GPT-5.6 Sol"
