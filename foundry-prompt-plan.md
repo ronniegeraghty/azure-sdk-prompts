@@ -48,6 +48,7 @@ Package family: `Azure.AI.Projects`, `azure-ai-projects`,
    select a built-in evaluator, poll the evaluation, and print metric results.
    - Evaluation focus: evaluator configuration, dataset reference, long-running
      operation handling, and metric-result traversal.
+   - Status: the four-language prompt and reference set is complete.
 
 ### Azure AI Voice Live
 
