@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyoka-basic-agent"
+version = "0.1.0"
+description = "A basic synchronous Azure AI Agents console application."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-ai-agents>=1.1.0,<2.0.0",
+    "azure-identity>=1.17.1,<2.0.0",
+]
+
+[project.scripts]
+hyoka-basic-agent = "hyoka_basic_agent:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"

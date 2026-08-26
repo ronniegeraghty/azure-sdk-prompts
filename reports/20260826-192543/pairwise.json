@@ -1,0 +1,50 @@
+{
+  "run_id": "20260826-192543",
+  "timestamp": "2026-08-26T12:09:58Z",
+  "reports": [
+    {
+      "prompt_id": "ai-agents-dp-python-basic-agent-lifecycle",
+      "baseline": {
+        "config_name": "python-azure-tools/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-python-file-search",
+      "baseline": {
+        "config_name": "python-azure-tools/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-python-function-tool",
+      "baseline": {
+        "config_name": "python-azure-tools/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-projects-dp-python-project-resource-inventory",
+      "baseline": {
+        "config_name": "python-azure-tools/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: hyoka-basic-agent
+Version: 0.1.0
+Summary: A basic synchronous Azure AI Agent conversation.
+Requires-Python: >=3.9
+Requires-Dist: azure-ai-agents<2.0.0,>=1.1.0
+Requires-Dist: azure-identity<2.0.0,>=1.24.0

@@ -1,0 +1,45 @@
+{
+  "prompt_id": "ai-agents-dp-python-basic-agent-lifecycle",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable Python console application that uses the\r\n`azure-ai-agents` package to run a basic Azure AI Agent conversation.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read the Azure AI project endpoint from `PROJECT_ENDPOINT` and the model deployment\r\n  name from `MODEL_DEPLOYMENT_NAME`.\r\n- Create the Azure AI Agents client using the project endpoint and\r\n  `DefaultAzureCredential`.\r\n- Create an agent named `hyoka-basic-agent` with the instructions\r\n  `Answer the user's question clearly and concisely.`\r\n- Create a thread and add this exact user message:\r\n  `What is the capital of France?`\r\n- Create a run for that thread and agent, then use the SDK to refresh the run until it\r\n  reaches a terminal status.\r\n- After a successful run, list the thread messages in chronological order and print\r\n  the text content of every assistant message.\r\n- Delete the thread and agent after the conversation finishes.\r\n- Include the project manifest and concise commands for restoring, building, and\r\n  running the application.\r\n\r\nUse the synchronous Azure AI Agents client throughout the agent workflow.",
+  "final_response": "Created the complete runnable application:\n\n- `pyproject.toml` — project manifest and dependencies\n- `src\\hyoka_basic_agent\\__init__.py` — synchronous agent lifecycle workflow\n- `src\\hyoka_basic_agent\\__main__.py` — module entry point\n- `README.md` — concise PowerShell restore, build, configuration, and run commands\n\nThe implementation polls runs to a terminal status, prints all chronological assistant text messages, and cleans up both the thread and agent.",
+  "workspace_delta": {
+    "bytes_added": 4209,
+    "bytes_removed": 0,
+    "bytes_net": 4209,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 906
+      },
+      {
+        "path": "pyproject.toml",
+        "size": 533
+      },
+      {
+        "path": "src\\hyoka_basic_agent\\__init__.py",
+        "size": 2724
+      },
+      {
+        "path": "src\\hyoka_basic_agent\\__main__.py",
+        "size": 46
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 20,
+    "tool_calls": 0,
+    "reasoning_steps": 20,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T19:36:58.3877172+08:00",
+  "ended_at": "2026-08-26T19:42:38.3512503+08:00",
+  "duration_ms": 339963,
+  "terminated_by": "completed"
+}
