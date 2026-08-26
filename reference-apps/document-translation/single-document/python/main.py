@@ -42,8 +42,7 @@ def main() -> None:
         )
 
         with output_path.open("wb") as output:
-            for chunk in translated:
-                output.write(chunk)
+            output.write(translated)
 
 
 def get_media_type(path: Path) -> str:

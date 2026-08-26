@@ -51,8 +51,7 @@ Use the synchronous SDK client.
   filename, binary file object or bytes, and a media type derived from the
   extension.
 - Calls `translate(body=content, target_language=targetLanguage)`.
-- Iterates the returned byte stream and writes every chunk directly to a file
-  opened in binary mode.
+- Writes the returned bytes directly to a file opened in binary mode.
 
 ### Scenario-specific anti-patterns
 
