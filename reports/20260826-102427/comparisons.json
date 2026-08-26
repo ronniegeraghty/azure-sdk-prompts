@@ -1,0 +1,161 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "python-cosmos-skill/baseline",
+    "label_b": "python-cosmos-skill/without-azure-sdk-python",
+    "per_prompt": [
+      {
+        "prompt_id": "cosmos-db-dp-python-crud",
+        "score_a": 0.7291666666666667,
+        "score_b": 0.7083333333333333,
+        "delta": -0.02083333333333348,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8333333333333334,
+            "score_b": 0.6666666666666666,
+            "delta": -0.16666666666666674,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Correct Package Imports",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "DefaultAzureCredential Usage",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Context Manager for Clients",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async Client Usage",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Proper Exception Handling",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Output Files Exist",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Tool Usage Verification",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": -0.02083333333333348,
+      "improved": 0,
+      "regressed": 1,
+      "unchanged": 0,
+      "top_regressed": [
+        {
+          "prompt_id": "cosmos-db-dp-python-crud",
+          "score_a": 0.7291666666666667,
+          "score_b": 0.7083333333333333,
+          "delta": -0.02083333333333348,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.8333333333333334,
+              "score_b": 0.6666666666666666,
+              "delta": -0.16666666666666674,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Correct Package Imports",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "DefaultAzureCredential Usage",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Context Manager for Clients",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Async Client Usage",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Proper Exception Handling",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Output Files Exist",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Tool Usage Verification",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

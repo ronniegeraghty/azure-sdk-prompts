@@ -1,0 +1,169 @@
+{
+  "run_id": "20260826-102427",
+  "timestamp": "2026-08-26T02:32:21Z",
+  "reports": [
+    {
+      "prompt_id": "cosmos-db-dp-python-crud",
+      "baseline": {
+        "config_name": "python-cosmos-skill/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": [
+        {
+          "config_name": "python-cosmos-skill/without-azure-sdk-python",
+          "removed_tool": "azure-sdk-python",
+          "score": 1,
+          "max_score": 1,
+          "success": false
+        }
+      ],
+      "impacts": [
+        {
+          "tool_name": "azure-sdk-python",
+          "impact": 0,
+          "baseline_score": 100,
+          "without_score": 100,
+          "baseline_pass": false,
+          "without_pass": false
+        }
+      ],
+      "check_diffs": {
+        "python-cosmos-skill/without-azure-sdk-python": [
+          {
+            "grader_name": "Async Client Usage",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Context Manager for Clients",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Correct Package Imports",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "`azure-cosmos` pip package",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_1",
+            "check_label": "`CosmosClient` creation",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_2",
+            "check_label": "`database_client.create_database_if_not_exists()`",
+            "baseline_passed": true,
+            "variant_passed": false,
+            "movement": "regressed",
+            "reasoning": "The code calls client.create_database_if_not_exists(), not database_client.create_database_if_not_exists() as explicitly required by the criterion."
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_3",
+            "check_label": "`database.create_container_if_not_exists()` with `PartitionKey`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_4",
+            "check_label": "`container.query_items()` with `enable_cross_partition_query`",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "container.query_items() is used, but the required enable_cross_partition_query argument is absent."
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_5",
+            "check_label": "`CosmosHttpResponseError` exception handling",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "DefaultAzureCredential Usage",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Output Files Exist",
+            "grader_type": "workspace",
+            "check_id": "check_0",
+            "check_label": "file: *.py (state=present)",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "file \"*.py\" does not exist"
+          },
+          {
+            "grader_name": "Proper Exception Handling",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Tool Usage Verification",
+            "grader_type": "tool",
+            "check_id": "check_0",
+            "check_label": "tool_used: azure (source=mcp, server=azure)",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "tool \"azure\" not found"
+          }
+        ]
+      }
+    }
+  ],
+  "aggregate_impacts": [
+    {
+      "tool_name": "azure-sdk-python",
+      "impact": 0,
+      "baseline_score": 100,
+      "without_score": 100,
+      "baseline_pass": false,
+      "without_pass": false
+    }
+  ]
+}
