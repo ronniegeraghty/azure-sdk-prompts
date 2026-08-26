@@ -176,7 +176,20 @@ The report above was produced with a temporary local compatibility shim. Hyoka
 needs a full upgrade to Copilot SDK v1 because v1 also changes permission and
 typed session-event APIs; changing only the dependency version does not compile.
 
-After adding the missing assets, run the .NET comparison with:
+The .NET comparison completed on August 26, 2026:
+
+- Run ID: `20260826-111051`
+- With `azure-sdk-dotnet`: 7/7 in 148.3 seconds, with three files generated
+- Without `azure-sdk-dotnet`: 7/7 in 293.4 seconds, with two files generated
+- Measured impact: 0
+- Report: [`reports/20260826-111051/summary.md`](reports/20260826-111051/summary.md)
+
+Both variants called Azure MCP and generated buildable implementations. The
+skill-enabled variant loaded the full .NET plugin, including the management-plane
+Cosmos DB skill, but no data-plane skill. The equal scores therefore don't show
+whether a relevant `Microsoft.Azure.Cosmos` skill would help.
+
+Reproduce the comparison with:
 
 ```powershell
 $env:npm_config_registry = "https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-js/npm/registry/"
@@ -195,9 +208,40 @@ It holds Azure MCP constant and produces two variants:
 1. `dotnet-cosmos-skill/baseline`
 2. `dotnet-cosmos-skill/without-azure-sdk-dotnet`
 
-The config is syntactically runnable now, but the current remote plugin has no
-`Microsoft.Azure.Cosmos` data-plane skill. Do not interpret its results as a
-Cosmos DB data-plane skill comparison until that skill is available.
+The current remote plugin has no `Microsoft.Azure.Cosmos` data-plane skill. Do
+not interpret this result as a data-plane skill comparison.
+
+## JavaScript/TypeScript and Java configs
+
+The report branch also includes focused configs for languages that have
+relevant Cosmos DB data-plane skills:
+
+| Language | Config | Skill |
+|----------|--------|-------|
+| JavaScript/TypeScript | `js-ts-cosmos-skill` | `azure-cosmos-ts` |
+| Java | `java-cosmos-skill` | `azure-cosmos-java` |
+
+Run them with:
+
+```powershell
+go run .\hyoka run `
+  --prompt-id cosmos-db-dp-js-ts-crud `
+  --config js-ts-cosmos-skill `
+  --pairwise `
+  --criteria-dir .\criteria `
+  --progress off `
+  --yes
+
+go run .\hyoka run `
+  --prompt-id cosmos-db-dp-java-crud `
+  --config java-cosmos-skill `
+  --pairwise `
+  --criteria-dir .\criteria `
+  --progress off `
+  --yes
+```
+
+Each config holds Azure MCP constant and toggles only its language SDK plugin.
 
 ## Required preparation
 

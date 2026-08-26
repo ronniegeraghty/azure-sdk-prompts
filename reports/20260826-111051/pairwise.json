@@ -1,0 +1,111 @@
+{
+  "run_id": "20260826-111051",
+  "timestamp": "2026-08-26T03:18:13Z",
+  "reports": [
+    {
+      "prompt_id": "cosmos-db-dp-dotnet-crud",
+      "baseline": {
+        "config_name": "dotnet-cosmos-skill/baseline",
+        "score": 7,
+        "max_score": 7,
+        "success": true
+      },
+      "variants": [
+        {
+          "config_name": "dotnet-cosmos-skill/without-azure-sdk-dotnet",
+          "removed_tool": "azure-sdk-dotnet",
+          "score": 7,
+          "max_score": 7,
+          "success": true
+        }
+      ],
+      "impacts": [
+        {
+          "tool_name": "azure-sdk-dotnet",
+          "impact": 0,
+          "baseline_score": 100,
+          "without_score": 100,
+          "baseline_pass": true,
+          "without_pass": true
+        }
+      ],
+      "check_diffs": {
+        "dotnet-cosmos-skill/without-azure-sdk-dotnet": [
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "`Microsoft.Azure.Cosmos` NuGet package",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_1",
+            "check_label": "`CosmosClient` creation and configuration",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_2",
+            "check_label": "`Database.CreateDatabaseIfNotExistsAsync()`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_3",
+            "check_label": "`Container.CreateContainerIfNotExistsAsync()` with partition key",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_4",
+            "check_label": "`Container.CreateItemAsync\u003cT\u003e()`, `ReadItemAsync\u003cT\u003e()`, `ReplaceItemAsync\u003cT\u003e()`, `DeleteItemAsync\u003cT\u003e()`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_5",
+            "check_label": "`Container.GetItemQueryIterator\u003cT\u003e()` with `QueryDefinition`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_6",
+            "check_label": "`CosmosException` handling with status codes",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          }
+        ]
+      }
+    }
+  ],
+  "aggregate_impacts": [
+    {
+      "tool_name": "azure-sdk-dotnet",
+      "impact": 0,
+      "baseline_score": 100,
+      "without_score": 100,
+      "baseline_pass": true,
+      "without_pass": true
+    }
+  ]
+}

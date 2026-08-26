@@ -1,0 +1,31 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "dotnet-cosmos-skill/baseline",
+    "label_b": "dotnet-cosmos-skill/without-azure-sdk-dotnet",
+    "per_prompt": [
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0,
+      "improved": 0,
+      "regressed": 0,
+      "unchanged": 1
+    }
+  }
+]

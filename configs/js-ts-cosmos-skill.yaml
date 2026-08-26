@@ -1,0 +1,29 @@
+# Focused Cosmos DB JavaScript/TypeScript skill comparison.
+# Azure MCP remains constant; pairwise mode toggles only the TypeScript SDK plugin.
+configs:
+  - name: js-ts-cosmos-skill
+    description: "Cosmos DB JavaScript/TypeScript SDK skill comparison with GPT-5.6 Sol"
+    generator:
+      model: "gpt-5.6-sol"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start"]
+          mcp_tools: ["*"]
+          pairwise: off
+        - name: azure-sdk-typescript
+          type: plugin
+          source: remote
+          repo: microsoft/skills
+    reviewer:
+      models:
+        - "gpt-5.6-sol"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    limits:
+      max_turns: 100

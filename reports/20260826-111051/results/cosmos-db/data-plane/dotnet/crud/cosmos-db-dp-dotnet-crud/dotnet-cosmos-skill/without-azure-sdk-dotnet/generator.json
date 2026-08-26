@@ -1,0 +1,37 @@
+{
+  "prompt_id": "cosmos-db-dp-dotnet-crud",
+  "config_name": "dotnet-cosmos-skill/without-azure-sdk-dotnet",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that performs\r\nCRUD operations on items in an Azure Cosmos DB NoSQL container:\r\n1. Create a CosmosClient using a connection string\r\n2. Create a database named \"TestDB\" and a container named \"Items\" with partition key \"/category\"\r\n3. Insert a JSON item with properties: id, category, name, and quantity\r\n4. Read the item back by id and partition key\r\n5. Query items where category equals \"electronics\" using SQL-like syntax\r\n6. Replace the item with updated quantity\r\n7. Delete the item\r\n\r\nShow required NuGet packages and proper error handling with CosmosException.",
+  "final_response": "Implemented the .NET 9 console application in `Program.cs`. It creates `TestDB`/`Items`, performs all requested CRUD operations, runs a parameterized category query, and handles `CosmosException` diagnostics including throttling.\n\n**Required NuGet packages:**\n```powershell\ndotnet add package Microsoft.Azure.Cosmos --version 3.62.1\ndotnet add package Newtonsoft.Json --version 13.0.4\n```\n\nRun using a connection string without hardcoding credentials:\n\n```powershell\n$env:COSMOS_CONNECTION_STRING = \"\u003cyour-connection-string\u003e\"\ndotnet run\n```\n\nProject file: `hyoka-cosmos-db-dp-dotnet-crud-dotnet-cosmos-skill-without-azure-sdk-dotnet-1953959705.csproj`\n\nReference: [Azure Cosmos DB for NoSQL .NET quickstart](https://learn.microsoft.com/azure/cosmos-db/quickstart-dotnet#code-examples)",
+  "workspace_delta": {
+    "bytes_added": 5142,
+    "bytes_removed": 0,
+    "bytes_net": 5142,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 4589
+      },
+      {
+        "path": "hyoka-cosmos-db-dp-dotnet-crud-dotnet-cosmos-skill-without-azure-sdk-dotnet-1953959705.csproj",
+        "size": 553
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 17,
+    "tool_calls": 0,
+    "reasoning_steps": 17,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T11:10:51.8731121+08:00",
+  "ended_at": "2026-08-26T11:14:54.4069336+08:00",
+  "duration_ms": 242533,
+  "terminated_by": "completed"
+}
