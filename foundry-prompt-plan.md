@@ -204,6 +204,7 @@ Package family: `Azure.AI.Translation.Text`, `azure-ai-translation-text`,
    transliterated output with the script metadata.
    - Evaluation focus: language/from-script/to-script parameters and transliteration
      result types.
+   - Status: the four-language prompt and reference set is complete.
 
 ### Azure AI Document Translation
 
