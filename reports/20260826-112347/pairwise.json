@@ -1,0 +1,224 @@
+{
+  "run_id": "20260826-112347",
+  "timestamp": "2026-08-26T03:37:29Z",
+  "reports": [
+    {
+      "prompt_id": "cosmos-db-dp-java-crud",
+      "baseline": {
+        "config_name": "java-cosmos-skill/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": [
+        {
+          "config_name": "java-cosmos-skill/without-azure-sdk-java",
+          "removed_tool": "azure-sdk-java",
+          "score": 1,
+          "max_score": 1,
+          "success": false
+        }
+      ],
+      "impacts": [
+        {
+          "tool_name": "azure-sdk-java",
+          "impact": 0,
+          "baseline_score": 100,
+          "without_score": 100,
+          "baseline_pass": false,
+          "without_pass": false
+        }
+      ],
+      "check_diffs": {
+        "java-cosmos-skill/without-azure-sdk-java": [
+          {
+            "grader_name": "Async Uses Project Reactor (Mono/Flux)",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Async Uses Project Reactor (Mono/Flux)**: Async code uses Project Reactor types (Mono, Flux). Not CompletableFuture (wrong), not RxJava (wrong), not sync wrapped in ExecutorService. No .block() inside async service implementations.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Azure SDK BOM for Version Management",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Azure SDK BOM for Version Management**: Uses azure-sdk-bom in dependencyManagement to manage Azure SDK versions instead of hardcoding individual artifact versions. Dependencies should omit \u003cversion\u003e tags when managed by the BOM.",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The pom.xml does not import com.azure:azure-sdk-bom in dependencyManagement and instead hardcodes version 4.81.0 on the azure-cosmos dependency. The README also shows the individually versioned dependency."
+          },
+          {
+            "grader_name": "Client Builder Pattern",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Client Builder Pattern**: SDK clients constructed using *ClientBuilder classes with .endpoint() or .vaultUrl() and .credential(). No legacy constructors (CloudStorageAccount, DocumentClient, KeyVaultClient).",
+            "baseline_passed": true,
+            "variant_passed": false,
+            "movement": "regressed",
+            "reasoning": "The code uses the modern CosmosClientBuilder with .endpoint() and no legacy constructor, but it authenticates with .key(key) rather than the criterion-required .credential() method."
+          },
+          {
+            "grader_name": "Code Compiles (mvn compile / gradle compileJava)",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Code Compiles (mvn compile / gradle compileJava)**: The generated code compiles without errors. Attempt build verification if build tools are available.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Correct Dependencies (com.azure, not com.microsoft.azure)**: Uses com.azure group ID for all Azure SDK packages. No com.microsoft.azure (legacy SDK) dependencies. Includes azure-identity for authentication.",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The project correctly uses com.azure:azure-cosmos and has no legacy com.microsoft.azure dependencies, but it does not include the required com.azure:azure-identity dependency."
+          },
+          {
+            "grader_name": "Correct Imports (no legacy, no internal packages)",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Correct Imports (no legacy, no internal packages)**: All imports use com.azure.* packages. No com.microsoft.azure.* (legacy) or com.azure.*.implementation.* (internal API) imports.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "`azure-cosmos` Maven dependency (com.azure:azure-cosmos)",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_1",
+            "check_label": "`CosmosClientBuilder` and `CosmosClient`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_2",
+            "check_label": "`CosmosDatabase` and `CosmosContainer` creation",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_3",
+            "check_label": "`CosmosContainer.createItem()`, `readItem()`, `replaceItem()`, `deleteItem()`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_4",
+            "check_label": "`CosmosQueryRequestOptions` and `CosmosPagedIterable`",
+            "baseline_passed": true,
+            "variant_passed": false,
+            "movement": "regressed",
+            "reasoning": "CosmosQueryRequestOptions is used, but CosmosPagedIterable is neither imported nor explicitly declared or otherwise referenced."
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_5",
+            "check_label": "`SqlQuerySpec` with parameters",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_6",
+            "check_label": "`CosmosException` error handling",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "DefaultAzureCredential Authentication",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**DefaultAzureCredential Authentication**: Uses DefaultAzureCredential or another com.azure.identity credential. No hardcoded connection strings, account keys, SAS tokens, or secrets.",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The program authenticates with an account key via CosmosClientBuilder.key(key), reading COSMOS_KEY from the environment. Although the secret is not hardcoded, it does not use DefaultAzureCredential or another com.azure.identity credential as required."
+          },
+          {
+            "grader_name": "LRO Pattern (SyncPoller/PollerFlux)",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**LRO Pattern (SyncPoller/PollerFlux)**: Long-running operations use SyncPoller (sync) or PollerFlux (async) with begin* method prefix. No Thread.sleep() polling loops.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "No Deprecated/Legacy Classes",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**No Deprecated/Legacy Classes**: No deprecated classes from the old SDK (CloudStorageAccount, CloudBlobClient, DocumentClient, QueueClient, ApplicationTokenCredentials, MSICredentials, ConnectionStringBuilder).",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Pagination (PagedIterable/PagedFlux)",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Pagination (PagedIterable/PagedFlux)**: List/query operations return PagedIterable (sync) or PagedFlux (async). Does not flatten all pages into a raw List or Stream in memory.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Service-Specific Exception Handling",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Service-Specific Exception Handling**: Catches service-specific exceptions (BlobStorageException, CosmosException, ServiceBusException, HttpResponseException) with status code inspection. Not just generic Exception catches.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Try-With-Resources for Clients",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Try-With-Resources for Clients**: All Azure SDK client instances that implement AutoCloseable are used within try-with-resources blocks or explicitly closed in a finally block.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          }
+        ]
+      }
+    }
+  ],
+  "aggregate_impacts": [
+    {
+      "tool_name": "azure-sdk-java",
+      "impact": 0,
+      "baseline_score": 100,
+      "without_score": 100,
+      "baseline_pass": false,
+      "without_pass": false
+    }
+  ]
+}

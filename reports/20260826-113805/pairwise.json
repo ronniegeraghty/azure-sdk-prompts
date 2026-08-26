@@ -1,0 +1,208 @@
+{
+  "run_id": "20260826-113805",
+  "timestamp": "2026-08-26T03:57:41Z",
+  "reports": [
+    {
+      "prompt_id": "cosmos-db-dp-js-ts-crud",
+      "baseline": {
+        "config_name": "js-ts-cosmos-skill/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": [
+        {
+          "config_name": "js-ts-cosmos-skill/without-azure-sdk-typescript",
+          "removed_tool": "azure-sdk-typescript",
+          "score": 1,
+          "max_score": 1,
+          "success": false
+        }
+      ],
+      "impacts": [
+        {
+          "tool_name": "azure-sdk-typescript",
+          "impact": 0,
+          "baseline_score": 100,
+          "without_score": 100,
+          "baseline_pass": false,
+          "without_pass": false
+        }
+      ],
+      "check_diffs": {
+        "js-ts-cosmos-skill/without-azure-sdk-typescript": [
+          {
+            "grader_name": "@azure/identity for Authentication",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to \"prod\" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The project does not include @azure/identity and authenticates CosmosClient with an account key from COSMOS_KEY instead of an Entra token credential. Although the key is read from an environment variable rather than hardcoded, key-based authentication still fails this criterion."
+          },
+          {
+            "grader_name": "Async/Await Pattern",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.",
+            "baseline_passed": true,
+            "variant_passed": false,
+            "movement": "regressed",
+            "reasoning": "All Cosmos DB operations use async/await within an async main function, but the entry point invokes main().catch(...), which is a raw Promise catch chain and violates the explicit requirement to avoid .then()/.catch() chains when await with try/catch is cleaner."
+          },
+          {
+            "grader_name": "Client Constructor with Endpoint and Credential",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Correct @azure/ Scoped Packages",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "`@azure/cosmos` npm package",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_1",
+            "check_label": "`CosmosClient` constructor with endpoint and key",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_2",
+            "check_label": "`client.databases.createIfNotExists()` and `database.containers.createIfNotExists()`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_3",
+            "check_label": "`container.items.create()`, `container.item(id, partitionKey).read()`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_4",
+            "check_label": "`container.items.query()` with `SqlQuerySpec`",
+            "baseline_passed": true,
+            "variant_passed": false,
+            "movement": "regressed",
+            "reasoning": "The query is parameterized and passed to container.items.query(), but it is an inferred object rather than an explicitly imported or typed SqlQuerySpec as required."
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_5",
+            "check_label": "`container.item(id, partitionKey).replace()` and `.delete()`",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Criteria from prompt file",
+            "grader_type": "prompt_review",
+            "check_id": "check_6",
+            "check_label": "`FeedResponse` iteration and error status codes",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The code performs status-code validation and handles common Cosmos error codes, but it neither imports or declares FeedResponse nor iterates a FeedResponse; it only logs the resources array returned by fetchAll()."
+          },
+          {
+            "grader_name": "LRO Pattern (beginXxx + pollUntilDone)",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Logging via @azure/logger",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The program does not import or directly use @azure/logger, call setLogLevel(), or document setting the AZURE_LOG_LEVEL environment variable. Its presence only as a transitive dependency of @azure/cosmos does not satisfy the criterion."
+          },
+          {
+            "grader_name": "No Deprecated Packages",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          },
+          {
+            "grader_name": "Pagination with for-await-of",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The query uses fetchAll(), which collects all matching resources into memory instead of iterating the query's async iterator with for-await-of (or using byPage() when page-level control is needed)."
+          },
+          {
+            "grader_name": "RestError Exception Handling",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.",
+            "baseline_passed": false,
+            "variant_passed": false,
+            "movement": "unchanged",
+            "reasoning": "The code does not catch or identify RestError and does not inspect its statusCode. It instead uses a custom ErrorResponse guard and branches on error.code, which does not satisfy the explicit RestError exception-handling requirement."
+          },
+          {
+            "grader_name": "package.json with Correct Dependencies",
+            "grader_type": "prompt_review",
+            "check_id": "check_0",
+            "check_label": "### Attribute-Matched Criteria\n\n**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.",
+            "baseline_passed": true,
+            "variant_passed": true,
+            "movement": "unchanged"
+          }
+        ]
+      }
+    }
+  ],
+  "aggregate_impacts": [
+    {
+      "tool_name": "azure-sdk-typescript",
+      "impact": 0,
+      "baseline_score": 100,
+      "without_score": 100,
+      "baseline_pass": false,
+      "without_pass": false
+    }
+  ]
+}

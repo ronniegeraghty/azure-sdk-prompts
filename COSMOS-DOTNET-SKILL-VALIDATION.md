@@ -221,7 +221,27 @@ relevant Cosmos DB data-plane skills:
 | JavaScript/TypeScript | `js-ts-cosmos-skill` | `azure-cosmos-ts` |
 | Java | `java-cosmos-skill` | `azure-cosmos-java` |
 
-Run them with:
+Both comparisons completed on August 26, 2026:
+
+| Language | Run | With skill | Without skill | Detailed impact |
+|----------|-----|------------|---------------|-----------------|
+| JavaScript/TypeScript | [`20260826-113805`](reports/20260826-113805/summary.md) | 12/17 | 10/17 | +2 checks |
+| Java | [`20260826-112347`](reports/20260826-112347/summary.md) | 16/19 | 14/19 | +2 checks |
+
+For JavaScript/TypeScript, the skill-enabled output gained explicit
+`SqlQuerySpec` usage and passed the async/await criterion. For Java, it gained
+explicit `CosmosPagedIterable` usage and passed the client-builder criterion.
+
+All four variants have an overall failed status because the generic language
+criteria conflict with the prompts. The prompts request key-based Cosmos
+authentication, while the language criteria require identity-based
+authentication. Other generic criteria, such as Java BOM use and
+JavaScript/TypeScript `@azure/logger` use, are also outside these CRUD prompts.
+
+The generated `pairwise.json` files incorrectly report 100/100 and impact 0.
+Use the detailed scores and check movements above instead.
+
+Reproduce them with:
 
 ```powershell
 go run .\hyoka run `

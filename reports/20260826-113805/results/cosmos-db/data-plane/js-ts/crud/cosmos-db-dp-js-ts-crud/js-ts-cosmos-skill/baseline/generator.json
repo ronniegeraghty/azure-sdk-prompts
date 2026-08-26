@@ -1,0 +1,45 @@
+{
+  "prompt_id": "cosmos-db-dp-js-ts-crud",
+  "config_name": "js-ts-cosmos-skill/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat performs CRUD operations on items in an Azure Cosmos DB NoSQL container:\r\n1. Create a CosmosClient using endpoint and key\r\n2. Create a database \"TestDB\" and container \"Items\" with partition key \"/category\"\r\n3. Create an item with properties: id, category, name, quantity\r\n4. Read the item back using item().read()\r\n5. Query items where category equals \"electronics\" using parameterized query\r\n6. Replace the item with updated quantity using item().replace()\r\n7. Delete the item using item().delete()\r\n\r\nShow required npm package and handle errors with appropriate status code checks.",
+  "final_response": "Implemented a complete TypeScript Cosmos DB CRUD sample in `src\\index.ts`.\n\n- Uses `@azure/cosmos` with endpoint/key from `COSMOS_ENDPOINT` and `COSMOS_KEY`\n- Creates `TestDB` and `Items` with partition key `/category`\n- Creates, reads, queries, replaces, and deletes an item\n- Uses a parameterized, partition-scoped query\n- Checks operation status codes and handles Cosmos errors including 400, 401, 403, 404, 409, 412, and 429\n- Disposes the client reliably\n\nRun it with:\n\n```powershell\n$env:COSMOS_ENDPOINT = \"https://your-account.documents.azure.com:443/\"\n$env:COSMOS_KEY = \"your-account-key\"\nnpm start\n```\n\nThe required package is declared as `@azure/cosmos` in `package.json`. Reference: [Azure Cosmos DB Node.js quickstart](https://learn.microsoft.com/azure/cosmos-db/nosql/quickstart-nodejs).",
+  "workspace_delta": {
+    "bytes_added": 33394,
+    "bytes_removed": 0,
+    "bytes_net": 33394,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "package.json",
+        "size": 402
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 4549
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 294
+      },
+      {
+        "path": "package-lock.json",
+        "size": 28149
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T11:38:05.5721417+08:00",
+  "ended_at": "2026-08-26T11:43:49.3744068+08:00",
+  "duration_ms": 343802,
+  "terminated_by": "completed"
+}

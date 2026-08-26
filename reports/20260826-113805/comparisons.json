@@ -1,0 +1,209 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "js-ts-cosmos-skill/baseline",
+    "label_b": "js-ts-cosmos-skill/without-azure-sdk-typescript",
+    "per_prompt": [
+      {
+        "prompt_id": "cosmos-db-dp-js-ts-crud",
+        "score_a": 0.6233766233766235,
+        "score_b": 0.5194805194805195,
+        "delta": -0.10389610389610393,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.7142857142857143,
+            "delta": -0.1428571428571428,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Correct @azure/ Scoped Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "@azure/identity for Authentication",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Client Constructor with Endpoint and Credential",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async/Await Pattern",
+            "score_a": 1,
+            "score_b": 0,
+            "delta": -1,
+            "pass_a": true,
+            "pass_b": false
+          },
+          {
+            "name": "Pagination with for-await-of",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "LRO Pattern (beginXxx + pollUntilDone)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "RestError Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "No Deprecated Packages",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Logging via @azure/logger",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "package.json with Correct Dependencies",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": -0.10389610389610393,
+      "improved": 0,
+      "regressed": 1,
+      "unchanged": 0,
+      "top_regressed": [
+        {
+          "prompt_id": "cosmos-db-dp-js-ts-crud",
+          "score_a": 0.6233766233766235,
+          "score_b": 0.5194805194805195,
+          "delta": -0.10389610389610393,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.8571428571428571,
+              "score_b": 0.7142857142857143,
+              "delta": -0.1428571428571428,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Correct @azure/ Scoped Packages",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "@azure/identity for Authentication",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Client Constructor with Endpoint and Credential",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Async/Await Pattern",
+              "score_a": 1,
+              "score_b": 0,
+              "delta": -1,
+              "pass_a": true,
+              "pass_b": false
+            },
+            {
+              "name": "Pagination with for-await-of",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "LRO Pattern (beginXxx + pollUntilDone)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "RestError Exception Handling",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "No Deprecated Packages",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Logging via @azure/logger",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "package.json with Correct Dependencies",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
