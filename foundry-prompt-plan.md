@@ -71,18 +71,32 @@ Package family: `Azure.AI.VoiceLive`, `azure-ai-voicelive`,
 Package family: `Azure.AI.ContentSafety`, `azure-ai-contentsafety`,
 `@azure-rest/ai-content-safety`, and `azure-ai-contentsafety`.
 
+Wave 2 status: skipped. The official JavaScript source tag
+`@azure-rest/ai-content-safety_1.0.2` contains the required package and APIs, but
+version 1.0.2 isn't restorable from the required Azure SDK private npm registry.
+On 2026-08-26, registry metadata listed only 1.0.3 alpha builds (from
+`1.0.3-alpha.20260302.1` through `1.0.3-alpha.20260825.1`);
+`npm install` returned `ETARGET` for 1.0.2, and the registry's direct 1.0.2
+tarball URL returned 404. The .NET 1.0.0, Java 1.0.20, and Python 1.0.0
+references restored and compiled, and the JavaScript APIs were source-verified,
+but the four-language contract requires every package to restore from the
+mandated registry.
+
 1. **Text harm analysis** — Analyze supplied text and print the severity returned
    for every harm category.
    - Evaluation focus: text request model, category result traversal, and severity
      mapping.
+   - Status: skipped because the library-level JavaScript package restore failed.
 2. **Image harm analysis** — Load an image, submit its bytes, and print category
    severities from the image result.
    - Evaluation focus: binary image encoding, image request model, and image-specific
      result traversal.
+   - Status: skipped because the library-level JavaScript package restore failed.
 3. **Blocklist lifecycle** — Create a blocklist, add terms, analyze text with that
    blocklist, report matched terms, and delete the blocklist.
    - Evaluation focus: blocklist and term identifiers, blocklist-enabled analysis,
      matched-term results, and cleanup.
+   - Status: skipped because the library-level JavaScript package restore failed.
 
 ### Azure AI Content Understanding
 
