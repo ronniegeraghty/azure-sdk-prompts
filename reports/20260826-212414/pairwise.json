@@ -1,0 +1,50 @@
+{
+  "run_id": "20260826-212414",
+  "timestamp": "2026-08-26T14:33:00Z",
+  "reports": [
+    {
+      "prompt_id": "ai-agents-dp-java-basic-agent-lifecycle",
+      "baseline": {
+        "config_name": "java-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-java-file-search",
+      "baseline": {
+        "config_name": "java-azure-tools/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-agents-dp-java-function-tool",
+      "baseline": {
+        "config_name": "java-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "ai-projects-dp-java-project-resource-inventory",
+      "baseline": {
+        "config_name": "java-azure-tools/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

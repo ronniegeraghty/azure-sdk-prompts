@@ -1,0 +1,41 @@
+{
+  "prompt_id": "ai-agents-dp-java-basic-agent-lifecycle",
+  "config_name": "java-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable Java console application that uses the\r\n`com.azure:azure-ai-agents-persistent` package to run a basic Azure AI Agent\r\nconversation.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read the Azure AI project endpoint from `PROJECT_ENDPOINT` and the model deployment\r\n  name from `MODEL_DEPLOYMENT_NAME`.\r\n- Create the Azure AI Agents client using the project endpoint and\r\n  `DefaultAzureCredential`.\r\n- Create an agent named `hyoka-basic-agent` with the instructions\r\n  `Answer the user's question clearly and concisely.`\r\n- Create a thread and add this exact user message:\r\n  `What is the capital of France?`\r\n- Create a run for that thread and agent, then use the SDK to refresh the run until it\r\n  reaches a terminal status.\r\n- After a successful run, list the thread messages in chronological order and print\r\n  the text content of every assistant message.\r\n- Delete the thread and agent after the conversation finishes.\r\n- Include the project manifest and concise commands for restoring, building, and\r\n  running the application.\r\n\r\nUse the synchronous Azure AI Agents client throughout the agent workflow.",
+  "final_response": "Created a complete Maven-based Java 17 console application in the workspace:\n\n- `pom.xml` — Azure Persistent Agents and Identity dependencies\n- `src\\main\\java\\com\\hyoka\\agents\\BasicAgentApplication.java` — synchronous agent workflow, polling, chronological assistant output, and guaranteed cleanup\n- `README.md` — environment setup and restore/build/run commands\n\nUse `mvn dependency:go-offline`, `mvn package`, then `mvn exec:java` after setting `PROJECT_ENDPOINT` and `MODEL_DEPLOYMENT_NAME`.",
+  "workspace_delta": {
+    "bytes_added": 7815,
+    "bytes_removed": 0,
+    "bytes_net": 7815,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 658
+      },
+      {
+        "path": "pom.xml",
+        "size": 1654
+      },
+      {
+        "path": "src\\main\\java\\com\\hyoka\\agents\\BasicAgentApplication.java",
+        "size": 5503
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 13,
+    "tool_calls": 0,
+    "reasoning_steps": 13,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T21:40:59.6285275+08:00",
+  "ended_at": "2026-08-26T21:44:43.0104337+08:00",
+  "duration_ms": 223381,
+  "terminated_by": "completed"
+}

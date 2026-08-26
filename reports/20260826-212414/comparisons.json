@@ -1,0 +1,915 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "java-azure-tools/baseline",
+    "label_b": "java-azure-tools/with-azure-tools",
+    "per_prompt": [
+      {
+        "prompt_id": "ai-agents-dp-java-basic-agent-lifecycle",
+        "score_a": 0.7692307692307693,
+        "score_b": 0.6153846153846154,
+        "delta": -0.15384615384615385,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Azure SDK BOM for Version Management",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Correct Imports (no legacy, no internal packages)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "DefaultAzureCredential Authentication",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Client Builder Pattern",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "No Deprecated/Legacy Classes",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Pagination (PagedIterable/PagedFlux)",
+            "score_a": 1,
+            "score_b": 0,
+            "delta": -1,
+            "pass_a": true,
+            "pass_b": false
+          },
+          {
+            "name": "LRO Pattern (SyncPoller/PollerFlux)",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Async Uses Project Reactor (Mono/Flux)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Service-Specific Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Code Compiles (mvn compile / gradle compileJava)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Try-With-Resources for Clients",
+            "score_a": 1,
+            "score_b": 0,
+            "delta": -1,
+            "pass_a": true,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-agents-dp-java-file-search",
+        "score_a": 0.17948717948717946,
+        "score_b": 0.6923076923076923,
+        "delta": 0.5128205128205128,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.3333333333333333,
+            "score_b": 1,
+            "delta": 0.6666666666666667,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "Azure SDK BOM for Version Management",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Correct Imports (no legacy, no internal packages)",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "DefaultAzureCredential Authentication",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "Client Builder Pattern",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "No Deprecated/Legacy Classes",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Pagination (PagedIterable/PagedFlux)",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "LRO Pattern (SyncPoller/PollerFlux)",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Async Uses Project Reactor (Mono/Flux)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Service-Specific Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Code Compiles (mvn compile / gradle compileJava)",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Try-With-Resources for Clients",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-agents-dp-java-function-tool",
+        "score_a": 0.6923076923076923,
+        "score_b": 0.6858974358974359,
+        "delta": -0.0064102564102563875,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 0.9166666666666666,
+            "delta": -0.08333333333333337,
+            "pass_a": true,
+            "pass_b": false
+          },
+          {
+            "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Azure SDK BOM for Version Management",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Correct Imports (no legacy, no internal packages)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "DefaultAzureCredential Authentication",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Client Builder Pattern",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "No Deprecated/Legacy Classes",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Pagination (PagedIterable/PagedFlux)",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "LRO Pattern (SyncPoller/PollerFlux)",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Async Uses Project Reactor (Mono/Flux)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Service-Specific Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Code Compiles (mvn compile / gradle compileJava)",
+            "score_a": 1,
+            "score_b": 0,
+            "delta": -1,
+            "pass_a": true,
+            "pass_b": false
+          },
+          {
+            "name": "Try-With-Resources for Clients",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "ai-projects-dp-java-project-resource-inventory",
+        "score_a": 0.8461538461538461,
+        "score_b": 0.7692307692307693,
+        "delta": -0.07692307692307687,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Azure SDK BOM for Version Management",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Correct Imports (no legacy, no internal packages)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "DefaultAzureCredential Authentication",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Client Builder Pattern",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "No Deprecated/Legacy Classes",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Pagination (PagedIterable/PagedFlux)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "LRO Pattern (SyncPoller/PollerFlux)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async Uses Project Reactor (Mono/Flux)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Service-Specific Exception Handling",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Code Compiles (mvn compile / gradle compileJava)",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Try-With-Resources for Clients",
+            "score_a": 1,
+            "score_b": 0,
+            "delta": -1,
+            "pass_a": true,
+            "pass_b": false
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0.06891025641025642,
+      "improved": 1,
+      "regressed": 3,
+      "unchanged": 0,
+      "top_improved": [
+        {
+          "prompt_id": "ai-agents-dp-java-file-search",
+          "score_a": 0.17948717948717946,
+          "score_b": 0.6923076923076923,
+          "delta": 0.5128205128205128,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.3333333333333333,
+              "score_b": 1,
+              "delta": 0.6666666666666667,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "Azure SDK BOM for Version Management",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Correct Imports (no legacy, no internal packages)",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "DefaultAzureCredential Authentication",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "Client Builder Pattern",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "No Deprecated/Legacy Classes",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Pagination (PagedIterable/PagedFlux)",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "LRO Pattern (SyncPoller/PollerFlux)",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Async Uses Project Reactor (Mono/Flux)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Service-Specific Exception Handling",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Code Compiles (mvn compile / gradle compileJava)",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Try-With-Resources for Clients",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            }
+          ]
+        }
+      ],
+      "top_regressed": [
+        {
+          "prompt_id": "ai-agents-dp-java-basic-agent-lifecycle",
+          "score_a": 0.7692307692307693,
+          "score_b": 0.6153846153846154,
+          "delta": -0.15384615384615385,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Azure SDK BOM for Version Management",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Correct Imports (no legacy, no internal packages)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "DefaultAzureCredential Authentication",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Client Builder Pattern",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "No Deprecated/Legacy Classes",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Pagination (PagedIterable/PagedFlux)",
+              "score_a": 1,
+              "score_b": 0,
+              "delta": -1,
+              "pass_a": true,
+              "pass_b": false
+            },
+            {
+              "name": "LRO Pattern (SyncPoller/PollerFlux)",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Async Uses Project Reactor (Mono/Flux)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Service-Specific Exception Handling",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Code Compiles (mvn compile / gradle compileJava)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Try-With-Resources for Clients",
+              "score_a": 1,
+              "score_b": 0,
+              "delta": -1,
+              "pass_a": true,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "ai-projects-dp-java-project-resource-inventory",
+          "score_a": 0.8461538461538461,
+          "score_b": 0.7692307692307693,
+          "delta": -0.07692307692307687,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Azure SDK BOM for Version Management",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Correct Imports (no legacy, no internal packages)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "DefaultAzureCredential Authentication",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Client Builder Pattern",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "No Deprecated/Legacy Classes",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Pagination (PagedIterable/PagedFlux)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "LRO Pattern (SyncPoller/PollerFlux)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Async Uses Project Reactor (Mono/Flux)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Service-Specific Exception Handling",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Code Compiles (mvn compile / gradle compileJava)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Try-With-Resources for Clients",
+              "score_a": 1,
+              "score_b": 0,
+              "delta": -1,
+              "pass_a": true,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "ai-agents-dp-java-function-tool",
+          "score_a": 0.6923076923076923,
+          "score_b": 0.6858974358974359,
+          "delta": -0.0064102564102563875,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 0.9166666666666666,
+              "delta": -0.08333333333333337,
+              "pass_a": true,
+              "pass_b": false
+            },
+            {
+              "name": "Correct Dependencies (com.azure, not com.microsoft.azure)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Azure SDK BOM for Version Management",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Correct Imports (no legacy, no internal packages)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "DefaultAzureCredential Authentication",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Client Builder Pattern",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "No Deprecated/Legacy Classes",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Pagination (PagedIterable/PagedFlux)",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "LRO Pattern (SyncPoller/PollerFlux)",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Async Uses Project Reactor (Mono/Flux)",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Service-Specific Exception Handling",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Code Compiles (mvn compile / gradle compileJava)",
+              "score_a": 1,
+              "score_b": 0,
+              "delta": -1,
+              "pass_a": true,
+              "pass_b": false
+            },
+            {
+              "name": "Try-With-Resources for Clients",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

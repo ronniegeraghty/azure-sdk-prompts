@@ -1,0 +1,41 @@
+{
+  "prompt_id": "ai-agents-dp-java-file-search",
+  "config_name": "java-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable Java console application that uses\r\n`com.azure:azure-ai-agents-persistent` to answer a question grounded in an uploaded\r\ndocument.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read `PROJECT_ENDPOINT` and `MODEL_DEPLOYMENT_NAME`.\r\n- Create a text document containing this exact fact:\r\n  `The Contoso Trail Guide says the Cascade Loop is 42 kilometers long and hikers should bring a rain jacket.`\r\n- Upload the document for agents, create a vector store containing it, and wait until\r\n  the vector store is ready. Fail if indexing doesn't complete successfully.\r\n- Create an agent named `hyoka-trail-guide-agent` with a file-search tool and tool\r\n  resources that reference the created vector store.\r\n- Create a thread with the exact user message\r\n  `According to the uploaded guide, how long is the Cascade Loop and what should hikers bring?`\r\n- Create and poll a run until terminal status, and require successful completion.\r\n- List messages in chronological order and print agent text.\r\n- Delete the thread, agent, vector store, and uploaded file in dependency order.\r\n- Include the project manifest and concise restore, build, and run commands.\r\n\r\nUse the synchronous SDK clients throughout.",
+  "final_response": "`beta.3` is present in the upstream source but not published to Maven Central. I’m switching to the published `beta.1` artifact required by the SDK guidance and adapting to that released API.",
+  "workspace_delta": {
+    "bytes_added": 14661,
+    "bytes_removed": 0,
+    "bytes_net": 14661,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 913
+      },
+      {
+        "path": "pom.xml",
+        "size": 1875
+      },
+      {
+        "path": "src\\main\\java\\com\\contoso\\trailguide\\TrailGuideApp.java",
+        "size": 11873
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 15,
+    "tool_calls": 0,
+    "reasoning_steps": 15,
+    "truncated": true
+  },
+  "started_at": "2026-08-26T21:31:29.2353005+08:00",
+  "ended_at": "2026-08-26T21:35:23.2740829+08:00",
+  "duration_ms": 234038,
+  "terminated_by": "completed"
+}
