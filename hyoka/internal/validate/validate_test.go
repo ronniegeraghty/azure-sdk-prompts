@@ -47,6 +47,26 @@ properties:
 Create an Azure AI Agents application.
 `
 
+const validAIProjectsPrompt = `---
+id: ai-projects-dp-python-inventory
+properties:
+  service: ai-projects
+  plane: data-plane
+  language: python
+  category: projects
+  difficulty: intermediate
+  description: "List Azure AI project resources"
+  created: "2026-08-26"
+  author: test
+---
+
+# Azure AI project inventory
+
+## Prompt
+
+List project resources.
+`
+
 const invalidServicePrompt = `---
 id: unknown-dp-dotnet-test
 properties:
@@ -146,6 +166,19 @@ t.Errorf("expected 1 file, got %d", result.TotalFiles)
 func TestValidateAIAgentsValues(t *testing.T) {
 dir := t.TempDir()
 writePromptFile(t, dir, "ai-agents.prompt.md", validAIAgentsPrompt)
+
+result, err := Validate(dir)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if !result.OK() {
+t.Errorf("expected validation to pass, got errors: %v", result.Errors)
+}
+}
+
+func TestValidateAIProjectsValues(t *testing.T) {
+dir := t.TempDir()
+writePromptFile(t, dir, "ai-projects.prompt.md", validAIProjectsPrompt)
 
 result, err := Validate(dir)
 if err != nil {
