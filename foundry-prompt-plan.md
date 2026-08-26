@@ -43,6 +43,7 @@ Package family: `Azure.AI.Projects`, `azure-ai-projects`,
    its version and metadata, download it, and delete the created dataset version.
    - Evaluation focus: file upload, dataset and version identifiers, download
      handling, and resource lifecycle.
+   - Status: the four-language prompt and reference set is complete.
 3. **Evaluation run** — Create an evaluation from a small JSONL or CSV dataset,
    select a built-in evaluator, poll the evaluation, and print metric results.
    - Evaluation focus: evaluator configuration, dataset reference, long-running
