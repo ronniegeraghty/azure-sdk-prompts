@@ -1,0 +1,44 @@
+# Two-arm comparison: neither Azure tool versus Azure MCP + Microsoft SDK skills.
+# Do not run with --pairwise; select both config names explicitly.
+configs:
+  - name: java-azure-tools/baseline
+    description: "Java baseline without Azure MCP or Microsoft SDK skills"
+    generator:
+      model: "gpt-5.6-sol"
+    reviewer:
+      models:
+        - "gpt-5.6-sol"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    limits:
+      max_turns: 100
+
+  - name: java-azure-tools/with-azure-tools
+    description: "Java with Azure MCP and Microsoft SDK skills"
+    generator:
+      model: "gpt-5.6-sol"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@latest", "server", "start"]
+          mcp_tools: ["*"]
+        - name: azure-sdk-java
+          type: plugin
+          source: remote
+          repo: microsoft/skills
+    reviewer:
+      models:
+        - "gpt-5.6-sol"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    limits:
+      max_turns: 100
