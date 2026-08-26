@@ -221,6 +221,7 @@ Package family: `Azure.AI.Translation.Document`,
    poll the batch operation, and enumerate each document's status and failure details.
    - Evaluation focus: source/target inputs, long-running operation, per-document
      paging, status, and failure result types.
+   - Status: the four-language prompt and reference set is complete.
 
 ## Scope summary
 
