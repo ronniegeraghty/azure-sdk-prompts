@@ -2,10 +2,8 @@ import os
 from pathlib import Path
 import sys
 
-from azure.ai.translation.document import (
-    DocumentTranslateContent,
-    SingleDocumentTranslationClient,
-)
+from azure.ai.translation.document import SingleDocumentTranslationClient
+from azure.ai.translation.document.models import DocumentTranslateContent
 from azure.identity import DefaultAzureCredential
 
 
