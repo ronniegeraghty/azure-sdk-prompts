@@ -112,7 +112,7 @@ func (r *CopilotReviewer) Review(ctx context.Context, originalPrompt string, wor
 	slog.Debug("Creating review session", "model", r.model)
 	sessionCfg := &copilot.SessionConfig{
 		Model:               r.model,
-		ConfigDir:           configDir,
+		ConfigDirectory:     configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilotperm.ApproveAll,
 		SkillDirectories:    r.skillDirectories,
@@ -280,8 +280,8 @@ func parseReviewResponseV2(text string, expected []ReviewCheck) (*ReviewResult, 
 	criteria := make([]CriterionResult, len(resp.Criteria))
 	for i, c := range resp.Criteria {
 		criteria[i] = CriterionResult{
-			ID:     c.ID,               // stable id for vote keying
-			Name:   expectedIDs[c.ID],  // canonical label from YAML
+			ID:     c.ID,              // stable id for vote keying
+			Name:   expectedIDs[c.ID], // canonical label from YAML
 			Passed: c.Passed,
 			Reason: c.Reasoning,
 		}
@@ -486,7 +486,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 	slog.Debug("Creating review session", "model", model)
 	sessionCfg := &copilot.SessionConfig{
 		Model:               model,
-		ConfigDir:           configDir,
+		ConfigDirectory:     configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilotperm.ApproveAll,
 		SkillDirectories:    p.skillDirectories,
@@ -533,7 +533,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 		}
 
 		responseText, _ := collector.response()
-		
+
 		// Use id-aware parser if checks provided, otherwise fall back to legacy
 		if len(checks) > 0 {
 			var validationErrors []string
@@ -547,7 +547,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 					for _, c := range checks {
 						expectedIDs[c.ID] = true
 					}
-					
+
 					// Parse to extract returned IDs for better error message
 					jsonStr := utils.ExtractJSON(responseText)
 					if jsonStr != "" {
@@ -571,7 +571,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 							}
 						}
 					}
-					
+
 					var retryMsg strings.Builder
 					retryMsg.WriteString("Your response has validation errors:\n")
 					for _, e := range validationErrors {
@@ -592,7 +592,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 				slog.Warn("reviewer failed to return valid criteria after 3 retries, synthesizing failures for missing checks",
 					"model", model,
 					"validation_errors", validationErrors)
-				
+
 				// Determine which IDs are missing
 				expectedIDs := make(map[string]bool)
 				for _, c := range checks {
@@ -604,7 +604,7 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 						returnedIDs[c.ID] = true
 					}
 				}
-				
+
 				// Synthesize failures for missing IDs
 				if result == nil {
 					result = &ReviewResult{
@@ -642,7 +642,6 @@ func (p *PanelReviewer) runSingleReview(ctx context.Context, model string, revie
 	return result, nil
 }
 
-
 // averageReview computes deterministic voting across a panel.
 // For each criterion, it FAILS if ANY reviewer marked it failed (strict voting).
 // This ensures no false passes when reviewers disagree.
@@ -661,8 +660,8 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 	// Collect all criteria by stable ID, track fail counts
 	type criterionAgg struct {
 		id         string
-		bucketName string   // extracted from prefixed Name
-		label      string   // canonical label from expected
+		bucketName string // extracted from prefixed Name
+		label      string // canonical label from expected
 		failCount  int
 		total      int
 		reasons    []string
@@ -731,7 +730,7 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 		for _, exp := range expected {
 			// Check for votes on this expected ID (may be bucketed or not)
 			foundVotes := false
-			
+
 			// First, check for non-bucketed vote (direct ID match)
 			if agg, hasVotes := criteriaMap[exp.ID]; hasVotes {
 				foundVotes = true
@@ -747,7 +746,7 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 					passedCount++
 				}
 			}
-			
+
 			// Then, check for bucketed votes (bucket::ID pattern)
 			// This handles cases where the same check appears in multiple buckets
 			for voteKey, agg := range criteriaMap {
@@ -759,7 +758,7 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 						checkID = parts[1]
 					}
 				}
-				
+
 				// If this vote matches the expected ID and wasn't already counted
 				if checkID == exp.ID && voteKey != exp.ID {
 					foundVotes = true
@@ -776,7 +775,7 @@ func averageReview(panel []ReviewResult, expected []ReviewCheck) *ReviewResult {
 					}
 				}
 			}
-			
+
 			if !foundVotes {
 				// No reviewer voted on this check → mark as failed
 				criteria = append(criteria, CriterionResult{
