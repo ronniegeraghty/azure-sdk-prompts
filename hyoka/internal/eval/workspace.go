@@ -280,7 +280,7 @@ func copyDir(src, dst string) error {
 }
 
 // NewIsolatedConfigDir creates an empty temporary directory to serve as the
-// Copilot CLI configuration directory. By pointing ConfigDir at this empty
+// Copilot CLI configuration directory. By pointing ConfigDirectory at this empty
 // directory, user-level skills and settings from ~/.config/github-copilot/
 // are excluded from eval sessions. Only skills explicitly listed in the eval
 // config's SkillDirectories are loaded (fixes #21).
