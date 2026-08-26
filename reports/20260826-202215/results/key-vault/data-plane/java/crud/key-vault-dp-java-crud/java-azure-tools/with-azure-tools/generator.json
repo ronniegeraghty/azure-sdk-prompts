@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-dp-java-crud",
+  "config_name": "java-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that performs\r\nall four CRUD operations on Azure Key Vault secrets:\r\n1. Create a new secret called \"my-secret\" with value \"my-secret-value\"\r\n2. Read the secret back and print its value\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Show the Maven dependency\r\nfor azure-security-keyvault-secrets and azure-identity. Include proper exception handling.",
+  "final_response": "Created a complete Maven Java 17 application:\n\n- `pom.xml` — includes `azure-security-keyvault-secrets:4.11.2` and `azure-identity:1.18.5`\n- `src\\main\\java\\com\\example\\KeyVaultSecretCrudApp.java` — create, read, update via a new secret version, soft-delete, and purge\n- `README.md` — configuration, permissions, and execution instructions\n\nRun with:\n\n```powershell\n$env:AZURE_KEY_VAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net/\"\nmvn compile exec:java\n```\n\nThe application uses `DefaultAzureCredential`, waits for deletion to complete before purging, and handles authentication, authorization, missing-secret, conflict, and throttling errors. Purge protection must be disabled and the identity needs set, get, delete, and purge permissions.\n\nReferences: [Key Vault Secrets SDK](https://learn.microsoft.com/java/api/overview/azure/security-keyvault-secrets-readme) · [Azure Identity SDK](https://learn.microsoft.com/java/api/overview/azure/identity-readme)",
+  "workspace_delta": {
+    "bytes_added": 6950,
+    "bytes_removed": 0,
+    "bytes_net": 6950,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\KeyVaultSecretCrudApp.java",
+        "size": 4340
+      },
+      {
+        "path": "README.md",
+        "size": 1163
+      },
+      {
+        "path": "pom.xml",
+        "size": 1447
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 9,
+    "tool_calls": 0,
+    "reasoning_steps": 9,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T20:48:05.9167385+08:00",
+  "ended_at": "2026-08-26T20:50:48.252638+08:00",
+  "duration_ms": 162335,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,41 @@
+{
+  "prompt_id": "cosmos-db-dp-java-crud",
+  "config_name": "java-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that performs\r\nCRUD operations on items in an Azure Cosmos DB NoSQL container:\r\n1. Create a CosmosClient using endpoint and key with CosmosClientBuilder\r\n2. Create a database \"TestDB\" and container \"Items\" with partition key \"/category\"\r\n3. Insert a POJO item with properties: id, category, name, quantity\r\n4. Read the item back by id and partition key value\r\n5. Query items where category equals \"electronics\" using parameterized SQL\r\n6. Replace the item with updated quantity\r\n7. Delete the item by id and partition key\r\n\r\nShow required Maven dependency and handle CosmosException appropriately.",
+  "final_response": "Implemented a complete Maven-based Java CRUD sample.\n\n- `pom.xml` — includes `com.azure:azure-cosmos:4.81.0`\n- `src\\main\\java\\com\\example\\cosmos\\CosmosCrudExample.java` — creates `TestDB`/`Items`, inserts, reads, parameterized-queries, replaces, and deletes the POJO item\n- `README.md` — documents emulator environment variables, build/run commands, dependency, and official references\n\nCredentials are read from `COSMOS_ENDPOINT` and `COSMOS_KEY`; `CosmosException` handling reports status codes, rate limiting, activity IDs, and diagnostics.",
+  "workspace_delta": {
+    "bytes_added": 9765,
+    "bytes_removed": 0,
+    "bytes_net": 9765,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1438
+      },
+      {
+        "path": "pom.xml",
+        "size": 839
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\cosmos\\CosmosCrudExample.java",
+        "size": 7488
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T22:54:41.5095753+08:00",
+  "ended_at": "2026-08-26T22:56:32.4271287+08:00",
+  "duration_ms": 110917,
+  "terminated_by": "completed"
+}

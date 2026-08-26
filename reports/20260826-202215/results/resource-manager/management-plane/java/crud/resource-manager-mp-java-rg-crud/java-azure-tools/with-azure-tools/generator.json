@@ -1,0 +1,41 @@
+{
+  "prompt_id": "resource-manager-mp-java-rg-crud",
+  "config_name": "java-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that manages\r\nAzure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new resource group in \"eastus\" region\r\n3. List all resource groups in the subscription\r\n4. Get details of the created resource group\r\n5. Add a tag to the resource group\r\n6. Delete the resource group\r\n\r\nShow required Maven dependencies and include proper exception handling.\r\nUse the modern azure-resourcemanager SDK.",
+  "final_response": "Implemented a complete Maven Java application using the modern Azure management-plane SDK:\n\n- `pom.xml` — `azure-resourcemanager:2.63.0` and `azure-identity:1.18.2`\n- `src\\main\\java\\com\\example\\ResourceGroupManagerApp.java` — authenticates with `DefaultAzureCredential`, creates in `eastus`, lists, retrieves, tags, and deletes the resource group\n- `README.md` — prerequisites, environment configuration, build/run instructions, and official references\n\nThe application uses a unique resource-group name, handles authentication and ARM failures explicitly, and guarantees deletion in a `finally` block while preserving any original exception. No Azure operations were executed.",
+  "workspace_delta": {
+    "bytes_added": 9550,
+    "bytes_removed": 0,
+    "bytes_net": 9550,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "pom.xml",
+        "size": 1864
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\ResourceGroupManagerApp.java",
+        "size": 5611
+      },
+      {
+        "path": "README.md",
+        "size": 2075
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T21:21:43.6022484+08:00",
+  "ended_at": "2026-08-26T21:25:21.7063039+08:00",
+  "duration_ms": 218104,
+  "terminated_by": "completed"
+}

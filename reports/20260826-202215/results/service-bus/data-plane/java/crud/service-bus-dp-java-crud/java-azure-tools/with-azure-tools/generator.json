@@ -1,0 +1,41 @@
+{
+  "prompt_id": "service-bus-dp-java-crud",
+  "config_name": "java-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that demonstrates\r\nmessaging with Azure Service Bus:\r\n1. Create a ServiceBusSenderClient using ServiceBusClientBuilder for a queue\r\n2. Send a single message with ServiceBusMessage\r\n3. Send a batch of 5 messages using ServiceBusMessageBatch\r\n4. Create a ServiceBusReceiverClient and receive messages using receiveMessages()\r\n5. Complete a message with complete() after processing\r\n6. Create a ServiceBusProcessorClient for continuous processing with handlers\r\n7. Demonstrate sending to a topic and receiving from a subscription\r\n\r\nShow required Maven dependency (com.azure:azure-messaging-servicebus) and\r\nproper resource cleanup with close().",
+  "final_response": "Implemented a complete Maven Java sample:\n\n- `ServiceBusSenderClient` for queue and topic messaging\n- Single message and five-message `ServiceBusMessageBatch`\n- `ServiceBusReceiverClient.receiveMessages()` with explicit `complete()`\n- Continuous `ServiceBusProcessorClient` handlers with manual settlement\n- Topic/subscription send and receive\n- Passwordless `DefaultAzureCredential`\n- Explicit `close()` cleanup for all clients\n\nFiles: `pom.xml`, `src\\main\\java\\com\\example\\servicebus\\ServiceBusMessagingDemo.java`, and `README.md`.\n\nReference: [Azure Service Bus client library for Java](https://learn.microsoft.com/java/api/overview/azure/messaging-servicebus-readme?view=azure-java-stable)",
+  "workspace_delta": {
+    "bytes_added": 9932,
+    "bytes_removed": 0,
+    "bytes_net": 9932,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1744
+      },
+      {
+        "path": "pom.xml",
+        "size": 1311
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\servicebus\\ServiceBusMessagingDemo.java",
+        "size": 6877
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 7,
+    "tool_calls": 0,
+    "reasoning_steps": 7,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T20:36:48.2289748+08:00",
+  "ended_at": "2026-08-26T20:38:46.015255+08:00",
+  "duration_ms": 117786,
+  "terminated_by": "completed"
+}

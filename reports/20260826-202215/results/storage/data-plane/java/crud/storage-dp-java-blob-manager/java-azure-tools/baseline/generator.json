@@ -1,0 +1,57 @@
+{
+  "prompt_id": "storage-dp-java-blob-manager",
+  "config_name": "java-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that provides a reusable Azure Blob Storage management utility.\r\n\r\nThe project needs:\r\n\r\n- A **service class** (both sync and async versions) that wraps blob operations: upload (with optional metadata and blob index tags for later querying), download, list blobs in a container, and delete. The upload method should handle large files efficiently so that uploading a multi-gigabyte file doesn't load the entire thing into memory or fail on slow connections. The service should also prevent concurrent writers from overwriting each other's changes when updating the same blob.\r\n\r\n- A **configuration class** that connects to Azure securely using the storage account endpoint (from an environment variable). No connection strings or account keys should be used — the app will run in Azure with managed identity. The configuration should set up a custom retry policy (exponential backoff, configurable max retries and delay) and a per-request timeout, so the app behaves predictably under transient failures. It should also enable HTTP request/response logging at a configurable level for debugging.\r\n\r\n- A **Main class** that wires everything together and demos each operation using the sync implementation first, then repeats the same operations using the async implementation: uploads a sample file with some index tags, lists blobs, downloads the file back, acquires a lease and overwrites it, and finally deletes it. Print status at each step.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created a complete Java 17 Maven project with:\n\n- Sync and Reactor-based async Blob Storage services\n- Streaming, bounded-concurrency block uploads for multi-GB files\n- Metadata and blob index tag support\n- ETag-based optimistic concurrency and lease-aware overwrites\n- Download, list, delete, acquire-lease, and release-lease operations\n- Managed identity authentication via `DefaultAzureCredential`\n- Configurable exponential retries, request timeouts, and HTTP logging\n- A `Main` demo covering all operations with both implementations\n- Environment configuration documentation and unit tests\n\nBuild succeeds with `mvn test`. See `README.md` for required environment variables and execution instructions.",
+  "workspace_delta": {
+    "bytes_added": 27251,
+    "bytes_removed": 0,
+    "bytes_net": 27251,
+    "new_file_count": 7,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "pom.xml",
+        "size": 3147
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blob\\AzureBlobConfiguration.java",
+        "size": 6379
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blob\\BlobStorageAsyncService.java",
+        "size": 4780
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blob\\BlobStorageService.java",
+        "size": 4364
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blob\\Main.java",
+        "size": 5148
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\blob\\AzureBlobConfigurationTest.java",
+        "size": 1959
+      },
+      {
+        "path": "README.md",
+        "size": 1474
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T00:17:41.7107846+08:00",
+  "ended_at": "2026-08-27T00:20:45.9598713+08:00",
+  "duration_ms": 184249,
+  "terminated_by": "completed"
+}

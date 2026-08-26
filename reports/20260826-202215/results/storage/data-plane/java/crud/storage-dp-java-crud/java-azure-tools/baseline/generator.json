@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-dp-java-crud",
+  "config_name": "java-azure-tools/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that performs\r\nCRUD operations on Azure Blob Storage:\r\n1. Create a BlobServiceClient using DefaultAzureCredential\r\n2. Create a container named \"my-container\" if it doesn't exist\r\n3. Upload a local file \"data.txt\" as a blob named \"uploads/data.txt\"\r\n4. List all blobs in the container and print their names and sizes\r\n5. Download the blob back to a local file \"data-downloaded.txt\"\r\n6. Delete the blob and then delete the container\r\n\r\nShow required Maven dependencies and proper error handling with BlobStorageException.",
+  "final_response": "Implemented a Maven-based Java Azure Blob Storage CRUD application.\n\n- `pom.xml` includes `azure-storage-blob` and `azure-identity`.\n- `BlobStorageCrudApp.java` creates the container, uploads `data.txt`, lists blobs and sizes, downloads the blob, then deletes the blob and container.\n- Uses `DefaultAzureCredential`.\n- Handles `BlobStorageException`, authentication failures, missing configuration, and missing input files.\n\nSet the storage endpoint and credentials supported by `DefaultAzureCredential`, then run:\n\n```powershell\n$env:AZURE_STORAGE_ACCOUNT_URL = \"https://\u003caccount-name\u003e.blob.core.windows.net\"\nmvn exec:java\n```",
+  "workspace_delta": {
+    "bytes_added": 5413,
+    "bytes_removed": 0,
+    "bytes_net": 5413,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "pom.xml",
+        "size": 1433
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\BlobStorageCrudApp.java",
+        "size": 3980
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 4,
+    "tool_calls": 0,
+    "reasoning_steps": 4,
+    "truncated": false
+  },
+  "started_at": "2026-08-26T23:55:04.6124913+08:00",
+  "ended_at": "2026-08-26T23:56:09.2371322+08:00",
+  "duration_ms": 64624,
+  "terminated_by": "completed"
+}
