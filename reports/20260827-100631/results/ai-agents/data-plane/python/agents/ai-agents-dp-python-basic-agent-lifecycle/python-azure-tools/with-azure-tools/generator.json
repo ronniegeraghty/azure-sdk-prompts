@@ -1,0 +1,65 @@
+{
+  "prompt_id": "ai-agents-dp-python-basic-agent-lifecycle",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable Python console application that uses the\r\n`azure-ai-agents` package to run a basic Azure AI Agent conversation.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read the Azure AI project endpoint from `PROJECT_ENDPOINT` and the model deployment\r\n  name from `MODEL_DEPLOYMENT_NAME`.\r\n- Create the Azure AI Agents client using the project endpoint and\r\n  `DefaultAzureCredential`.\r\n- Create an agent named `hyoka-basic-agent` with the instructions\r\n  `Answer the user's question clearly and concisely.`\r\n- Create a thread and add this exact user message:\r\n  `What is the capital of France?`\r\n- Create a run for that thread and agent, then use the SDK to refresh the run until it\r\n  reaches a terminal status.\r\n- After a successful run, list the thread messages in chronological order and print\r\n  the text content of every assistant message.\r\n- Delete the thread and agent after the conversation finishes.\r\n- Include the project manifest and concise commands for restoring, building, and\r\n  running the application.\r\n\r\nUse the synchronous Azure AI Agents client throughout the agent workflow.",
+  "final_response": "The current SDK exposes explicit `RunStatus` terminal values and ascending message ordering, so I’m implementing manual synchronous polling with guaranteed thread-and-agent cleanup.",
+  "workspace_delta": {
+    "bytes_added": 4650,
+    "bytes_removed": 0,
+    "bytes_net": 4650,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "hyoka_basic_agent.egg-info\\entry_points.txt",
+        "size": 48
+      },
+      {
+        "path": "hyoka_basic_agent.egg-info\\top_level.txt",
+        "size": 5
+      },
+      {
+        "path": "main.py",
+        "size": 2693
+      },
+      {
+        "path": "pyproject.toml",
+        "size": 430
+      },
+      {
+        "path": "README.md",
+        "size": 914
+      },
+      {
+        "path": "hyoka_basic_agent.egg-info\\dependency_links.txt",
+        "size": 1
+      },
+      {
+        "path": "hyoka_basic_agent.egg-info\\requires.txt",
+        "size": 46
+      },
+      {
+        "path": "hyoka_basic_agent.egg-info\\PKG-INFO",
+        "size": 233
+      },
+      {
+        "path": "hyoka_basic_agent.egg-info\\SOURCES.txt",
+        "size": 280
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 18,
+    "tool_calls": 0,
+    "reasoning_steps": 18,
+    "truncated": true
+  },
+  "started_at": "2026-08-27T10:21:55.4055488+08:00",
+  "ended_at": "2026-08-27T10:25:57.8603807+08:00",
+  "duration_ms": 242454,
+  "terminated_by": "completed"
+}

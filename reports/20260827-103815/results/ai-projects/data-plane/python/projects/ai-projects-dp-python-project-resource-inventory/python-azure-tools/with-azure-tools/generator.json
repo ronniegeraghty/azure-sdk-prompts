@@ -1,0 +1,41 @@
+{
+  "prompt_id": "ai-projects-dp-python-project-resource-inventory",
+  "config_name": "python-azure-tools/with-azure-tools",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a complete, runnable Python console application that uses `azure-ai-projects`\r\nto inspect connections and model deployments in a Microsoft Foundry project.\r\n\r\n**Write the application to files in the workspace. Do not reply with code blocks.**\r\n\r\nThe application must:\r\n\r\n- Read `FOUNDRY_PROJECT_ENDPOINT`, `CONNECTION_NAME`, and `DEPLOYMENT_NAME`.\r\n- Enumerate every project connection through the SDK's pageable API and print each\r\n  connection's name, type, target, and default status.\r\n- Retrieve `CONNECTION_NAME` without requesting credentials and print the same typed\r\n  metadata.\r\n- Enumerate every project deployment through the SDK's pageable API. For each model\r\n  deployment, print its name, model publisher, model name, and model version.\r\n- Retrieve `DEPLOYMENT_NAME`, require it to be a model deployment, and print the same\r\n  typed model metadata.\r\n- Include the dependency manifest and concise install and run commands.\r\n\r\nUse the synchronous SDK client throughout.",
+  "final_response": "Created a complete synchronous Microsoft Foundry inventory application:\n\n- `app.py` — lists and retrieves connections without credentials, then lists and validates model deployments.\n- `requirements.txt` — pins `azure-ai-projects==2.5.0` with Azure Identity.\n- `README.md` — concise PowerShell installation, configuration, and run commands.\n\nThe application uses `DefaultAzureCredential`, SDK context managers, pageable APIs, typed `Connection`/`ModelDeployment` metadata, required environment-variable validation, and clear error reporting.",
+  "workspace_delta": {
+    "bytes_added": 4360,
+    "bytes_removed": 0,
+    "bytes_net": 4360,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1077
+      },
+      {
+        "path": "app.py",
+        "size": 3226
+      },
+      {
+        "path": "requirements.txt",
+        "size": 57
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 18,
+    "tool_calls": 0,
+    "reasoning_steps": 18,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T10:38:15.1074215+08:00",
+  "ended_at": "2026-08-27T10:43:54.5559456+08:00",
+  "duration_ms": 339448,
+  "terminated_by": "completed"
+}

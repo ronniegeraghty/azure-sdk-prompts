@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/hyoka_basic_agent/__init__.py
+src/hyoka_basic_agent/__main__.py
+src/hyoka_basic_agent/main.py
+src/hyoka_basic_agent.egg-info/PKG-INFO
+src/hyoka_basic_agent.egg-info/SOURCES.txt
+src/hyoka_basic_agent.egg-info/dependency_links.txt
+src/hyoka_basic_agent.egg-info/entry_points.txt
+src/hyoka_basic_agent.egg-info/requires.txt
+src/hyoka_basic_agent.egg-info/top_level.txt

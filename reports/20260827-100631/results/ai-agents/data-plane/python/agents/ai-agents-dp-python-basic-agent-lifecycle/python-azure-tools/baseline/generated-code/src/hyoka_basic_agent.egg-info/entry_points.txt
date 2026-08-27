@@ -1,0 +1,2 @@
+[console_scripts]
+hyoka-basic-agent = hyoka_basic_agent.main:main

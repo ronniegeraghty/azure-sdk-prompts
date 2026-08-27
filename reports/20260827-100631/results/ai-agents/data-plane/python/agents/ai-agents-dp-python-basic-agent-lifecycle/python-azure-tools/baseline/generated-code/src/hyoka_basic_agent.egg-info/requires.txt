@@ -1,0 +1,5 @@
+azure-ai-agents<2.0.0,>=1.1.0
+azure-identity<2.0.0,>=1.19.0
+
+[dev]
+build<2.0.0,>=1.2.2

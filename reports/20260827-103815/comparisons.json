@@ -1,0 +1,161 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "python-azure-tools/baseline",
+    "label_b": "python-azure-tools/with-azure-tools",
+    "per_prompt": [
+      {
+        "prompt_id": "ai-projects-dp-python-project-resource-inventory",
+        "score_a": 0.625,
+        "score_b": 0.875,
+        "delta": 0.25,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Correct Package Imports",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "DefaultAzureCredential Usage",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Context Manager for Clients",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Async Client Usage",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          },
+          {
+            "name": "Proper Exception Handling",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          },
+          {
+            "name": "Output Files Exist",
+            "score_a": 0,
+            "score_b": 0,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          },
+          {
+            "name": "Tool Usage Verification",
+            "score_a": 0,
+            "score_b": 1,
+            "delta": 1,
+            "pass_a": false,
+            "pass_b": true
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0.25,
+      "improved": 1,
+      "regressed": 0,
+      "unchanged": 0,
+      "top_improved": [
+        {
+          "prompt_id": "ai-projects-dp-python-project-resource-inventory",
+          "score_a": 0.625,
+          "score_b": 0.875,
+          "delta": 0.25,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Correct Package Imports",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "DefaultAzureCredential Usage",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Context Manager for Clients",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Async Client Usage",
+              "score_a": 1,
+              "score_b": 1,
+              "delta": 0,
+              "pass_a": true,
+              "pass_b": true
+            },
+            {
+              "name": "Proper Exception Handling",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            },
+            {
+              "name": "Output Files Exist",
+              "score_a": 0,
+              "score_b": 0,
+              "delta": 0,
+              "pass_a": false,
+              "pass_b": false
+            },
+            {
+              "name": "Tool Usage Verification",
+              "score_a": 0,
+              "score_b": 1,
+              "delta": 1,
+              "pass_a": false,
+              "pass_b": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
