@@ -69,7 +69,8 @@ func TestAssistantTurnStartToolLoadGate(t *testing.T) {
 			configSkills: []string{"/skills/skill-a", "/skills/skill-b"},
 			configMCP:    map[string]bool{"mcp-1": true, "mcp-2": true},
 
-			// SDK reports skill-a and mcp-1 loaded, but skill-b and mcp-2 missing
+			// SDK reports skill-a and mcp-1. Skill-b remains available from
+			// pre-session validation, while mcp-2 is a runtime failure.
 			skillsLoadedBefore: []string{"skill-a"},
 			mcpLoadedBefore:    []string{"mcp-1"},
 
@@ -79,7 +80,7 @@ func TestAssistantTurnStartToolLoadGate(t *testing.T) {
 
 			expectAllLoaded:   false,
 			expectPartialFail: true,
-			expectFailedTools: []string{"skill-b", "mcp-2"},
+			expectFailedTools: []string{"mcp-2"},
 			expectFailReason:  "did not report", // Substring from failure reason
 		},
 		{
@@ -107,8 +108,8 @@ func TestAssistantTurnStartToolLoadGate(t *testing.T) {
 			configSkills: []string{"/skills/skill-a", "/skills/skill-b"},
 			configMCP:    map[string]bool{"mcp-1": true},
 
-			// SDK reports skill-a loaded, but AssistantTurnStart fires
-			// BEFORE skill-b or mcp-1 events arrive
+			// SDK reports skill-a, but AssistantTurnStart fires before the MCP
+			// event. Skill-b remains available from pre-session validation.
 			skillsLoadedBefore: []string{"skill-a"},
 			mcpLoadedBefore:    nil, // MCP event hasn't fired yet
 
@@ -118,8 +119,8 @@ func TestAssistantTurnStartToolLoadGate(t *testing.T) {
 
 			expectAllLoaded:   false,
 			expectPartialFail: true,
-			expectFailedTools: []string{"skill-b", "mcp-1"},
-			expectFailReason:  "Not registered before first turn", // Exact reason from Neo's impl
+			expectFailedTools: []string{"mcp-1"},
+			expectFailReason:  "Not registered before first turn",
 		},
 		{
 			name:         "absolute_ceiling_exceeded_no_turn_start",
@@ -138,7 +139,7 @@ func TestAssistantTurnStartToolLoadGate(t *testing.T) {
 
 			expectAllLoaded:    false,
 			expectPartialFail:  true,
-			expectFailedTools:  []string{"hung-skill", "hung-mcp"},
+			expectFailedTools:  []string{"hung-mcp"},
 			expectAbsoluteCeil: true,
 			expectCeilError:    "ceiling exceeded", // Production: "session never started"
 		},
@@ -215,15 +216,13 @@ func TestAssistantTurnStartToolLoadGate(t *testing.T) {
 					tools = reconstructToolStatuses(verifier)
 				}
 			case <-ceilingCtx.Done():
-				// Absolute ceiling exceeded - mark all tools as Failed
+				// Absolute ceiling exceeded - fail unconfirmed MCP servers.
 				ceilingExceeded = true
-				// Synthesize failures for all expected tools
 				for name := range verifier.expectedSkills {
 					tools = append(tools, progress.ToolStatus{
 						ToolName: name,
 						ToolKind: progress.ToolKindSkill,
-						Status:   progress.ToolStatusFailed,
-						Reason:   "absolute ceiling exceeded (test: 2s; production: 5min)",
+						Status:   progress.ToolStatusLoaded,
 					})
 				}
 				for name := range verifier.expectedMCP {
@@ -346,22 +345,10 @@ func TestAssistantTurnStartToolLoadGate(t *testing.T) {
 func reconstructToolStatuses(v *toolVerifier) []progress.ToolStatus {
 	tools := make([]progress.ToolStatus, 0, len(v.expectedSkills)+len(v.expectedMCP))
 	for name := range v.expectedSkills {
-		status := progress.ToolStatusFailed
-		reason := ""
-		if v.loadedSkills[name] {
-			status = progress.ToolStatusLoaded
-		} else {
-			if v.turnBeforeSkills {
-				reason = "Not registered before first turn"
-			} else {
-				reason = "SDK did not report skill as loaded"
-			}
-		}
 		tools = append(tools, progress.ToolStatus{
 			ToolName: name,
 			ToolKind: progress.ToolKindSkill,
-			Status:   status,
-			Reason:   reason,
+			Status:   progress.ToolStatusLoaded,
 		})
 	}
 	for name := range v.expectedMCP {
