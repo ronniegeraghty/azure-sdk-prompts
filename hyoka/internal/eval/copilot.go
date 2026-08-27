@@ -229,7 +229,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	var events []copilot.SessionEvent
 	var sessionRecords []report.SessionEventRecord
 	var mu sync.Mutex
-	toolNames := make(map[string]string)
+	var toolTracker copilotevent.ToolTracker
 	debugPrefix := p.ID + "/" + cfg.Name
 	// Structured logger for this eval session (#42)
 	lg := logging.EvalLogger(p.ID, cfg.Name, "generation", 0)
@@ -290,18 +290,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		mu.Lock()
 		events = append(events, event)
 		details := copilotevent.Extract(event)
-		if details.ToolCallID != nil {
-			switch event.Type() {
-			case copilot.SessionEventTypeToolExecutionStart:
-				if details.ToolName != nil {
-					toolNames[*details.ToolCallID] = *details.ToolName
-				}
-			case copilot.SessionEventTypeToolExecutionComplete:
-				if toolName, ok := toolNames[*details.ToolCallID]; ok {
-					details.ToolName = &toolName
-				}
-			}
-		}
+		toolTracker.Enrich(event, &details)
 		var verifiedTools []progress.ToolStatus
 
 		// Build serializable event record
