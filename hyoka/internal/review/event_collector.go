@@ -20,7 +20,7 @@ type eventCollector struct {
 	maxActions       int
 	model            string
 	cancel           func()
-	toolNames        map[string]string
+	toolTracker      copilotevent.ToolTracker
 }
 
 func newEventCollector(model string, maxActions int, cancel func()) *eventCollector {
@@ -28,7 +28,6 @@ func newEventCollector(model string, maxActions int, cancel func()) *eventCollec
 		model:      model,
 		maxActions: maxActions,
 		cancel:     cancel,
-		toolNames:  make(map[string]string),
 	}
 }
 
@@ -37,18 +36,7 @@ func (c *eventCollector) handleEvent(event copilot.SessionEvent) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	details := copilotevent.Extract(event)
-	if details.ToolCallID != nil {
-		switch event.Type() {
-		case copilot.SessionEventTypeToolExecutionStart:
-			if details.ToolName != nil {
-				c.toolNames[*details.ToolCallID] = *details.ToolName
-			}
-		case copilot.SessionEventTypeToolExecutionComplete:
-			if toolName, ok := c.toolNames[*details.ToolCallID]; ok {
-				details.ToolName = &toolName
-			}
-		}
-	}
+	c.toolTracker.Enrich(event, &details)
 
 	// Count actions and enforce limit
 	switch event.Type() {

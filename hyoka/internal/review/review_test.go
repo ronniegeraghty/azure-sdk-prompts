@@ -1259,8 +1259,13 @@ func TestEventCollectorToolEvents(t *testing.T) {
 	toolName := "read_file"
 	args := map[string]string{"path": "main.go"}
 	resultContent := "file content"
-	c.handleEvent(toolStartEvent(toolName, args))
-	c.handleEvent(toolCompleteEvent(resultContent, nil))
+	startedAt := time.Date(2026, time.August, 27, 1, 2, 3, 0, time.UTC)
+	start := toolStartEvent(toolName, args)
+	start.Timestamp = startedAt
+	complete := toolCompleteEvent(resultContent, nil)
+	complete.Timestamp = startedAt.Add(42_500 * time.Microsecond)
+	c.handleEvent(start)
+	c.handleEvent(complete)
 
 	_, events := c.response()
 	if len(events) != 2 {
@@ -1274,6 +1279,25 @@ func TestEventCollectorToolEvents(t *testing.T) {
 	}
 	if events[1].Result != "file content" {
 		t.Errorf("complete event result = %q", events[1].Result)
+	}
+	if events[1].Duration != 42.5 {
+		t.Errorf("complete event duration = %f, want 42.5", events[1].Duration)
+	}
+}
+
+func TestEventCollectorUnmatchedCompletionHasZeroDuration(t *testing.T) {
+	c := newEventCollector("model", 100, func() {})
+	complete := toolCompleteEvent("file content", nil)
+	complete.Timestamp = time.Now()
+
+	c.handleEvent(complete)
+
+	_, events := c.response()
+	if len(events) != 1 {
+		t.Fatalf("events count = %d, want 1", len(events))
+	}
+	if events[0].Duration != 0 {
+		t.Errorf("complete event duration = %f, want 0", events[0].Duration)
 	}
 }
 

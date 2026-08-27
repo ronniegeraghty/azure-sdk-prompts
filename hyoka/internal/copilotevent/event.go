@@ -1,7 +1,11 @@
 // Package copilotevent extracts common fields from Copilot SDK session events.
 package copilotevent
 
-import copilot "github.com/github/copilot-sdk/go"
+import (
+	"time"
+
+	copilot "github.com/github/copilot-sdk/go"
+)
 
 // Details contains the fields Hyoka records from the SDK's typed event variants.
 type Details struct {
@@ -49,6 +53,49 @@ type ErrorClass struct {
 // Named represents a named loaded SDK resource.
 type Named struct {
 	Name string
+}
+
+// ToolTracker restores fields that SDK v1 only exposes across a matching pair
+// of tool execution events. Its zero value is ready to use.
+type ToolTracker struct {
+	names     map[string]string
+	startedAt map[string]time.Time
+}
+
+// Enrich restores the tool name and duration on completion events.
+func (t *ToolTracker) Enrich(event copilot.SessionEvent, details *Details) {
+	if details.ToolCallID == nil {
+		return
+	}
+
+	toolCallID := *details.ToolCallID
+	switch event.Type() {
+	case copilot.SessionEventTypeToolExecutionStart:
+		if details.ToolName != nil {
+			if t.names == nil {
+				t.names = make(map[string]string)
+			}
+			t.names[toolCallID] = *details.ToolName
+		}
+		if !event.Timestamp.IsZero() {
+			if t.startedAt == nil {
+				t.startedAt = make(map[string]time.Time)
+			}
+			t.startedAt[toolCallID] = event.Timestamp
+		}
+	case copilot.SessionEventTypeToolExecutionComplete:
+		if toolName, ok := t.names[toolCallID]; ok {
+			details.ToolName = &toolName
+			delete(t.names, toolCallID)
+		}
+		if startedAt, ok := t.startedAt[toolCallID]; ok {
+			if duration := event.Timestamp.Sub(startedAt); duration >= 0 && !event.Timestamp.IsZero() {
+				durationMS := float64(duration) / float64(time.Millisecond)
+				details.Duration = &durationMS
+			}
+			delete(t.startedAt, toolCallID)
+		}
+	}
 }
 
 // Extract returns the common fields from a typed SDK event payload.
