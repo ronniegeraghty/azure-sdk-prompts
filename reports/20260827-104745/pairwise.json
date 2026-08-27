@@ -1,0 +1,17 @@
+{
+  "run_id": "20260827-104745",
+  "timestamp": "2026-08-27T02:56:56Z",
+  "reports": [
+    {
+      "prompt_id": "cosmos-db-dp-python-crud",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}
