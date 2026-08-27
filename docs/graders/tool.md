@@ -35,12 +35,12 @@ Four check kinds are supported:
 
 #### 1. `tool_used`
 
-A named tool must be invoked at least once. Optional `min_calls` and `max_calls` bounds. Use `source` to filter by tool type (skill/mcp/builtin).
+A named tool must be invoked at least once. Optional `min_calls` and `max_calls` bounds. Use `source` to filter by tool type (skill/mcp/builtin). To accept any tool from one MCP server, omit `tool` and set both `source: mcp` and `mcp_server`.
 
 | Field      | Type     | Required | Description                              |
 |------------|----------|----------|------------------------------------------|
 | `kind`     | string   | yes      | Must be `"tool_used"` |
-| `tool`     | string   | yes      | Tool name (skill, plugin, or MCP server name) |
+| `tool`     | string   | conditional | Tool name. Optional only when `source: mcp` and `mcp_server` are set. |
 | `min_calls` | int     | no       | Minimum number of invocations (default: 1 if present is required) |
 | `max_calls` | int     | no       | Maximum number of invocations |
 | `source`   | string   | no       | Filter by tool source: `skill`, `mcp`, or `builtin`. If omitted, matches any source. |
@@ -48,12 +48,12 @@ A named tool must be invoked at least once. Optional `min_calls` and `max_calls`
 
 #### 2. `tool_not_used`
 
-A named tool must NOT be invoked at all. Use `source` to filter by tool type.
+A named tool must NOT be invoked at all. Use `source` to filter by tool type. To forbid every tool from one MCP server, omit `tool` and set both `source: mcp` and `mcp_server`.
 
 | Field      | Type     | Required | Description                              |
 |------------|----------|----------|------------------------------------------|
 | `kind`     | string   | yes      | Must be `"tool_not_used"` |
-| `tool`     | string   | yes      | Tool name (skill, plugin, or MCP server name) |
+| `tool`     | string   | conditional | Tool name. Optional only when `source: mcp` and `mcp_server` are set. |
 | `source`   | string   | no       | Filter by tool source: `skill`, `mcp`, or `builtin`. If omitted, matches any source. |
 | `mcp_server` | string | no       | MCP server name (only meaningful with `source: mcp`). Filters to a specific MCP server. |
 
@@ -111,6 +111,18 @@ graders:
         tool: file_search
         min_calls: 1
         max_calls: 10
+```
+
+### Any tool from an MCP server
+
+```yaml
+graders:
+  - name: Azure MCP Used
+    type: tool
+    checks:
+      - kind: tool_used
+        source: mcp
+        mcp_server: azure
 ```
 
 ### Forbid Dangerous Tools
@@ -228,7 +240,7 @@ Consult your evaluation configuration or skill directory to see available groups
 
 - **All-or-nothing**: Grader passes only if **every** check passes. A single failed check fails the grader.
 - **Call count semantics**: `min_calls` and `max_calls` apply only to `kind: tool_used`. If `min_calls` is not specified for a `tool_used` check, the default is to just verify the tool was used at least once.
-- **Source and mcp_server fields**: These apply only to `tool_used` and `tool_not_used`. Group checks (`any_from_group`, `none_from_group`) do not support source or mcp_server filtering.
+- **Source and mcp_server fields**: These apply only to `tool_used` and `tool_not_used`. Omit `tool` to match any invocation carrying the specified `mcp_server_name`. Group checks (`any_from_group`, `none_from_group`) do not support source or mcp_server filtering.
 - **MCP server validation**: If `mcp_server` is specified, `source` must be set to `mcp`. Specifying `mcp_server` without `source: mcp` will cause a validation error.
 - **Group matching**: Groups are resolved from the tool topology at evaluation time. If a group is not defined, the check will fail with a descriptive error.
 - **Exception handling**: The `except:` list in group checks allows you to exclude specific tools from group validation (e.g., allow "bash" even though it's in the "dangerous_tools" group).
