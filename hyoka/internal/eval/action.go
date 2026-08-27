@@ -60,11 +60,13 @@ func NewActionTimeline() *ActionTimeline {
 
 // classifyEventType maps a SessionEventRecord type string to a higher-level
 // action type for the timeline.
-func classifyEventType(evType, toolName string) (actionType, action string) {
+func classifyEventType(evType, toolName, mcpServer string) (actionType, action string) {
 	switch evType {
 	case "tool.execution_start":
 		action = "start"
 		switch {
+		case mcpServer != "":
+			actionType = "mcp_call"
 		case isFileReadTool(toolName):
 			actionType = "file_read"
 		case isFileWriteTool(toolName):
@@ -77,6 +79,8 @@ func classifyEventType(evType, toolName string) (actionType, action string) {
 	case "tool.execution_complete":
 		action = "complete"
 		switch {
+		case mcpServer != "":
+			actionType = "mcp_call"
 		case isFileReadTool(toolName):
 			actionType = "file_read"
 		case isFileWriteTool(toolName):
@@ -159,7 +163,7 @@ func BuildActionTimeline(records []report.SessionEventRecord) *ActionTimeline {
 
 	turnTracker := 0
 	for i, rec := range records {
-		actionType, action := classifyEventType(rec.Type, rec.ToolName)
+		actionType, action := classifyEventType(rec.Type, rec.ToolName, rec.MCPServerName)
 
 		ev := ActionEvent{
 			Sequence:   i,
