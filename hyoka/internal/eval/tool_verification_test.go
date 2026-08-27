@@ -79,7 +79,7 @@ func TestToolVerifier_SingleKindOnlyFiresOnThatEvent(t *testing.T) {
 	}{
 		{"skills only", []string{"/s/a"}, nil, true, false, true, progress.ToolKindSkill},
 		{"mcp only", nil, map[string]bool{"m1": true}, false, true, true, progress.ToolKindMCP},
-		{"skills only but MCP event fired", []string{"/s/a"}, nil, false, true, false, ""},
+		{"skills only but MCP event fired", []string{"/s/a"}, nil, false, true, true, progress.ToolKindSkill},
 		{"neither configured", nil, nil, true, true, false, ""},
 	}
 	for _, tc := range cases {
@@ -132,9 +132,10 @@ func TestToolVerifier_MissingMCPMarkedFailed(t *testing.T) {
 	}
 }
 
-func TestToolVerifier_MissingSkillMarkedFailed(t *testing.T) {
+func TestToolVerifier_MissingSkillEventDoesNotFailPrevalidatedSkill(t *testing.T) {
 	v := newToolVerifier([]string{"/skills/alpha", "/skills/beta"}, nil)
-	// SDK only reports alpha; beta is missing.
+	// SDK only reports alpha. Beta remains available because it was validated
+	// and supplied before session creation.
 	v.onSkillsLoaded([]string{"alpha"})
 	got := v.emitIfReady()
 	if len(got) != 2 {
@@ -150,8 +151,8 @@ func TestToolVerifier_MissingSkillMarkedFailed(t *testing.T) {
 	if byName["alpha"].Status != progress.ToolStatusLoaded {
 		t.Errorf("alpha should be Loaded, got %+v", byName["alpha"])
 	}
-	if byName["beta"].Status != progress.ToolStatusFailed || byName["beta"].Reason == "" {
-		t.Errorf("beta should be Failed with Reason, got %+v", byName["beta"])
+	if byName["beta"].Status != progress.ToolStatusLoaded {
+		t.Errorf("beta should remain Loaded, got %+v", byName["beta"])
 	}
 }
 
@@ -262,14 +263,14 @@ func TestToolValidationGate_HappyPath(t *testing.T) {
 	}
 }
 
-// TestToolValidationGate_SkillLoadFailure validates that when an expected
-// skill reports as Failed, the validation gate should detect it.
-func TestToolValidationGate_SkillLoadFailure(t *testing.T) {
+// TestToolValidationGate_MissingSkillEvent validates that a missing optional
+// SDK event does not override successful pre-session skill validation.
+func TestToolValidationGate_MissingSkillEvent(t *testing.T) {
 	v := newToolVerifier(
 		[]string{"/skills/generator-skills", "/skills/helper"},
 		nil,
 	)
-	// SDK only reports generator-skills; helper is missing
+	// SDK only reports generator-skills; helper was still prevalidated.
 	v.onSkillsLoaded([]string{"generator-skills"})
 
 	tools := v.emitIfReady()
@@ -277,19 +278,11 @@ func TestToolValidationGate_SkillLoadFailure(t *testing.T) {
 		t.Fatal("expected tools to be emitted")
 	}
 
-	// Verify that the missing skill is marked as failed
-	failures := 0
+	// Both skills remain available.
 	for _, tool := range tools {
-		if tool.ToolName == "helper" && tool.Status == progress.ToolStatusFailed {
-			failures++
-			if tool.Reason == "" {
-				t.Error("failed tool should have a Reason explaining why")
-			}
+		if tool.Status != progress.ToolStatusLoaded {
+			t.Errorf("skill %s should remain loaded, got %+v", tool.ToolName, tool)
 		}
-	}
-
-	if failures == 0 {
-		t.Error("expected helper skill to be marked as failed")
 	}
 }
 
@@ -331,7 +324,8 @@ func TestToolValidationGate_MixedFailure(t *testing.T) {
 		[]string{"/skills/alpha", "/skills/beta", "/skills/gamma"},
 		map[string]bool{"mcp1": true, "mcp2": true},
 	)
-	// SDK reports: alpha loaded, beta missing, gamma loaded, mcp1 missing, mcp2 loaded
+	// SDK reports alpha and gamma, while mcp1 is missing. Beta remains loaded
+	// because skill availability comes from pre-session validation.
 	v.onSkillsLoaded([]string{"alpha", "gamma"})
 	v.onMCPLoaded([]string{"mcp2"})
 
@@ -353,27 +347,27 @@ func TestToolValidationGate_MixedFailure(t *testing.T) {
 	if byName["gamma"].Status != progress.ToolStatusLoaded {
 		t.Errorf("gamma should be loaded, got %+v", byName["gamma"])
 	}
+	if byName["beta"].Status != progress.ToolStatusLoaded {
+		t.Errorf("beta should remain loaded, got %+v", byName["beta"])
+	}
 	if byName["mcp2"].Status != progress.ToolStatusLoaded {
 		t.Errorf("mcp2 should be loaded, got %+v", byName["mcp2"])
 	}
 
 	// Verify failed tools
-	if byName["beta"].Status != progress.ToolStatusFailed {
-		t.Errorf("beta should be failed, got %+v", byName["beta"])
-	}
 	if byName["mcp1"].Status != progress.ToolStatusFailed {
 		t.Errorf("mcp1 should be failed, got %+v", byName["mcp1"])
 	}
 
-	// Count failures (should be 2: beta and mcp1)
+	// Only the missing MCP server fails.
 	failures := 0
 	for _, tool := range tools {
 		if tool.Status == progress.ToolStatusFailed {
 			failures++
 		}
 	}
-	if failures != 2 {
-		t.Errorf("expected 2 failures, got %d", failures)
+	if failures != 1 {
+		t.Errorf("expected 1 failure, got %d", failures)
 	}
 }
 
@@ -461,17 +455,20 @@ func TestToolValidationGate_AllFailures(t *testing.T) {
 		t.Fatal("expected tools to be emitted")
 	}
 
-	// All 4 tools should be marked as failed
+	// Skills remain loaded; both MCP servers fail.
 	if len(tools) != 4 {
 		t.Fatalf("expected 4 tools, got %d", len(tools))
 	}
 
 	for _, tool := range tools {
-		if tool.Status != progress.ToolStatusFailed {
-			t.Errorf("tool %s should be failed, got status=%s", tool.ToolName, tool.Status)
+		if tool.ToolKind == progress.ToolKindSkill {
+			if tool.Status != progress.ToolStatusLoaded {
+				t.Errorf("skill %s should remain loaded, got status=%s", tool.ToolName, tool.Status)
+			}
+			continue
 		}
-		if tool.Reason == "" {
-			t.Errorf("failed tool %s should have a reason", tool.ToolName)
+		if tool.Status != progress.ToolStatusFailed || tool.Reason == "" {
+			t.Errorf("MCP server %s should fail with a reason, got %+v", tool.ToolName, tool)
 		}
 	}
 }
@@ -511,26 +508,18 @@ t.Errorf("expected empty summary when all tools loaded, got %q", got)
 }
 }
 
-// TestPostSessionVerification_FailedSkill asserts a missing skill produces
-// a tool.SummarizeToolLoadErrors-formatted summary so the eval engine can
-// short-circuit to tool_load_failure with the same wording as pre-session.
-func TestPostSessionVerification_FailedSkill(t *testing.T) {
+// TestPostSessionVerification_MissingSkillEvent asserts that an absent
+// SessionSkillsLoaded entry does not fail a prevalidated skill.
+func TestPostSessionVerification_MissingSkillEvent(t *testing.T) {
 v := newToolVerifier(
 []string{"/skills/alpha", "/skills/beta"},
 nil,
 )
-v.onSkillsLoaded([]string{"alpha"}) // beta missing
+v.onSkillsLoaded([]string{"alpha"})
 
 got := postSessionToolVerification(context.Background(), v, 5*time.Second)
-if got == "" {
-t.Fatal("expected non-empty summary for failed skill")
-}
-wantHeader := "1 tool(s) failed to load:"
-if !strings.HasPrefix(got, wantHeader) {
-t.Errorf("summary should start with %q, got: %s", wantHeader, got)
-}
-if !strings.Contains(got, `skill "beta"`) {
-t.Errorf("summary should name the failed skill, got: %s", got)
+if got != "" {
+t.Errorf("missing optional skill event should not fail verification, got: %s", got)
 }
 }
 
@@ -552,33 +541,31 @@ t.Errorf("unexpected header in summary: %s", got)
 }
 }
 
-// TestPostSessionVerification_MixedFailures asserts every failed tool —
-// both skills and MCPs — is listed in the aggregated summary, in
-// (kind, name) sort order matching emitIfReady.
+// TestPostSessionVerification_MixedFailures asserts missing skill telemetry is
+// ignored while missing MCP servers remain fatal.
 func TestPostSessionVerification_MixedFailures(t *testing.T) {
 v := newToolVerifier(
 []string{"/skills/alpha", "/skills/beta"},
 map[string]bool{"mcp1": true, "mcp2": true},
 )
-v.onSkillsLoaded([]string{"alpha"}) // beta failed
+v.onSkillsLoaded([]string{"alpha"})
 v.onMCPLoaded([]string{"mcp2"})     // mcp1 failed
 
 got := postSessionToolVerification(context.Background(), v, 5*time.Second)
-if !strings.HasPrefix(got, "2 tool(s) failed to load:") {
-t.Errorf("expected 2-failure header, got: %s", got)
+if !strings.HasPrefix(got, "1 tool(s) failed to load:") {
+t.Errorf("expected 1-failure header, got: %s", got)
 }
-for _, want := range []string{`skill "beta"`, `mcp "mcp1"`} {
-if !strings.Contains(got, want) {
-t.Errorf("summary missing %q\nfull summary:\n%s", want, got)
+if !strings.Contains(got, `mcp "mcp1"`) {
+t.Errorf("summary missing mcp1\nfull summary:\n%s", got)
 }
+if strings.Contains(got, `skill "beta"`) {
+t.Errorf("summary should not fail prevalidated beta skill\nfull summary:\n%s", got)
 }
 }
 
-// TestPostSessionVerification_TimeoutMarksAllFailed asserts the timeout
-// path treats every configured tool as Failed (no false positives) and
-// the reason is the timeout string. Uses a short timeout to keep the test
-// fast.
-func TestPostSessionVerification_TimeoutMarksAllFailed(t *testing.T) {
+// TestPostSessionVerification_TimeoutFailsOnlyMCP asserts a runtime timeout
+// leaves prevalidated skills loaded and fails only unconfirmed MCP servers.
+func TestPostSessionVerification_TimeoutFailsOnlyMCP(t *testing.T) {
 v := newToolVerifier(
 []string{"/skills/alpha"},
 map[string]bool{"mcp1": true},
@@ -593,13 +580,16 @@ elapsed := time.Since(start)
 if got == "" {
 t.Fatal("expected timeout to produce a failure summary")
 }
-if !strings.HasPrefix(got, "2 tool(s) failed to load:") {
-t.Errorf("timeout should mark every configured tool as failed, got: %s", got)
+if !strings.HasPrefix(got, "1 tool(s) failed to load:") {
+t.Errorf("timeout should fail only the MCP server, got: %s", got)
 }
-for _, want := range []string{`skill "alpha"`, `mcp "mcp1"`, "Session did not reach first turn within"} {
+for _, want := range []string{`mcp "mcp1"`, "Session did not reach first turn within"} {
 if !strings.Contains(got, want) {
 t.Errorf("timeout summary missing %q\nfull summary:\n%s", want, got)
 }
+}
+if strings.Contains(got, `skill "alpha"`) {
+t.Errorf("timeout should not fail prevalidated skill alpha\nfull summary:\n%s", got)
 }
 if elapsed < timeout {
 t.Errorf("gate returned before timeout elapsed: %v < %v", elapsed, timeout)
@@ -621,7 +611,7 @@ func TestPostSessionVerification_FormatMatchesPreSession(t *testing.T) {
 		[]string{"/skills/alpha", "/skills/beta"},
 		map[string]bool{"mcp1": true, "mcp2": true},
 	)
-	v.onSkillsLoaded([]string{"alpha"}) // beta failed
+	v.onSkillsLoaded([]string{"alpha"})
 	v.onMCPLoaded([]string{"mcp2"})     // mcp1 failed
 
 	postSummary := postSessionToolVerification(context.Background(), v, 5*time.Second)
@@ -629,13 +619,9 @@ func TestPostSessionVerification_FormatMatchesPreSession(t *testing.T) {
 		t.Fatal("expected non-empty post-session summary")
 	}
 
-	// Build the equivalent pre-session error list using the same kind names
-	// and the empty Reason that the post-session path emits when the SDK
-	// did not provide a reason. emitIfReady returns entries sorted by
-	// (kind, name): mcp before skill, alpha before beta.
+	// Build the equivalent pre-session error list for the missing MCP server.
 	preErrs := []*tool.ToolLoadError{
 		{Kind: "mcp", Name: "mcp1", Reason: "SDK did not report MCP server as loaded"},
-		{Kind: "skill", Name: "beta", Reason: "SDK did not report skill as loaded"},
 	}
 	preSummary := tool.SummarizeToolLoadErrors(preErrs)
 

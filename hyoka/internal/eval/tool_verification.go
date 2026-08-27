@@ -11,17 +11,17 @@ import (
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/progress"
 )
 
-// toolVerifier accumulates SDK-reported tool loads and emits a deterministic
-// bulk []progress.ToolStatus exactly once per eval, after every configured
-// tool kind has produced its corresponding SDK load event OR the first
-// assistant turn starts (whichever comes first).
+// toolVerifier emits a deterministic bulk []progress.ToolStatus exactly once
+// per eval. Skill directories are validated before session creation, so they
+// are available without requiring the optional SessionSkillsLoaded event.
+// MCP servers still require runtime confirmation from the SDK.
 //
 // Contract (mirrors .squad/decisions.md round-1-2 tool-verification wiring):
 //
 //  1. At-most-once per verifier instance.
-//  2. Emits once both configured kinds have fired (or the single relevant one
-//     if only skills or only MCP are configured), OR when the first assistant
-//     turn starts (which definitively marks tool registration as complete).
+//  2. Emits once configured MCP servers have produced their SDK load event, OR
+//     when the first assistant turn starts. Skill-only configurations can emit
+//     immediately because their directories were prevalidated.
 //  3. Never emits when neither skills nor MCP are configured.
 //  4. Tools sorted by (kind, name) ascending — deterministic for renderers
 //     and snapshot tests.
@@ -34,29 +34,30 @@ import (
 // call under a mutex and only invokes the returned slice's consumer after
 // releasing that mutex.
 type toolVerifier struct {
-	expectedSkills    map[string]bool
-	expectedMCP       map[string]bool
-	loadedSkills      map[string]bool
-	loadedMCP         map[string]bool
-	skillsEvtSeen     bool
-	mcpEvtSeen        bool
-	emitted           bool
-	emittedTools      []progress.ToolStatus // Cached result of first successful emit
-	readyChan         chan struct{}         // Signals when verification is complete
-	turnBeforeSkills  bool          // True if turn started before skills event
-	turnBeforeMCP     bool          // True if turn started before MCP event
+	expectedSkills map[string]bool
+	expectedMCP    map[string]bool
+	loadedSkills   map[string]bool
+	loadedMCP      map[string]bool
+	skillsEvtSeen  bool
+	mcpEvtSeen     bool
+	emitted        bool
+	emittedTools   []progress.ToolStatus // Cached result of first successful emit
+	readyChan      chan struct{}         // Signals when verification is complete
+	turnBeforeMCP  bool                  // True if turn started before MCP event
 }
 
 // newToolVerifier builds a verifier keyed on expected skills (derived from
 // resolved skill directory basenames) and expected MCP server names.
 func newToolVerifier(skillDirs []string, mcpNames map[string]bool) *toolVerifier {
 	sk := make(map[string]bool, len(skillDirs))
+	loadedSkills := make(map[string]bool, len(skillDirs))
 	for _, dir := range skillDirs {
 		name := filepath.Base(dir)
-		if name == "" || name == "." || name == "/" {
+		if name == "" || name == "." || name == "/" || name == `\` {
 			continue
 		}
 		sk[name] = true
+		loadedSkills[name] = true
 	}
 	mc := make(map[string]bool, len(mcpNames))
 	for n := range mcpNames {
@@ -65,16 +66,15 @@ func newToolVerifier(skillDirs []string, mcpNames map[string]bool) *toolVerifier
 	return &toolVerifier{
 		expectedSkills: sk,
 		expectedMCP:    mc,
-		loadedSkills:   make(map[string]bool),
+		loadedSkills:   loadedSkills,
 		loadedMCP:      make(map[string]bool),
+		skillsEvtSeen:  len(sk) > 0,
 		readyChan:      make(chan struct{}),
 	}
 }
 
-// onSkillsLoaded records that the SessionSkillsLoaded SDK event fired and
-// which skill names it reported. Safe to call even when names is empty —
-// the presence of the event alone marks the skill channel as seen so a
-// later emit can proceed.
+// onSkillsLoaded records optional SDK corroboration. SDK v1 does not guarantee
+// that this event fires before the first turn, or at all.
 func (v *toolVerifier) onSkillsLoaded(names []string) {
 	v.skillsEvtSeen = true
 	for _, n := range names {
@@ -91,17 +91,10 @@ func (v *toolVerifier) onMCPLoaded(names []string) {
 	}
 }
 
-// onSessionReady is called when AssistantTurnStart fires — the definitive
-// signal that tool loading is complete. If we haven't seen tool-load events
-// by the time the first turn starts, they will never arrive. This method
-// forces verification to complete so postSessionToolVerification doesn't
-// wait forever for events that will never come.
+// onSessionReady is called when AssistantTurnStart fires. It finalizes MCP
+// verification so postSessionToolVerification does not wait forever for an MCP
+// event that will never arrive. Skill events are optional and do not gate.
 func (v *toolVerifier) onSessionReady() {
-	// Mark which kinds have NOT been seen yet (turn happened before their event)
-	if len(v.expectedSkills) > 0 && !v.skillsEvtSeen {
-		v.turnBeforeSkills = true
-		v.skillsEvtSeen = true // Force as seen so emitIfReady will proceed
-	}
 	if len(v.expectedMCP) > 0 && !v.mcpEvtSeen {
 		v.turnBeforeMCP = true
 		v.mcpEvtSeen = true // Force as seen so emitIfReady will proceed
@@ -134,22 +127,10 @@ func (v *toolVerifier) emitIfReady() []progress.ToolStatus {
 
 	tools := make([]progress.ToolStatus, 0, len(v.expectedSkills)+len(v.expectedMCP))
 	for name := range v.expectedSkills {
-		status := progress.ToolStatusFailed
-		reason := ""
-		if v.loadedSkills[name] {
-			status = progress.ToolStatusLoaded
-		} else {
-			if v.turnBeforeSkills {
-				reason = "Not registered before first turn"
-			} else {
-				reason = "SDK did not report skill as loaded"
-			}
-		}
 		tools = append(tools, progress.ToolStatus{
 			ToolName: name,
 			ToolKind: progress.ToolKindSkill,
-			Status:   status,
-			Reason:   reason,
+			Status:   progress.ToolStatusLoaded,
 		})
 	}
 	for name := range v.expectedMCP {
@@ -188,9 +169,8 @@ func (v *toolVerifier) emitIfReady() []progress.ToolStatus {
 // This is the blocking gate that prevents evals from proceeding with failed tools.
 //
 // The timeout is an ABSOLUTE CEILING (default 5 minutes), not the primary gate.
-// The real completion signal is onSessionReady (fired when AssistantTurnStart
-// happens), which marks tool registration as definitively complete. The timeout
-// only fires when the session is broken (auth hang, network failure, SDK bug).
+// The real completion signal is the MCP load event or onSessionReady. The
+// timeout only fires when a configured MCP server reaches neither signal.
 func waitForToolVerification(ctx context.Context, v *toolVerifier, timeout time.Duration) ([]progress.ToolStatus, error) {
 	// If nothing is configured to verify, return immediately with no error
 	if len(v.expectedSkills) == 0 && len(v.expectedMCP) == 0 {
@@ -216,21 +196,19 @@ func waitForToolVerification(ctx context.Context, v *toolVerifier, timeout time.
 	}
 }
 
-// postSessionToolVerification waits for the SDK to confirm every configured
-// skill / MCP server actually loaded after `session.SendAndWait` returned.
+// postSessionToolVerification waits for the SDK to confirm configured MCP
+// servers after `session.SendAndWait` returned. Skills were validated before
+// session creation and do not depend on SessionSkillsLoaded.
 // Returns a tool.SummarizeToolLoadErrors-formatted summary of any failures
-// (matching the pre-session validation format from Item D), or "" when
-// every configured tool loaded cleanly OR when nothing was configured to
-// verify.
+// (matching the pre-session validation format from Item D), or "" when every
+// configured MCP server loaded cleanly OR when nothing was configured.
 //
 // Timeout semantics (Option A): The timeout is an ABSOLUTE CEILING (default
 // 5 minutes) for broken sessions that never reach first turn (auth hang,
 // network failure). The PRIMARY gate is onSessionReady, which fires when
-// AssistantTurnStart happens and marks tool registration as definitively
-// complete. If the ceiling hits, every configured tool is marked Failed with
-// reason "session did not reach first turn within <timeout>". The point of
-// this gate is to eliminate false-positive evals; we'd rather hard-fail on
-// a hung session than silently grade code that never had its tools.
+// AssistantTurnStart happens and finalizes MCP registration. If the ceiling
+// hits, configured MCP servers are marked Failed while prevalidated skills
+// remain Loaded.
 func postSessionToolVerification(ctx context.Context, v *toolVerifier, timeout time.Duration) string {
 	if v == nil {
 		return ""
@@ -241,15 +219,14 @@ func postSessionToolVerification(ctx context.Context, v *toolVerifier, timeout t
 	// Opportunistic flush: in production the OnEvent handler only calls
 	// emitIfReady when a progressFn is registered, so an eval running
 	// without a progress display would otherwise time out here even when
-	// every SDK event already fired. Calling emitIfReady ourselves closes
-	// readyChan if both kinds have reported.
+	// every required SDK event already fired. Calling emitIfReady ourselves
+	// closes readyChan once MCP verification is ready.
 	tools := v.emitIfReady()
 	if tools == nil {
 		var err error
 		tools, err = waitForToolVerification(ctx, v, timeout)
 		if err != nil {
-			// Timeout — synthesize a Failed entry per configured tool so the
-			// summary names every tool we expected to see and didn't.
+			// Timeout — fail MCP servers that never reached a runtime signal.
 			tools = expectedAsTimeoutFailures(v, timeout)
 		}
 	}
@@ -266,10 +243,8 @@ func postSessionToolVerification(ctx context.Context, v *toolVerifier, timeout t
 	return tool.SummarizeToolLoadErrors(failed)
 }
 
-// expectedAsTimeoutFailures builds the synthetic Failed list used when
-// waitForToolVerification times out. Sort order matches emitIfReady so
-// renderers and snapshot tests see identical ordering across the
-// happy/timeout paths.
+// expectedAsTimeoutFailures builds the synthetic result used when runtime MCP
+// verification times out. Prevalidated skills remain loaded.
 func expectedAsTimeoutFailures(v *toolVerifier, timeout time.Duration) []progress.ToolStatus {
 	reason := fmt.Sprintf("Session did not reach first turn within %s", timeout)
 	tools := make([]progress.ToolStatus, 0, len(v.expectedSkills)+len(v.expectedMCP))
@@ -277,8 +252,7 @@ func expectedAsTimeoutFailures(v *toolVerifier, timeout time.Duration) []progres
 		tools = append(tools, progress.ToolStatus{
 			ToolName: name,
 			ToolKind: progress.ToolKindSkill,
-			Status:   progress.ToolStatusFailed,
-			Reason:   reason,
+			Status:   progress.ToolStatusLoaded,
 		})
 	}
 	for name := range v.expectedMCP {
