@@ -51,6 +51,5 @@ graders:
     weight: 1.0
     checks:
       - kind: tool_used
-        tool: azure
         source: mcp
         mcp_server: azure

@@ -254,41 +254,63 @@ func TestBuildActionTimeline_TruncatesLargeInput(t *testing.T) {
 
 func TestClassifyEventType(t *testing.T) {
 	tests := []struct {
-		evType   string
-		toolName string
-		wantType string
-		wantAct  string
+		evType    string
+		toolName  string
+		mcpServer string
+		wantType  string
+		wantAct   string
 	}{
-		{"tool.execution_start", "view", "file_read", "start"},
-		{"tool.execution_start", "read_file", "file_read", "start"},
-		{"tool.execution_start", "create", "file_write", "start"},
-		{"tool.execution_start", "edit", "file_write", "start"},
-		{"tool.execution_start", "bash", "bash", "start"},
-		{"tool.execution_start", "grep", "tool_call", "start"},
-		{"tool.execution_complete", "view", "file_read", "complete"},
-		{"tool.execution_complete", "bash", "bash", "complete"},
-		{"assistant.turn_start", "", "turn_start", ""},
-		{"assistant.turn_end", "", "turn_end", ""},
-		{"assistant.reasoning", "", "reasoning", ""},
-		{"assistant.message", "", "message", ""},
-		{"external_tool.requested", "mcp-tool", "mcp_call", "start"},
-		{"external_tool.completed", "mcp-tool", "mcp_call", "complete"},
-		{"command.execute", "", "bash", "start"},
-		{"command.completed", "", "bash", "complete"},
-		{"session.error", "", "error", ""},
-		{"session.truncation", "", "truncation", ""},
-		{"session.workspace_file_changed", "", "file_change", ""},
-		{"skill.invoked", "", "skill", ""},
-		{"abort", "", "abort", ""},
-		{"unknown.type", "", "other", ""},
+		{"tool.execution_start", "view", "", "file_read", "start"},
+		{"tool.execution_start", "read_file", "", "file_read", "start"},
+		{"tool.execution_start", "create", "", "file_write", "start"},
+		{"tool.execution_start", "edit", "", "file_write", "start"},
+		{"tool.execution_start", "bash", "", "bash", "start"},
+		{"tool.execution_start", "grep", "", "tool_call", "start"},
+		{"tool.execution_start", "azure-documentation", "azure", "mcp_call", "start"},
+		{"tool.execution_complete", "view", "", "file_read", "complete"},
+		{"tool.execution_complete", "bash", "", "bash", "complete"},
+		{"tool.execution_complete", "azure-documentation", "azure", "mcp_call", "complete"},
+		{"assistant.turn_start", "", "", "turn_start", ""},
+		{"assistant.turn_end", "", "", "turn_end", ""},
+		{"assistant.reasoning", "", "", "reasoning", ""},
+		{"assistant.message", "", "", "message", ""},
+		{"external_tool.requested", "mcp-tool", "", "mcp_call", "start"},
+		{"external_tool.completed", "mcp-tool", "", "mcp_call", "complete"},
+		{"command.execute", "", "", "bash", "start"},
+		{"command.completed", "", "", "bash", "complete"},
+		{"session.error", "", "", "error", ""},
+		{"session.truncation", "", "", "truncation", ""},
+		{"session.workspace_file_changed", "", "", "file_change", ""},
+		{"skill.invoked", "", "", "skill", ""},
+		{"abort", "", "", "abort", ""},
+		{"unknown.type", "", "", "other", ""},
 	}
 
 	for _, tc := range tests {
-		gotType, gotAct := classifyEventType(tc.evType, tc.toolName)
+		gotType, gotAct := classifyEventType(tc.evType, tc.toolName, tc.mcpServer)
 		if gotType != tc.wantType || gotAct != tc.wantAct {
-			t.Errorf("classifyEventType(%q, %q) = (%q, %q), want (%q, %q)",
-				tc.evType, tc.toolName, gotType, gotAct, tc.wantType, tc.wantAct)
+			t.Errorf("classifyEventType(%q, %q, %q) = (%q, %q), want (%q, %q)",
+				tc.evType, tc.toolName, tc.mcpServer, gotType, gotAct, tc.wantType, tc.wantAct)
 		}
+	}
+}
+
+func TestBuildActionTimeline_MCPToolExecutionEvent(t *testing.T) {
+	records := []report.SessionEventRecord{{
+		Type:          "tool.execution_start",
+		ToolName:      "azure-documentation",
+		MCPServerName: "azure",
+	}}
+
+	tl := BuildActionTimeline(records)
+	if tl.Summary.MCPCalls != 1 {
+		t.Fatalf("MCPCalls = %d, want 1", tl.Summary.MCPCalls)
+	}
+	if tl.Summary.ToolCalls != 0 {
+		t.Fatalf("ToolCalls = %d, want 0", tl.Summary.ToolCalls)
+	}
+	if got := tl.Events[0].MCPServer; got != "azure" {
+		t.Errorf("MCPServer = %q, want azure", got)
 	}
 }
 
