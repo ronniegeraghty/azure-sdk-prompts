@@ -383,45 +383,45 @@ func TestToolGraderValidation(t *testing.T) {
 
 func TestToolGraderLegacyKindMigration(t *testing.T) {
 	tests := []struct {
-		name         string
-		kind         string
-		expectError  bool
+		name          string
+		kind          string
+		expectError   bool
 		errorContains string
 	}{
 		{
-			name:         "specific_tool",
-			kind:         "specific_tool",
-			expectError:  true,
+			name:          "specific_tool",
+			kind:          "specific_tool",
+			expectError:   true,
 			errorContains: "tool_used",
 		},
 		{
-			name:         "any_of_group",
-			kind:         "any_of_group",
-			expectError:  true,
+			name:          "any_of_group",
+			kind:          "any_of_group",
+			expectError:   true,
 			errorContains: "any_from_group",
 		},
 		{
-			name:         "group_not_used",
-			kind:         "group_not_used",
-			expectError:  true,
+			name:          "group_not_used",
+			kind:          "group_not_used",
+			expectError:   true,
 			errorContains: "none_from_group",
 		},
 		{
-			name:         "turn_limit",
-			kind:         "turn_limit",
-			expectError:  true,
+			name:          "turn_limit",
+			kind:          "turn_limit",
+			expectError:   true,
 			errorContains: "activity grader",
 		},
 		{
-			name:         "min_calls",
-			kind:         "min_calls",
-			expectError:  true,
+			name:          "min_calls",
+			kind:          "min_calls",
+			expectError:   true,
 			errorContains: "tool_used",
 		},
 		{
-			name:         "max_calls",
-			kind:         "max_calls",
-			expectError:  true,
+			name:          "max_calls",
+			kind:          "max_calls",
+			expectError:   true,
 			errorContains: "tool_used",
 		},
 	}
@@ -504,9 +504,9 @@ func TestToolGraderToolNameGlob(t *testing.T) {
 // Test source field filtering
 func TestToolGraderToolUsedWithSource(t *testing.T) {
 	tests := []struct {
-		name      string
-		rule      ToolCheckRule
-		events    []ActionEvent
+		name       string
+		rule       ToolCheckRule
+		events     []ActionEvent
 		shouldPass bool
 	}{
 		{
@@ -595,9 +595,9 @@ func TestToolGraderToolUsedWithSource(t *testing.T) {
 // Test mcp_server field filtering
 func TestToolGraderToolUsedWithMCPServer(t *testing.T) {
 	tests := []struct {
-		name      string
-		rule      ToolCheckRule
-		events    []ActionEvent
+		name       string
+		rule       ToolCheckRule
+		events     []ActionEvent
 		shouldPass bool
 	}{
 		{
@@ -660,12 +660,69 @@ func TestToolGraderToolUsedWithMCPServer(t *testing.T) {
 	}
 }
 
+func TestToolGraderMCPServerWideCheck(t *testing.T) {
+	tests := []struct {
+		name       string
+		rule       ToolCheckRule
+		events     []ActionEvent
+		shouldPass bool
+	}{
+		{
+			name: "matches any tool from server",
+			rule: ToolCheckRule{Kind: "tool_used", Source: "mcp", MCPServer: "azure"},
+			events: []ActionEvent{
+				{Type: "tool_call", Tool: "azure-documentation", MCPServer: "azure"},
+			},
+			shouldPass: true,
+		},
+		{
+			name: "rejects a different server",
+			rule: ToolCheckRule{Kind: "tool_used", Source: "mcp", MCPServer: "azure"},
+			events: []ActionEvent{
+				{Type: "mcp_call", Tool: "github-search", MCPServer: "github"},
+			},
+			shouldPass: false,
+		},
+		{
+			name: "tool_not_used fails for any tool from server",
+			rule: ToolCheckRule{Kind: "tool_not_used", Source: "mcp", MCPServer: "azure"},
+			events: []ActionEvent{
+				{Type: "mcp_call", Tool: "azure-documentation", MCPServer: "azure"},
+			},
+			shouldPass: false,
+		},
+		{
+			name:       "tool_not_used passes when server is absent",
+			rule:       ToolCheckRule{Kind: "tool_not_used", Source: "mcp", MCPServer: "azure"},
+			events:     []ActionEvent{{Type: "bash", Tool: "bash"}},
+			shouldPass: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g, err := NewToolGrader("test", &ToolConfig{Checks: []ToolCheckRule{tt.rule}})
+			if err != nil {
+				t.Fatalf("NewToolGrader: %v", err)
+			}
+
+			res, err := g.Grade(context.Background(), GraderInput{ActionLog: tt.events})
+			if err != nil {
+				t.Fatalf("Grade: %v", err)
+			}
+			if got := res.Checks[0].Pass; got != tt.shouldPass {
+				t.Errorf("Pass = %v, want %v; message: %s", got, tt.shouldPass, res.Checks[0].Message)
+			}
+		})
+	}
+}
+
 // Test tool_not_used with source filtering
 func TestToolGraderToolNotUsedWithSource(t *testing.T) {
 	tests := []struct {
-		name      string
-		rule      ToolCheckRule
-		events    []ActionEvent
+		name       string
+		rule       ToolCheckRule
+		events     []ActionEvent
 		shouldPass bool
 	}{
 		{
@@ -722,9 +779,9 @@ func TestToolGraderToolNotUsedWithSource(t *testing.T) {
 // Test source validation
 func TestToolGraderSourceValidation(t *testing.T) {
 	tests := []struct {
-		name        string
-		rule        ToolCheckRule
-		expectError bool
+		name          string
+		rule          ToolCheckRule
+		expectError   bool
 		errorContains string
 	}{
 		{
@@ -743,21 +800,21 @@ func TestToolGraderSourceValidation(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "invalid source",
-			rule:        ToolCheckRule{Kind: "tool_used", Tool: "auth", Source: "invalid"},
-			expectError: true,
+			name:          "invalid source",
+			rule:          ToolCheckRule{Kind: "tool_used", Tool: "auth", Source: "invalid"},
+			expectError:   true,
 			errorContains: "source must be one of: skill, mcp, builtin",
 		},
 		{
-			name:        "mcp_server without source",
-			rule:        ToolCheckRule{Kind: "tool_used", Tool: "auth", MCPServer: "azure-mcp"},
-			expectError: true,
+			name:          "mcp_server without source",
+			rule:          ToolCheckRule{Kind: "tool_used", Tool: "auth", MCPServer: "azure-mcp"},
+			expectError:   true,
 			errorContains: "mcp_server requires source=mcp",
 		},
 		{
-			name:        "mcp_server with source=skill",
-			rule:        ToolCheckRule{Kind: "tool_used", Tool: "auth", Source: "skill", MCPServer: "azure-mcp"},
-			expectError: true,
+			name:          "mcp_server with source=skill",
+			rule:          ToolCheckRule{Kind: "tool_used", Tool: "auth", Source: "skill", MCPServer: "azure-mcp"},
+			expectError:   true,
 			errorContains: "mcp_server requires source=mcp",
 		},
 		{
@@ -765,13 +822,24 @@ func TestToolGraderSourceValidation(t *testing.T) {
 			rule:        ToolCheckRule{Kind: "tool_used", Tool: "auth", Source: "mcp", MCPServer: "azure-mcp"},
 			expectError: false,
 		},
+		{
+			name:        "valid server-wide MCP check",
+			rule:        ToolCheckRule{Kind: "tool_used", Source: "mcp", MCPServer: "azure-mcp"},
+			expectError: false,
+		},
+		{
+			name:          "missing tool and mcp_server",
+			rule:          ToolCheckRule{Kind: "tool_used", Source: "mcp"},
+			expectError:   true,
+			errorContains: "requires 'tool' or source=mcp with 'mcp_server'",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &ToolConfig{Checks: []ToolCheckRule{tt.rule}}
 			_, err := NewToolGrader("test", cfg)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error, got none")

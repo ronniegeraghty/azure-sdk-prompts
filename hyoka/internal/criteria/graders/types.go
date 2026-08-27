@@ -24,9 +24,9 @@ const (
 	KindProgram      = "program"
 	KindPrompt       = "prompt"
 	KindPromptReview = "prompt_review"
-	KindTool         = "tool"       // Canonical tool-perspective grader
-	KindWorkspace    = "workspace"  // Canonical workspace-delta grader
-	KindActivity     = "activity"   // Canonical session-activity grader
+	KindTool         = "tool"      // Canonical tool-perspective grader
+	KindWorkspace    = "workspace" // Canonical workspace-delta grader
+	KindActivity     = "activity"  // Canonical session-activity grader
 )
 
 // validKinds is the set of recognized grader kind values.
@@ -50,12 +50,12 @@ type GraderConfig struct {
 	Name   string    `yaml:"name" json:"name"`
 	Config yaml.Node `yaml:"config" json:"config"`
 	Weight float64   `yaml:"weight,omitempty" json:"weight,omitempty"`
-	
+
 	// Deprecated: Gate semantics are no longer enforced. All graders run and contribute
 	// their score to the weighted aggregate. Use the consolidated 'tool' grader's check
 	// kinds or separate explicit graders to express pass/fail requirements instead.
-	Gate   bool      `yaml:"gate,omitempty" json:"gate,omitempty"`
-	When   WhenMap   `yaml:"when,omitempty" json:"when,omitempty"`
+	Gate bool    `yaml:"gate,omitempty" json:"gate,omitempty"`
+	When WhenMap `yaml:"when,omitempty" json:"when,omitempty"`
 }
 
 // WhenMap holds property-based applicability conditions.
@@ -90,9 +90,9 @@ type ProgramConfig struct {
 
 // ProgramCheck defines a single command check within a program grader.
 type ProgramCheck struct {
-	Kind    string   `yaml:"kind" json:"kind"`                       // "command" (only supported kind)
-	Command string   `yaml:"command" json:"command"`                 // Command to run
-	Args    []string `yaml:"args,omitempty" json:"args,omitempty"`   // Command arguments
+	Kind    string   `yaml:"kind" json:"kind"`                           // "command" (only supported kind)
+	Command string   `yaml:"command" json:"command"`                     // Command to run
+	Args    []string `yaml:"args,omitempty" json:"args,omitempty"`       // Command arguments
 	Timeout int      `yaml:"timeout,omitempty" json:"timeout,omitempty"` // Timeout in seconds (default: 30)
 }
 
@@ -177,10 +177,10 @@ type WorkspaceConfig struct {
 
 // WorkspaceCheck defines a single check within a workspace grader.
 type WorkspaceCheck struct {
-	Kind     string   `yaml:"kind" json:"kind"`               // One of: require_to_create, forbidden_to_create, required_to_update, required_to_delete, forbidden_to_delete, file
-	Files    []string `yaml:"files,omitempty" json:"files,omitempty"` // For kinds other than "file"
-	Name     string   `yaml:"name,omitempty" json:"name,omitempty"`   // For kind: file
-	State    string   `yaml:"state,omitempty" json:"state,omitempty"` // For kind: file; "present" or "absent"
+	Kind     string   `yaml:"kind" json:"kind"`                               // One of: require_to_create, forbidden_to_create, required_to_update, required_to_delete, forbidden_to_delete, file
+	Files    []string `yaml:"files,omitempty" json:"files,omitempty"`         // For kinds other than "file"
+	Name     string   `yaml:"name,omitempty" json:"name,omitempty"`           // For kind: file
+	State    string   `yaml:"state,omitempty" json:"state,omitempty"`         // For kind: file; "present" or "absent"
 	MinBytes *int64   `yaml:"min_bytes,omitempty" json:"min_bytes,omitempty"` // For kind: file, state: present
 	MaxBytes *int64   `yaml:"max_bytes,omitempty" json:"max_bytes,omitempty"` // For kind: file, state: present
 	Contains string   `yaml:"contains,omitempty" json:"contains,omitempty"`   // For kind: file, state: present
@@ -196,12 +196,12 @@ type ToolConfig struct {
 // ToolCheckRule defines one check within a ToolConfig. See tool_grader.go for semantics.
 type ToolCheckRule struct {
 	Kind      string   `yaml:"kind" json:"kind"`
-	Tool      string   `yaml:"tool,omitempty" json:"tool,omitempty"`           // For tool_used, tool_not_used
-	Group     string   `yaml:"group,omitempty" json:"group,omitempty"`         // For any_from_group, none_from_group
-	Except    []string `yaml:"except,omitempty" json:"except,omitempty"`       // Optional exclusion list for group checks
-	MinCalls  *int     `yaml:"min_calls,omitempty" json:"min_calls,omitempty"` // Optional for tool_used
-	MaxCalls  *int     `yaml:"max_calls,omitempty" json:"max_calls,omitempty"` // Optional for tool_used
-	Source    string   `yaml:"source,omitempty" json:"source,omitempty"`       // Optional: skill|mcp|builtin (filters by event.Type)
+	Tool      string   `yaml:"tool,omitempty" json:"tool,omitempty"`             // For tool_used, tool_not_used; optional for an MCP server-wide check
+	Group     string   `yaml:"group,omitempty" json:"group,omitempty"`           // For any_from_group, none_from_group
+	Except    []string `yaml:"except,omitempty" json:"except,omitempty"`         // Optional exclusion list for group checks
+	MinCalls  *int     `yaml:"min_calls,omitempty" json:"min_calls,omitempty"`   // Optional for tool_used
+	MaxCalls  *int     `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`   // Optional for tool_used
+	Source    string   `yaml:"source,omitempty" json:"source,omitempty"`         // Optional: skill|mcp|builtin (filters by event.Type)
 	MCPServer string   `yaml:"mcp_server,omitempty" json:"mcp_server,omitempty"` // Optional: MCP server name (requires source=mcp)
 }
 
