@@ -17,7 +17,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: dotnet-azure-skills/azure
+  - name: dotnet-azure-skills/azure-skill-mcp
     description: ".NET with Azure MCP and general Azure skills"
     generator:
       model: "gpt-5.6-sol"
@@ -43,7 +43,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: dotnet-azure-skills/azure-with-sdk
+  - name: dotnet-azure-skills/azure-skill-mcp-microsoft-skill
     description: ".NET with Azure MCP, general Azure skills, and .NET SDK skills"
     generator:
       model: "gpt-5.6-sol"

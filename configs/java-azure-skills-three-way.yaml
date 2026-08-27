@@ -17,7 +17,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: java-azure-skills/azure
+  - name: java-azure-skills/azure-skill-mcp
     description: "Java with Azure MCP and general Azure skills"
     generator:
       model: "gpt-5.6-sol"
@@ -43,7 +43,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: java-azure-skills/azure-with-sdk
+  - name: java-azure-skills/azure-skill-mcp-microsoft-skill
     description: "Java with Azure MCP, general Azure skills, and Java SDK skills"
     generator:
       model: "gpt-5.6-sol"

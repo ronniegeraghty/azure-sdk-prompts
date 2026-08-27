@@ -17,7 +17,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: js-ts-azure-skills/azure
+  - name: js-ts-azure-skills/azure-skill-mcp
     description: "JavaScript/TypeScript with Azure MCP and general Azure skills"
     generator:
       model: "gpt-5.6-sol"
@@ -43,7 +43,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: js-ts-azure-skills/azure-with-sdk
+  - name: js-ts-azure-skills/azure-skill-mcp-microsoft-skill
     description: "JavaScript/TypeScript with Azure MCP, general Azure skills, and TypeScript SDK skills"
     generator:
       model: "gpt-5.6-sol"

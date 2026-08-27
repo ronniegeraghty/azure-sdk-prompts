@@ -17,7 +17,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: python-azure-skills/azure
+  - name: python-azure-skills/azure-skill-mcp
     description: "Python with Azure MCP and general Azure skills"
     generator:
       model: "gpt-5.6-sol"
@@ -43,7 +43,7 @@ configs:
     limits:
       max_turns: 100
 
-  - name: python-azure-skills/azure-with-sdk
+  - name: python-azure-skills/azure-skill-mcp-microsoft-skill
     description: "Python with Azure MCP, general Azure skills, and Python SDK skills"
     generator:
       model: "gpt-5.6-sol"
