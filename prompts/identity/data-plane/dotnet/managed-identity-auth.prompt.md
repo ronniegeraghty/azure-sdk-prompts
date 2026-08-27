@@ -23,12 +23,13 @@ tags:
 
 ## Prompt
 
-Show me how to use
-Managed Identity to authenticate Azure SDK clients in C#. Cover:
-1. System-assigned vs user-assigned managed identity differences
-2. How to create a ManagedIdentityCredential for each type
-3. Using it with an Azure SDK client (e.g., KeyVaultClient or BlobServiceClient)
-4. How to test locally when managed identity isn't available
+I'm deploying my app to Azure and want to stop using connection strings
+for authentication. How do I switch to managed identity for my Azure SDK
+clients in .NET? I need to know:
+1. System-assigned vs user-assigned managed identity — which should I pick?
+2. How to create a credential for each type
+3. Using the credential with Azure SDK clients
+4. How to test locally when managed identity isn't available — what's the fallback?
 5. Common pitfalls and error handling
 
 Provide examples for both system-assigned and user-assigned identity.
@@ -36,12 +37,11 @@ Provide examples for both system-assigned and user-assigned identity.
 ## Evaluation Criteria
 
 The generated code should include:
-- `ManagedIdentityCredential` class and constructors
-- System-assigned: no parameters needed
-- User-assigned: passing the client ID
-- Integration with `DefaultAzureCredential` (managed identity in the chain)
-- `CredentialUnavailableException` when not running in Azure
-- Combining with `ChainedTokenCredential` for local fallback
+- Uses managed identity credentials (system-assigned and user-assigned)
+- Passes the client ID for user-assigned identity
+- Integrates with DefaultAzureCredential (managed identity in the chain)
+- Handles the case where managed identity is unavailable (local dev fallback)
+- Handles credential-unavailable errors appropriately
 
 ## Context
 

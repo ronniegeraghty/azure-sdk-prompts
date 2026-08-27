@@ -23,24 +23,24 @@ tags:
 
 ## Prompt
 
-Write a C# console application that performs
-all four CRUD operations on Azure Key Vault secrets:
-1. Create a new secret called "my-secret" with value "my-secret-value"
-2. Read the secret back and print its value
-3. Update the secret to a new value "updated-value"
-4. Delete the secret and purge it (soft-delete enabled vault)
+I need to rotate a secret in Azure Key Vault — set a new value for an
+existing secret and then purge the old deleted version. How do I do the full
+lifecycle in .NET?
+1. Create a secret with an initial value
+2. Read it back and print its value
+3. Update it to a new value
+4. Delete the old secret and purge it (soft-delete enabled vault)
 
-Use DefaultAzureCredential for authentication. Include proper error handling
-and show required NuGet packages.
+Authenticate securely using identity-based credentials. Include proper
+error handling.
 
 ## Evaluation Criteria
 
 The generated code should include:
-- Installing `Azure.Security.KeyVault.Secrets` and `Azure.Identity` NuGet packages
-- Creating a `SecretClient` with vault URI and credential
-- `SetSecret()`, `GetSecret()`, `StartDeleteSecret()`, `PurgeDeletedSecret()`
-- Handling soft-delete (polling `DeleteSecretOperation` to completion before purge)
-- Exception handling for `RequestFailedException`
+- Creates a secret client with identity-based authentication
+- Creates, reads, and updates secrets
+- Handles soft-delete by waiting for deletion to complete before purging
+- Handles errors appropriately
 
 ## Context
 

@@ -24,27 +24,17 @@ tags:
 
 ## Prompt
 
-How do I perform batch operations on Azure Blob Storage in .NET?
-I have a container with thousands of blobs and need to:
-1. Bulk delete 500 blobs in a single batched HTTP request
-2. Bulk set the access tier of 200 blobs from Hot to Cool
-3. Handle partial failures where some operations in the batch succeed and others fail
-4. Understand the limits — max operations per batch and size restrictions
-
-Show me how to use BlobBatchClient to submit batch requests with
-the Azure.Storage.Blobs.Batch package. Include proper error handling
-for partial batch failures.
+I have a container with about 500 old blobs I need to delete in one shot
+instead of deleting them one at a time. How do I perform bulk blob operations
+in a single HTTP request in .NET? I also need to handle partial failures
+where some operations succeed and others fail.
 
 ## Evaluation Criteria
 
-- `BlobBatchClient` from `Azure.Storage.Blobs.Batch` package
-- `BlobBatchClient.DeleteBlobsAsync()` for bulk delete
-- `BlobBatchClient.SetBlobsAccessTierAsync()` for bulk tier changes
-- Custom batch via `BlobBatchClient.CreateBatch()` and `SubmitBatchAsync()`
-- Batch size limits (256 operations per batch)
-- Partial failure handling: `AggregateException` with per-operation status
-- `RequestFailedException` for individual operation failures within a batch
-- Authentication scopes for batch operations
+- Performs bulk blob operations (delete or tier change) in batched requests
+- Handles batch size limits
+- Handles partial failures where individual operations fail within a batch
+- Uses the appropriate batch SDK package
 
 ## Context
 

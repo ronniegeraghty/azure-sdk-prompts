@@ -24,27 +24,24 @@ tags:
 
 ## Prompt
 
-Write a C# program that manages
-Azure Resource Groups using the management plane SDK:
-1. Authenticate using DefaultAzureCredential
-2. Create a new resource group in "eastus" region
+I'm setting up automation to create and manage resource groups using the
+modern Azure management SDK in .NET. How do I:
+1. Authenticate securely and get an ARM client
+2. Create a new resource group in a specific region
 3. List all resource groups in the subscription
-4. Get details of the created resource group
-5. Add a tag to the resource group
-6. Delete the resource group
+4. Add tags to the resource group
+5. Delete the resource group when done
 
-Show required NuGet packages and proper error handling.
-Use the Azure.ResourceManager SDK (not the older Microsoft.Azure.Management packages).
+Include proper error handling.
 
 ## Evaluation Criteria
 
 The generated code should include:
-- `Azure.ResourceManager` NuGet package
-- `ArmClient` creation with `DefaultAzureCredential`
-- `GetDefaultSubscription()` and `GetResourceGroups()` collection
-- `CreateOrUpdate()`, `Get()`, `GetAll()` operations
-- Tag management with `SetTags()` or `AddTag()`
-- `Delete()` with `WaitForCompletion()`
+- Uses the modern track 2 Azure Resource Manager SDK
+- Authenticates with identity-based credentials
+- Creates, lists, gets, and deletes resource groups
+- Manages tags on resource groups
+- Waits for deletion to complete
 
 ## Context
 

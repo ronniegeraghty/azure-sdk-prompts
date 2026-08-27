@@ -25,28 +25,23 @@ tags:
 
 ## Prompt
 
-Write a C# program that creates
-an Azure Key Vault using the management plane SDK and handles the long-running
-operation:
-1. Authenticate using DefaultAzureCredential
-2. Create a Key Vault with RBAC authorization enabled in "eastus"
+I need to create a Key Vault with RBAC authorization and purge protection
+using the management SDK, and wait for the operation to complete. How do I
+do this in .NET?
+1. Authenticate securely using identity-based credentials
+2. Create a Key Vault with RBAC authorization enabled
 3. Configure soft-delete and purge protection
-4. Wait for the vault creation to complete using the ArmOperation pattern
-5. Verify the vault is accessible by creating a SecretClient pointing to it
+4. Wait for the vault creation to complete
 
-Use Azure.ResourceManager.KeyVault. Show required NuGet packages and how
-to set access policies or RBAC roles during creation.
+Explain the difference between RBAC and access-policy authorization models.
 
 ## Evaluation Criteria
 
-- `KeyVaultCollection.CreateOrUpdateAsync()` returning `ArmOperation<KeyVaultResource>`
-- `KeyVaultCreateOrUpdateContent` with `KeyVaultProperties`
-- Configuring `EnableRbacAuthorization`, `EnableSoftDelete`, `EnablePurgeProtection`
-- `VaultAccessPolicy` vs RBAC authorization model
-- `ArmOperation<T>.WaitForCompletionAsync()` for completion
-- `WaitUntil.Completed` vs `WaitUntil.Started`
-- Tenant ID and object ID configuration
-- Error handling for existing vaults and soft-deleted vaults
+- Creates a Key Vault using the management SDK with RBAC authorization
+- Configures soft-delete and purge protection at creation time
+- Waits for the long-running operation to complete
+- Explains RBAC vs access-policy authorization
+- Handles errors for existing vaults and soft-deleted vaults
 
 ## Context
 

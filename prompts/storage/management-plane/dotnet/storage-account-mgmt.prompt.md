@@ -23,28 +23,22 @@ tags:
 
 ## Prompt
 
-Write a C# program that manages
-Azure Storage Accounts using the management plane SDK:
-1. Authenticate using DefaultAzureCredential
-2. Create a new Storage Account with Standard_LRS SKU in "eastus"
-3. List all Storage Accounts in a resource group
-4. Get the properties of the created Storage Account
-5. Update the account to enable blob versioning
-6. Delete the Storage Account
-
-Show required NuGet packages and proper error handling.
-Use the Azure.ResourceManager.Storage SDK.
+I need to create a storage account programmatically and then modify
+its configuration using the Azure management SDK in .NET. How do I:
+1. Authenticate and navigate the resource hierarchy
+2. Create a storage account with specific SKU and region
+3. Enable features like blob versioning after creation
+4. List and manage storage accounts
 
 ## Evaluation Criteria
 
 The generated code should include:
-- `Azure.ResourceManager.Storage` NuGet package
-- `ArmClient` and subscription/resource group navigation
-- `StorageAccountCollection.CreateOrUpdate()` with `StorageAccountCreateOrUpdateContent`
-- SKU and kind configuration (`StorageSku`, `StorageKind`)
-- Listing and getting storage accounts
-- Updating properties via `StorageAccountPatch`
-- Delete operation
+- Uses the modern track 2 Azure Resource Manager Storage SDK
+- Authenticates with identity-based credentials
+- Creates a storage account with SKU and kind configuration
+- Lists and retrieves storage accounts
+- Updates properties after creation
+- Handles deletion
 
 ## Context
 

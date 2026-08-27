@@ -24,29 +24,22 @@ tags:
 
 ## Prompt
 
-Write a C# program that demonstrates
-messaging with Azure Service Bus:
-1. Create a ServiceBusClient using a connection string
-2. Create a ServiceBusSender for a queue and send a single message
-3. Send a batch of 5 messages using ServiceBusMessageBatch
-4. Create a ServiceBusReceiver and receive messages using ReceiveMessagesAsync
-5. Complete a message after processing with CompleteMessageAsync
-6. Create a ServiceBusProcessor for continuous processing with handlers
-7. Demonstrate sending to a topic and receiving from a subscription
-
-Show required NuGet packages and proper disposal with await using.
+How do I send and receive messages from an Azure Service Bus queue in .NET?
+I need to:
+1. Connect to Service Bus securely
+2. Send a single message and a batch of messages to a queue
+3. Receive and acknowledge messages
+4. Set up continuous message processing with error handling
+5. Ensure proper resource cleanup
 
 ## Evaluation Criteria
 
 The generated code should include:
-- `Azure.Messaging.ServiceBus` NuGet package
-- `ServiceBusClient` creation with connection string or `DefaultAzureCredential`
-- `ServiceBusSender` and `ServiceBusMessage` for sending
-- `ServiceBusMessageBatch` and `TryAddMessage()`
-- `ServiceBusReceiver` and `ReceiveMessagesAsync()`
-- `CompleteMessageAsync()`, `AbandonMessageAsync()`, `DeadLetterMessageAsync()`
-- `ServiceBusProcessor` with `ProcessMessageAsync` and `ProcessErrorAsync`
-- Topic/subscription with `CreateSender(topicName)` and `CreateReceiver(topicName, subscriptionName)`
+- Connects to Service Bus with identity-based authentication or connection string
+- Sends individual and batched messages with size validation
+- Receives messages and acknowledges them after processing
+- Supports continuous processing via a processor or handler pattern
+- Handles processing errors and properly disposes of clients
 
 ## Context
 
