@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	copilot "github.com/github/copilot-sdk/go"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotevent"
 )
 
 // eventCollector accumulates assistant messages and review events from
@@ -19,6 +20,7 @@ type eventCollector struct {
 	maxActions       int
 	model            string
 	cancel           func()
+	toolTracker      copilotevent.ToolTracker
 }
 
 func newEventCollector(model string, maxActions int, cancel func()) *eventCollector {
@@ -33,9 +35,11 @@ func newEventCollector(model string, maxActions int, cancel func()) *eventCollec
 func (c *eventCollector) handleEvent(event copilot.SessionEvent) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	details := copilotevent.Extract(event)
+	c.toolTracker.Enrich(event, &details)
 
 	// Count actions and enforce limit
-	switch event.Type {
+	switch event.Type() {
 	case copilot.SessionEventTypeAssistantReasoning,
 		copilot.SessionEventTypeAssistantMessage,
 		copilot.SessionEventTypeToolExecutionStart:
@@ -49,63 +53,63 @@ func (c *eventCollector) handleEvent(event copilot.SessionEvent) {
 	}
 
 	// Log review events at debug level for visibility during runs.
-	switch event.Type {
+	switch event.Type() {
 	case copilot.SessionEventTypeAssistantTurnStart:
 		slog.Debug("Review turn started", "model", c.model)
 	case copilot.SessionEventTypeAssistantTurnEnd:
 		slog.Debug("Review turn ended", "model", c.model)
 	case copilot.SessionEventTypeAssistantMessage:
-		if event.Data.Content != nil {
+		if details.Content != nil {
 			slog.Debug("Review assistant message", "model", c.model,
-				"content_len", len(*event.Data.Content))
+				"content_len", len(*details.Content))
 		}
 	case copilot.SessionEventTypeToolExecutionStart:
 		toolName := ""
-		if event.Data.ToolName != nil {
-			toolName = *event.Data.ToolName
+		if details.ToolName != nil {
+			toolName = *details.ToolName
 		}
 		slog.Debug("Review tool start", "model", c.model, "tool", toolName)
 	case copilot.SessionEventTypeToolExecutionComplete:
 		toolName := ""
-		if event.Data.ToolName != nil {
-			toolName = *event.Data.ToolName
+		if details.ToolName != nil {
+			toolName = *details.ToolName
 		}
 		slog.Debug("Review tool complete", "model", c.model, "tool", toolName)
 	case copilot.SessionEventTypeAssistantUsage:
 		slog.Debug("Review token usage", "model", c.model)
 	}
 
-	if event.Type == copilot.SessionEventTypeAssistantMessage && event.Data.Content != nil {
-		c.assistantContent += *event.Data.Content
+	if event.Type() == copilot.SessionEventTypeAssistantMessage && details.Content != nil {
+		c.assistantContent += *details.Content
 	}
 
 	// Capture all events for the report timeline
-	evt := ReviewEvent{Type: string(event.Type)}
-	if event.Data.ToolName != nil {
-		evt.ToolName = *event.Data.ToolName
+	evt := ReviewEvent{Type: string(event.Type())}
+	if details.ToolName != nil {
+		evt.ToolName = *details.ToolName
 	}
-	if event.Data.Content != nil {
-		evt.Content = *event.Data.Content
+	if details.Content != nil {
+		evt.Content = *details.Content
 	}
-	if event.Data.Arguments != nil {
-		if argsBytes, err := json.Marshal(event.Data.Arguments); err == nil {
+	if details.Arguments != nil {
+		if argsBytes, err := json.Marshal(details.Arguments); err == nil {
 			evt.ToolArgs = string(argsBytes)
 		}
 	}
-	if event.Data.Result != nil {
-		if event.Data.Result.Content != nil {
-			evt.Result = *event.Data.Result.Content
+	if details.Result != nil {
+		if details.Result.Content != nil {
+			evt.Result = *details.Result.Content
 		}
 	}
-	if event.Data.Error != nil {
-		if event.Data.Error.ErrorClass != nil {
-			evt.Error = event.Data.Error.ErrorClass.Message
-		} else if event.Data.Error.String != nil {
-			evt.Error = *event.Data.Error.String
+	if details.Error != nil {
+		if details.Error.ErrorClass != nil {
+			evt.Error = details.Error.ErrorClass.Message
+		} else if details.Error.String != nil {
+			evt.Error = *details.Error.String
 		}
 	}
-	if event.Data.Duration != nil {
-		evt.Duration = *event.Data.Duration
+	if details.Duration != nil {
+		evt.Duration = *details.Duration
 	}
 	c.events = append(c.events, evt)
 }
@@ -118,4 +122,3 @@ func (c *eventCollector) response() (string, []ReviewEvent) {
 	copy(events, c.events)
 	return c.assistantContent, events
 }
-

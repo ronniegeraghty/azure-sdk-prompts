@@ -14,6 +14,7 @@ import (
 	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotevent"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotperm"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/logging"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/pidfile"
@@ -90,7 +91,7 @@ func NewCopilotPromptRunner(opts PromptRunnerOptions) *CopilotPromptRunner {
 		clientOpts.GitHubToken = opts.GitHubToken
 	}
 	if opts.CLIPath != "" {
-		clientOpts.CLIPath = opts.CLIPath
+		clientOpts.Connection = copilot.StdioConnection{Path: opts.CLIPath}
 	}
 	return &CopilotPromptRunner{
 		clientOpts:        clientOpts,
@@ -151,7 +152,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 
 	// Create Copilot client
 	opts := *e.clientOpts
-	opts.Cwd = workDir
+	opts.WorkingDirectory = workDir
 	// Enrich env with prompt/config metadata for this specific eval (#70).
 	opts.Env = process.HyokaEvalEnv(p.ID, cfg.Name)
 	client := copilot.NewClient(&opts)
@@ -228,6 +229,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	var events []copilot.SessionEvent
 	var sessionRecords []report.SessionEventRecord
 	var mu sync.Mutex
+	var toolTracker copilotevent.ToolTracker
 	debugPrefix := p.ID + "/" + cfg.Name
 	// Structured logger for this eval session (#42)
 	lg := logging.EvalLogger(p.ID, cfg.Name, "generation", 0)
@@ -287,55 +289,57 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	sessionCfg.OnEvent = func(event copilot.SessionEvent) {
 		mu.Lock()
 		events = append(events, event)
+		details := copilotevent.Extract(event)
+		toolTracker.Enrich(event, &details)
 		var verifiedTools []progress.ToolStatus
 
 		// Build serializable event record
 		rec := report.SessionEventRecord{
-			Type: string(event.Type),
+			Type: string(event.Type()),
 		}
-		if event.Data.ToolName != nil {
-			rec.ToolName = *event.Data.ToolName
+		if details.ToolName != nil {
+			rec.ToolName = *details.ToolName
 		}
-		if event.Data.Content != nil {
-			rec.Content = *event.Data.Content
+		if details.Content != nil {
+			rec.Content = *details.Content
 		}
-		if event.Data.Arguments != nil {
-			if argsBytes, err := json.Marshal(event.Data.Arguments); err == nil {
+		if details.Arguments != nil {
+			if argsBytes, err := json.Marshal(details.Arguments); err == nil {
 				rec.ToolArgs = string(argsBytes)
 			}
 		}
-		if event.Data.Result != nil {
-			if event.Data.Result.DetailedContent != nil {
-				rec.ToolResult = *event.Data.Result.DetailedContent
-			} else if event.Data.Result.Content != nil {
-				rec.ToolResult = *event.Data.Result.Content
+		if details.Result != nil {
+			if details.Result.DetailedContent != nil {
+				rec.ToolResult = *details.Result.DetailedContent
+			} else if details.Result.Content != nil {
+				rec.ToolResult = *details.Result.Content
 			}
 		}
-		if event.Data.Error != nil {
-			if event.Data.Error.ErrorClass != nil {
-				rec.Error = event.Data.Error.ErrorClass.Message
-			} else if event.Data.Error.String != nil {
-				rec.Error = *event.Data.Error.String
+		if details.Error != nil {
+			if details.Error.ErrorClass != nil {
+				rec.Error = details.Error.ErrorClass.Message
+			} else if details.Error.String != nil {
+				rec.Error = *details.Error.String
 			}
 		}
-		if event.Data.Success != nil {
-			rec.ToolSuccess = event.Data.Success
+		if details.Success != nil {
+			rec.ToolSuccess = details.Success
 		}
-		if event.Data.Duration != nil {
-			rec.Duration = *event.Data.Duration
+		if details.Duration != nil {
+			rec.Duration = *details.Duration
 		}
-		if event.Data.MCPServerName != nil {
-			rec.MCPServerName = *event.Data.MCPServerName
+		if details.MCPServerName != nil {
+			rec.MCPServerName = *details.MCPServerName
 		}
-		if event.Data.MCPToolName != nil {
-			rec.MCPToolName = *event.Data.MCPToolName
+		if details.MCPToolName != nil {
+			rec.MCPToolName = *details.MCPToolName
 		}
-		if event.Data.Path != nil {
-			rec.FilePath = *event.Data.Path
+		if details.Path != nil {
+			rec.FilePath = *details.Path
 		}
 
 		// Expanded event fields
-		switch event.Type {
+		switch event.Type() {
 		case copilot.SessionEventTypeAssistantTurnStart:
 			turnCounter++
 			rec.TurnNumber = turnCounter
@@ -359,9 +363,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			}
 		case copilot.SessionEventTypeAssistantTurnEnd:
 			rec.TurnNumber = turnCounter
-			if event.Data.Duration != nil {
-				lg.Info("Turn ended", "turn", turnCounter, "duration_ms", *event.Data.Duration)
-			}
+			lg.Info("Turn ended", "turn", turnCounter)
 		case copilot.SessionEventTypeAssistantReasoning:
 			actionCounter++
 			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
@@ -371,21 +373,21 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			}
 			// Content already captured above
 		case copilot.SessionEventTypeAssistantIntent:
-			if event.Data.Intent != nil {
-				rec.Intent = *event.Data.Intent
+			if details.Intent != nil {
+				rec.Intent = *details.Intent
 			}
 		case copilot.SessionEventTypeAssistantUsage:
-			if event.Data.InputTokens != nil {
-				rec.InputTokens = int(*event.Data.InputTokens)
+			if details.InputTokens != nil {
+				rec.InputTokens = int(*details.InputTokens)
 			}
-			if event.Data.OutputTokens != nil {
-				rec.OutputTokens = int(*event.Data.OutputTokens)
+			if details.OutputTokens != nil {
+				rec.OutputTokens = int(*details.OutputTokens)
 			}
 		case copilot.SessionEventTypeSessionWorkspaceFileChanged:
-			if event.Data.Operation != nil {
-				rec.FileOperation = string(*event.Data.Operation)
+			if details.Operation != nil {
+				rec.FileOperation = *details.Operation
 				// Real-time file count enforcement (#347)
-				if string(*event.Data.Operation) == "create" {
+				if *details.Operation == "create" {
 					fileCounter++
 					if maxFilesLimit > 0 && fileCounter > maxFilesLimit && !fileLimitHit {
 						fileLimitHit = true
@@ -396,20 +398,16 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				}
 			}
 		case copilot.SessionEventTypeCommandExecute:
-			if event.Data.Command != nil {
-				rec.CommandText = *event.Data.Command
-			}
-		case copilot.SessionEventTypeCommandCompleted:
-			if event.Data.Command != nil {
-				rec.CommandText = *event.Data.Command
+			if details.Command != nil {
+				rec.CommandText = *details.Command
 			}
 		case copilot.SessionEventTypeSkillInvoked:
-			if event.Data.Name != nil {
-				rec.SkillName = *event.Data.Name
+			if details.SkillName != nil {
+				rec.SkillName = *details.SkillName
 			}
 		case copilot.SessionEventTypeExternalToolRequested, copilot.SessionEventTypeExternalToolCompleted:
-			if event.Data.ToolName != nil {
-				rec.ToolName = *event.Data.ToolName
+			if details.ToolName != nil {
+				rec.ToolName = *details.ToolName
 			}
 		case copilot.SessionEventTypeSessionTruncation:
 			rec.IsTruncation = true
@@ -419,42 +417,42 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		case copilot.SessionEventTypeSessionCompactionComplete:
 			lg.Info("Context compaction complete")
 		case copilot.SessionEventTypeSessionWarning:
-			if event.Data.Message != nil {
-				rec.WarningText = *event.Data.Message
-				lg.Warn("Session warning", "message", *event.Data.Message)
+			if details.Message != nil {
+				rec.WarningText = *details.Message
+				lg.Warn("Session warning", "message", *details.Message)
 			}
 		case copilot.SessionEventTypeAbort:
 			lg.Error("Session aborted")
 		case copilot.SessionEventTypePermissionRequested:
 			tn, tc := "", ""
-			if event.Data.ToolName != nil {
-				tn = *event.Data.ToolName
+			if details.ToolName != nil {
+				tn = *details.ToolName
 			}
-			if event.Data.ToolCallID != nil {
-				tc = *event.Data.ToolCallID
+			if details.ToolCallID != nil {
+				tc = *details.ToolCallID
 			}
 			lg.Debug("Permission requested", "toolName", tn, "toolCallID", tc)
 		case copilot.SessionEventTypePermissionCompleted:
 			tn, tc, rsn, ern, msg := "", "", "", "", ""
-			if event.Data.ToolName != nil {
-				tn = *event.Data.ToolName
+			if details.ToolName != nil {
+				tn = *details.ToolName
 			}
-			if event.Data.ToolCallID != nil {
-				tc = *event.Data.ToolCallID
+			if details.ToolCallID != nil {
+				tc = *details.ToolCallID
 			}
-			if event.Data.Reason != nil {
-				rsn = *event.Data.Reason
+			if details.Reason != nil {
+				rsn = *details.Reason
 			}
-			if event.Data.ErrorReason != nil {
-				ern = *event.Data.ErrorReason
+			if details.ErrorReason != nil {
+				ern = *details.ErrorReason
 			}
-			if event.Data.Message != nil {
-				msg = *event.Data.Message
+			if details.Message != nil {
+				msg = *details.Message
 			}
 			lg.Debug("Permission completed", "toolName", tn, "toolCallID", tc, "reason", rsn, "errorReason", ern, "message", msg)
 		case copilot.SessionEventTypeSessionSkillsLoaded:
-			names := make([]string, 0, len(event.Data.Skills))
-			for _, s := range event.Data.Skills {
+			names := make([]string, 0, len(details.Skills))
+			for _, s := range details.Skills {
 				names = append(names, s.Name)
 			}
 			if len(names) > 0 {
@@ -470,10 +468,10 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 					verifiedTools = t
 				}
 			}
-		case copilot.SessionEventTypeSessionMcpServersLoaded:
-			names := make([]string, 0, len(event.Data.Servers))
-			loadedNames := make(map[string]bool, len(event.Data.Servers))
-			for _, s := range event.Data.Servers {
+		case copilot.SessionEventTypeSessionMCPServersLoaded:
+			names := make([]string, 0, len(details.Servers))
+			loadedNames := make(map[string]bool, len(details.Servers))
+			for _, s := range details.Servers {
 				names = append(names, s.Name)
 				loadedNames[s.Name] = true
 			}
@@ -500,12 +498,12 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		case copilot.SessionEventTypeSessionToolsUpdated:
 			lg.Info("Tools updated")
 		case copilot.SessionEventTypeSubagentCompleted:
-			if event.Data.ToolCallID != nil {
-				rec.SubagentID = *event.Data.ToolCallID
+			if details.ToolCallID != nil {
+				rec.SubagentID = *details.ToolCallID
 			}
 		case copilot.SessionEventTypeSubagentFailed:
-			if event.Data.ToolCallID != nil {
-				rec.SubagentID = *event.Data.ToolCallID
+			if details.ToolCallID != nil {
+				rec.SubagentID = *details.ToolCallID
 			}
 		}
 
@@ -528,11 +526,11 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		// Forward progress events to display
 		if e.progressFn != nil {
 			evalID := debugPrefix
-			switch event.Type {
+			switch event.Type() {
 			case copilot.SessionEventTypeToolExecutionStart:
 				toolName := ""
-				if event.Data.ToolName != nil {
-					toolName = *event.Data.ToolName
+				if details.ToolName != nil {
+					toolName = *details.ToolName
 				}
 				if isFileWriteTool(toolName) {
 					arg := toolArgSummary(event)
@@ -555,12 +553,12 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				}
 			case copilot.SessionEventTypeToolExecutionComplete:
 				toolName := ""
-				if event.Data.ToolName != nil {
-					toolName = *event.Data.ToolName
+				if details.ToolName != nil {
+					toolName = *details.ToolName
 				}
 				result := ""
-				if event.Data.Result != nil && event.Data.Result.Content != nil {
-					result = truncateStr(*event.Data.Result.Content, 60)
+				if details.Result != nil && details.Result.Content != nil {
+					result = truncateStr(*details.Result.Content, 60)
 				}
 				msg := toolName
 				if result != "" {
@@ -573,8 +571,8 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				})
 			case copilot.SessionEventTypeAssistantMessage:
 				content := ""
-				if event.Data.Content != nil {
-					content = *event.Data.Content
+				if details.Content != nil {
+					content = *details.Content
 				}
 				if content != "" {
 					summary := truncateStr(content, 80)
@@ -600,7 +598,7 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 		}
 
 		// Debug logging — all event types (slog.Debug is a no-op at higher levels)
-		switch event.Type {
+		switch event.Type() {
 		case copilot.SessionEventTypeToolExecutionStart:
 			actionCounter++
 			if maxSessionActionsLimit > 0 && actionCounter > maxSessionActionsLimit && !actionLimitHit {
@@ -609,18 +607,18 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				genCancel()
 			}
 			toolName := ""
-			if event.Data.ToolName != nil {
-				toolName = *event.Data.ToolName
+			if details.ToolName != nil {
+				toolName = *details.ToolName
 			}
 			lg.Debug("Tool start", "tool", toolName)
 		case copilot.SessionEventTypeToolExecutionComplete:
 			toolName := ""
-			if event.Data.ToolName != nil {
-				toolName = *event.Data.ToolName
+			if details.ToolName != nil {
+				toolName = *details.ToolName
 			}
 			content := ""
-			if event.Data.Content != nil {
-				content = truncateStr(*event.Data.Content, 200)
+			if details.Content != nil {
+				content = truncateStr(*details.Content, 200)
 			}
 			lg.Debug("Tool done", "tool", toolName, "result", content)
 		case copilot.SessionEventTypeAssistantMessage:
@@ -631,8 +629,8 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 				genCancel()
 			}
 			content := ""
-			if event.Data.Content != nil {
-				content = *event.Data.Content
+			if details.Content != nil {
+				content = *details.Content
 			}
 			if content != "" {
 				if summary := detectFileCreation(content); summary != "" {
@@ -643,8 +641,8 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			}
 		case copilot.SessionEventTypeSessionError:
 			content := ""
-			if event.Data.Content != nil {
-				content = *event.Data.Content
+			if details.Content != nil {
+				content = *details.Content
 			}
 			lg.Debug("Session error", "content", content)
 		case copilot.SessionEventTypeAssistantTurnStart:
@@ -653,29 +651,29 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			lg.Debug("Turn ended", "turn", turnCounter)
 		case copilot.SessionEventTypeAssistantUsage:
 			in, out := 0, 0
-			if event.Data.InputTokens != nil {
-				in = int(*event.Data.InputTokens)
+			if details.InputTokens != nil {
+				in = int(*details.InputTokens)
 			}
-			if event.Data.OutputTokens != nil {
-				out = int(*event.Data.OutputTokens)
+			if details.OutputTokens != nil {
+				out = int(*details.OutputTokens)
 			}
 			lg.Debug("Token usage", "input_tokens", in, "output_tokens", out)
 		case copilot.SessionEventTypeSessionTruncation:
 			lg.Debug("Context truncated")
 		case copilot.SessionEventTypeSkillInvoked:
 			name := ""
-			if event.Data.Name != nil {
-				name = *event.Data.Name
+			if details.SkillName != nil {
+				name = *details.SkillName
 			}
 			lg.Debug("Skill invoked", "skill", name)
 		case copilot.SessionEventTypeSubagentCompleted, copilot.SessionEventTypeSubagentFailed:
-			lg.Debug("Subagent event", "type", string(event.Type))
+			lg.Debug("Subagent event", "type", string(event.Type()))
 		default:
 			content := ""
-			if event.Data.Content != nil {
-				content = truncateStr(*event.Data.Content, 100)
+			if details.Content != nil {
+				content = truncateStr(*details.Content, 100)
 			}
-			lg.Debug("SDK event", "type", string(event.Type), "content", content)
+			lg.Debug("SDK event", "type", string(event.Type()), "content", content)
 		}
 	}
 
@@ -888,7 +886,7 @@ func detectFileCreation(content string) string {
 // Exported for use by the review package.
 func (e *CopilotPromptRunner) Client(ctx context.Context, workDir string) (*copilot.Client, error) {
 	opts := *e.clientOpts
-	opts.Cwd = workDir
+	opts.WorkingDirectory = workDir
 	client := copilot.NewClient(&opts)
 	if err := client.Start(ctx); err != nil {
 		return nil, err
@@ -1008,7 +1006,7 @@ func (e *CopilotPromptRunner) buildSessionConfigForEval(ctx context.Context, cfg
 
 	sc := &copilot.SessionConfig{
 		Model:               cfg.Generator.Model,
-		ConfigDir:           configDir,
+		ConfigDirectory:     configDir,
 		WorkingDirectory:    workDir,
 		OnPermissionRequest: copilotperm.ApproveAll,
 		Hooks: &copilot.SessionHooks{
@@ -1102,19 +1100,16 @@ func (e *CopilotPromptRunner) buildSessionConfigForEval(ctx context.Context, cfg
 			mcpType := entry.ResolvedMCPType()
 			var mcpCfg copilot.MCPServerConfig
 			if mcpType == "remote" {
-				mcpCfg = copilot.MCPServerConfig{
-					"type": "remote",
-					"url":  entry.URL,
+				mcpCfg = copilot.MCPHTTPServerConfig{
+					Tools: entry.MCPTools,
+					URL:   entry.URL,
 				}
 			} else {
-				mcpCfg = copilot.MCPServerConfig{
-					"type":    "local",
-					"command": entry.Command,
-					"args":    entry.Args,
+				mcpCfg = copilot.MCPStdioServerConfig{
+					Tools:   entry.MCPTools,
+					Command: entry.Command,
+					Args:    entry.Args,
 				}
-			}
-			if len(entry.MCPTools) > 0 {
-				mcpCfg["tools"] = entry.MCPTools
 			}
 			sc.MCPServers[entry.Name] = mcpCfg
 			slog.Info("MCP server configured",
@@ -1148,11 +1143,11 @@ func extractToolCalls(events []copilot.SessionEvent) []string {
 	seen := make(map[string]bool)
 	var tools []string
 	for _, e := range events {
-		if e.Type == copilot.SessionEventTypeToolExecutionStart ||
-			e.Type == copilot.SessionEventTypeToolExecutionComplete {
+		if e.Type() == copilot.SessionEventTypeToolExecutionStart ||
+			e.Type() == copilot.SessionEventTypeToolExecutionComplete {
 			name := ""
-			if e.Data.ToolName != nil {
-				name = *e.Data.ToolName
+			if details := copilotevent.Extract(e); details.ToolName != nil {
+				name = *details.ToolName
 			}
 			if name != "" && !seen[name] {
 				seen[name] = true
@@ -1166,7 +1161,7 @@ func extractToolCalls(events []copilot.SessionEvent) []string {
 // hasSessionError checks for error events.
 func hasSessionError(events []copilot.SessionEvent) bool {
 	for _, e := range events {
-		if e.Type == copilot.SessionEventTypeSessionError {
+		if e.Type() == copilot.SessionEventTypeSessionError {
 			return true
 		}
 	}
@@ -1213,11 +1208,12 @@ func extractAbsPathsFromCommand(cmd string) []string {
 
 // toolArgSummary extracts a short summary of the tool's primary argument.
 func toolArgSummary(event copilot.SessionEvent) string {
-	if event.Data.Path != nil && *event.Data.Path != "" {
-		return filepath.Base(*event.Data.Path)
+	details := copilotevent.Extract(event)
+	if details.Path != nil && *details.Path != "" {
+		return filepath.Base(*details.Path)
 	}
-	if event.Data.Arguments != nil {
-		if args, ok := event.Data.Arguments.(map[string]interface{}); ok {
+	if details.Arguments != nil {
+		if args, ok := details.Arguments.(map[string]interface{}); ok {
 			for _, key := range []string{"path", "file", "command"} {
 				if v, ok := args[key]; ok {
 					if s, ok := v.(string); ok && s != "" {

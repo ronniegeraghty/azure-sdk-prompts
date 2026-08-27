@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	copilot "github.com/github/copilot-sdk/go"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
 )
@@ -79,8 +80,20 @@ func TestBuildSessionConfig_ConfigDir(t *testing.T) {
 	e := &CopilotPromptRunner{}
 	cfg := &config.ToolConfig{Name: "test", Generator: &config.GeneratorConfig{Model: "gpt-4"}}
 	sc := e.buildSessionConfig(context.Background(), cfg, "/workspace/eval-123", "/isolated/config", nil)
-	if sc.ConfigDir != "/isolated/config" {
-		t.Errorf("expected ConfigDir '/isolated/config', got %q", sc.ConfigDir)
+	if sc.ConfigDirectory != "/isolated/config" {
+		t.Errorf("expected ConfigDirectory '/isolated/config', got %q", sc.ConfigDirectory)
+	}
+}
+
+func TestNewCopilotPromptRunnerCLIPath(t *testing.T) {
+	runner := NewCopilotPromptRunner(PromptRunnerOptions{CLIPath: "C:\\tools\\copilot.exe"})
+
+	connection, ok := runner.clientOpts.Connection.(copilot.StdioConnection)
+	if !ok {
+		t.Fatalf("Connection = %T, want copilot.StdioConnection", runner.clientOpts.Connection)
+	}
+	if connection.Path != "C:\\tools\\copilot.exe" {
+		t.Errorf("Connection.Path = %q, want %q", connection.Path, "C:\\tools\\copilot.exe")
 	}
 }
 
@@ -117,8 +130,12 @@ func TestBuildSessionConfig_MCPServers(t *testing.T) {
 	if !ok {
 		t.Fatal("expected 'azure' MCP server")
 	}
-	if azure["command"] != "npx" {
-		t.Errorf("expected MCP command 'npx', got %v", azure["command"])
+	azureConfig, ok := azure.(copilot.MCPStdioServerConfig)
+	if !ok {
+		t.Fatalf("expected stdio MCP config, got %T", azure)
+	}
+	if azureConfig.Command != "npx" {
+		t.Errorf("expected MCP command 'npx', got %q", azureConfig.Command)
 	}
 }
 
@@ -510,10 +527,11 @@ func TestBuildSessionConfig_RemoteMCP(t *testing.T) {
 		t.Fatalf("expected 1 MCP server, got %d", len(sc.MCPServers))
 	}
 	serverCfg := sc.MCPServers["remote-server"]
-	if serverCfg["type"] != "remote" {
-		t.Errorf("expected type=remote, got %v", serverCfg["type"])
+	remoteConfig, ok := serverCfg.(copilot.MCPHTTPServerConfig)
+	if !ok {
+		t.Fatalf("expected HTTP MCP config, got %T", serverCfg)
 	}
-	if serverCfg["url"] != "https://mcp.example.com" {
-		t.Errorf("expected url=https://mcp.example.com, got %v", serverCfg["url"])
+	if remoteConfig.URL != "https://mcp.example.com" {
+		t.Errorf("expected url=https://mcp.example.com, got %q", remoteConfig.URL)
 	}
 }

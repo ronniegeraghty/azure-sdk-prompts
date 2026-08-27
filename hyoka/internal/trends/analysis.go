@@ -10,6 +10,7 @@ import (
 	"time"
 
 	copilot "github.com/github/copilot-sdk/go"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotevent"
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/copilotperm"
 )
 
@@ -53,7 +54,7 @@ func AnalyzeTrends(ctx context.Context, tr *TrendReport) (string, error) {
 			Mode:    "append",
 			Content: "You are an expert at analyzing AI agent tool usage and its impact on output quality. Focus on how tool availability affects output. Be concise and actionable.",
 		},
-		ConfigDir:           configDir,
+		ConfigDirectory:     configDir,
 		OnPermissionRequest: copilotperm.ApproveAll,
 	})
 	if err != nil {
@@ -66,9 +67,10 @@ func AnalyzeTrends(ctx context.Context, tr *TrendReport) (string, error) {
 	var assistantContent strings.Builder
 	var mu sync.Mutex
 	unsub := session.On(func(event copilot.SessionEvent) {
-		if event.Type == copilot.SessionEventTypeAssistantMessage && event.Data.Content != nil {
+		details := copilotevent.Extract(event)
+		if event.Type() == copilot.SessionEventTypeAssistantMessage && details.Content != nil {
 			mu.Lock()
-			assistantContent.WriteString(*event.Data.Content)
+			assistantContent.WriteString(*details.Content)
 			mu.Unlock()
 		}
 	})
