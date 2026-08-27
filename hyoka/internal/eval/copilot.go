@@ -344,10 +344,9 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 			turnCounter++
 			rec.TurnNumber = turnCounter
 			lg.Info("Turn started", "turn", turnCounter)
-			// Tool loading MUST be complete by first turn start — the SDK won't
-			// begin generation until tools are loaded or definitively failed.
-			// Signal the verifier so postSessionToolVerification doesn't wait
-			// forever for events that will never arrive (#347 / Option A).
+			// Finalize MCP verification at first turn start. Skill directories
+			// were validated before session creation, and SDK v1 does not
+			// guarantee a SessionSkillsLoaded event before this point.
 			verifier.onSessionReady()
 			if e.progressFn != nil {
 				if t := verifier.emitIfReady(); t != nil {
@@ -773,20 +772,18 @@ func (e *CopilotPromptRunner) Run(ctx context.Context, p *prompt.Prompt, cfg *co
 	mu.Unlock()
 
 	// Post-session tool verification gate (#347 / Item E / Option A).
-	// The SDK emits SessionSkillsLoaded / SessionMcpServersLoaded only after
-	// the first message round-trip, so this gate runs AFTER SendAndWait
-	// returned — by which point the verifier's readyChan has typically already
-	// closed from inside the OnEvent callback (either from normal tool events
-	// OR from onSessionReady when AssistantTurnStart fired).
+	// The SDK may omit or delay SessionSkillsLoaded, so prevalidated skill
+	// directories do not depend on that event. MCP servers still use their
+	// runtime load event or AssistantTurnStart as the verification boundary.
 	//
 	// waitForToolVerification now uses a 5-minute absolute ceiling as a
 	// fail-safe in case the session never reached first turn (auth hang,
 	// network failure, SDK bug). This is NOT the primary gate — the real
-	// signal is AssistantTurnStart, which marks tool registration as
-	// definitively complete. The ceiling is ONLY for broken sessions.
+	// signal is AssistantTurnStart, which finalizes MCP registration. The
+	// ceiling is ONLY for broken sessions.
 	//
-	// Failure here is fatal to the eval: grading code that ran without the
-	// configured tools produces false-positive scores. Match the
+	// MCP failure here is fatal to the eval: grading code that ran without the
+	// configured server produces false-positive scores. Match the
 	// pre-session error format (Item D) by using
 	// tool.SummarizeToolLoadErrors so operators see consistent messaging
 	// regardless of which validation layer caught the breakage.
