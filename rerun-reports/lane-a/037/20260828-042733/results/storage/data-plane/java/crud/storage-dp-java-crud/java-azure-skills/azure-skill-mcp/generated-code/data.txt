@@ -1,1 +1,0 @@
-Sample data for the Azure Blob Storage CRUD application.

@@ -1,6 +1,0 @@
-"id","lane","lane_order","language","prompt_id","config","reason","output_folder"
-"timeout-js-ts-batch-001","a","1","js-ts","event-hubs-dp-js-ts-streaming","js-ts-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\js-ts-batch\001"
-"timeout-js-ts-batch-002","a","2","js-ts","event-hubs-dp-js-ts-streaming","js-ts-azure-skills/azure-skill-mcp-microsoft-skill","controlled SDK timeout retry","retry-reports\js-ts-batch\002"
-"timeout-js-ts-batch-003","a","3","js-ts","identity-dp-js-ts-managed-identity","js-ts-azure-skills/azure-skill-mcp-microsoft-skill","controlled SDK timeout retry","retry-reports\js-ts-batch\003"
-"timeout-js-ts-batch-004","a","4","js-ts","identity-dp-js-ts-service-principal","js-ts-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\js-ts-batch\004"
-"timeout-js-ts-batch-005","a","5","js-ts","key-vault-dp-js-ts-secret-config","js-ts-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\js-ts-batch\005"

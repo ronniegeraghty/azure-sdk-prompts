@@ -1,2 +1,0 @@
--r requirements.txt
-azure-identity-broker>=1.2.0
