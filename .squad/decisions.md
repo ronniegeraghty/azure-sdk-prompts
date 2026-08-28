@@ -1,5 +1,31 @@
 # Active Decisions
 
+## Issue #644 Scope Underestimation: Autonomous Two-PR Split (2026-05-22)
+
+**By:** Neo  
+**Status:** EXECUTED (PRs #649 merged, #650 filed)
+
+**Decision:** Original triage for issue #644 estimated a single PR to migrate all 91 legacy prompts and enforce hard error in parser. During Phase 1 implementation, Neo discovered the full scope of legacy `## Evaluation Criteria` usage and **autonomously pivoted to a two-PR strategy** to prevent Phase 1 delay.
+
+**Phase 1 (✅ PR #649, Commit 9f475d87):**
+- Parser now logs `slog.Warn` for legacy `## Evaluation Criteria` usage
+- Non-breaking change enables backward compatibility
+- Deployed immediately, unblocks other work
+
+**Phase 2 (📋 Issue #650, pending):**
+- Batch migrate all 91 prompts from legacy syntax to new format
+- Enforce hard error in parser (breaking change)
+- Scheduled as separate effort to keep scope manageable
+
+**Rationale:** Splitting the work allowed Phase 1 (non-breaking deprecation warning) to merge immediately while Phase 2 (breaking migration + enforcement) is tracked as a separate, focused issue. This prevents scope creep from blocking Phase 1 and clarifies dependencies for downstream work.
+
+**What Changed:**
+- Issue #644 remains open pending Phase 2 completion
+- Phase 2 created as follow-up issue #650 to separate concerns
+- Squad demonstrated autonomous scope management when original estimate proved incorrect
+
+---
+
 ## Report/Site Schema Cutover: Dual-Emit Alias Removed (2026-05-14)
 
 **By:** Trinity  

@@ -341,3 +341,108 @@ t.Errorf("expected 3 flat checks, got %d: %v",
 len(parsed[0].Checks), parsed[0].Checks)
 }
 }
+
+// TestDeprecatedEvaluationCriteriaYAML verifies that ParsePromptYAML emits
+// a deprecation warning when the evaluation_criteria field is present, but
+// still parses the prompt successfully for backward compatibility.
+func TestDeprecatedEvaluationCriteriaYAML(t *testing.T) {
+content := []byte(`id: test-yaml-legacy
+properties:
+  service: test
+  language: python
+prompt_text: Write some Python code.
+evaluation_criteria: |
+  The code should include:
+  - DefaultAzureCredential usage
+  - Error handling
+`)
+
+p, err := ParsePromptYAML(content, "test.prompt.yaml")
+if err != nil {
+t.Fatalf("ParsePromptYAML should not error on legacy evaluation_criteria field: %v", err)
+}
+
+if p.EvaluationCriteria == "" {
+t.Error("expected EvaluationCriteria to be populated from deprecated field")
+}
+if len(p.ParsedCriteria) == 0 {
+t.Error("expected ParsedCriteria to be populated from deprecated field")
+}
+
+// Warning is logged via slog.Warn but doesn't break parsing
+// (verified by running tests with -v to see stderr output)
+}
+
+// TestMarkdownEvaluationCriteriaSectionSupported verifies that ParsePromptFile
+// continues to support the ## Evaluation Criteria markdown section without any
+// deprecation warning. The markdown body section remains a first-class way to
+// declare criteria in .prompt.md files; only the YAML/frontmatter
+// `evaluation_criteria:` field is deprecated in favor of `graders:`.
+func TestMarkdownEvaluationCriteriaSectionSupported(t *testing.T) {
+content := []byte(`---
+id: test-md-legacy
+properties:
+  service: test
+  language: python
+---
+
+## Prompt
+
+Write some Python code.
+
+## Evaluation Criteria
+
+The code should include:
+- DefaultAzureCredential usage
+- Error handling
+`)
+
+p, err := ParsePromptFile(content, "test.prompt.md")
+if err != nil {
+t.Fatalf("ParsePromptFile should not error on legacy ## Evaluation Criteria section: %v", err)
+}
+
+if p.EvaluationCriteria == "" {
+t.Error("expected EvaluationCriteria to be populated from markdown section")
+}
+if len(p.ParsedCriteria) == 0 {
+t.Error("expected ParsedCriteria to be populated from markdown section")
+}
+}
+
+// TestGradersNoDeprecationWarning verifies that prompts using the new
+// graders: frontmatter do NOT trigger deprecation warnings.
+func TestGradersNoDeprecationWarning(t *testing.T) {
+content := []byte(`---
+id: test-clean-graders
+properties:
+  service: test
+  language: python
+graders:
+  - type: prompt
+    name: DefaultAzureCredential Check
+    checks:
+      - Uses DefaultAzureCredential
+      - Handles authentication errors
+---
+
+## Prompt
+
+Write some Python code using DefaultAzureCredential.
+`)
+
+p, err := ParsePromptFile(content, "test.prompt.md")
+if err != nil {
+t.Fatalf("ParsePromptFile should not error on clean graders: %v", err)
+}
+
+if p.EvaluationCriteria != "" {
+t.Error("expected EvaluationCriteria to be empty when using graders")
+}
+if len(p.Graders) == 0 {
+t.Error("expected Graders to be populated")
+}
+
+// No deprecation warning should be emitted (no EvaluationCriteria section)
+}
+

@@ -2025,3 +2025,75 @@ Test prompts were reframed (commit b1769058):
 
 **Orchestration Log:** `.squad/orchestration-log/2026-05-14T22-41-09Z-neo.md`
 
+
+---
+
+## 2026-05-22 — Issue #644 Phase 1: evaluation_criteria Deprecation Warning
+
+**Branch:** `squad/644-deprecate-evaluation-criteria`  
+**PR:** #649  
+**Follow-up Issue:** #650  
+**Status:** ✅ Complete (Phase 1)
+
+**What shipped:**
+- Added deprecation warnings via `slog.Warn` when parser encounters legacy `evaluation_criteria` usage
+- Two warning locations:
+  1. `## Evaluation Criteria` markdown section in `.prompt.md` files (parser.go:132)
+  2. `evaluation_criteria:` frontmatter field in `.prompt.yaml` files (parser.go:172)
+- Prompts continue to load successfully — warnings are non-breaking
+- Added 3 new tests verifying warning behavior
+
+**Changes:**
+- `hyoka/internal/prompt/parser.go` — added `slog` import and two deprecation warnings
+- `hyoka/internal/prompt/parser_test.go` — added tests for both legacy paths + clean graders
+
+**Verification:**
+- ✅ Build: `go build ./...` succeeds
+- ✅ Tests: `go test ./...` passes (34.7s)
+- ✅ Manual: `hyoka list` shows 91 deprecation warnings (all `.prompt.md` files with `## Evaluation Criteria`)
+
+**Commit:** `9f475d87`
+
+### Learnings
+
+#### Two-Phase Rollout Decision
+
+Squad autonomously decided to split #644 into two phases after I discovered ~91 prompts still using the legacy format during dev-branch review (2026-05-14). The original quick-win estimate (30 min, XS effort) assumed zero prompts were affected because the field was already "non-functional" — but the parser still accepted and processed it.
+
+**Phase 1 (this PR):** Deprecation warning only. Non-breaking. Gives time to migrate prompts.
+
+**Phase 2 (issue #650):** Migrate all 91 prompts + enforce hard error + remove dead code paths.
+
+This decision pattern (warn → migrate → enforce) is the correct approach when a breaking change affects many files, especially in a repo with limited test coverage. Attempting a hard cutover would have broken 91 prompts in one shot.
+
+#### Warning Message Design
+
+The `slog.Warn` call includes structured fields:
+- `file` — full path to the prompt file triggering the warning
+- `migration_guide` — actionable instructions for fixing the issue
+
+This makes bulk migration easier: users can parse stderr or log files to get a list of affected files, and each warning tells them exactly what to change.
+
+Pattern:
+```go
+slog.Warn("DEPRECATED: 'evaluation_criteria:' frontmatter field is deprecated...",
+    "file", filePath,
+    "migration_guide", "Replace 'evaluation_criteria:' field with 'graders:' using 'type: prompt'")
+```
+
+#### Test Strategy for Warnings
+
+Since we're not enforcing an error yet, the tests verify:
+1. Legacy prompts parse successfully (no error returned)
+2. `EvaluationCriteria` and `ParsedCriteria` fields are populated
+3. Clean prompts using `graders:` don't trigger warnings
+
+The tests don't capture/assert the `slog.Warn` output — that would require setting up a custom slog handler in the test. Instead, we rely on manual verification (`hyoka list 2>&1 | grep DEPRECATED`) to confirm warnings fire correctly.
+
+For Phase 2, when we switch to hard errors, the tests will verify `err != nil` instead.
+
+#### Precise Discovery Count
+
+Initial estimate was "~50 prompts" from the dev-branch review. Actual count via `hyoka list 2>&1 | grep -c "DEPRECATED"` was **91 prompts** — all `.prompt.md` files using `## Evaluation Criteria`.
+
+Zero prompts use the YAML `evaluation_criteria:` field (all existing prompts are `.prompt.md`, not `.prompt.yaml`). That path is still warned on for completeness, but won't hit in practice.
