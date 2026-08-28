@@ -19,7 +19,7 @@ $languageLabels = [ordered]@{
 $variantLabels = [ordered]@{
     "baseline" = "Baseline"
     "azure-skill-mcp" = "Azure Skill + MCP"
-    "azure-skill-mcp-microsoft-skill" = "Azure Skill + MCP + Microsoft skill"
+    "azure-skill-mcp-microsoft-skill" = "Azure Skill + MCP + Microsoft Skills"
 }
 $statusDirs = @(
     "statuses",
@@ -190,8 +190,7 @@ foreach ($language in $runs.Keys) {
 
     $pairs = @(
         [pscustomobject]@{ id = "azure_vs_baseline"; label = "Azure Skill + MCP vs baseline"; left = "azure-skill-mcp"; right = "baseline" },
-        [pscustomobject]@{ id = "microsoft_vs_baseline"; label = "Microsoft skill vs baseline"; left = "azure-skill-mcp-microsoft-skill"; right = "baseline" },
-        [pscustomobject]@{ id = "microsoft_vs_azure"; label = "Microsoft skill vs Azure Skill + MCP"; left = "azure-skill-mcp-microsoft-skill"; right = "azure-skill-mcp" }
+        [pscustomobject]@{ id = "microsoft_vs_baseline"; label = "Azure Skill + MCP + Microsoft Skills vs baseline"; left = "azure-skill-mcp-microsoft-skill"; right = "baseline" }
     )
     $pairResults = [ordered]@{}
     foreach ($pair in $pairs) {
@@ -260,7 +259,7 @@ foreach ($language in $runs.Keys) {
     $lines.Add("|---|---:|---:|---:|")
     $lines.Add("| Baseline | $($baseline.prompt.passed)/$($baseline.prompt.total) | $($baseline.prompt.rate)% | - |")
     $lines.Add("| Azure Skill + MCP | $($azure.prompt.passed)/$($azure.prompt.total) | $($azure.prompt.rate)% | $(Format-Delta ($azure.prompt.rate - $baseline.prompt.rate)) |")
-    $lines.Add("| Azure Skill + MCP + Microsoft skill | $($microsoft.prompt.passed)/$($microsoft.prompt.total) | $($microsoft.prompt.rate)% | $(Format-Delta ($microsoft.prompt.rate - $baseline.prompt.rate)) |")
+    $lines.Add("| Azure Skill + MCP + Microsoft Skills | $($microsoft.prompt.passed)/$($microsoft.prompt.total) | $($microsoft.prompt.rate)% | $(Format-Delta ($microsoft.prompt.rate - $baseline.prompt.rate)) |")
     $lines.Add("")
     $lines.Add("| Pairwise prompt outcome | Improved | Regressed | Tied |")
     $lines.Add("|---|---:|---:|---:|")
@@ -268,7 +267,7 @@ foreach ($language in $runs.Keys) {
         $lines.Add("| $($pair.label) | $($pair.improved) | $($pair.regressed) | $($pair.tied) |")
     }
     $lines.Add("")
-    $lines.Add("Adding Azure Skill + MCP changed the prompt-check rate by **$(Format-Delta ($azure.prompt.rate - $baseline.prompt.rate))**. Adding the Microsoft language skill changed it by **$(Format-Delta ($microsoft.prompt.rate - $azure.prompt.rate))** relative to Azure Skill + MCP.")
+    $lines.Add("Compared with baseline, Azure Skill + MCP changed the prompt-check rate by **$(Format-Delta ($azure.prompt.rate - $baseline.prompt.rate))**, while Azure Skill + MCP + Microsoft Skills changed it by **$(Format-Delta ($microsoft.prompt.rate - $baseline.prompt.rate))**.")
     $lines.Add("")
     $lines.Add("## Language checks")
     $lines.Add("")
@@ -279,12 +278,12 @@ foreach ($language in $runs.Keys) {
         $lines.Add("|---|---:|---:|---:|")
         $lines.Add("| Baseline | $($baseline.language.passed)/$($baseline.language.total) | $($baseline.language.rate)% | - |")
         $lines.Add("| Azure Skill + MCP | $($azure.language.passed)/$($azure.language.total) | $($azure.language.rate)% | $(Format-Delta ($azure.language.rate - $baseline.language.rate)) |")
-        $lines.Add("| Azure Skill + MCP + Microsoft skill | $($microsoft.language.passed)/$($microsoft.language.total) | $($microsoft.language.rate)% | $(Format-Delta ($microsoft.language.rate - $baseline.language.rate)) |")
+        $lines.Add("| Azure Skill + MCP + Microsoft Skills | $($microsoft.language.passed)/$($microsoft.language.total) | $($microsoft.language.rate)% | $(Format-Delta ($microsoft.language.rate - $baseline.language.rate)) |")
     }
     $lines.Add("")
     $lines.Add("## Excluded diagnostics")
     $lines.Add("")
-    $lines.Add("| Diagnostic | Baseline | Azure Skill + MCP | Microsoft skill |")
+    $lines.Add("| Diagnostic | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |")
     $lines.Add("|---|---:|---:|---:|")
     $lines.Add("| Workspace checks | $(Format-Score $baseline.workspace) | $(Format-Score $azure.workspace) | $(Format-Score $microsoft.workspace) |")
     $lines.Add("| Azure MCP usage checks | $(Format-Score $baseline.tool) | $(Format-Score $azure.tool) | $(Format-Score $microsoft.tool) |")
@@ -305,7 +304,7 @@ foreach ($language in $runs.Keys) {
     $lines.Add("")
     $lines.Add("## Per-prompt prompt checks")
     $lines.Add("")
-    $lines.Add("| Prompt ID | Baseline | Azure Skill + MCP | Microsoft skill |")
+    $lines.Add("| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |")
     $lines.Add("|---|---:|---:|---:|")
     foreach ($prompt in $perPrompt) {
         $lines.Add("| ``$($prompt.prompt_id)`` | $($prompt.arms.baseline.prompt_passed)/$($prompt.arms.baseline.prompt_total) | $($prompt.arms.'azure-skill-mcp'.prompt_passed)/$($prompt.arms.'azure-skill-mcp'.prompt_total) | $($prompt.arms.'azure-skill-mcp-microsoft-skill'.prompt_passed)/$($prompt.arms.'azure-skill-mcp-microsoft-skill'.prompt_total) |")
@@ -336,24 +335,24 @@ $summaryLines.Add("Prompt checks are the primary task-correctness measure. Langu
 $summaryLines.Add("")
 $summaryLines.Add("## Prompt checks")
 $summaryLines.Add("")
-$summaryLines.Add("| Language | Complete triplets | Baseline | Azure Skill + MCP | Difference | Microsoft skill | Difference vs baseline | Difference vs Azure Skill + MCP |")
-$summaryLines.Add("|---|---:|---:|---:|---:|---:|---:|---:|")
+$summaryLines.Add("| Language | Complete triplets | Baseline | Azure Skill + MCP | Difference vs baseline | Azure Skill + MCP + Microsoft Skills | Difference vs baseline |")
+$summaryLines.Add("|---|---:|---:|---:|---:|---:|---:|")
 foreach ($result in $allLanguageResults) {
     $b = $result.variants.baseline.prompt
     $a = $result.variants.'azure-skill-mcp'.prompt
     $m = $result.variants.'azure-skill-mcp-microsoft-skill'.prompt
-    $summaryLines.Add("| [$($result.label)](./$($result.language).md) | $($result.complete_triplets) | $($b.passed)/$($b.total) ($($b.rate)%) | $($a.passed)/$($a.total) ($($a.rate)%) | $(Format-Delta ($a.rate - $b.rate)) | $($m.passed)/$($m.total) ($($m.rate)%) | $(Format-Delta ($m.rate - $b.rate)) | $(Format-Delta ($m.rate - $a.rate)) |")
+    $summaryLines.Add("| [$($result.label)](./$($result.language).md) | $($result.complete_triplets) | $($b.passed)/$($b.total) ($($b.rate)%) | $($a.passed)/$($a.total) ($($a.rate)%) | $(Format-Delta ($a.rate - $b.rate)) | $($m.passed)/$($m.total) ($($m.rate)%) | $(Format-Delta ($m.rate - $b.rate)) |")
 }
 $rb = $rollupVariants.baseline
 $ra = $rollupVariants.'azure-skill-mcp'
 $rm = $rollupVariants.'azure-skill-mcp-microsoft-skill'
-$summaryLines.Add("| **Informational rollup** | **$($summary.complete_triplets)** | **$($rb.passed)/$($rb.total) ($($rb.rate)%)** | **$($ra.passed)/$($ra.total) ($($ra.rate)%)** | **$(Format-Delta ($ra.rate - $rb.rate))** | **$($rm.passed)/$($rm.total) ($($rm.rate)%)** | **$(Format-Delta ($rm.rate - $rb.rate))** | **$(Format-Delta ($rm.rate - $ra.rate))** |")
+$summaryLines.Add("| **Informational rollup** | **$($summary.complete_triplets)** | **$($rb.passed)/$($rb.total) ($($rb.rate)%)** | **$($ra.passed)/$($ra.total) ($($ra.rate)%)** | **$(Format-Delta ($ra.rate - $rb.rate))** | **$($rm.passed)/$($rm.total) ($($rm.rate)%)** | **$(Format-Delta ($rm.rate - $rb.rate))** |")
 $summaryLines.Add("")
 $summaryLines.Add("The informational rollup combines equivalent prompt checks only. It is not a language ranking.")
 $summaryLines.Add("")
 $summaryLines.Add("## Language checks")
 $summaryLines.Add("")
-$summaryLines.Add("| Language | Baseline | Azure Skill + MCP | Microsoft skill |")
+$summaryLines.Add("| Language | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |")
 $summaryLines.Add("|---|---:|---:|---:|")
 foreach ($result in $allLanguageResults) {
     $summaryLines.Add("| $($result.label) | $(Format-Score $result.variants.baseline.language) | $(Format-Score $result.variants.'azure-skill-mcp'.language) | $(Format-Score $result.variants.'azure-skill-mcp-microsoft-skill'.language) |")
@@ -366,7 +365,7 @@ $summaryLines.Add("- Cross-language scores are not directly comparable because p
 $summaryLines.Add("- Loaded skills might not be invoked for every prompt.")
 $summaryLines.Add("- MCP invocation and workspace checks are diagnostics, not generated-code correctness checks.")
 if ($excluded.Count -gt 0) {
-    $summaryLines.Add("- One JS/TS prompt triplet is excluded because the Microsoft-skill arm repeatedly hit a Copilot SDK ``session.idle`` timeout.")
+    $summaryLines.Add("- One JS/TS prompt triplet is excluded because the Azure Skill + MCP + Microsoft Skills arm repeatedly hit a Copilot SDK ``session.idle`` timeout.")
 }
 $summaryLines -join "`n" | Set-Content -LiteralPath (Join-Path $outputDir "summary.md") -Encoding utf8
 

@@ -8,15 +8,14 @@ The report includes **20 complete prompt triplets** and **60 valid evaluations**
 |---|---:|---:|---:|
 | Baseline | 110/135 | 81.5% | - |
 | Azure Skill + MCP | 108/135 | 80% | -1.5 pp |
-| Azure Skill + MCP + Microsoft skill | 104/135 | 77% | -4.5 pp |
+| Azure Skill + MCP + Microsoft Skills | 104/135 | 77% | -4.5 pp |
 
 | Pairwise prompt outcome | Improved | Regressed | Tied |
 |---|---:|---:|---:|
 | Azure Skill + MCP vs baseline | 2 | 4 | 14 |
-| Microsoft skill vs baseline | 1 | 3 | 16 |
-| Microsoft skill vs Azure Skill + MCP | 4 | 2 | 14 |
+| Azure Skill + MCP + Microsoft Skills vs baseline | 1 | 3 | 16 |
 
-Adding Azure Skill + MCP changed the prompt-check rate by **-1.5 pp**. Adding the Microsoft language skill changed it by **-3.0 pp** relative to Azure Skill + MCP.
+Compared with baseline, Azure Skill + MCP changed the prompt-check rate by **-1.5 pp**, while Azure Skill + MCP + Microsoft Skills changed it by **-4.5 pp**.
 
 ## Language checks
 
@@ -24,7 +23,7 @@ No generic .NET language criteria are configured.
 
 ## Excluded diagnostics
 
-| Diagnostic | Baseline | Azure Skill + MCP | Microsoft skill |
+| Diagnostic | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | Workspace checks | Not configured | Not configured | Not configured |
 | Azure MCP usage checks | Not configured | Not configured | Not configured |
@@ -33,7 +32,7 @@ Workspace and tool checks are excluded from scored aggregates because they measu
 
 ## Per-prompt prompt checks
 
-| Prompt ID | Baseline | Azure Skill + MCP | Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | `app-configuration-dp-dotnet-crud` | 6/7 | 6/7 | 6/7 |
 | `cosmos-db-dp-dotnet-crud` | 7/7 | 7/7 | 7/7 |

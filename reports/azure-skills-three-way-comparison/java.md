@@ -8,15 +8,14 @@ The report includes **19 complete prompt triplets** and **57 valid evaluations**
 |---|---:|---:|---:|
 | Baseline | 155/167 | 92.8% | - |
 | Azure Skill + MCP | 151/167 | 90.4% | -2.4 pp |
-| Azure Skill + MCP + Microsoft skill | 149/167 | 89.2% | -3.6 pp |
+| Azure Skill + MCP + Microsoft Skills | 149/167 | 89.2% | -3.6 pp |
 
 | Pairwise prompt outcome | Improved | Regressed | Tied |
 |---|---:|---:|---:|
 | Azure Skill + MCP vs baseline | 1 | 3 | 15 |
-| Microsoft skill vs baseline | 3 | 2 | 14 |
-| Microsoft skill vs Azure Skill + MCP | 5 | 2 | 12 |
+| Azure Skill + MCP + Microsoft Skills vs baseline | 3 | 2 | 14 |
 
-Adding Azure Skill + MCP changed the prompt-check rate by **-2.4 pp**. Adding the Microsoft language skill changed it by **-1.2 pp** relative to Azure Skill + MCP.
+Compared with baseline, Azure Skill + MCP changed the prompt-check rate by **-2.4 pp**, while Azure Skill + MCP + Microsoft Skills changed it by **-3.6 pp**.
 
 ## Language checks
 
@@ -24,11 +23,11 @@ Adding Azure Skill + MCP changed the prompt-check rate by **-2.4 pp**. Adding th
 |---|---:|---:|---:|
 | Baseline | 187/228 | 82% | - |
 | Azure Skill + MCP | 186/228 | 81.6% | -0.4 pp |
-| Azure Skill + MCP + Microsoft skill | 177/228 | 77.6% | -4.4 pp |
+| Azure Skill + MCP + Microsoft Skills | 177/228 | 77.6% | -4.4 pp |
 
 ## Excluded diagnostics
 
-| Diagnostic | Baseline | Azure Skill + MCP | Microsoft skill |
+| Diagnostic | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | Workspace checks | Not configured | Not configured | Not configured |
 | Azure MCP usage checks | Not configured | Not configured | Not configured |
@@ -37,7 +36,7 @@ Workspace and tool checks are excluded from scored aggregates because they measu
 
 ## Per-prompt prompt checks
 
-| Prompt ID | Baseline | Azure Skill + MCP | Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | `app-configuration-dp-java-crud` | 7/7 | 7/7 | 7/7 |
 | `app-configuration-dp-java-feature-flags` | 8/9 | 7/9 | 9/9 |

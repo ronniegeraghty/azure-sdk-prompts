@@ -48,7 +48,7 @@
       }
     },
     "azure-skill-mcp-microsoft-skill": {
-      "label": "Azure Skill + MCP + Microsoft skill",
+      "label": "Azure Skill + MCP + Microsoft Skills",
       "prompt": {
         "passed": 104.0,
         "total": 135.0,
@@ -77,16 +77,10 @@
       "tied": 14
     },
     "microsoft_vs_baseline": {
-      "label": "Microsoft skill vs baseline",
+      "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
       "improved": 1,
       "regressed": 3,
       "tied": 16
-    },
-    "microsoft_vs_azure": {
-      "label": "Microsoft skill vs Azure Skill + MCP",
-      "improved": 4,
-      "regressed": 2,
-      "tied": 14
     }
   },
   "prompts": [

@@ -8,15 +8,14 @@ The report includes **13 complete prompt triplets** and **39 valid evaluations**
 |---|---:|---:|---:|
 | Baseline | 86/101 | 85.1% | - |
 | Azure Skill + MCP | 88/101 | 87.1% | +2.0 pp |
-| Azure Skill + MCP + Microsoft skill | 87/101 | 86.1% | +1.0 pp |
+| Azure Skill + MCP + Microsoft Skills | 87/101 | 86.1% | +1.0 pp |
 
 | Pairwise prompt outcome | Improved | Regressed | Tied |
 |---|---:|---:|---:|
 | Azure Skill + MCP vs baseline | 3 | 1 | 9 |
-| Microsoft skill vs baseline | 2 | 1 | 10 |
-| Microsoft skill vs Azure Skill + MCP | 2 | 3 | 8 |
+| Azure Skill + MCP + Microsoft Skills vs baseline | 2 | 1 | 10 |
 
-Adding Azure Skill + MCP changed the prompt-check rate by **+2.0 pp**. Adding the Microsoft language skill changed it by **-1.0 pp** relative to Azure Skill + MCP.
+Compared with baseline, Azure Skill + MCP changed the prompt-check rate by **+2.0 pp**, while Azure Skill + MCP + Microsoft Skills changed it by **+1.0 pp**.
 
 ## Language checks
 
@@ -24,11 +23,11 @@ Adding Azure Skill + MCP changed the prompt-check rate by **+2.0 pp**. Adding th
 |---|---:|---:|---:|
 | Baseline | 88/130 | 67.7% | - |
 | Azure Skill + MCP | 88/130 | 67.7% | 0.0 pp |
-| Azure Skill + MCP + Microsoft skill | 94/130 | 72.3% | +4.6 pp |
+| Azure Skill + MCP + Microsoft Skills | 94/130 | 72.3% | +4.6 pp |
 
 ## Excluded diagnostics
 
-| Diagnostic | Baseline | Azure Skill + MCP | Microsoft skill |
+| Diagnostic | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | Workspace checks | Not configured | Not configured | Not configured |
 | Azure MCP usage checks | Not configured | Not configured | Not configured |
@@ -43,7 +42,7 @@ Workspace and tool checks are excluded from scored aggregates because they measu
 
 ## Per-prompt prompt checks
 
-| Prompt ID | Baseline | Azure Skill + MCP | Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | `app-configuration-dp-js-ts-crud` | 6/8 | 7/8 | 6/8 |
 | `cosmos-db-dp-js-ts-crud` | 5/7 | 5/7 | 6/7 |

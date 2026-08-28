@@ -19,7 +19,7 @@ $languageLabels = @{
 $variantLabels = [ordered]@{
     "baseline" = "Baseline"
     "azure-skill-mcp" = "Azure Skill + MCP"
-    "azure-skill-mcp-microsoft-skill" = "Azure Skill + MCP + Microsoft skill"
+    "azure-skill-mcp-microsoft-skill" = "Azure Skill + MCP + Microsoft Skills"
 }
 
 Push-Location $repo
@@ -170,7 +170,7 @@ foreach ($section in $languageSections) {
     $lines.Add("")
     $lines.Add(('Run: `{0}`' -f $section.RunID))
     $lines.Add("")
-    $lines.Add("| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft skill |")
+    $lines.Add("| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |")
     $lines.Add("|---|---|---|---|")
     foreach ($row in $section.Rows) {
         $lines.Add($row)

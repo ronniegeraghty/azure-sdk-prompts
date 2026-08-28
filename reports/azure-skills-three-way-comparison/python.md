@@ -8,15 +8,14 @@ The report includes **19 complete prompt triplets** and **57 valid evaluations**
 |---|---:|---:|---:|
 | Baseline | 157/172 | 91.3% | - |
 | Azure Skill + MCP | 156/172 | 90.7% | -0.6 pp |
-| Azure Skill + MCP + Microsoft skill | 163/172 | 94.8% | +3.5 pp |
+| Azure Skill + MCP + Microsoft Skills | 163/172 | 94.8% | +3.5 pp |
 
 | Pairwise prompt outcome | Improved | Regressed | Tied |
 |---|---:|---:|---:|
 | Azure Skill + MCP vs baseline | 3 | 4 | 12 |
-| Microsoft skill vs baseline | 4 | 2 | 13 |
-| Microsoft skill vs Azure Skill + MCP | 5 | 0 | 14 |
+| Azure Skill + MCP + Microsoft Skills vs baseline | 4 | 2 | 13 |
 
-Adding Azure Skill + MCP changed the prompt-check rate by **-0.6 pp**. Adding the Microsoft language skill changed it by **+4.1 pp** relative to Azure Skill + MCP.
+Compared with baseline, Azure Skill + MCP changed the prompt-check rate by **-0.6 pp**, while Azure Skill + MCP + Microsoft Skills changed it by **+3.5 pp**.
 
 ## Language checks
 
@@ -24,11 +23,11 @@ Adding Azure Skill + MCP changed the prompt-check rate by **-0.6 pp**. Adding th
 |---|---:|---:|---:|
 | Baseline | 78/95 | 82.1% | - |
 | Azure Skill + MCP | 78/95 | 82.1% | 0.0 pp |
-| Azure Skill + MCP + Microsoft skill | 83/95 | 87.4% | +5.3 pp |
+| Azure Skill + MCP + Microsoft Skills | 83/95 | 87.4% | +5.3 pp |
 
 ## Excluded diagnostics
 
-| Diagnostic | Baseline | Azure Skill + MCP | Microsoft skill |
+| Diagnostic | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | Workspace checks | 0/19 (0.0%) | 0/19 (0.0%) | 0/19 (0.0%) |
 | Azure MCP usage checks | 0/19 (0.0%) | 19/19 (100.0%) | 19/19 (100.0%) |
@@ -37,7 +36,7 @@ Workspace and tool checks are excluded from scored aggregates because they measu
 
 ## Per-prompt prompt checks
 
-| Prompt ID | Baseline | Azure Skill + MCP | Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | `app-configuration-dp-python-crud` | 6/6 | 6/6 | 6/6 |
 | `app-configuration-dp-python-feature-flags` | 7/9 | 8/9 | 9/9 |

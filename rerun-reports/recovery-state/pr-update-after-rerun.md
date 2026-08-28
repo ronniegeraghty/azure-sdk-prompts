@@ -52,15 +52,13 @@ The three arms are:
 |---|---|
 | Baseline | `baseline` |
 | Azure Skill + MCP | `azure-skill-mcp` |
-| Azure Skill + MCP + Microsoft skill | `azure-skill-mcp-microsoft-skill` |
+| Azure Skill + MCP + Microsoft Skills | `azure-skill-mcp-microsoft-skill` |
 
 For each language, calculate:
 
 - Passed/total prompt checks and percentage for each arm.
 - Prompt-check difference from baseline for both enhanced arms.
-- Prompt-check difference between the Microsoft-skill arm and Azure Skill + MCP.
 - Improved, regressed, and tied prompt counts for each enhanced arm versus baseline.
-- Improved, regressed, and tied prompt counts for the Microsoft-skill arm versus Azure Skill + MCP.
 - The same aggregates separately for language checks when language criteria exist.
 - Workspace and MCP tool results as unscored diagnostics.
 
@@ -85,15 +83,14 @@ Report: [`<report path>`](<committed report URL>)
 |---|---:|---:|---:|
 | Baseline | <passed>/<total> | <rate>% | — |
 | Azure Skill + MCP | <passed>/<total> | <rate>% | <signed difference> |
-| Azure Skill + MCP + Microsoft skill | <passed>/<total> | <rate>% | <signed difference> |
+| Azure Skill + MCP + Microsoft Skills | <passed>/<total> | <rate>% | <signed difference> |
 
 | Pairwise prompt outcome | Improved | Regressed | Tied |
 |---|---:|---:|---:|
 | Azure Skill + MCP vs baseline | <N> | <N> | <N> |
-| Microsoft skill vs baseline | <N> | <N> | <N> |
-| Microsoft skill vs Azure Skill + MCP | <N> | <N> | <N> |
+| Azure Skill + MCP + Microsoft Skills vs baseline | <N> | <N> | <N> |
 
-<Concise prompt-check interpretation. Identify where the additional Microsoft skill helped,
+<Concise prompt-check interpretation. Identify where the additional Microsoft Skills helped,
 regressed, or made no measurable difference.>
 
 ### Language checks
@@ -102,13 +99,13 @@ regressed, or made no measurable difference.>
 |---|---:|---:|---:|
 | Baseline | <passed>/<total> | <rate>% | — |
 | Azure Skill + MCP | <passed>/<total> | <rate>% | <signed difference> |
-| Azure Skill + MCP + Microsoft skill | <passed>/<total> | <rate>% | <signed difference> |
+| Azure Skill + MCP + Microsoft Skills | <passed>/<total> | <rate>% | <signed difference> |
 
 <Concise language-check interpretation, or state that no language criteria are configured.>
 
 ### Excluded diagnostics
 
-| Diagnostic | Baseline | Azure Skill + MCP | Microsoft skill |
+| Diagnostic | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | Workspace checks | <passed>/<total or N/A> | <passed>/<total or N/A> | <passed>/<total or N/A> |
 | Azure MCP usage checks | <passed>/<total or N/A> | <passed>/<total or N/A> | <passed>/<total or N/A> |
@@ -163,19 +160,19 @@ are reported separately. Workspace and tool/MCP checks are excluded from scored 
 
 ### Prompt checks
 
-| Language | Complete triplets | Baseline | Azure Skill + MCP | Difference | Microsoft skill | Difference vs baseline | Difference vs Azure Skill + MCP |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| [Python](<comment-or-report-link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> | <delta> |
-| [JavaScript/TypeScript](<link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> | <delta> |
-| [Java](<link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> | <delta> |
-| [.NET](<link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> | <delta> |
-| **Informational rollup** | **<N>** | **<P/T (%)>** | **<P/T (%)>** | **<delta>** | **<P/T (%)>** | **<delta>** | **<delta>** |
+| Language | Complete triplets | Baseline | Azure Skill + MCP | Difference vs baseline | Azure Skill + MCP + Microsoft Skills | Difference vs baseline |
+|---|---:|---:|---:|---:|---:|---:|
+| [Python](<comment-or-report-link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> |
+| [JavaScript/TypeScript](<link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> |
+| [Java](<link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> |
+| [.NET](<link>) | <N> | <P/T (%)> | <P/T (%)> | <delta> | <P/T (%)> | <delta> |
+| **Informational rollup** | **<N>** | **<P/T (%)>** | **<P/T (%)>** | **<delta>** | **<P/T (%)>** | **<delta>** |
 
 The informational rollup combines equivalent prompt checks only. It is not a language ranking.
 
 ### Language checks
 
-| Language | Baseline | Azure Skill + MCP | Microsoft skill |
+| Language | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---:|---:|---:|
 | Python | <P/T (%)> | <P/T (%)> | <P/T (%)> |
 | JavaScript/TypeScript | <P/T (%)> | <P/T (%)> | <P/T (%)> |
@@ -185,7 +182,7 @@ The informational rollup combines equivalent prompt checks only. It is not a lan
 ### Findings
 
 - <Overall effect of Azure Skill + MCP compared with baseline.>
-- <Incremental effect of adding the Microsoft language skill.>
+- <Incremental effect of Azure Skill + MCP + Microsoft Skills.>
 - <Languages or prompt groups with meaningful gains or regressions.>
 - <Whether Azure MCP was actually invoked, reported only as an unscored diagnostic.>
 - <Any excluded triplets or persistent execution failures.>

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-28T06:52:07.8048034Z",
+  "generated_at": "2026-08-28T07:22:41.9024181Z",
   "complete_triplets": 71.0,
   "valid_evaluations": 213.0,
   "excluded": [
@@ -80,7 +80,7 @@
           }
         },
         "azure-skill-mcp-microsoft-skill": {
-          "label": "Azure Skill + MCP + Microsoft skill",
+          "label": "Azure Skill + MCP + Microsoft Skills",
           "prompt": {
             "passed": 163.0,
             "total": 172.0,
@@ -109,16 +109,10 @@
           "tied": 12
         },
         "microsoft_vs_baseline": {
-          "label": "Microsoft skill vs baseline",
+          "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
           "improved": 4,
           "regressed": 2,
           "tied": 13
-        },
-        "microsoft_vs_azure": {
-          "label": "Microsoft skill vs Azure Skill + MCP",
-          "improved": 5,
-          "regressed": 0,
-          "tied": 14
         }
       },
       "prompts": [
@@ -962,7 +956,7 @@
           }
         },
         "azure-skill-mcp-microsoft-skill": {
-          "label": "Azure Skill + MCP + Microsoft skill",
+          "label": "Azure Skill + MCP + Microsoft Skills",
           "prompt": {
             "passed": 87.0,
             "total": 101.0,
@@ -991,16 +985,10 @@
           "tied": 9
         },
         "microsoft_vs_baseline": {
-          "label": "Microsoft skill vs baseline",
+          "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
           "improved": 2,
           "regressed": 1,
           "tied": 10
-        },
-        "microsoft_vs_azure": {
-          "label": "Microsoft skill vs Azure Skill + MCP",
-          "improved": 2,
-          "regressed": 3,
-          "tied": 8
         }
       },
       "prompts": [
@@ -1589,7 +1577,7 @@
           }
         },
         "azure-skill-mcp-microsoft-skill": {
-          "label": "Azure Skill + MCP + Microsoft skill",
+          "label": "Azure Skill + MCP + Microsoft Skills",
           "prompt": {
             "passed": 149.0,
             "total": 167.0,
@@ -1618,16 +1606,10 @@
           "tied": 15
         },
         "microsoft_vs_baseline": {
-          "label": "Microsoft skill vs baseline",
+          "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
           "improved": 3,
           "regressed": 2,
           "tied": 14
-        },
-        "microsoft_vs_azure": {
-          "label": "Microsoft skill vs Azure Skill + MCP",
-          "improved": 5,
-          "regressed": 2,
-          "tied": 12
         }
       },
       "prompts": [
@@ -2462,7 +2444,7 @@
           }
         },
         "azure-skill-mcp-microsoft-skill": {
-          "label": "Azure Skill + MCP + Microsoft skill",
+          "label": "Azure Skill + MCP + Microsoft Skills",
           "prompt": {
             "passed": 104.0,
             "total": 135.0,
@@ -2491,16 +2473,10 @@
           "tied": 14
         },
         "microsoft_vs_baseline": {
-          "label": "Microsoft skill vs baseline",
+          "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
           "improved": 1,
           "regressed": 3,
           "tied": 16
-        },
-        "microsoft_vs_azure": {
-          "label": "Microsoft skill vs Azure Skill + MCP",
-          "improved": 4,
-          "regressed": 2,
-          "tied": 14
         }
       },
       "prompts": [

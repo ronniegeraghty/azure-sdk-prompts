@@ -99,7 +99,7 @@ Write-Output "ARM_SUMMARY"
 $armDefinitions = @(
     @{ Name = "Baseline"; Property = "Baseline" },
     @{ Name = "Azure Skill + MCP"; Property = "MCP" },
-    @{ Name = "Microsoft skill"; Property = "Microsoft" }
+    @{ Name = "Azure Skill + MCP + Microsoft Skills"; Property = "Microsoft" }
 )
 
 & {

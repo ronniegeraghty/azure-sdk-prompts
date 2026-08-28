@@ -18,7 +18,7 @@ Score cells use `P passed/total; L passed/total`, where P is prompt-specific che
 
 Run: `20260827-143238`
 
-| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---|---|---|
 | `app-configuration-dp-python-crud` | P 6/6; L 4/5 | RERUN (tool_load_failure) | RERUN (missing) |
 | `app-configuration-dp-python-feature-flags` | RERUN (missing) | RERUN (missing) | RERUN (tool_load_failure) |
@@ -44,7 +44,7 @@ Run: `20260827-143238`
 
 Run: `20260827-143332`
 
-| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---|---|---|
 | `app-configuration-dp-js-ts-crud` | P 6/8; L 6/10 | RERUN (tool_load_failure) | RERUN (tool_load_failure) |
 | `cosmos-db-dp-js-ts-crud` | P 5/7; L 5/10 | RERUN (tool_load_failure) | RERUN (tool_load_failure) |
@@ -65,7 +65,7 @@ Run: `20260827-143332`
 
 Run: `20260827-143433`
 
-| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---|---|---|
 | `app-configuration-dp-java-crud` | P 7/7; L 8/12 | RERUN (tool_load_failure) | RERUN (tool_load_failure) |
 | `app-configuration-dp-java-feature-flags` | P 8/9; L 9/12 | RERUN (SDK timeout) | RERUN (tool_load_failure) |
@@ -91,7 +91,7 @@ Run: `20260827-143433`
 
 Run: `20260827-143539`
 
-| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft skill |
+| Prompt ID | Baseline | Azure Skill + MCP | Azure Skill + MCP + Microsoft Skills |
 |---|---|---|---|
 | `app-configuration-dp-dotnet-crud` | P 6/7; L n/a | RERUN (tool_load_failure) | RERUN (tool_load_failure) |
 | `cosmos-db-dp-dotnet-crud` | P 7/7; L n/a | RERUN (tool_load_failure) | RERUN (tool_load_failure) |
