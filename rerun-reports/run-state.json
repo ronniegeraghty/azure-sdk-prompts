@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "branch": "weidongxu-microsoft/issue-656-three-way-rerun",
+  "source_pr": "https://github.com/ronniegeraghty/hyoka/pull/656",
+  "status": "planned",
+  "current_suite_id": null,
+  "last_updated": "2026-08-29T00:35:42+08:00",
+  "completed_suite_ids": [],
+  "remaining_suite_ids": [
+    "dotnet",
+    "python",
+    "java",
+    "js-ts"
+  ],
+  "suites": [
+    {
+      "id": "dotnet",
+      "order": 1,
+      "language": "dotnet",
+      "config_file": "configs/dotnet-azure-skills-three-way.yaml",
+      "prompt_count": 20,
+      "expected_evaluations": 60,
+      "output_dir": "rerun-reports/01-dotnet",
+      "log_file": "rerun-reports/01-dotnet.log",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "run_id": null,
+      "result_commit": null,
+      "health_summary": null
+    },
+    {
+      "id": "python",
+      "order": 2,
+      "language": "python",
+      "config_file": "configs/python-azure-skills-three-way.yaml",
+      "prompt_count": 19,
+      "expected_evaluations": 57,
+      "output_dir": "rerun-reports/02-python",
+      "log_file": "rerun-reports/02-python.log",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "run_id": null,
+      "result_commit": null,
+      "health_summary": null
+    },
+    {
+      "id": "java",
+      "order": 3,
+      "language": "java",
+      "config_file": "configs/java-azure-skills-three-way.yaml",
+      "prompt_count": 19,
+      "expected_evaluations": 57,
+      "output_dir": "rerun-reports/03-java",
+      "log_file": "rerun-reports/03-java.log",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "run_id": null,
+      "result_commit": null,
+      "health_summary": null
+    },
+    {
+      "id": "js-ts",
+      "order": 4,
+      "language": "js-ts",
+      "config_file": "configs/js-ts-azure-skills-three-way.yaml",
+      "prompt_count": 14,
+      "expected_evaluations": 42,
+      "output_dir": "rerun-reports/04-js-ts",
+      "log_file": "rerun-reports/04-js-ts.log",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "run_id": null,
+      "result_commit": null,
+      "health_summary": null
+    }
+  ]
+}
