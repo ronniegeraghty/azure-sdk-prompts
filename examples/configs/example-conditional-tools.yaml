@@ -1,0 +1,22 @@
+configs:
+  - name: example/conditional-tools
+    description: "Example showing conditional tool activation by prompt properties"
+    generator:
+      model: "claude-opus-4.6"
+      tools:
+        - name: create
+          always_on: true
+        - name: edit
+          always_on: true
+        - name: azure_mcp
+          when:
+            language: python
+        - name: dotnet_analyzer
+          when:
+            language: dotnet
+            plane: data-plane
+      excluded_tools:
+        - web_fetch
+    reviewer:
+      models:
+        - "gpt-4.1"

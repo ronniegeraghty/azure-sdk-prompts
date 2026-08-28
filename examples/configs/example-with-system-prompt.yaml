@@ -1,0 +1,10 @@
+configs:
+  - name: example/with-system-prompt
+    description: "Example showing custom system prompts"
+    generator:
+      model: "claude-opus-4.6"
+      system_prompt: "You are an Azure SDK expert. Always use the latest stable API versions and follow Azure SDK design guidelines."
+    reviewer:
+      models:
+        - "gpt-4.1"
+      system_prompt: "Review code for Azure SDK best practices. Focus on error handling, retry policies, and credential management."

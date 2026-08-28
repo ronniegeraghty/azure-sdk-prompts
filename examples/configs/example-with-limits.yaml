@@ -1,0 +1,13 @@
+configs:
+  - name: example/with-limits
+    description: "Example showing session guardrail limits"
+    generator:
+      model: "claude-opus-4.6"
+    reviewer:
+      models:
+        - "gpt-4.1"
+    limits:
+      max_turns: 15
+      max_files: 30
+      max_output_size: 524288
+      max_session_actions: 40

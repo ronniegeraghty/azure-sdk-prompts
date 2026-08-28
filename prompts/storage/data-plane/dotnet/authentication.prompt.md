@@ -4,7 +4,7 @@ properties:
   service: storage
   plane: data-plane
   language: dotnet
-  category: authentication
+  category: auth
   difficulty: basic
   description: 'Can a developer authenticate to Azure Blob Storage using DefaultAzureCredential in .NET?
 
