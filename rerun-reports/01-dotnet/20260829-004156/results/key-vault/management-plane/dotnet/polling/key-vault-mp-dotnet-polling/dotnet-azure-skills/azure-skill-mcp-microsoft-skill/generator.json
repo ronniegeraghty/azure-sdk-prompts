@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-mp-dotnet-polling",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that creates\r\nan Azure Key Vault using the management plane SDK and handles the long-running\r\noperation:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a Key Vault with RBAC authorization enabled in \"eastus\"\r\n3. Configure soft-delete and purge protection\r\n4. Wait for the vault creation to complete using the ArmOperation pattern\r\n5. Verify the vault is accessible by creating a SecretClient pointing to it\r\n\r\nUse Azure.ResourceManager.KeyVault. Show required NuGet packages and how\r\nto set access policies or RBAC roles during creation.",
+  "final_response": "The first compile exposed a package-generation compatibility issue: the selected Identity package duplicates `DefaultAzureCredential` now present in the resolved Azure.Core. I’m aligning the current package set and removing the model-name ambiguity.",
+  "workspace_delta": {
+    "bytes_added": 8588,
+    "bytes_removed": 0,
+    "bytes_net": 8588,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "KeyVaultManagementSample.csproj",
+        "size": 605
+      },
+      {
+        "path": "Program.cs",
+        "size": 5917
+      },
+      {
+        "path": "README.md",
+        "size": 2066
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 14,
+    "tool_calls": 0,
+    "reasoning_steps": 14,
+    "truncated": true
+  },
+  "started_at": "2026-08-29T02:22:19.7718208+08:00",
+  "ended_at": "2026-08-29T02:24:51.9001976+08:00",
+  "duration_ms": 152128,
+  "terminated_by": "completed"
+}

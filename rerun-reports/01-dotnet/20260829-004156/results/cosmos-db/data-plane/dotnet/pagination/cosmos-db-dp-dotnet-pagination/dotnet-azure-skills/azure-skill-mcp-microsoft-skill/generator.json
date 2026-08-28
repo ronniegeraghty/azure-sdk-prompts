@@ -1,0 +1,41 @@
+{
+  "prompt_id": "cosmos-db-dp-dotnet-pagination",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that queries\r\nitems in a Cosmos DB container with proper pagination:\r\n1. Execute a SQL query \"SELECT * FROM c WHERE c.category = 'electronics'\" against a container\r\n2. Process results page-by-page using FeedIterator, limiting each page to 50 items\r\n3. Print the continuation token after each page\r\n4. Implement a \"resume from token\" pattern where the query can restart from a saved token\r\n5. Track total RU consumption across all pages\r\n\r\nUse the Microsoft.Azure.Cosmos SDK v3. Show how to configure MaxItemCount\r\nand explain the difference between FeedIterator and LINQ-based queries.",
+  "final_response": "Implemented a complete .NET 8 Cosmos DB pagination sample:\n\n- `Program.cs` — `FeedIterator\u003cT\u003e`, `MaxItemCount = 50`, continuation-token persistence/resume, per-page output, and cumulative RU tracking.\n- `CosmosPagination.csproj` — Microsoft.Azure.Cosmos v3.62.1 and secure `DefaultAzureCredential` authentication.\n- `README.md` — configuration, resume commands, pagination caveats, and `FeedIterator` vs. LINQ guidance.\n\n```powershell\n$env:COSMOS_ENDPOINT = \"https://\u003caccount\u003e.documents.azure.com:443/\"\n$env:COSMOS_DATABASE = \"\u003cdatabase-id\u003e\"\n$env:COSMOS_CONTAINER = \"\u003ccontainer-id\u003e\"\n\ndotnet run\ndotnet run -- --resume\n```\n\n`MaxItemCount = 50` is an upper bound; Cosmos DB can return fewer records in a page. LINQ queries provide strongly typed query composition, but must be converted with `ToFeedIterator()` for asynchronous page control, continuation tokens, diagnostics, and per-page RU charges.\n\nReferences: [query items](https://learn.microsoft.com/azure/cosmos-db/nosql/how-to-dotnet-query-items), [page-size guidance](https://learn.microsoft.com/azure/cosmos-db/performance-tips-query-sdk?pivots=programming-language-csharp#tune-the-page-size), and [LINQ translation](https://learn.microsoft.com/azure/cosmos-db/nosql/query/linq-to-sql).",
+  "workspace_delta": {
+    "bytes_added": 8684,
+    "bytes_removed": 0,
+    "bytes_net": 8684,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "CosmosPagination.csproj",
+        "size": 495
+      },
+      {
+        "path": "Program.cs",
+        "size": 5012
+      },
+      {
+        "path": "README.md",
+        "size": 3177
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T01:17:21.5144822+08:00",
+  "ended_at": "2026-08-29T01:19:59.981655+08:00",
+  "duration_ms": 158467,
+  "terminated_by": "completed"
+}

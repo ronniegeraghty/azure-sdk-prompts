@@ -6,20 +6,20 @@ Progress comment: https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-
 
 Overall status: **Running**
 
-Current suite: **.NET**
+Current suite: **None - .NET audit complete**
 
 ## Suite status
 
 | Order | Suite | Prompts | Evaluations | Status | Run ID | Health |
 |---:|---|---:|---:|---|---|---|
-| 1 | .NET | 20 | 60 | In progress (30 reports) | `20260829-004156` | 1 isolated generation timeout; MCP healthy |
+| 1 | .NET | 20 | 60 | Completed with 1 issue | `20260829-004156` | 60/60 reports; 20/20 triplets; MCP 261/261 |
 | 2 | Python | 19 | 57 | Pending | - | - |
 | 3 | Java | 19 | 57 | Pending | - | - |
 | 4 | JS/TS | 14 | 42 | Pending | - | - |
 
-Completed: none.
+Completed: .NET.
 
-Remaining: .NET, Python, Java, JS/TS.
+Remaining: Python, Java, JS/TS.
 
 ## Frozen environment
 
@@ -44,3 +44,4 @@ Remaining: .NET, Python, Java, JS/TS.
 | 2026-08-29 00:35 +08:00 | Initialized the four-suite rerun plan. | Pending |
 | 2026-08-29 00:40 +08:00 | Froze the runtime versions and marked .NET in progress. | Pending |
 | 2026-08-29 02:05 +08:00 | Recorded one isolated .NET full-arm generation timeout at 30/60 reports; 121/121 Azure MCP calls had succeeded. | Pending |
+| 2026-08-29 03:18 +08:00 | Completed the .NET suite audit: 60/60 reports, 20/20 triplets, one generation timeout, and no MCP/test timeouts. | Pending |

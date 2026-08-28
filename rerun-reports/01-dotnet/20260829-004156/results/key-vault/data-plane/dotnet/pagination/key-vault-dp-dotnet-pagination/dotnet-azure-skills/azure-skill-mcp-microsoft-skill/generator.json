@@ -1,0 +1,37 @@
+{
+  "prompt_id": "key-vault-dp-dotnet-pagination",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that lists all\r\nsecrets in an Azure Key Vault that contains hundreds of secrets. The program should:\r\n1. Use SecretClient with DefaultAzureCredential\r\n2. Iterate through secrets page-by-page using AsyncPageable\r\n3. Print the name, content type, and enabled status of each secret\r\n4. Handle the case where some secrets are disabled\r\n5. Show both sync and async iteration patterns\r\n\r\nI want to understand how Azure.Page\u003cT\u003e and AsyncPageable\u003cT\u003e work\r\nfor large result sets. Show required NuGet packages.",
+  "final_response": "Implemented the console sample in `Program.cs`, with package references in `KeyVaultSecretPagination.csproj`:\n\n```powershell\ndotnet add package Azure.Security.KeyVault.Secrets # 4.11.0\ndotnet add package Azure.Identity                 # 1.21.0\n```\n\nRun it with:\n\n```powershell\n$env:AZURE_KEY_VAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net/\"\ndotnet run -- async  # AsyncPageable\u003cT\u003e\ndotnet run -- sync   # Pageable\u003cT\u003e\ndotnet run -- both\n```\n\nThe sample uses `AsPages(pageSizeHint: 25)` and processes each `Page\u003cSecretProperties\u003e` separately. `Page\u003cT\u003e.Values` contains the current page, while `ContinuationToken` indicates whether another page is available. `AsyncPageable\u003cT\u003e` retrieves pages lazily as `await foreach` advances. Disabled secrets remain listable because the program reads metadata only—it never calls `GetSecret` to retrieve secret values.\n\nReferences: [Azure SDK pagination](https://learn.microsoft.com/dotnet/azure/sdk/pagination) · [Key Vault Secrets .NET client](https://learn.microsoft.com/dotnet/api/overview/azure/security.keyvault.secrets-readme?view=azure-dotnet)",
+  "workspace_delta": {
+    "bytes_added": 4947,
+    "bytes_removed": 0,
+    "bytes_net": 4947,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "KeyVaultSecretPagination.csproj",
+        "size": 439
+      },
+      {
+        "path": "Program.cs",
+        "size": 4508
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 9,
+    "tool_calls": 0,
+    "reasoning_steps": 9,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T02:12:39.2393653+08:00",
+  "ended_at": "2026-08-29T02:14:45.8019597+08:00",
+  "duration_ms": 126562,
+  "terminated_by": "completed"
+}

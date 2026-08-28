@@ -1,0 +1,657 @@
+Found 20 prompt(s), 3 config(s) → 60 evaluation(s)
+Using Copilot SDK evaluator
+
+📊 Evaluation plan: 60 evaluations (20 prompts × 3 configs)
+   Estimated Copilot sessions: 120 (60 × 2 for generate/review)
+   Workers: 1 | Max sessions: 3
+
+
+Graders for storage-mp-dotnet-account-mgmt / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `Azure.ResourceManager.Storage` NuGet package: Pass
+      - `ArmClient` and subscription/resource group navigation: Pass
+      - `StorageAccountCollection.CreateOrUpdate()` with `StorageAccountCreateOrUpdateContent`: Pass
+      - SKU and kind configuration (`StorageSku`, `StorageKind`): Pass
+      - Listing and getting storage accounts: Pass
+      - Updating properties via `StorageAccountPatch`: Fail
+      - Delete operation: Pass
+
+Graders for cosmos-db-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `Microsoft.Azure.Cosmos` NuGet package: Pass
+      - `CosmosClient` creation and configuration: Pass
+      - `Database.CreateDatabaseIfNotExistsAsync()`: Pass
+      - `Container.CreateContainerIfNotExistsAsync()` with partition key: Pass
+      - `Container.CreateItemAsync<T>()`, `ReadItemAsync<T>()`, `ReplaceItemAsync<T>()`, `DeleteItemAsync<T>()`: Pass
+      - `Container.GetItemQueryIterator<T>()` with `QueryDefinition`: Pass
+      - `CosmosException` handling with status codes: Pass
+
+Graders for app-configuration-dp-dotnet-crud / dotnet-azure-skills/baseline:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `Azure.Data.AppConfiguration` NuGet package: Pass
+      - `ConfigurationClient` creation with connection string or `DefaultAzureCredential`: Pass
+      - `SetConfigurationSetting()` with key, value, and optional label: Pass
+      - `GetConfigurationSetting()` by key and label: Fail
+      - `GetConfigurationSettings()` with `SettingSelector` for filtering: Pass
+      - Feature flag configuration settings with `FeatureFlagConfigurationSetting`: Pass
+      - `DeleteConfigurationSetting()` and `RequestFailedException` handling: Pass
+
+Graders for app-configuration-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `Azure.Data.AppConfiguration` NuGet package: Pass
+      - `ConfigurationClient` creation with connection string or `DefaultAzureCredential`: Pass
+      - `SetConfigurationSetting()` with key, value, and optional label: Pass
+      - `GetConfigurationSetting()` by key and label: Fail
+      - `GetConfigurationSettings()` with `SettingSelector` for filtering: Pass
+      - Feature flag configuration settings with `FeatureFlagConfigurationSetting`: Pass
+      - `DeleteConfigurationSetting()` and `RequestFailedException` handling: Pass
+
+Graders for app-configuration-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `Azure.Data.AppConfiguration` NuGet package: Pass
+      - `ConfigurationClient` creation with connection string or `DefaultAzureCredential`: Pass
+      - `SetConfigurationSetting()` with key, value, and optional label: Pass
+      - `GetConfigurationSetting()` by key and label: Fail
+      - `GetConfigurationSettings()` with `SettingSelector` for filtering: Pass
+      - Feature flag configuration settings with `FeatureFlagConfigurationSetting`: Pass
+      - `DeleteConfigurationSetting()` and `RequestFailedException` handling: Pass
+
+Graders for cosmos-db-dp-dotnet-crud / dotnet-azure-skills/baseline:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `Microsoft.Azure.Cosmos` NuGet package: Pass
+      - `CosmosClient` creation and configuration: Pass
+      - `Database.CreateDatabaseIfNotExistsAsync()`: Pass
+      - `Container.CreateContainerIfNotExistsAsync()` with partition key: Pass
+      - `Container.CreateItemAsync<T>()`, `ReadItemAsync<T>()`, `ReplaceItemAsync<T>()`, `DeleteItemAsync<T>()`: Pass
+      - `Container.GetItemQueryIterator<T>()` with `QueryDefinition`: Pass
+      - `CosmosException` handling with status codes: Pass
+
+Graders for key-vault-dp-dotnet-pagination / dotnet-azure-skills/azure-skill-mcp:
+- pagination-list-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `SecretClient.GetPropertiesOfSecretsAsync()` returning `AsyncPageable<SecretProperties>`: Pass
+      - `await foreach` pattern for async iteration: Pass
+      - `AsPages()` for explicit page-by-page control: Pass
+      - Page size hints via `GetPropertiesOfSecretsAsync(cancellationToken)`: Pass
+      - Accessing `SecretProperties` fields (Name, ContentType, Enabled, CreatedOn): Fail
+      - Sync alternative using `Pageable<SecretProperties>`: Pass
+      - Error handling during pagination: Pass
+
+Graders for cosmos-db-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `Microsoft.Azure.Cosmos` NuGet package: Pass
+      - `CosmosClient` creation and configuration: Pass
+      - `Database.CreateDatabaseIfNotExistsAsync()`: Pass
+      - `Container.CreateContainerIfNotExistsAsync()` with partition key: Pass
+      - `Container.CreateItemAsync<T>()`, `ReadItemAsync<T>()`, `ReplaceItemAsync<T>()`, `DeleteItemAsync<T>()`: Pass
+      - `Container.GetItemQueryIterator<T>()` with `QueryDefinition`: Pass
+      - `CosmosException` handling with status codes: Pass
+
+Graders for cosmos-db-dp-dotnet-error-handling / dotnet-azure-skills/baseline:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `CosmosException` as the primary exception type: Pass
+      - Extracting `StatusCode`, `SubStatusCode`, and `RetryAfter` properties: Pass
+      - Handling 429 (TooManyRequests) with retry-after backoff: Pass
+      - Handling 404 (NotFound) for missing items or containers: Pass
+      - Handling 409 (Conflict) for duplicate items: Pass
+      - `CosmosClientOptions.MaxRetryAttemptsOnRateLimitedRequests` configuration: Pass
+      - RU consumption tracking via `RequestCharge` on responses: Fail
+      - Diagnostics string for troubleshooting: Pass
+
+Graders for cosmos-db-dp-dotnet-error-handling / dotnet-azure-skills/azure-skill-mcp:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `CosmosException` as the primary exception type: Pass
+      - Extracting `StatusCode`, `SubStatusCode`, and `RetryAfter` properties: Fail
+      - Handling 429 (TooManyRequests) with retry-after backoff: Pass
+      - Handling 404 (NotFound) for missing items or containers: Pass
+      - Handling 409 (Conflict) for duplicate items: Pass
+      - `CosmosClientOptions.MaxRetryAttemptsOnRateLimitedRequests` configuration: Pass
+      - RU consumption tracking via `RequestCharge` on responses: Fail
+      - Diagnostics string for troubleshooting: Pass
+
+Graders for cosmos-db-dp-dotnet-error-handling / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `CosmosException` as the primary exception type: Pass
+      - Extracting `StatusCode`, `SubStatusCode`, and `RetryAfter` properties: Pass
+      - Handling 429 (TooManyRequests) with retry-after backoff: Fail
+      - Handling 404 (NotFound) for missing items or containers: Pass
+      - Handling 409 (Conflict) for duplicate items: Pass
+      - `CosmosClientOptions.MaxRetryAttemptsOnRateLimitedRequests` configuration: Pass
+      - RU consumption tracking via `RequestCharge` on responses: Fail
+      - Diagnostics string for troubleshooting: Pass
+
+Graders for cosmos-db-dp-dotnet-pagination / dotnet-azure-skills/baseline:
+- pagination-query-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `Container.GetItemQueryIterator<T>()` with `QueryDefinition`: Pass
+      - `QueryRequestOptions.MaxItemCount` for page size control: Pass
+      - `FeedIterator<T>.HasMoreResults` and `ReadNextAsync()` loop pattern: Pass
+      - `FeedResponse<T>.ContinuationToken` for resumable pagination: Pass
+      - Passing continuation token to resume a query: Pass
+      - `FeedResponse<T>.RequestCharge` for RU tracking: Pass
+      - Cross-partition query considerations: Fail
+      - LINQ alternative via `GetItemLinqQueryable<T>()`: Pass
+
+Graders for cosmos-db-dp-dotnet-pagination / dotnet-azure-skills/azure-skill-mcp:
+- pagination-query-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `Container.GetItemQueryIterator<T>()` with `QueryDefinition`: Pass
+      - `QueryRequestOptions.MaxItemCount` for page size control: Pass
+      - `FeedIterator<T>.HasMoreResults` and `ReadNextAsync()` loop pattern: Pass
+      - `FeedResponse<T>.ContinuationToken` for resumable pagination: Pass
+      - Passing continuation token to resume a query: Pass
+      - `FeedResponse<T>.RequestCharge` for RU tracking: Pass
+      - Cross-partition query considerations: Fail
+      - LINQ alternative via `GetItemLinqQueryable<T>()`: Pass
+
+Graders for cosmos-db-dp-dotnet-pagination / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- pagination-query-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `Container.GetItemQueryIterator<T>()` with `QueryDefinition`: Pass
+      - `QueryRequestOptions.MaxItemCount` for page size control: Pass
+      - `FeedIterator<T>.HasMoreResults` and `ReadNextAsync()` loop pattern: Pass
+      - `FeedResponse<T>.ContinuationToken` for resumable pagination: Pass
+      - Passing continuation token to resume a query: Pass
+      - `FeedResponse<T>.RequestCharge` for RU tracking: Pass
+      - Cross-partition query considerations: Pass
+      - LINQ alternative via `GetItemLinqQueryable<T>()`: Pass
+
+Graders for event-hubs-dp-dotnet-streaming / dotnet-azure-skills/baseline:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `Azure.Messaging.EventHubs` and `Azure.Messaging.EventHubs.Processor` NuGet packages: Pass
+      - `EventHubProducerClient` and `EventHubConsumerClient`: Pass
+      - `CreateBatchAsync()` and `EventDataBatch.TryAdd()`: Pass
+      - `SendAsync()` for publishing events: Pass
+      - `EventProcessorClient` with `BlobContainerClient` for checkpointing: Pass
+      - Event handler delegates and `ProcessEventArgs`: Pass
+      - `UpdateCheckpointAsync()` for reliable processing: Pass
+
+Graders for event-hubs-dp-dotnet-streaming / dotnet-azure-skills/azure-skill-mcp:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `Azure.Messaging.EventHubs` and `Azure.Messaging.EventHubs.Processor` NuGet packages: Pass
+      - `EventHubProducerClient` and `EventHubConsumerClient`: Pass
+      - `CreateBatchAsync()` and `EventDataBatch.TryAdd()`: Pass
+      - `SendAsync()` for publishing events: Pass
+      - `EventProcessorClient` with `BlobContainerClient` for checkpointing: Pass
+      - Event handler delegates and `ProcessEventArgs`: Pass
+      - `UpdateCheckpointAsync()` for reliable processing: Pass
+
+Graders for event-hubs-dp-dotnet-streaming / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `Azure.Messaging.EventHubs` and `Azure.Messaging.EventHubs.Processor` NuGet packages: Pass
+      - `EventHubProducerClient` and `EventHubConsumerClient`: Pass
+      - `CreateBatchAsync()` and `EventDataBatch.TryAdd()`: Pass
+      - `SendAsync()` for publishing events: Pass
+      - `EventProcessorClient` with `BlobContainerClient` for checkpointing: Pass
+      - Event handler delegates and `ProcessEventArgs`: Pass
+      - `UpdateCheckpointAsync()` for reliable processing: Pass
+
+Graders for identity-dp-dotnet-default-credential / dotnet-azure-skills/baseline:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `Azure.Identity` NuGet package installation: Pass
+      - `DefaultAzureCredential` constructor and options: Pass
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to any Azure SDK client constructor: Pass
+      - `AuthenticationFailedException` handling and diagnostics: Pass
+
+Graders for identity-dp-dotnet-default-credential / dotnet-azure-skills/azure-skill-mcp:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - `Azure.Identity` NuGet package installation: Pass
+      - `DefaultAzureCredential` constructor and options: Fail
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to any Azure SDK client constructor: Pass
+      - `AuthenticationFailedException` handling and diagnostics: Pass
+
+Graders for identity-dp-dotnet-default-credential / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `Azure.Identity` NuGet package installation: Pass
+      - `DefaultAzureCredential` constructor and options: Pass
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to any Azure SDK client constructor: Pass
+      - `AuthenticationFailedException` handling and diagnostics: Pass
+
+Graders for identity-dp-dotnet-managed-identity / dotnet-azure-skills/baseline:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `ManagedIdentityCredential` class and constructors: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing the client ID: Pass
+      - Integration with `DefaultAzureCredential` (managed identity in the chain): Pass
+      - `CredentialUnavailableException` when not running in Azure: Pass
+      - Combining with `ChainedTokenCredential` for local fallback: Fail
+
+Graders for identity-dp-dotnet-managed-identity / dotnet-azure-skills/azure-skill-mcp:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/6)
+      - `ManagedIdentityCredential` class and constructors: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing the client ID: Pass
+      - Integration with `DefaultAzureCredential` (managed identity in the chain): Fail
+      - `CredentialUnavailableException` when not running in Azure: Pass
+      - Combining with `ChainedTokenCredential` for local fallback: Fail
+
+Graders for identity-dp-dotnet-managed-identity / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (0/1)
+      - grader executed: Fail
+
+Graders for identity-dp-dotnet-service-principal / dotnet-azure-skills/baseline:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `Azure.Identity` package with `ClientSecretCredential` class: Pass
+      - Constructor parameters: tenantId, clientId, clientSecret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - Environment variable patterns for secret storage: Pass
+      - `AuthenticationFailedException` for invalid credentials: Pass
+
+Graders for identity-dp-dotnet-service-principal / dotnet-azure-skills/azure-skill-mcp:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `Azure.Identity` package with `ClientSecretCredential` class: Pass
+      - Constructor parameters: tenantId, clientId, clientSecret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - Environment variable patterns for secret storage: Pass
+      - `AuthenticationFailedException` for invalid credentials: Pass
+
+Graders for identity-dp-dotnet-service-principal / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `Azure.Identity` package with `ClientSecretCredential` class: Pass
+      - Constructor parameters: tenantId, clientId, clientSecret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - Environment variable patterns for secret storage: Pass
+      - `AuthenticationFailedException` for invalid credentials: Pass
+
+Graders for key-vault-dp-dotnet-crud / dotnet-azure-skills/baseline:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - Installing `Azure.Security.KeyVault.Secrets` and `Azure.Identity` NuGet packages: Pass
+      - Creating a `SecretClient` with vault URI and credential: Pass
+      - `SetSecret()`, `GetSecret()`, `StartDeleteSecret()`, `PurgeDeletedSecret()`: Pass
+      - Handling soft-delete (polling `DeleteSecretOperation` to completion before purge): Pass
+      - Exception handling for `RequestFailedException`: Pass
+
+Graders for key-vault-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - Installing `Azure.Security.KeyVault.Secrets` and `Azure.Identity` NuGet packages: Pass
+      - Creating a `SecretClient` with vault URI and credential: Pass
+      - `SetSecret()`, `GetSecret()`, `StartDeleteSecret()`, `PurgeDeletedSecret()`: Pass
+      - Handling soft-delete (polling `DeleteSecretOperation` to completion before purge): Pass
+      - Exception handling for `RequestFailedException`: Pass
+
+Graders for key-vault-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - Installing `Azure.Security.KeyVault.Secrets` and `Azure.Identity` NuGet packages: Fail
+      - Creating a `SecretClient` with vault URI and credential: Pass
+      - `SetSecret()`, `GetSecret()`, `StartDeleteSecret()`, `PurgeDeletedSecret()`: Pass
+      - Handling soft-delete (polling `DeleteSecretOperation` to completion before purge): Pass
+      - Exception handling for `RequestFailedException`: Pass
+
+Graders for key-vault-dp-dotnet-error-handling / dotnet-azure-skills/baseline:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/7)
+      - `RequestFailedException` for all Key Vault errors: Pass
+      - Extracting `Status` and `ErrorCode` properties: Pass
+      - 403 handling: diagnosing RBAC vs. access policy misconfiguration: Fail
+      - 404 handling: secret not found vs. deleted secret: Fail
+      - 429 throttling: Key Vault rate limits and retry behavior: Pass
+      - Soft-delete and purge protection error scenarios: Fail
+      - `SecretClientOptions` retry configuration: Pass
+
+Graders for key-vault-dp-dotnet-error-handling / dotnet-azure-skills/azure-skill-mcp:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/7)
+      - `RequestFailedException` for all Key Vault errors: Pass
+      - Extracting `Status` and `ErrorCode` properties: Pass
+      - 403 handling: diagnosing RBAC vs. access policy misconfiguration: Fail
+      - 404 handling: secret not found vs. deleted secret: Fail
+      - 429 throttling: Key Vault rate limits and retry behavior: Pass
+      - Soft-delete and purge protection error scenarios: Fail
+      - `SecretClientOptions` retry configuration: Pass
+
+Graders for key-vault-dp-dotnet-error-handling / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/7)
+      - `RequestFailedException` for all Key Vault errors: Pass
+      - Extracting `Status` and `ErrorCode` properties: Pass
+      - 403 handling: diagnosing RBAC vs. access policy misconfiguration: Fail
+      - 404 handling: secret not found vs. deleted secret: Fail
+      - 429 throttling: Key Vault rate limits and retry behavior: Pass
+      - Soft-delete and purge protection error scenarios: Fail
+      - `SecretClientOptions` retry configuration: Pass
+
+Graders for key-vault-dp-dotnet-pagination / dotnet-azure-skills/baseline:
+- pagination-list-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/7)
+      - `SecretClient.GetPropertiesOfSecretsAsync()` returning `AsyncPageable<SecretProperties>`: Pass
+      - `await foreach` pattern for async iteration: Pass
+      - `AsPages()` for explicit page-by-page control: Pass
+      - Page size hints via `GetPropertiesOfSecretsAsync(cancellationToken)`: Fail
+      - Accessing `SecretProperties` fields (Name, ContentType, Enabled, CreatedOn): Fail
+      - Sync alternative using `Pageable<SecretProperties>`: Pass
+      - Error handling during pagination: Pass
+
+Graders for storage-dp-dotnet-batch / dotnet-azure-skills/baseline:
+- batch-blob-operations.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/8)
+      - `BlobBatchClient` from `Azure.Storage.Blobs.Batch` package: Pass
+      - `BlobBatchClient.DeleteBlobsAsync()` for bulk delete: Fail
+      - `BlobBatchClient.SetBlobsAccessTierAsync()` for bulk tier changes: Fail
+      - Custom batch via `BlobBatchClient.CreateBatch()` and `SubmitBatchAsync()`: Pass
+      - Batch size limits (256 operations per batch): Pass
+      - Partial failure handling: `AggregateException` with per-operation status: Pass
+      - `RequestFailedException` for individual operation failures within a batch: Pass
+      - Authentication scopes for batch operations: Fail
+
+Graders for key-vault-dp-dotnet-pagination / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- pagination-list-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `SecretClient.GetPropertiesOfSecretsAsync()` returning `AsyncPageable<SecretProperties>`: Pass
+      - `await foreach` pattern for async iteration: Pass
+      - `AsPages()` for explicit page-by-page control: Pass
+      - Page size hints via `GetPropertiesOfSecretsAsync(cancellationToken)`: Pass
+      - Accessing `SecretProperties` fields (Name, ContentType, Enabled, CreatedOn): Fail
+      - Sync alternative using `Pageable<SecretProperties>`: Pass
+      - Error handling during pagination: Pass
+
+Graders for key-vault-mp-dotnet-polling / dotnet-azure-skills/baseline:
+- polling-create-vault.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `KeyVaultCollection.CreateOrUpdateAsync()` returning `ArmOperation<KeyVaultResource>`: Pass
+      - `KeyVaultCreateOrUpdateContent` with `KeyVaultProperties`: Pass
+      - Configuring `EnableRbacAuthorization`, `EnableSoftDelete`, `EnablePurgeProtection`: Pass
+      - `VaultAccessPolicy` vs RBAC authorization model: Pass
+      - `ArmOperation<T>.WaitForCompletionAsync()` for completion: Pass
+      - `WaitUntil.Completed` vs `WaitUntil.Started`: Pass
+      - Tenant ID and object ID configuration: Pass
+      - Error handling for existing vaults and soft-deleted vaults: Fail
+
+Graders for key-vault-mp-dotnet-polling / dotnet-azure-skills/azure-skill-mcp:
+- polling-create-vault.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (0/8)
+      - `KeyVaultCollection.CreateOrUpdateAsync()` returning `ArmOperation<KeyVaultResource>`: Fail
+      - `KeyVaultCreateOrUpdateContent` with `KeyVaultProperties`: Fail
+      - Configuring `EnableRbacAuthorization`, `EnableSoftDelete`, `EnablePurgeProtection`: Fail
+      - `VaultAccessPolicy` vs RBAC authorization model: Fail
+      - `ArmOperation<T>.WaitForCompletionAsync()` for completion: Fail
+      - `WaitUntil.Completed` vs `WaitUntil.Started`: Fail
+      - Tenant ID and object ID configuration: Fail
+      - Error handling for existing vaults and soft-deleted vaults: Fail
+
+Graders for key-vault-mp-dotnet-polling / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- polling-create-vault.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `KeyVaultCollection.CreateOrUpdateAsync()` returning `ArmOperation<KeyVaultResource>`: Pass
+      - `KeyVaultCreateOrUpdateContent` with `KeyVaultProperties`: Pass
+      - Configuring `EnableRbacAuthorization`, `EnableSoftDelete`, `EnablePurgeProtection`: Pass
+      - `VaultAccessPolicy` vs RBAC authorization model: Pass
+      - `ArmOperation<T>.WaitForCompletionAsync()` for completion: Pass
+      - `WaitUntil.Completed` vs `WaitUntil.Started`: Pass
+      - Tenant ID and object ID configuration: Pass
+      - Error handling for existing vaults and soft-deleted vaults: Fail
+
+Graders for resource-manager-mp-dotnet-rg-crud / dotnet-azure-skills/baseline:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (6/6)
+      - `Azure.ResourceManager` NuGet package: Pass
+      - `ArmClient` creation with `DefaultAzureCredential`: Pass
+      - `GetDefaultSubscription()` and `GetResourceGroups()` collection: Pass
+      - `CreateOrUpdate()`, `Get()`, `GetAll()` operations: Pass
+      - Tag management with `SetTags()` or `AddTag()`: Pass
+      - `Delete()` with `WaitForCompletion()`: Pass
+
+Graders for resource-manager-mp-dotnet-rg-crud / dotnet-azure-skills/azure-skill-mcp:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (6/6)
+      - `Azure.ResourceManager` NuGet package: Pass
+      - `ArmClient` creation with `DefaultAzureCredential`: Pass
+      - `GetDefaultSubscription()` and `GetResourceGroups()` collection: Pass
+      - `CreateOrUpdate()`, `Get()`, `GetAll()` operations: Pass
+      - Tag management with `SetTags()` or `AddTag()`: Pass
+      - `Delete()` with `WaitForCompletion()`: Pass
+
+Graders for resource-manager-mp-dotnet-rg-crud / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (6/6)
+      - `Azure.ResourceManager` NuGet package: Pass
+      - `ArmClient` creation with `DefaultAzureCredential`: Pass
+      - `GetDefaultSubscription()` and `GetResourceGroups()` collection: Pass
+      - `CreateOrUpdate()`, `Get()`, `GetAll()` operations: Pass
+      - Tag management with `SetTags()` or `AddTag()`: Pass
+      - `Delete()` with `WaitForCompletion()`: Pass
+
+Graders for service-bus-dp-dotnet-crud / dotnet-azure-skills/baseline:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `Azure.Messaging.ServiceBus` NuGet package: Pass
+      - `ServiceBusClient` creation with connection string or `DefaultAzureCredential`: Pass
+      - `ServiceBusSender` and `ServiceBusMessage` for sending: Pass
+      - `ServiceBusMessageBatch` and `TryAddMessage()`: Pass
+      - `ServiceBusReceiver` and `ReceiveMessagesAsync()`: Pass
+      - `CompleteMessageAsync()`, `AbandonMessageAsync()`, `DeadLetterMessageAsync()`: Fail
+      - `ServiceBusProcessor` with `ProcessMessageAsync` and `ProcessErrorAsync`: Pass
+      - Topic/subscription with `CreateSender(topicName)` and `CreateReceiver(topicName, subscriptionName)`: Pass
+
+Graders for service-bus-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `Azure.Messaging.ServiceBus` NuGet package: Pass
+      - `ServiceBusClient` creation with connection string or `DefaultAzureCredential`: Pass
+      - `ServiceBusSender` and `ServiceBusMessage` for sending: Pass
+      - `ServiceBusMessageBatch` and `TryAddMessage()`: Pass
+      - `ServiceBusReceiver` and `ReceiveMessagesAsync()`: Pass
+      - `CompleteMessageAsync()`, `AbandonMessageAsync()`, `DeadLetterMessageAsync()`: Fail
+      - `ServiceBusProcessor` with `ProcessMessageAsync` and `ProcessErrorAsync`: Pass
+      - Topic/subscription with `CreateSender(topicName)` and `CreateReceiver(topicName, subscriptionName)`: Pass
+
+Graders for service-bus-dp-dotnet-crud / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `Azure.Messaging.ServiceBus` NuGet package: Pass
+      - `ServiceBusClient` creation with connection string or `DefaultAzureCredential`: Pass
+      - `ServiceBusSender` and `ServiceBusMessage` for sending: Pass
+      - `ServiceBusMessageBatch` and `TryAddMessage()`: Pass
+      - `ServiceBusReceiver` and `ReceiveMessagesAsync()`: Pass
+      - `CompleteMessageAsync()`, `AbandonMessageAsync()`, `DeadLetterMessageAsync()`: Fail
+      - `ServiceBusProcessor` with `ProcessMessageAsync` and `ProcessErrorAsync`: Pass
+      - Topic/subscription with `CreateSender(topicName)` and `CreateReceiver(topicName, subscriptionName)`: Pass
+
+Graders for storage-dp-dotnet-auth / dotnet-azure-skills/baseline:
+- authentication.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (3/5)
+      - Installing `Azure.Identity` and `Azure.Storage.Blobs` packages: Pass
+      - Creating a `DefaultAzureCredential` instance: Pass
+      - Passing the credential to `BlobServiceClient`: Pass
+      - Explanation of the credential chain (managed identity → CLI → env vars): Fail
+      - Error handling when no credential is available: Fail
+
+Graders for storage-dp-dotnet-auth / dotnet-azure-skills/azure-skill-mcp:
+- authentication.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (3/5)
+      - Installing `Azure.Identity` and `Azure.Storage.Blobs` packages: Pass
+      - Creating a `DefaultAzureCredential` instance: Pass
+      - Passing the credential to `BlobServiceClient`: Pass
+      - Explanation of the credential chain (managed identity → CLI → env vars): Fail
+      - Error handling when no credential is available: Fail
+
+Graders for storage-dp-dotnet-auth / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- authentication.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (3/5)
+      - Installing `Azure.Identity` and `Azure.Storage.Blobs` packages: Pass
+      - Creating a `DefaultAzureCredential` instance: Pass
+      - Passing the credential to `BlobServiceClient`: Pass
+      - Explanation of the credential chain (managed identity → CLI → env vars): Fail
+      - Error handling when no credential is available: Fail
+
+Graders for storage-dp-dotnet-retries / dotnet-azure-skills/azure-skill-mcp:
+- retry-configuration.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `BlobClientOptions.Retry` configuration with `RetryOptions`: Pass
+      - `MaxRetries`, `Delay`, `MaxDelay`, `Mode` (Exponential vs Fixed): Pass
+      - `NetworkTimeout` for per-request timeouts: Pass
+      - Default retryable status codes (408, 429, 500, 502, 503, 504): Pass
+      - Non-retryable errors (400, 401, 403, 404, 409): Pass
+      - Per-operation `CancellationToken` for timeout control: Pass
+      - Geo-redundant retry with `GeoRedundantSecondaryUri`: Fail
+      - Interaction with Polly or other resilience libraries: Pass
+
+Graders for storage-dp-dotnet-batch / dotnet-azure-skills/azure-skill-mcp:
+- batch-blob-operations.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/8)
+      - `BlobBatchClient` from `Azure.Storage.Blobs.Batch` package: Pass
+      - `BlobBatchClient.DeleteBlobsAsync()` for bulk delete: Fail
+      - `BlobBatchClient.SetBlobsAccessTierAsync()` for bulk tier changes: Fail
+      - Custom batch via `BlobBatchClient.CreateBatch()` and `SubmitBatchAsync()`: Pass
+      - Batch size limits (256 operations per batch): Pass
+      - Partial failure handling: `AggregateException` with per-operation status: Pass
+      - `RequestFailedException` for individual operation failures within a batch: Fail
+      - Authentication scopes for batch operations: Pass
+
+Graders for storage-dp-dotnet-batch / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- batch-blob-operations.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/8)
+      - `BlobBatchClient` from `Azure.Storage.Blobs.Batch` package: Pass
+      - `BlobBatchClient.DeleteBlobsAsync()` for bulk delete: Fail
+      - `BlobBatchClient.SetBlobsAccessTierAsync()` for bulk tier changes: Fail
+      - Custom batch via `BlobBatchClient.CreateBatch()` and `SubmitBatchAsync()`: Pass
+      - Batch size limits (256 operations per batch): Pass
+      - Partial failure handling: `AggregateException` with per-operation status: Pass
+      - `RequestFailedException` for individual operation failures within a batch: Pass
+      - Authentication scopes for batch operations: Fail
+
+Graders for storage-dp-dotnet-error-handling / dotnet-azure-skills/baseline:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/6)
+      - `RequestFailedException` as the primary exception type: Pass
+      - Extracting `Status` and `ErrorCode` from the exception: Pass
+      - Handling specific HTTP status codes (404, 403, 409, 429): Fail
+      - Retry policy configuration via `BlobClientOptions`: Pass
+      - Conditional request failures (ETags, leases): Fail
+      - Logging and diagnostics for troubleshooting: Pass
+
+Graders for storage-dp-dotnet-error-handling / dotnet-azure-skills/azure-skill-mcp:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/6)
+      - `RequestFailedException` as the primary exception type: Pass
+      - Extracting `Status` and `ErrorCode` from the exception: Pass
+      - Handling specific HTTP status codes (404, 403, 409, 429): Fail
+      - Retry policy configuration via `BlobClientOptions`: Pass
+      - Conditional request failures (ETags, leases): Fail
+      - Logging and diagnostics for troubleshooting: Pass
+
+Graders for storage-dp-dotnet-error-handling / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- error-handling.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/6)
+      - `RequestFailedException` as the primary exception type: Pass
+      - Extracting `Status` and `ErrorCode` from the exception: Pass
+      - Handling specific HTTP status codes (404, 403, 409, 429): Fail
+      - Retry policy configuration via `BlobClientOptions`: Pass
+      - Conditional request failures (ETags, leases): Fail
+      - Logging and diagnostics for troubleshooting: Pass
+
+Graders for storage-dp-dotnet-retries / dotnet-azure-skills/baseline:
+- retry-configuration.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `BlobClientOptions.Retry` configuration with `RetryOptions`: Pass
+      - `MaxRetries`, `Delay`, `MaxDelay`, `Mode` (Exponential vs Fixed): Pass
+      - `NetworkTimeout` for per-request timeouts: Pass
+      - Default retryable status codes (408, 429, 500, 502, 503, 504): Pass
+      - Non-retryable errors (400, 401, 403, 404, 409): Pass
+      - Per-operation `CancellationToken` for timeout control: Pass
+      - Geo-redundant retry with `GeoRedundantSecondaryUri`: Fail
+      - Interaction with Polly or other resilience libraries: Pass
+
+Graders for storage-mp-dotnet-polling / dotnet-azure-skills/azure-skill-mcp:
+- polling-create-account.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `StorageAccountCollection.CreateOrUpdateAsync()` returning `ArmOperation<StorageAccountResource>`: Pass
+      - `ArmOperation<T>.WaitForCompletionAsync()` for simple completion: Pass
+      - `ArmOperation<T>.HasCompleted` and `UpdateStatusAsync()` for manual polling: Pass
+      - `ArmOperation<T>.Value` to get the result after completion: Pass
+      - Timeout handling with `CancellationToken`: Pass
+      - `WaitUntil.Completed` vs `WaitUntil.Started` parameter: Fail
+      - Error handling when the LRO fails: Pass
+
+Graders for storage-dp-dotnet-retries / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- retry-configuration.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `BlobClientOptions.Retry` configuration with `RetryOptions`: Pass
+      - `MaxRetries`, `Delay`, `MaxDelay`, `Mode` (Exponential vs Fixed): Pass
+      - `NetworkTimeout` for per-request timeouts: Pass
+      - Default retryable status codes (408, 429, 500, 502, 503, 504): Pass
+      - Non-retryable errors (400, 401, 403, 404, 409): Pass
+      - Per-operation `CancellationToken` for timeout control: Pass
+      - Geo-redundant retry with `GeoRedundantSecondaryUri`: Fail
+      - Interaction with Polly or other resilience libraries: Pass
+
+Graders for storage-mp-dotnet-polling / dotnet-azure-skills/baseline:
+- polling-create-account.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `StorageAccountCollection.CreateOrUpdateAsync()` returning `ArmOperation<StorageAccountResource>`: Pass
+      - `ArmOperation<T>.WaitForCompletionAsync()` for simple completion: Pass
+      - `ArmOperation<T>.HasCompleted` and `UpdateStatusAsync()` for manual polling: Pass
+      - `ArmOperation<T>.Value` to get the result after completion: Pass
+      - Timeout handling with `CancellationToken`: Pass
+      - `WaitUntil.Completed` vs `WaitUntil.Started` parameter: Fail
+      - Error handling when the LRO fails: Pass
+
+Graders for storage-mp-dotnet-account-mgmt / dotnet-azure-skills/baseline:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `Azure.ResourceManager.Storage` NuGet package: Pass
+      - `ArmClient` and subscription/resource group navigation: Pass
+      - `StorageAccountCollection.CreateOrUpdate()` with `StorageAccountCreateOrUpdateContent`: Pass
+      - SKU and kind configuration (`StorageSku`, `StorageKind`): Pass
+      - Listing and getting storage accounts: Pass
+      - Updating properties via `StorageAccountPatch`: Fail
+      - Delete operation: Pass
+
+Graders for storage-mp-dotnet-polling / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- polling-create-account.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `StorageAccountCollection.CreateOrUpdateAsync()` returning `ArmOperation<StorageAccountResource>`: Pass
+      - `ArmOperation<T>.WaitForCompletionAsync()` for simple completion: Pass
+      - `ArmOperation<T>.HasCompleted` and `UpdateStatusAsync()` for manual polling: Pass
+      - `ArmOperation<T>.Value` to get the result after completion: Pass
+      - Timeout handling with `CancellationToken`: Pass
+      - `WaitUntil.Completed` vs `WaitUntil.Started` parameter: Fail
+      - Error handling when the LRO fails: Pass
+
+Graders for storage-mp-dotnet-account-mgmt / dotnet-azure-skills/azure-skill-mcp:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `Azure.ResourceManager.Storage` NuGet package: Pass
+      - `ArmClient` and subscription/resource group navigation: Pass
+      - `StorageAccountCollection.CreateOrUpdate()` with `StorageAccountCreateOrUpdateContent`: Pass
+      - SKU and kind configuration (`StorageSku`, `StorageKind`): Pass
+      - Listing and getting storage accounts: Pass
+      - Updating properties via `StorageAccountPatch`: Fail
+      - Delete operation: Pass
+
+🔍 Resource usage: Peak: 60 sessions, 0.0GB RAM, 0% CPU
+
+Run Summary:
+  Run ID:      20260829-004156
+  Evaluations: 60
+  Passed:      17
+  Failed:      42
+  Errors:      1
+  Duration:    9310.49s

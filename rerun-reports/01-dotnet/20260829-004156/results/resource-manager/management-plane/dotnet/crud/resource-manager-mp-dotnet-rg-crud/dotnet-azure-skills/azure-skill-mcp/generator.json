@@ -1,0 +1,41 @@
+{
+  "prompt_id": "resource-manager-mp-dotnet-rg-crud",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that manages\r\nAzure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new resource group in \"eastus\" region\r\n3. List all resource groups in the subscription\r\n4. Get details of the created resource group\r\n5. Add a tag to the resource group\r\n6. Delete the resource group\r\n\r\nShow required NuGet packages and proper error handling.\r\nUse the Azure.ResourceManager SDK (not the older Microsoft.Azure.Management packages).",
+  "final_response": "Implemented a complete C# console application:\n\n- `Program.cs` — authenticates with `DefaultAzureCredential`, creates an `eastus` resource group, lists groups, retrieves details, adds a tag, and deletes it.\n- `AzureResourceGroupManager.csproj` — uses `Azure.Identity` **1.21.0** and `Azure.ResourceManager` **1.14.0**.\n- `README.md` — includes setup, permissions, execution instructions, and cleanup behavior.\n\nThe program uses targeted handling for authentication failures, Azure HTTP errors, cancellation, and best-effort cleanup. Run with `dotnet run`; it will create and delete a real Azure resource group in the credential’s default subscription.\n\nReference: [Resource management using the Azure SDK for .NET](https://learn.microsoft.com/dotnet/azure/sdk/resource-management)",
+  "workspace_delta": {
+    "bytes_added": 6802,
+    "bytes_removed": 0,
+    "bytes_net": 6802,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "AzureResourceGroupManager.csproj",
+        "size": 429
+      },
+      {
+        "path": "Program.cs",
+        "size": 4375
+      },
+      {
+        "path": "README.md",
+        "size": 1998
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T02:27:22.275022+08:00",
+  "ended_at": "2026-08-29T02:29:00.1345504+08:00",
+  "duration_ms": 97859,
+  "terminated_by": "completed"
+}

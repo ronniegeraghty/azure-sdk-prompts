@@ -1,0 +1,28 @@
+{
+  "prompt_id": "storage-dp-dotnet-auth",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "How do I authenticate to Azure Blob Storage using DefaultAzureCredential in C#?\r\nI need to create a BlobServiceClient that uses managed identity in production\r\nbut falls back to Azure CLI credentials during local development.\r\nShow me the complete setup including required NuGet packages.",
+  "final_response": "Use `DefaultAzureCredential`, but restrict it to **Azure CLI locally** and **managed identity in production**. This avoids accidentally selecting another credential from the default chain.\n\n### NuGet packages\n\n```powershell\ndotnet add package Azure.Identity\ndotnet add package Azure.Storage.Blobs\n```\n\nUse `Azure.Identity` **1.15.0 or later**, which supports selecting a specific credential through `DefaultAzureCredential`.\n\n### Configuration\n\n`appsettings.json`:\n\n```json\n{\n  \"AzureStorage\": {\n    \"ServiceUri\": \"https://\u003cstorage-account-name\u003e.blob.core.windows.net\",\n    \"ManagedIdentityClientId\": \"\"\n  }\n}\n```\n\nLeave `ManagedIdentityClientId` empty for a **system-assigned managed identity**. For a **user-assigned managed identity**, set it through an environment variable rather than hardcoding deployment-specific configuration:\n\n```text\nAzureStorage__ManagedIdentityClientId=\u003cuser-assigned-identity-client-id\u003e\n```\n\n### ASP.NET Core setup\n\n`Program.cs`:\n\n```csharp\nusing Azure.Core;\nusing Azure.Identity;\nusing Azure.Storage.Blobs;\n\nvar builder = WebApplication.CreateBuilder(args);\n\nvar storageServiceUri =\n    builder.Configuration[\"AzureStorage:ServiceUri\"]\n    ?? throw new InvalidOperationException(\n        \"AzureStorage:ServiceUri is required.\");\n\nvar credentialOptions = new DefaultAzureCredentialOptions();\n\nif (!builder.Environment.IsDevelopment())\n{\n    var managedIdentityClientId =\n        builder.Configuration[\"AzureStorage:ManagedIdentityClientId\"];\n\n    if (!string.IsNullOrWhiteSpace(managedIdentityClientId))\n    {\n        credentialOptions.ManagedIdentityClientId = managedIdentityClientId;\n    }\n}\n\nTokenCredential credential = builder.Environment.IsDevelopment()\n    ? new DefaultAzureCredential(\n        \"AzureCliCredential\",\n        credentialOptions)\n    : new DefaultAzureCredential(\n        \"ManagedIdentityCredential\",\n        credentialOptions);\n\nbuilder.Services.AddSingleton(\n    new BlobServiceClient(\n        new Uri(storageServiceUri),\n        credential));\n\nvar app = builder.Build();\n\napp.MapGet(\"/blobs/{containerName}\", async (\n    string containerName,\n    BlobServiceClient blobServiceClient,\n    CancellationToken cancellationToken) =\u003e\n{\n    var container = blobServiceClient.GetBlobContainerClient(containerName);\n    var blobNames = new List\u003cstring\u003e();\n\n    await foreach (var blob in container.GetBlobsAsync(\n        cancellationToken: cancellationToken))\n    {\n        blobNames.Add(blob.Name);\n    }\n\n    return Results.Ok(blobNames);\n});\n\napp.Run();\n```\n\n`BlobServiceClient` is thread-safe and should be registered once as a singleton.\n\n### Local development\n\nAuthenticate the Azure CLI with a developer identity that has Blob data-plane access:\n\n```powershell\naz login\naz account set --subscription \"\u003csubscription-name-or-id\u003e\"\n```\n\nRun under the Development environment:\n\n```powershell\n$env:ASPNETCORE_ENVIRONMENT = \"Development\"\ndotnet run\n```\n\nThe code will use only `AzureCliCredential`.\n\n### Production\n\n1. Enable a system-assigned or user-assigned managed identity on the Azure host.\n2. Grant that identity an appropriate data-plane role:\n   - **Storage Blob Data Reader** for downloads/listing.\n   - **Storage Blob Data Contributor** for upload, update, and delete operations.\n3. Scope the role as narrowly as possible—prefer the target container when appropriate.\n4. Ensure `ASPNETCORE_ENVIRONMENT` is not set to `Development`.\n\nThe local developer account needs the same appropriate Blob data role. Azure subscription `Contributor` alone does **not** grant access to blob data.\n\nIf you do not require deterministic credential selection, the shorter form below naturally tries managed identity before Azure CLI:\n\n```csharp\nvar client = new BlobServiceClient(\n    new Uri(\"https://\u003cstorage-account-name\u003e.blob.core.windows.net\"),\n    new DefaultAzureCredential());\n```\n\nHowever, the environment-specific version above is preferable for production because it prevents other credentials in the default chain from being selected unexpectedly.\n\nReferences: [Credential chains in Azure Identity for .NET](https://learn.microsoft.com/dotnet/azure/sdk/authentication/credential-chains), [Blob Storage quickstart for .NET](https://learn.microsoft.com/azure/storage/blobs/storage-quickstart-blobs-dotnet), and [Authorize Blob access with Microsoft Entra ID](https://learn.microsoft.com/azure/storage/blobs/authorize-access-azure-active-directory).",
+  "workspace_delta": {
+    "bytes_added": 0,
+    "bytes_removed": 0,
+    "bytes_net": 0,
+    "new_file_count": 0,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": null,
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 7,
+    "tool_calls": 0,
+    "reasoning_steps": 7,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T02:37:57.6837262+08:00",
+  "ended_at": "2026-08-29T02:39:42.0908203+08:00",
+  "duration_ms": 104407,
+  "terminated_by": "completed"
+}

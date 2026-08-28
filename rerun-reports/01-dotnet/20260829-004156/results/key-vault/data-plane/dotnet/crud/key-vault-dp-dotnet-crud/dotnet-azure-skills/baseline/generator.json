@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-dp-dotnet-crud",
+  "config_name": "dotnet-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# console application that performs\r\nall four CRUD operations on Azure Key Vault secrets:\r\n1. Create a new secret called \"my-secret\" with value \"my-secret-value\"\r\n2. Read the secret back and print its value\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Include proper error handling\r\nand show required NuGet packages.",
+  "final_response": "Created a .NET 8 C# console application with all Azure Key Vault secret CRUD operations:\n\n- Creates `my-secret` with `my-secret-value`\n- Reads and prints the value\n- Updates it to `updated-value`\n- Deletes and purges it after deletion completes\n- Uses `DefaultAzureCredential`\n- Handles authentication, Azure request, configuration, and unexpected errors\n\nRequired packages are included in `KeyVaultCrud.csproj`:\n\n```xml\n\u003cPackageReference Include=\"Azure.Identity\" Version=\"1.13.2\" /\u003e\n\u003cPackageReference Include=\"Azure.Security.KeyVault.Secrets\" Version=\"4.7.0\" /\u003e\n```\n\nRun it with:\n\n```powershell\n$env:KEY_VAULT_URI = \"https://your-vault-name.vault.azure.net/\"\ndotnet run\n```\n\nThe identity requires secret `set`, `get`, `delete`, and `purge` permissions. Purging is unavailable if vault purge protection is enabled.",
+  "workspace_delta": {
+    "bytes_added": 3653,
+    "bytes_removed": 0,
+    "bytes_net": 3653,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 2079
+      },
+      {
+        "path": "README.md",
+        "size": 1140
+      },
+      {
+        "path": "KeyVaultCrud.csproj",
+        "size": 434
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 4,
+    "tool_calls": 0,
+    "reasoning_steps": 4,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T01:56:24.5596751+08:00",
+  "ended_at": "2026-08-29T01:57:20.9686307+08:00",
+  "duration_ms": 56408,
+  "terminated_by": "completed"
+}

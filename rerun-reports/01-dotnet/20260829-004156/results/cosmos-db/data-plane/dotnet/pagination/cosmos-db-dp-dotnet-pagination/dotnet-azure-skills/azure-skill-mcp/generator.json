@@ -1,0 +1,41 @@
+{
+  "prompt_id": "cosmos-db-dp-dotnet-pagination",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that queries\r\nitems in a Cosmos DB container with proper pagination:\r\n1. Execute a SQL query \"SELECT * FROM c WHERE c.category = 'electronics'\" against a container\r\n2. Process results page-by-page using FeedIterator, limiting each page to 50 items\r\n3. Print the continuation token after each page\r\n4. Implement a \"resume from token\" pattern where the query can restart from a saved token\r\n5. Track total RU consumption across all pages\r\n\r\nUse the Microsoft.Azure.Cosmos SDK v3. Show how to configure MaxItemCount\r\nand explain the difference between FeedIterator and LINQ-based queries.",
+  "final_response": "Created a complete .NET 8 console sample:\n\n- `Program.cs` — executes the SQL query with `FeedIterator`, `MaxItemCount = 50`, continuation-token checkpoint/resume, and cumulative RU tracking.\n- `CosmosPaginationSample.csproj` — uses `Microsoft.Azure.Cosmos` v3.62.1.\n- `README.md` — includes local emulator configuration, resume commands, pagination caveats, official references, and `FeedIterator` versus LINQ guidance.\n\nRun locally:\n\n```powershell\n$env:COSMOS_CONNECTION_STRING = \"\u003clocal-emulator-connection-string\u003e\"\n$env:COSMOS_DATABASE_ID = \"\u003cdatabase-id\u003e\"\n$env:COSMOS_CONTAINER_ID = \"\u003ccontainer-id\u003e\"\n\ndotnet run\n```\n\nResume after interruption using the saved token and RU total:\n\n```powershell\ndotnet run -- --resume\n```",
+  "workspace_delta": {
+    "bytes_added": 7790,
+    "bytes_removed": 0,
+    "bytes_net": 7790,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "CosmosPaginationSample.csproj",
+        "size": 427
+      },
+      {
+        "path": "Program.cs",
+        "size": 4639
+      },
+      {
+        "path": "README.md",
+        "size": 2724
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 14,
+    "tool_calls": 0,
+    "reasoning_steps": 14,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T01:13:55.143903+08:00",
+  "ended_at": "2026-08-29T01:17:00.1161538+08:00",
+  "duration_ms": 184972,
+  "terminated_by": "completed"
+}

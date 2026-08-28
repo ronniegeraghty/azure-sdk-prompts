@@ -1,0 +1,37 @@
+{
+  "prompt_id": "app-configuration-dp-dotnet-crud",
+  "config_name": "dotnet-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that manages\r\nconfiguration settings in Azure App Configuration:\r\n1. Create a ConfigurationClient using a connection string\r\n2. Set a configuration setting with key \"app:Settings:FontSize\" and value \"24\"\r\n3. Set a configuration setting with a label \"Production\"\r\n4. Get the setting by key and print its value\r\n5. List all settings with the prefix \"app:Settings:\" using GetConfigurationSettings\r\n6. Create a feature flag setting for \"BetaFeature\" that is enabled\r\n7. Delete the setting\r\n\r\nShow required NuGet packages and proper error handling with RequestFailedException.",
+  "final_response": "Created a complete C# sample:\n\n- `Program.cs` implements setting creation, Production label, retrieval, prefix listing, enabled `BetaFeature` flag, deletion, and `RequestFailedException` handling.\n- `AppConfigurationSample.csproj` targets .NET 8 and includes:\n\n```xml\n\u003cPackageReference Include=\"Azure.Data.AppConfiguration\" Version=\"1.6.0\" /\u003e\n```\n\nProvide the connection string through an environment variable before running:\n\n```powershell\n$env:AZURE_APP_CONFIGURATION_CONNECTION_STRING = \"\u003cconnection-string\u003e\"\ndotnet run\n```\n\nThe program deletes the unlabeled `app:Settings:FontSize` setting; the separately labeled `Production` setting remains.",
+  "workspace_delta": {
+    "bytes_added": 2345,
+    "bytes_removed": 0,
+    "bytes_net": 2345,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "AppConfigurationSample.csproj",
+        "size": 362
+      },
+      {
+        "path": "Program.cs",
+        "size": 1983
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 4,
+    "tool_calls": 0,
+    "reasoning_steps": 4,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T00:49:00.2159226+08:00",
+  "ended_at": "2026-08-29T00:49:53.403239+08:00",
+  "duration_ms": 53187,
+  "terminated_by": "completed"
+}

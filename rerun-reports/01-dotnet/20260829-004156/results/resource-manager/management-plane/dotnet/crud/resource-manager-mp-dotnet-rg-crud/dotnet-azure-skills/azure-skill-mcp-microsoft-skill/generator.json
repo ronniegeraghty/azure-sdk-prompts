@@ -1,0 +1,41 @@
+{
+  "prompt_id": "resource-manager-mp-dotnet-rg-crud",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that manages\r\nAzure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new resource group in \"eastus\" region\r\n3. List all resource groups in the subscription\r\n4. Get details of the created resource group\r\n5. Add a tag to the resource group\r\n6. Delete the resource group\r\n\r\nShow required NuGet packages and proper error handling.\r\nUse the Azure.ResourceManager SDK (not the older Microsoft.Azure.Management packages).",
+  "final_response": "Implemented a complete C# console sample using the modern Azure management-plane SDK.\n\n**Files created:**\n- `Program.cs` — authenticates with `DefaultAzureCredential`, creates an `eastus` resource group, lists groups, retrieves details, adds a tag, and deletes the group.\n- `ResourceGroupManager.csproj` — references `Azure.Identity` 1.21.0 and `Azure.ResourceManager` 1.14.0.\n- `README.md` — package installation, permissions, usage, cleanup behavior, and official references.\n\nThe program includes cancellation handling, targeted authentication/API error reporting, and best-effort cleanup if an operation fails after resource creation. It builds successfully with no warnings or errors. No Azure operations were executed.",
+  "workspace_delta": {
+    "bytes_added": 6846,
+    "bytes_removed": 0,
+    "bytes_net": 6846,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 4772
+      },
+      {
+        "path": "README.md",
+        "size": 1645
+      },
+      {
+        "path": "ResourceGroupManager.csproj",
+        "size": 429
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 15,
+    "tool_calls": 0,
+    "reasoning_steps": 15,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T02:29:13.3345099+08:00",
+  "ended_at": "2026-08-29T02:30:53.1621118+08:00",
+  "duration_ms": 99827,
+  "terminated_by": "completed"
+}

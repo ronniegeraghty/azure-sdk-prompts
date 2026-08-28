@@ -1,0 +1,1253 @@
+[
+  {
+    "kind": "configs",
+    "label_a": "dotnet-azure-skills/azure-skill-mcp",
+    "label_b": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+    "per_prompt": [
+      {
+        "prompt_id": "app-configuration-dp-dotnet-crud",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-error-handling",
+        "score_a": 0.75,
+        "score_b": 0.75,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.75,
+            "score_b": 0.75,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-pagination",
+        "score_a": 0.875,
+        "score_b": 1,
+        "delta": 0.125,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 1,
+            "delta": 0.125,
+            "pass_a": false,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "event-hubs-dp-dotnet-streaming",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-default-credential",
+        "score_a": 0.8,
+        "score_b": 1,
+        "delta": 0.19999999999999996,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8,
+            "score_b": 1,
+            "delta": 0.19999999999999996,
+            "pass_a": false,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-managed-identity",
+        "score_a": 0.6666666666666666,
+        "score_b": 0,
+        "delta": -0.6666666666666666,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6666666666666666,
+            "score_b": 0,
+            "delta": -0.6666666666666666,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-service-principal",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-crud",
+        "score_a": 1,
+        "score_b": 0.8,
+        "delta": -0.19999999999999996,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 0.8,
+            "delta": -0.19999999999999996,
+            "pass_a": true,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-error-handling",
+        "score_a": 0.5714285714285714,
+        "score_b": 0.5714285714285714,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.5714285714285714,
+            "score_b": 0.5714285714285714,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-pagination",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-mp-dotnet-polling",
+        "score_a": 0,
+        "score_b": 0.875,
+        "delta": 0.875,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0,
+            "score_b": 0.875,
+            "delta": 0.875,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "resource-manager-mp-dotnet-rg-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "service-bus-dp-dotnet-crud",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-auth",
+        "score_a": 0.6,
+        "score_b": 0.6,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6,
+            "score_b": 0.6,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-batch",
+        "score_a": 0.625,
+        "score_b": 0.625,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.625,
+            "score_b": 0.625,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-error-handling",
+        "score_a": 0.6666666666666666,
+        "score_b": 0.6666666666666666,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6666666666666666,
+            "score_b": 0.6666666666666666,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-retries",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-mp-dotnet-account-mgmt",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-mp-dotnet-polling",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0.01666666666666667,
+      "improved": 3,
+      "regressed": 2,
+      "unchanged": 15,
+      "top_improved": [
+        {
+          "prompt_id": "key-vault-mp-dotnet-polling",
+          "score_a": 0,
+          "score_b": 0.875,
+          "delta": 0.875,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0,
+              "score_b": 0.875,
+              "delta": 0.875,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "identity-dp-dotnet-default-credential",
+          "score_a": 0.8,
+          "score_b": 1,
+          "delta": 0.19999999999999996,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.8,
+              "score_b": 1,
+              "delta": 0.19999999999999996,
+              "pass_a": false,
+              "pass_b": true
+            }
+          ]
+        },
+        {
+          "prompt_id": "cosmos-db-dp-dotnet-pagination",
+          "score_a": 0.875,
+          "score_b": 1,
+          "delta": 0.125,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.875,
+              "score_b": 1,
+              "delta": 0.125,
+              "pass_a": false,
+              "pass_b": true
+            }
+          ]
+        }
+      ],
+      "top_regressed": [
+        {
+          "prompt_id": "identity-dp-dotnet-managed-identity",
+          "score_a": 0.6666666666666666,
+          "score_b": 0,
+          "delta": -0.6666666666666666,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.6666666666666666,
+              "score_b": 0,
+              "delta": -0.6666666666666666,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "key-vault-dp-dotnet-crud",
+          "score_a": 1,
+          "score_b": 0.8,
+          "delta": -0.19999999999999996,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 0.8,
+              "delta": -0.19999999999999996,
+              "pass_a": true,
+              "pass_b": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "configs",
+    "label_a": "dotnet-azure-skills/azure-skill-mcp",
+    "label_b": "dotnet-azure-skills/baseline",
+    "per_prompt": [
+      {
+        "prompt_id": "app-configuration-dp-dotnet-crud",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-error-handling",
+        "score_a": 0.75,
+        "score_b": 0.875,
+        "delta": 0.125,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.75,
+            "score_b": 0.875,
+            "delta": 0.125,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-pagination",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "event-hubs-dp-dotnet-streaming",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-default-credential",
+        "score_a": 0.8,
+        "score_b": 1,
+        "delta": 0.19999999999999996,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8,
+            "score_b": 1,
+            "delta": 0.19999999999999996,
+            "pass_a": false,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-managed-identity",
+        "score_a": 0.6666666666666666,
+        "score_b": 0.8333333333333334,
+        "delta": 0.16666666666666674,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6666666666666666,
+            "score_b": 0.8333333333333334,
+            "delta": 0.16666666666666674,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-service-principal",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-error-handling",
+        "score_a": 0.5714285714285714,
+        "score_b": 0.5714285714285714,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.5714285714285714,
+            "score_b": 0.5714285714285714,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-pagination",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.7142857142857143,
+        "delta": -0.1428571428571428,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.7142857142857143,
+            "delta": -0.1428571428571428,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-mp-dotnet-polling",
+        "score_a": 0,
+        "score_b": 0.875,
+        "delta": 0.875,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0,
+            "score_b": 0.875,
+            "delta": 0.875,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "resource-manager-mp-dotnet-rg-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "service-bus-dp-dotnet-crud",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-auth",
+        "score_a": 0.6,
+        "score_b": 0.6,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6,
+            "score_b": 0.6,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-batch",
+        "score_a": 0.625,
+        "score_b": 0.625,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.625,
+            "score_b": 0.625,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-error-handling",
+        "score_a": 0.6666666666666666,
+        "score_b": 0.6666666666666666,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6666666666666666,
+            "score_b": 0.6666666666666666,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-retries",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-mp-dotnet-account-mgmt",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-mp-dotnet-polling",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0.0611904761904762,
+      "improved": 4,
+      "regressed": 1,
+      "unchanged": 15,
+      "top_improved": [
+        {
+          "prompt_id": "key-vault-mp-dotnet-polling",
+          "score_a": 0,
+          "score_b": 0.875,
+          "delta": 0.875,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0,
+              "score_b": 0.875,
+              "delta": 0.875,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "identity-dp-dotnet-default-credential",
+          "score_a": 0.8,
+          "score_b": 1,
+          "delta": 0.19999999999999996,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.8,
+              "score_b": 1,
+              "delta": 0.19999999999999996,
+              "pass_a": false,
+              "pass_b": true
+            }
+          ]
+        },
+        {
+          "prompt_id": "identity-dp-dotnet-managed-identity",
+          "score_a": 0.6666666666666666,
+          "score_b": 0.8333333333333334,
+          "delta": 0.16666666666666674,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.6666666666666666,
+              "score_b": 0.8333333333333334,
+              "delta": 0.16666666666666674,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "cosmos-db-dp-dotnet-error-handling",
+          "score_a": 0.75,
+          "score_b": 0.875,
+          "delta": 0.125,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.75,
+              "score_b": 0.875,
+              "delta": 0.125,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        }
+      ],
+      "top_regressed": [
+        {
+          "prompt_id": "key-vault-dp-dotnet-pagination",
+          "score_a": 0.8571428571428571,
+          "score_b": 0.7142857142857143,
+          "delta": -0.1428571428571428,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.8571428571428571,
+              "score_b": 0.7142857142857143,
+              "delta": -0.1428571428571428,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "configs",
+    "label_a": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+    "label_b": "dotnet-azure-skills/baseline",
+    "per_prompt": [
+      {
+        "prompt_id": "app-configuration-dp-dotnet-crud",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-error-handling",
+        "score_a": 0.75,
+        "score_b": 0.875,
+        "delta": 0.125,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.75,
+            "score_b": 0.875,
+            "delta": 0.125,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "cosmos-db-dp-dotnet-pagination",
+        "score_a": 1,
+        "score_b": 0.875,
+        "delta": -0.125,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 0.875,
+            "delta": -0.125,
+            "pass_a": true,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "event-hubs-dp-dotnet-streaming",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-default-credential",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-managed-identity",
+        "score_a": 0,
+        "score_b": 0.8333333333333334,
+        "delta": 0.8333333333333334,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0,
+            "score_b": 0.8333333333333334,
+            "delta": 0.8333333333333334,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "identity-dp-dotnet-service-principal",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-crud",
+        "score_a": 0.8,
+        "score_b": 1,
+        "delta": 0.19999999999999996,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8,
+            "score_b": 1,
+            "delta": 0.19999999999999996,
+            "pass_a": false,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-error-handling",
+        "score_a": 0.5714285714285714,
+        "score_b": 0.5714285714285714,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.5714285714285714,
+            "score_b": 0.5714285714285714,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-dp-dotnet-pagination",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.7142857142857143,
+        "delta": -0.1428571428571428,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.7142857142857143,
+            "delta": -0.1428571428571428,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "key-vault-mp-dotnet-polling",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "resource-manager-mp-dotnet-rg-crud",
+        "score_a": 1,
+        "score_b": 1,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 1,
+            "score_b": 1,
+            "delta": 0,
+            "pass_a": true,
+            "pass_b": true
+          }
+        ]
+      },
+      {
+        "prompt_id": "service-bus-dp-dotnet-crud",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-auth",
+        "score_a": 0.6,
+        "score_b": 0.6,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6,
+            "score_b": 0.6,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-batch",
+        "score_a": 0.625,
+        "score_b": 0.625,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.625,
+            "score_b": 0.625,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-error-handling",
+        "score_a": 0.6666666666666666,
+        "score_b": 0.6666666666666666,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.6666666666666666,
+            "score_b": 0.6666666666666666,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-dp-dotnet-retries",
+        "score_a": 0.875,
+        "score_b": 0.875,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.875,
+            "score_b": 0.875,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-mp-dotnet-account-mgmt",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      },
+      {
+        "prompt_id": "storage-mp-dotnet-polling",
+        "score_a": 0.8571428571428571,
+        "score_b": 0.8571428571428571,
+        "delta": 0,
+        "grader_diffs": [
+          {
+            "name": "Criteria from prompt file",
+            "score_a": 0.8571428571428571,
+            "score_b": 0.8571428571428571,
+            "delta": 0,
+            "pass_a": false,
+            "pass_b": false
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "avg_delta": 0.04452380952380952,
+      "improved": 3,
+      "regressed": 2,
+      "unchanged": 15,
+      "top_improved": [
+        {
+          "prompt_id": "identity-dp-dotnet-managed-identity",
+          "score_a": 0,
+          "score_b": 0.8333333333333334,
+          "delta": 0.8333333333333334,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0,
+              "score_b": 0.8333333333333334,
+              "delta": 0.8333333333333334,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "key-vault-dp-dotnet-crud",
+          "score_a": 0.8,
+          "score_b": 1,
+          "delta": 0.19999999999999996,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.8,
+              "score_b": 1,
+              "delta": 0.19999999999999996,
+              "pass_a": false,
+              "pass_b": true
+            }
+          ]
+        },
+        {
+          "prompt_id": "cosmos-db-dp-dotnet-error-handling",
+          "score_a": 0.75,
+          "score_b": 0.875,
+          "delta": 0.125,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.75,
+              "score_b": 0.875,
+              "delta": 0.125,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        }
+      ],
+      "top_regressed": [
+        {
+          "prompt_id": "key-vault-dp-dotnet-pagination",
+          "score_a": 0.8571428571428571,
+          "score_b": 0.7142857142857143,
+          "delta": -0.1428571428571428,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 0.8571428571428571,
+              "score_b": 0.7142857142857143,
+              "delta": -0.1428571428571428,
+              "pass_a": false,
+              "pass_b": false
+            }
+          ]
+        },
+        {
+          "prompt_id": "cosmos-db-dp-dotnet-pagination",
+          "score_a": 1,
+          "score_b": 0.875,
+          "delta": -0.125,
+          "grader_diffs": [
+            {
+              "name": "Criteria from prompt file",
+              "score_a": 1,
+              "score_b": 0.875,
+              "delta": -0.125,
+              "pass_a": true,
+              "pass_b": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

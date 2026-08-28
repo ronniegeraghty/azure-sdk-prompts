@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-mp-dotnet-account-mgmt",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that manages\r\nAzure Storage Accounts using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new Storage Account with Standard_LRS SKU in \"eastus\"\r\n3. List all Storage Accounts in a resource group\r\n4. Get the properties of the created Storage Account\r\n5. Update the account to enable blob versioning\r\n6. Delete the Storage Account\r\n\r\nShow required NuGet packages and proper error handling.\r\nUse the Azure.ResourceManager.Storage SDK.",
+  "final_response": "Implemented the C# console application in:\n\n- `Program.cs`\n- `StorageAccountManager.csproj`\n\nIt uses `DefaultAzureCredential` and `Azure.ResourceManager.Storage` to create a `Standard_LRS` StorageV2 account in `eastus`, list accounts, retrieve properties, enable blob versioning, and delete the account. It includes cancellation, Azure-specific error handling, name validation, and cleanup after partial failures.\n\n**Required packages:**\n\n```powershell\ndotnet add package Azure.Identity\ndotnet add package Azure.ResourceManager.Storage\n```\n\nResolved versions:\n\n```xml\n\u003cPackageReference Include=\"Azure.Identity\" Version=\"1.21.0\" /\u003e\n\u003cPackageReference Include=\"Azure.ResourceManager.Storage\" Version=\"1.7.0\" /\u003e\n```\n\n**Run:**\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\n$env:AZURE_RESOURCE_GROUP = \"\u003cexisting-resource-group\u003e\"\n$env:AZURE_STORAGE_ACCOUNT_NAME = \"\u003coptional-globally-unique-name\u003e\"\n\ndotnet run --project .\\StorageAccountManager.csproj\n```\n\nIf the account name is omitted, the program generates a valid random name. The authenticated identity needs storage-account management permissions on the resource group.\n\nReferences: [Manage storage accounts with .NET](https://learn.microsoft.com/azure/storage/common/storage-srp-manage-account-dotnet) and [`BlobServiceResource.CreateOrUpdateAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.storage.blobserviceresource.createorupdateasync).",
+  "workspace_delta": {
+    "bytes_added": 7822,
+    "bytes_removed": 0,
+    "bytes_net": 7822,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 7331
+      },
+      {
+        "path": "StorageAccountManager.csproj",
+        "size": 491
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 18,
+    "tool_calls": 0,
+    "reasoning_steps": 18,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T03:13:30.3297175+08:00",
+  "ended_at": "2026-08-29T03:16:37.1802375+08:00",
+  "duration_ms": 186850,
+  "terminated_by": "completed"
+}

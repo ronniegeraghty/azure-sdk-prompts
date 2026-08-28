@@ -1,0 +1,41 @@
+{
+  "prompt_id": "cosmos-db-dp-dotnet-pagination",
+  "config_name": "dotnet-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that queries\r\nitems in a Cosmos DB container with proper pagination:\r\n1. Execute a SQL query \"SELECT * FROM c WHERE c.category = 'electronics'\" against a container\r\n2. Process results page-by-page using FeedIterator, limiting each page to 50 items\r\n3. Print the continuation token after each page\r\n4. Implement a \"resume from token\" pattern where the query can restart from a saved token\r\n5. Track total RU consumption across all pages\r\n\r\nUse the Microsoft.Azure.Cosmos SDK v3. Show how to configure MaxItemCount\r\nand explain the difference between FeedIterator and LINQ-based queries.",
+  "final_response": "Implemented a complete .NET 8 Cosmos DB pagination sample using Microsoft.Azure.Cosmos SDK v3.\n\n- `Program.cs` queries electronics with `FeedIterator\u003cdynamic\u003e`.\n- Limits pages using `MaxItemCount = 50`.\n- Prints and atomically checkpoints each continuation token.\n- Supports `--resume`, `--token-file`, and `--continuation-token`.\n- Accumulates RU consumption from `FeedResponse.RequestCharge`.\n- `README.md` documents configuration, execution, checkpoint semantics, and `FeedIterator` versus LINQ.\n- Uses environment variables for Cosmos credentials and identifiers.",
+  "workspace_delta": {
+    "bytes_added": 7454,
+    "bytes_removed": 0,
+    "bytes_net": 7454,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "CosmosPaginationSample.csproj",
+        "size": 427
+      },
+      {
+        "path": "Program.cs",
+        "size": 4357
+      },
+      {
+        "path": "README.md",
+        "size": 2670
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 6,
+    "tool_calls": 0,
+    "reasoning_steps": 6,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T01:12:10.8305756+08:00",
+  "ended_at": "2026-08-29T01:13:27.8908181+08:00",
+  "duration_ms": 77060,
+  "terminated_by": "completed"
+}
