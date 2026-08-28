@@ -1,0 +1,17 @@
+{
+  "prompt_id": "cosmos-db-dp-js-ts-crud",
+  "duration_seconds": 683.9,
+  "output_folder": "rerun-reports\\lane-a\\047",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 47,
+  "completed_at": "2026-08-27T22:17:09.3927352Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\047\\20260828-060546\\results\\cosmos-db\\data-plane\\js-ts\\crud\\cosmos-db-dp-js-ts-crud\\js-ts-azure-skills\\azure-skill-mcp\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "js-ts",
+  "started_at": "2026-08-27T22:05:45.4616420Z",
+  "problems": [],
+  "id": "lane-a-047",
+  "config": "js-ts-azure-skills/azure-skill-mcp",
+  "exit_code": 0
+}

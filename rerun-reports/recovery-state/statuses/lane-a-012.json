@@ -1,0 +1,17 @@
+{
+  "prompt_id": "identity-dp-java-credential-chain",
+  "duration_seconds": 701.8,
+  "output_folder": "rerun-reports\\lane-a\\012",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 12,
+  "completed_at": "2026-08-27T16:06:25.4598665Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\012\\20260827-235444\\results\\identity\\data-plane\\java\\auth\\identity-dp-java-credential-chain\\java-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T15:54:43.6370704Z",
+  "problems": [],
+  "id": "lane-a-012",
+  "config": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "exit_code": 0
+}

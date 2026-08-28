@@ -1,0 +1,17 @@
+{
+  "prompt_id": "key-vault-dp-java-crud",
+  "duration_seconds": 520.7,
+  "output_folder": "rerun-reports\\lane-a\\021",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 21,
+  "completed_at": "2026-08-27T17:38:08.4801913Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\021\\20260828-012928\\results\\key-vault\\data-plane\\java\\crud\\key-vault-dp-java-crud\\java-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T17:29:27.7395710Z",
+  "problems": [],
+  "id": "lane-a-021",
+  "config": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "exit_code": 0
+}

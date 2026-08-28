@@ -1,0 +1,17 @@
+{
+  "prompt_id": "storage-dp-java-encrypted-uploader",
+  "duration_seconds": 384.6,
+  "output_folder": "rerun-reports\\lane-a\\042",
+  "failure_reason": "",
+  "lane_order": 42,
+  "completed_at": "2026-08-27T21:22:17.6886989Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\042\\20260828-051553\\results\\storage\\data-plane\\java\\crud\\storage-dp-java-encrypted-uploader\\java-azure-skills\\baseline\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T21:15:53.0884983Z",
+  "problems": [],
+  "id": "lane-a-042",
+  "config": "java-azure-skills/baseline",
+  "exit_code": 0
+}

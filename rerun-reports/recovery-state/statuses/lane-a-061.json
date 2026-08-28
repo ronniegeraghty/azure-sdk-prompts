@@ -1,0 +1,17 @@
+{
+  "status": "valid",
+  "config": "js-ts-azure-skills/azure-skill-mcp",
+  "failure_reason": "one or more graders failed",
+  "duration_seconds": 467.4,
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\061\\20260828-105335\\results\\resource-manager\\management-plane\\js-ts\\crud\\resource-manager-mp-js-ts-rg-crud\\js-ts-azure-skills\\azure-skill-mcp\\report.json",
+  "prompt_id": "resource-manager-mp-js-ts-rg-crud",
+  "problems": [],
+  "lane_order": 61,
+  "lane": "a",
+  "language": "js-ts",
+  "id": "lane-a-061",
+  "exit_code": 0,
+  "started_at": "2026-08-28T02:53:34.3267851Z",
+  "output_folder": "rerun-reports\\lane-a\\061",
+  "completed_at": "2026-08-28T03:01:21.7724630Z"
+}

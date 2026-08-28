@@ -1,0 +1,19 @@
+{
+  "prompt_id": "service-bus-dp-java-order-processor",
+  "duration_seconds": 870.9,
+  "output_folder": "rerun-reports\\lane-a\\029",
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "lane_order": 29,
+  "completed_at": "2026-08-27T19:07:51.5894470Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\029\\20260828-025329\\results\\service-bus\\data-plane\\java\\streaming\\service-bus-dp-java-order-processor\\java-azure-skills\\azure-skill-mcp\\report.json",
+  "lane": "a",
+  "status": "problem",
+  "language": "java",
+  "started_at": "2026-08-27T18:53:20.6625594Z",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "id": "lane-a-029",
+  "config": "java-azure-skills/azure-skill-mcp",
+  "exit_code": 0
+}

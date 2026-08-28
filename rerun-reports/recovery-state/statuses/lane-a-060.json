@@ -1,0 +1,17 @@
+{
+  "status": "valid",
+  "config": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "failure_reason": "one or more graders failed",
+  "duration_seconds": 691.3,
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\060\\20260828-104204\\results\\key-vault\\data-plane\\js-ts\\crud\\key-vault-dp-js-ts-secret-config\\js-ts-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "prompt_id": "key-vault-dp-js-ts-secret-config",
+  "problems": [],
+  "lane_order": 60,
+  "lane": "a",
+  "language": "js-ts",
+  "id": "lane-a-060",
+  "exit_code": 0,
+  "started_at": "2026-08-28T02:42:03.0669446Z",
+  "output_folder": "rerun-reports\\lane-a\\060",
+  "completed_at": "2026-08-28T02:53:34.3169815Z"
+}

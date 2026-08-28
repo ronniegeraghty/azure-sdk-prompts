@@ -1,0 +1,17 @@
+{
+  "output_folder": "retry-reports\\java-second\\001",
+  "completed_at": "2026-08-28T03:53:41.3531716Z",
+  "config": "java-azure-skills/azure-skill-mcp",
+  "duration_seconds": 762.9,
+  "exit_code": 0,
+  "problems": [],
+  "lane": "a",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\retry-reports\\java-second\\001\\20260828-114101\\results\\identity\\data-plane\\java\\auth\\identity-dp-java-credential-chain\\java-azure-skills\\azure-skill-mcp\\report.json",
+  "prompt_id": "identity-dp-java-credential-chain",
+  "status": "valid",
+  "id": "timeout-java-second-001",
+  "language": "java",
+  "started_at": "2026-08-28T03:40:58.4641537Z",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 1
+}

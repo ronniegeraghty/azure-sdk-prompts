@@ -1,0 +1,17 @@
+{
+  "prompt_id": "cosmos-db-dp-java-crud",
+  "duration_seconds": 754.3,
+  "output_folder": "rerun-reports\\lane-a\\005",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 5,
+  "completed_at": "2026-08-27T14:38:35.1256852Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\005\\20260827-222601\\results\\cosmos-db\\data-plane\\java\\crud\\cosmos-db-dp-java-crud\\java-azure-skills\\azure-skill-mcp\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T14:26:00.7821147Z",
+  "problems": [],
+  "id": "lane-a-005",
+  "config": "java-azure-skills/azure-skill-mcp",
+  "exit_code": 0
+}

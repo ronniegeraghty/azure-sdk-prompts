@@ -1,0 +1,17 @@
+{
+  "prompt_id": "identity-dp-java-service-principal",
+  "duration_seconds": 327.5,
+  "output_folder": "rerun-reports\\lane-a\\019",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 19,
+  "completed_at": "2026-08-27T17:16:57.6354077Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\019\\20260828-011131\\results\\identity\\data-plane\\java\\auth\\identity-dp-java-service-principal\\java-azure-skills\\baseline\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T17:11:30.1325845Z",
+  "problems": [],
+  "id": "lane-a-019",
+  "config": "java-azure-skills/baseline",
+  "exit_code": 0
+}

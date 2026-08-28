@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-08-27T14:46:27.0390422Z",
+  "status": "problem",
+  "language": "dotnet",
+  "completed_at": "2026-08-27T14:56:35.7569680Z",
+  "lane_order": 12,
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "prompt_id": "identity-dp-dotnet-default-credential",
+  "duration_seconds": 608.7,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\012",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\012\\20260827-224628\\results\\identity\\data-plane\\dotnet\\auth\\identity-dp-dotnet-default-credential\\dotnet-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "exit_code": 0,
+  "id": "lane-b-012"
+}

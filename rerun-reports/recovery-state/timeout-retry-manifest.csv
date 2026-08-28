@@ -1,0 +1,8 @@
+"id","lane","lane_order","language","prompt_id","config","reason","output_folder"
+"timeout-java-001","a","1","java","app-configuration-dp-java-feature-flags","java-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\java\001"
+"timeout-java-002","a","2","java","cosmos-db-dp-java-todo-repository","java-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\java\002"
+"timeout-java-003","a","3","java","identity-dp-java-credential-chain","java-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\java\003"
+"timeout-java-004","a","4","java","service-bus-dp-java-order-processor","java-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\java\004"
+"timeout-dotnet-001","b","1","dotnet","identity-dp-dotnet-default-credential","dotnet-azure-skills/azure-skill-mcp-microsoft-skill","controlled SDK timeout retry","retry-reports\dotnet\001"
+"timeout-dotnet-002","b","2","dotnet","identity-dp-dotnet-managed-identity","dotnet-azure-skills/azure-skill-mcp-microsoft-skill","controlled SDK timeout retry","retry-reports\dotnet\002"
+"timeout-dotnet-003","b","3","dotnet","key-vault-mp-dotnet-polling","dotnet-azure-skills/azure-skill-mcp","controlled SDK timeout retry","retry-reports\dotnet\003"

@@ -1,0 +1,17 @@
+{
+  "started_at": "2026-08-27T18:41:44.2947498Z",
+  "status": "valid",
+  "language": "python",
+  "completed_at": "2026-08-27T18:51:47.9572650Z",
+  "lane_order": 42,
+  "failure_reason": "one or more graders failed",
+  "prompt_id": "app-configuration-dp-python-crud",
+  "duration_seconds": 603.7,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\042",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\042\\20260828-024147\\results\\app-configuration\\data-plane\\python\\crud\\app-configuration-dp-python-crud\\python-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "config": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "problems": [],
+  "exit_code": 0,
+  "id": "lane-b-042"
+}

@@ -1,0 +1,17 @@
+{
+  "started_at": "2026-08-27T16:51:45.1208194Z",
+  "status": "valid",
+  "language": "dotnet",
+  "completed_at": "2026-08-27T16:59:45.6993290Z",
+  "lane_order": 28,
+  "failure_reason": "one or more graders failed",
+  "prompt_id": "service-bus-dp-dotnet-crud",
+  "duration_seconds": 480.6,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\028",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\028\\20260828-005146\\results\\service-bus\\data-plane\\dotnet\\crud\\service-bus-dp-dotnet-crud\\dotnet-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "problems": [],
+  "exit_code": 0,
+  "id": "lane-b-028"
+}

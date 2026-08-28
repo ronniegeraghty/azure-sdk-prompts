@@ -1,0 +1,19 @@
+{
+  "prompt_id": "event-hubs-dp-js-ts-streaming",
+  "duration_seconds": 786.5,
+  "output_folder": "rerun-reports\\lane-a\\049",
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "lane_order": 49,
+  "completed_at": "2026-08-27T22:37:51.9565478Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\049\\20260828-062454\\results\\event-hubs\\data-plane\\js-ts\\streaming\\event-hubs-dp-js-ts-streaming\\js-ts-azure-skills\\azure-skill-mcp\\report.json",
+  "lane": "a",
+  "status": "problem",
+  "language": "js-ts",
+  "started_at": "2026-08-27T22:24:45.4522505Z",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "id": "lane-a-049",
+  "config": "js-ts-azure-skills/azure-skill-mcp",
+  "exit_code": 0
+}

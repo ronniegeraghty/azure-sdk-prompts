@@ -1,0 +1,19 @@
+{
+  "status": "problem",
+  "lane_order": 3,
+  "lane": "a",
+  "id": "timeout-java-003",
+  "completed_at": "2026-08-28T03:27:48.1347086Z",
+  "config": "java-azure-skills/azure-skill-mcp",
+  "language": "java",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\retry-reports\\java\\003\\20260828-111453\\results\\identity\\data-plane\\java\\auth\\identity-dp-java-credential-chain\\java-azure-skills\\azure-skill-mcp\\report.json",
+  "exit_code": 0,
+  "output_folder": "retry-reports\\java\\003",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "started_at": "2026-08-28T03:14:47.0907077Z",
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "duration_seconds": 781.0,
+  "prompt_id": "identity-dp-java-credential-chain"
+}

@@ -1,0 +1,17 @@
+{
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\078\\20260828-103317\\results\\storage\\management-plane\\python\\provisioning\\storage-mp-python-account-mgmt\\python-azure-skills\\azure-skill-mcp\\report.json",
+  "config": "python-azure-skills/azure-skill-mcp",
+  "id": "lane-b-078",
+  "started_at": "2026-08-28T02:33:16.3353133Z",
+  "lane_order": 78,
+  "exit_code": 0,
+  "language": "python",
+  "problems": [],
+  "status": "valid",
+  "failure_reason": "one or more graders failed",
+  "duration_seconds": 560.3,
+  "prompt_id": "storage-mp-python-account-mgmt",
+  "output_folder": "rerun-reports\\lane-b\\078",
+  "completed_at": "2026-08-28T02:42:36.6705695Z",
+  "lane": "b"
+}

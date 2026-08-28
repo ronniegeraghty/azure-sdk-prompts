@@ -1,0 +1,17 @@
+{
+  "prompt_id": "event-hubs-dp-java-streaming",
+  "duration_seconds": 629.7,
+  "output_folder": "rerun-reports\\lane-a\\010",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 10,
+  "completed_at": "2026-08-27T15:40:16.6253839Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\010\\20260827-232948\\results\\event-hubs\\data-plane\\java\\streaming\\event-hubs-dp-java-streaming\\java-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T15:29:46.9641672Z",
+  "problems": [],
+  "id": "lane-a-010",
+  "config": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "exit_code": 0
+}

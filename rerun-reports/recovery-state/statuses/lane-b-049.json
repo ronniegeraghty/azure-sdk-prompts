@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-08-27T19:40:03.0074314Z",
+  "status": "problem",
+  "language": "python",
+  "completed_at": "2026-08-27T19:52:32.4669583Z",
+  "lane_order": 49,
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "prompt_id": "cosmos-db-dp-python-todo-repository",
+  "duration_seconds": 749.5,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\049",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\049\\20260828-034012\\results\\cosmos-db\\data-plane\\python\\crud\\cosmos-db-dp-python-todo-repository\\python-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "config": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "exit_code": 0,
+  "id": "lane-b-049"
+}

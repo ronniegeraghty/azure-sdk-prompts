@@ -1,0 +1,17 @@
+{
+  "duration_seconds": 478.6,
+  "lane": "a",
+  "language": "js-ts",
+  "exit_code": 0,
+  "output_folder": "retry-reports\\js-ts-batch\\003",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\retry-reports\\js-ts-batch\\003\\20260828-134106\\results\\identity\\data-plane\\js-ts\\auth\\identity-dp-js-ts-managed-identity\\js-ts-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "completed_at": "2026-08-28T05:49:04.1986773Z",
+  "config": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "prompt_id": "identity-dp-js-ts-managed-identity",
+  "started_at": "2026-08-28T05:41:05.5578514Z",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 3,
+  "id": "timeout-js-ts-batch-003",
+  "status": "valid",
+  "problems": []
+}

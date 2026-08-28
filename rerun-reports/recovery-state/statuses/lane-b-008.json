@@ -1,0 +1,17 @@
+{
+  "started_at": "2026-08-27T14:20:11.6122801Z",
+  "status": "valid",
+  "language": "dotnet",
+  "completed_at": "2026-08-27T14:28:52.9672805Z",
+  "lane_order": 8,
+  "failure_reason": "one or more graders failed",
+  "prompt_id": "cosmos-db-dp-dotnet-pagination",
+  "duration_seconds": 521.4,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\008",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\008\\20260827-222012\\results\\cosmos-db\\data-plane\\dotnet\\pagination\\cosmos-db-dp-dotnet-pagination\\dotnet-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "problems": [],
+  "exit_code": 0,
+  "id": "lane-b-008"
+}

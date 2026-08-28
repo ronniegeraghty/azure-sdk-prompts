@@ -1,0 +1,17 @@
+{
+  "prompt_id": "key-vault-dp-java-secret-config",
+  "duration_seconds": 716.4,
+  "output_folder": "rerun-reports\\lane-a\\022",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 22,
+  "completed_at": "2026-08-27T17:50:04.8683649Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\022\\20260828-013809\\results\\key-vault\\data-plane\\java\\crud\\key-vault-dp-java-secret-config\\java-azure-skills\\azure-skill-mcp\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T17:38:08.5128748Z",
+  "problems": [],
+  "id": "lane-a-022",
+  "config": "java-azure-skills/azure-skill-mcp",
+  "exit_code": 0
+}

@@ -1,0 +1,17 @@
+{
+  "prompt_id": "resource-manager-mp-java-rg-crud",
+  "duration_seconds": 740.7,
+  "output_folder": "rerun-reports\\lane-a\\024",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 24,
+  "completed_at": "2026-08-27T18:15:09.2177346Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\024\\20260828-020249\\results\\resource-manager\\management-plane\\java\\crud\\resource-manager-mp-java-rg-crud\\java-azure-skills\\azure-skill-mcp\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T18:02:48.5222935Z",
+  "problems": [],
+  "id": "lane-a-024",
+  "config": "java-azure-skills/azure-skill-mcp",
+  "exit_code": 0
+}

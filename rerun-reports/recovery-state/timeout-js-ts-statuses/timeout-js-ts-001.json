@@ -1,0 +1,19 @@
+{
+  "output_folder": "retry-reports\\js-ts\\001",
+  "prompt_id": "storage-dp-js-ts-encrypted-uploader",
+  "duration_seconds": 768.1,
+  "language": "js-ts",
+  "lane_order": 1,
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "exit_code": 0,
+  "lane": "a",
+  "completed_at": "2026-08-28T05:08:23.2493826Z",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "started_at": "2026-08-28T04:55:35.1114880Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\retry-reports\\js-ts\\001\\20260828-125545\\results\\storage\\data-plane\\js-ts\\crud\\storage-dp-js-ts-encrypted-uploader\\js-ts-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "config": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "status": "problem",
+  "id": "timeout-js-ts-001"
+}

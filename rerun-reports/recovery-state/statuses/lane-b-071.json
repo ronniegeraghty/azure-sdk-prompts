@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-08-27T22:45:29.5453222Z",
+  "status": "problem",
+  "language": "python",
+  "completed_at": "2026-08-27T22:57:03.9115067Z",
+  "lane_order": 71,
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "prompt_id": "storage-dp-python-blob-event-notifier",
+  "duration_seconds": 694.4,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\071",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\071\\20260828-064534\\results\\storage\\data-plane\\python\\streaming\\storage-dp-python-blob-event-notifier\\python-azure-skills\\azure-skill-mcp\\report.json",
+  "config": "python-azure-skills/azure-skill-mcp",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "exit_code": 0,
+  "id": "lane-b-071"
+}

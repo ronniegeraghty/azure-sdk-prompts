@@ -1,0 +1,17 @@
+{
+  "started_at": "2026-08-27T15:15:06.4811147Z",
+  "status": "valid",
+  "language": "dotnet",
+  "completed_at": "2026-08-27T15:20:24.0691594Z",
+  "lane_order": 15,
+  "failure_reason": "",
+  "prompt_id": "identity-dp-dotnet-service-principal",
+  "duration_seconds": 317.6,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\015",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\015\\20260827-231511\\results\\identity\\data-plane\\dotnet\\auth\\identity-dp-dotnet-service-principal\\dotnet-azure-skills\\azure-skill-mcp\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp",
+  "problems": [],
+  "exit_code": 0,
+  "id": "lane-b-015"
+}

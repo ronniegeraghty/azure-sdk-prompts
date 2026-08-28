@@ -1,0 +1,17 @@
+{
+  "duration_seconds": 301.6,
+  "lane": "a",
+  "language": "js-ts",
+  "exit_code": 0,
+  "output_folder": "retry-reports\\js-ts-batch\\002",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\retry-reports\\js-ts-batch\\002\\20260828-133607\\results\\event-hubs\\data-plane\\js-ts\\streaming\\event-hubs-dp-js-ts-streaming\\js-ts-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "completed_at": "2026-08-28T05:41:05.5492183Z",
+  "config": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "prompt_id": "event-hubs-dp-js-ts-streaming",
+  "started_at": "2026-08-28T05:36:03.9248103Z",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 2,
+  "id": "timeout-js-ts-batch-002",
+  "status": "valid",
+  "problems": []
+}

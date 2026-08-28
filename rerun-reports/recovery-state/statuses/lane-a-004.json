@@ -1,0 +1,17 @@
+{
+  "prompt_id": "app-configuration-dp-java-feature-flags",
+  "duration_seconds": 845.2,
+  "output_folder": "rerun-reports\\lane-a\\004",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 4,
+  "completed_at": "2026-08-27T14:26:00.7731221Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\004\\20260827-221156\\results\\app-configuration\\data-plane\\java\\crud\\app-configuration-dp-java-feature-flags\\java-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "java",
+  "started_at": "2026-08-27T14:11:55.5806397Z",
+  "problems": [],
+  "id": "lane-a-004",
+  "config": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "exit_code": 0
+}

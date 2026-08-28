@@ -1,0 +1,17 @@
+{
+  "started_at": "2026-08-27T13:48:28.9966650Z",
+  "status": "valid",
+  "language": "dotnet",
+  "completed_at": "2026-08-27T13:54:19.6158600Z",
+  "lane_order": 3,
+  "failure_reason": "",
+  "prompt_id": "cosmos-db-dp-dotnet-crud",
+  "duration_seconds": 350.6,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\003",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\003\\20260827-214829\\results\\cosmos-db\\data-plane\\dotnet\\crud\\cosmos-db-dp-dotnet-crud\\dotnet-azure-skills\\azure-skill-mcp\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp",
+  "problems": [],
+  "exit_code": 0,
+  "id": "lane-b-003"
+}

@@ -1,0 +1,17 @@
+{
+  "started_at": "2026-08-27T17:04:45.2325090Z",
+  "status": "valid",
+  "language": "dotnet",
+  "completed_at": "2026-08-27T17:09:26.2983934Z",
+  "lane_order": 30,
+  "failure_reason": "one or more graders failed",
+  "prompt_id": "storage-dp-dotnet-auth",
+  "duration_seconds": 281.1,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\030",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\030\\20260828-010446\\results\\storage\\data-plane\\dotnet\\authentication\\storage-dp-dotnet-auth\\dotnet-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "problems": [],
+  "exit_code": 0,
+  "id": "lane-b-030"
+}

@@ -1,0 +1,17 @@
+{
+  "prompt_id": "identity-dp-js-ts-managed-identity",
+  "duration_seconds": 311.1,
+  "output_folder": "rerun-reports\\lane-a\\053",
+  "failure_reason": "one or more graders failed",
+  "lane_order": 53,
+  "completed_at": "2026-08-27T23:13:35.1197062Z",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\053\\20260828-070824\\results\\identity\\data-plane\\js-ts\\auth\\identity-dp-js-ts-managed-identity\\js-ts-azure-skills\\azure-skill-mcp\\report.json",
+  "lane": "a",
+  "status": "valid",
+  "language": "js-ts",
+  "started_at": "2026-08-27T23:08:24.0681231Z",
+  "problems": [],
+  "id": "lane-a-053",
+  "config": "js-ts-azure-skills/azure-skill-mcp",
+  "exit_code": 0
+}

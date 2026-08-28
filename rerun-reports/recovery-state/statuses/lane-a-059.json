@@ -1,0 +1,19 @@
+{
+  "status": "problem",
+  "config": "js-ts-azure-skills/azure-skill-mcp",
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "duration_seconds": 745.0,
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\059\\20260828-102939\\results\\key-vault\\data-plane\\js-ts\\crud\\key-vault-dp-js-ts-secret-config\\js-ts-azure-skills\\azure-skill-mcp\\report.json",
+  "prompt_id": "key-vault-dp-js-ts-secret-config",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "lane_order": 59,
+  "lane": "a",
+  "language": "js-ts",
+  "id": "lane-a-059",
+  "exit_code": 0,
+  "started_at": "2026-08-28T02:29:38.0264538Z",
+  "output_folder": "rerun-reports\\lane-a\\059",
+  "completed_at": "2026-08-28T02:42:03.0623008Z"
+}

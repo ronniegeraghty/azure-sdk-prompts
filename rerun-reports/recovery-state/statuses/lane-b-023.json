@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-08-27T16:07:27.0776822Z",
+  "status": "problem",
+  "language": "dotnet",
+  "completed_at": "2026-08-27T16:18:22.4130002Z",
+  "lane_order": 23,
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "prompt_id": "key-vault-mp-dotnet-polling",
+  "duration_seconds": 655.3,
+  "lane": "b",
+  "output_folder": "rerun-reports\\lane-b\\023",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\023\\20260828-000736\\results\\key-vault\\management-plane\\dotnet\\polling\\key-vault-mp-dotnet-polling\\dotnet-azure-skills\\azure-skill-mcp\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp",
+  "problems": [
+    "sdk_timeout"
+  ],
+  "exit_code": 0,
+  "id": "lane-b-023"
+}

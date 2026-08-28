@@ -1,0 +1,17 @@
+{
+  "status": "valid",
+  "config": "js-ts-azure-skills/azure-skill-mcp",
+  "failure_reason": "one or more graders failed",
+  "duration_seconds": 404.5,
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-a\\067\\20260828-114243\\results\\storage\\data-plane\\js-ts\\crud\\storage-dp-js-ts-crud\\js-ts-azure-skills\\azure-skill-mcp\\report.json",
+  "prompt_id": "storage-dp-js-ts-crud",
+  "problems": [],
+  "lane_order": 67,
+  "lane": "a",
+  "language": "js-ts",
+  "id": "lane-a-067",
+  "exit_code": 0,
+  "started_at": "2026-08-28T03:42:41.8318494Z",
+  "output_folder": "rerun-reports\\lane-a\\067",
+  "completed_at": "2026-08-28T03:49:26.3613760Z"
+}

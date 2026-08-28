@@ -1,0 +1,19 @@
+{
+  "prompt_id": "storage-mp-python-account-mgmt",
+  "status": "problem",
+  "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+  "output_folder": "retry-reports\\python\\007",
+  "duration_seconds": 752.0,
+  "problems": [
+    "sdk_timeout"
+  ],
+  "lane": "b",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\retry-reports\\python\\007\\20260828-124142\\results\\storage\\management-plane\\python\\provisioning\\storage-mp-python-account-mgmt\\python-azure-skills\\azure-skill-mcp-microsoft-skill\\report.json",
+  "lane_order": 7,
+  "config": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "id": "timeout-python-007",
+  "started_at": "2026-08-28T04:41:40.1246123Z",
+  "language": "python",
+  "completed_at": "2026-08-28T04:54:12.1175716Z",
+  "exit_code": 0
+}

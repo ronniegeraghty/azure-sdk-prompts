@@ -1,0 +1,17 @@
+{
+  "lane_order": 3,
+  "output_folder": "retry-reports\\dotnet\\003",
+  "report_path": "C:\\github\\hyoka-azure-skills-three-way-comparison\\retry-reports\\dotnet\\003\\20260828-110416\\results\\key-vault\\management-plane\\dotnet\\polling\\key-vault-mp-dotnet-polling\\dotnet-azure-skills\\azure-skill-mcp\\report.json",
+  "config": "dotnet-azure-skills/azure-skill-mcp",
+  "exit_code": 0,
+  "completed_at": "2026-08-28T03:14:39.3919147Z",
+  "duration_seconds": 624.5,
+  "id": "timeout-dotnet-003",
+  "status": "valid",
+  "prompt_id": "key-vault-mp-dotnet-polling",
+  "failure_reason": "one or more graders failed",
+  "problems": [],
+  "language": "dotnet",
+  "lane": "b",
+  "started_at": "2026-08-28T03:04:14.9173053Z"
+}
