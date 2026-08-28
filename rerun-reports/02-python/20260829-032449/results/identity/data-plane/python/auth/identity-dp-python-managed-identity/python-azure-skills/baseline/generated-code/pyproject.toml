@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "azure-managed-identity-sample"
+version = "0.1.0"
+description = "Runnable examples for authenticating Azure SDK clients with managed identity"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "azure-identity>=1.17.0,<2",
+    "azure-storage-blob>=12.20.0,<13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+managed-identity-demo = "managed_identity_demo.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["managed_identity_demo*"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

@@ -1,0 +1,14 @@
+README.md
+pyproject.toml
+azure_managed_identity_sample.egg-info/PKG-INFO
+azure_managed_identity_sample.egg-info/SOURCES.txt
+azure_managed_identity_sample.egg-info/dependency_links.txt
+azure_managed_identity_sample.egg-info/entry_points.txt
+azure_managed_identity_sample.egg-info/requires.txt
+azure_managed_identity_sample.egg-info/top_level.txt
+managed_identity_demo/__init__.py
+managed_identity_demo/auth.py
+managed_identity_demo/cli.py
+managed_identity_demo/storage.py
+tests/test_auth.py
+tests/test_cli.py

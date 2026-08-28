@@ -1,0 +1,69 @@
+{
+  "prompt_id": "storage-dp-python-encrypted-uploader",
+  "config_name": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that uploads files to Azure Blob Storage with client-side encryption, where the encryption key material is managed in Azure Key Vault.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **key management module** (both sync and async versions) that interacts with Azure Key Vault's Keys service (not Secrets) to perform cryptographic operations. It should implement envelope encryption: generate a data encryption key locally, use Key Vault to protect (wrap) it, and store the protected key alongside the encrypted blob. For decryption, have Key Vault recover (unwrap) the data key, then decrypt locally. The raw data key should never be persisted anywhere, and the vault's key material should never leave Key Vault.\r\n\r\n- A **blob uploader/downloader module** (both sync and async versions) that handles the actual encryption and storage. For upload: generate a data key, encrypt the data locally using **AES-GCM** (authenticated encryption), protect the data key via Key Vault, then upload the ciphertext to Blob Storage with the protected key and any necessary cryptographic parameters (nonce/IV) stored as blob metadata. For download: read the blob and its metadata, recover the data key via Key Vault, and decrypt. Should handle errors from both services (e.g., the vault key may have been disabled, or the blob may not exist).\r\n\r\n- A **configuration module** that builds the necessary Azure connections for both Blob Storage and Key Vault. It should read endpoints from environment variables and authenticate with `DefaultAzureCredential`. All connections should share a single credential instance.\r\n\r\n- A **main script** that demos both implementations: runs the full encrypt-upload-download-decrypt round-trip using the sync implementation first, then repeats with the async implementation. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the complete Python project with:\n\n- Sync and async Azure Key Vault envelope key management using `wrap_key`/`unwrap_key`\n- Local AES-256-GCM encryption with per-upload DEKs and nonces\n- Sync and async encrypted Blob Storage upload/download APIs\n- Shared `DefaultAzureCredential` instances per sync/async client graph\n- Versioned Key Vault key IDs and wrapped DEKs stored in blob metadata\n- Explicit handling for missing blobs, unavailable/disabled keys, malformed metadata, and authentication failures\n- Sync-then-async demo in `main.py`\n- Environment configuration, dependencies, sample input, README, and offline unit tests\n\nAll 4 offline round-trip and integrity tests pass. Configure the required environment variables documented in `README.md`, then run `python main.py`.",
+  "workspace_delta": {
+    "bytes_added": 34663,
+    "bytes_removed": 0,
+    "bytes_net": 34663,
+    "new_file_count": 10,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "sample.txt",
+        "size": 72
+      },
+      {
+        "path": "tests\\__init__.py",
+        "size": 22
+      },
+      {
+        "path": "README.md",
+        "size": 2206
+      },
+      {
+        "path": "encrypted_blob\\blob_transfer.py",
+        "size": 11511
+      },
+      {
+        "path": "main.py",
+        "size": 2728
+      },
+      {
+        "path": "requirements.txt",
+        "size": 160
+      },
+      {
+        "path": "tests\\test_blob_transfer.py",
+        "size": 6049
+      },
+      {
+        "path": "encrypted_blob\\__init__.py",
+        "size": 570
+      },
+      {
+        "path": "encrypted_blob\\config.py",
+        "size": 4039
+      },
+      {
+        "path": "encrypted_blob\\key_management.py",
+        "size": 7306
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 17,
+    "tool_calls": 0,
+    "reasoning_steps": 17,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T06:36:58.4083439+08:00",
+  "ended_at": "2026-08-29T06:41:00.0969973+08:00",
+  "duration_ms": 241688,
+  "terminated_by": "completed"
+}

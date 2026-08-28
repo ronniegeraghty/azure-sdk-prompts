@@ -1,0 +1,2186 @@
+Found 19 prompt(s), 3 config(s) → 57 evaluation(s)
+Using Copilot SDK evaluator
+
+📊 Evaluation plan: 57 evaluations (19 prompts × 3 configs)
+   Estimated Copilot sessions: 114 (57 × 2 for generate/review)
+   Workers: 1 | Max sessions: 3
+
+
+Graders for identity-dp-python-credential-chain / python-azure-skills/baseline:
+- credential-chain.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (14/14)
+      - Uses `ChainedTokenCredential` to compose multiple credentials: Pass
+      - Credentials passed in order to the constructor — order matters: Pass
+      - **Dev chain**: includes `AzureCliCredential`; may include `VisualStudioCodeCredential`, `AzurePowerShellCredential`: Pass
+      - **CI chain**: uses `EnvironmentCredential` or `AzurePipelinesCredential` (not just `DefaultAzureCredential`): Pass
+      - **Production chain**: `ManagedIdentityCredential` first (supports user-assigned via `client_id` kwarg), `WorkloadIdentityCredential` as fallback: Pass
+      - Enables CAE via `enable_cae=True` in `get_token()` call or token request context: Pass
+      - Detects CI (checks `CI`, `TF_BUILD`, `BUILD_SOURCESDIRECTORY`, or similar env vars): Pass
+      - Detects production/managed identity (checks `IDENTITY_ENDPOINT`, `MSI_ENDPOINT`, or similar): Pass
+      - Falls back to dev if neither detected: Pass
+      - Calls `get_token()` with correct scope (`https://management.azure.com/.default`): Pass
+      - Prints token expiry from `AccessToken.expires_on`: Pass
+      - Handles failure with specific exception info from `ClientAuthenticationError`: Pass
+      - Async tester uses `azure.identity.aio` async credentials and `await get_token()`: Pass
+      - NOT using `DefaultAzureCredential` as the CI credential (too broad): Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for storage-mp-python-account-mgmt / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Includes the required Azure management and identity SDK packages: Pass
+      - Creates a management client authenticated with credential and subscription ID: Pass
+      - Creates a storage account as a long-running operation with the correct SKU and kind: Pass
+      - Lists all storage accounts in the resource group: Pass
+      - Retrieves detailed properties of a specific storage account: Pass
+      - Enables blob versioning on the account (via account update or blob service properties): Pass
+      - Deletes the storage account: Pass
+      - Code builds and runs without import errors or API misuse: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for identity-dp-python-credential-chain / python-azure-skills/azure-skill-mcp:
+- credential-chain.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (14/14)
+      - Uses `ChainedTokenCredential` to compose multiple credentials: Pass
+      - Credentials passed in order to the constructor — order matters: Pass
+      - **Dev chain**: includes `AzureCliCredential`; may include `VisualStudioCodeCredential`, `AzurePowerShellCredential`: Pass
+      - **CI chain**: uses `EnvironmentCredential` or `AzurePipelinesCredential` (not just `DefaultAzureCredential`): Pass
+      - **Production chain**: `ManagedIdentityCredential` first (supports user-assigned via `client_id` kwarg), `WorkloadIdentityCredential` as fallback: Pass
+      - Enables CAE via `enable_cae=True` in `get_token()` call or token request context: Pass
+      - Detects CI (checks `CI`, `TF_BUILD`, `BUILD_SOURCESDIRECTORY`, or similar env vars): Pass
+      - Detects production/managed identity (checks `IDENTITY_ENDPOINT`, `MSI_ENDPOINT`, or similar): Pass
+      - Falls back to dev if neither detected: Pass
+      - Calls `get_token()` with correct scope (`https://management.azure.com/.default`): Pass
+      - Prints token expiry from `AccessToken.expires_on`: Pass
+      - Handles failure with specific exception info from `ClientAuthenticationError`: Pass
+      - Async tester uses `azure.identity.aio` async credentials and `await get_token()`: Pass
+      - NOT using `DefaultAzureCredential` as the CI credential (too broad): Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for identity-dp-python-credential-chain / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- credential-chain.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (14/14)
+      - Uses `ChainedTokenCredential` to compose multiple credentials: Pass
+      - Credentials passed in order to the constructor — order matters: Pass
+      - **Dev chain**: includes `AzureCliCredential`; may include `VisualStudioCodeCredential`, `AzurePowerShellCredential`: Pass
+      - **CI chain**: uses `EnvironmentCredential` or `AzurePipelinesCredential` (not just `DefaultAzureCredential`): Pass
+      - **Production chain**: `ManagedIdentityCredential` first (supports user-assigned via `client_id` kwarg), `WorkloadIdentityCredential` as fallback: Pass
+      - Enables CAE via `enable_cae=True` in `get_token()` call or token request context: Pass
+      - Detects CI (checks `CI`, `TF_BUILD`, `BUILD_SOURCESDIRECTORY`, or similar env vars): Pass
+      - Detects production/managed identity (checks `IDENTITY_ENDPOINT`, `MSI_ENDPOINT`, or similar): Pass
+      - Falls back to dev if neither detected: Pass
+      - Calls `get_token()` with correct scope (`https://management.azure.com/.default`): Pass
+      - Prints token expiry from `AccessToken.expires_on`: Pass
+      - Handles failure with specific exception info from `ClientAuthenticationError`: Pass
+      - Async tester uses `azure.identity.aio` async credentials and `await get_token()`: Pass
+      - NOT using `DefaultAzureCredential` as the CI credential (too broad): Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for identity-dp-python-default-credential / python-azure-skills/baseline:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - `azure-identity` pip package installation: Pass
+      - `DefaultAzureCredential()` constructor and keyword arguments: Pass
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `ClientAuthenticationError` handling and `logging` module configuration: Fail
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for identity-dp-python-default-credential / python-azure-skills/azure-skill-mcp:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `azure-identity` pip package installation: Pass
+      - `DefaultAzureCredential()` constructor and keyword arguments: Pass
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `ClientAuthenticationError` handling and `logging` module configuration: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for identity-dp-python-default-credential / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (3/5)
+      - `azure-identity` pip package installation: Pass
+      - `DefaultAzureCredential()` constructor and keyword arguments: Fail
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `ClientAuthenticationError` handling and `logging` module configuration: Fail
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for identity-dp-python-managed-identity / python-azure-skills/baseline:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `ManagedIdentityCredential` class from `azure.identity`: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing `client_id` keyword argument: Pass
+      - Integration with `DefaultAzureCredential` chain: Pass
+      - `CredentialUnavailableError` when not running in Azure: Pass
+      - `ChainedTokenCredential` for local development fallback: Fail
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for identity-dp-python-managed-identity / python-azure-skills/azure-skill-mcp:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `ManagedIdentityCredential` class from `azure.identity`: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing `client_id` keyword argument: Pass
+      - Integration with `DefaultAzureCredential` chain: Pass
+      - `CredentialUnavailableError` when not running in Azure: Pass
+      - `ChainedTokenCredential` for local development fallback: Fail
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for identity-dp-python-managed-identity / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `ManagedIdentityCredential` class from `azure.identity`: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing `client_id` keyword argument: Pass
+      - Integration with `DefaultAzureCredential` chain: Pass
+      - `CredentialUnavailableError` when not running in Azure: Pass
+      - `ChainedTokenCredential` for local development fallback: Fail
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for identity-dp-python-service-principal / python-azure-skills/baseline:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `azure-identity` package with `ClientSecretCredential` class: Pass
+      - Constructor keyword arguments: tenant_id, client_id, client_secret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `os.environ` or python-dotenv patterns: Pass
+      - `ClientAuthenticationError` exception handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for identity-dp-python-service-principal / python-azure-skills/azure-skill-mcp:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `azure-identity` package with `ClientSecretCredential` class: Pass
+      - Constructor keyword arguments: tenant_id, client_id, client_secret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `os.environ` or python-dotenv patterns: Pass
+      - `ClientAuthenticationError` exception handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for identity-dp-python-service-principal / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `azure-identity` package with `ClientSecretCredential` class: Pass
+      - Constructor keyword arguments: tenant_id, client_id, client_secret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `os.environ` or python-dotenv patterns: Pass
+      - `ClientAuthenticationError` exception handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for key-vault-dp-python-crud / python-azure-skills/baseline:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - Installing `azure-keyvault-secrets` and `azure-identity` packages: Pass
+      - Creating a `SecretClient` with vault URL and credential: Pass
+      - `set_secret()`, `get_secret()`, `begin_delete_secret()`, `purge_deleted_secret()`: Pass
+      - Handling soft-delete (waiting for delete to complete before purge): Pass
+      - Exception handling for `ResourceNotFoundError`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for key-vault-dp-python-crud / python-azure-skills/azure-skill-mcp:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - Installing `azure-keyvault-secrets` and `azure-identity` packages: Pass
+      - Creating a `SecretClient` with vault URL and credential: Pass
+      - `set_secret()`, `get_secret()`, `begin_delete_secret()`, `purge_deleted_secret()`: Pass
+      - Handling soft-delete (waiting for delete to complete before purge): Pass
+      - Exception handling for `ResourceNotFoundError`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for key-vault-dp-python-crud / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - Installing `azure-keyvault-secrets` and `azure-identity` packages: Pass
+      - Creating a `SecretClient` with vault URL and credential: Pass
+      - `set_secret()`, `get_secret()`, `begin_delete_secret()`, `purge_deleted_secret()`: Pass
+      - Handling soft-delete (waiting for delete to complete before purge): Pass
+      - Exception handling for `ResourceNotFoundError`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for key-vault-dp-python-secret-config / python-azure-skills/baseline:
+- secret-config.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (11/12)
+      - Secret versioning: retrieves specific version via `get_secret(name, version=version)`: Pass
+      - Secret expiry: accesses `secret.properties.expires_on`: Pass
+      - Configurable warning window for near-expiry detection: Pass
+      - In-memory caching (e.g., `dict`) with bulk-load and single-key refresh: Pass
+      - Secret rotation uses `begin_delete_secret()` as a long-running operation: Pass
+      - Sync uses `LROPoller` — calls `.wait()` or `.result()` to wait for delete completion: Pass
+      - Async uses the async poller — `await poller.wait()` for delete completion: Fail
+      - Creates new secret only after delete completes (not concurrently): Pass
+      - Async version uses `azure.keyvault.secrets.aio.SecretClient`: Pass
+      - Returns a default value when secret is not found (`ResourceNotFoundError`): Pass
+      - NOT using fire-and-forget `delete_secret()` without the long-running operation: Pass
+      - NOT ignoring the poller and creating the new secret immediately: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for key-vault-dp-python-secret-config / python-azure-skills/azure-skill-mcp:
+- secret-config.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/12)
+      - Secret versioning: retrieves specific version via `get_secret(name, version=version)`: Fail
+      - Secret expiry: accesses `secret.properties.expires_on`: Pass
+      - Configurable warning window for near-expiry detection: Pass
+      - In-memory caching (e.g., `dict`) with bulk-load and single-key refresh: Pass
+      - Secret rotation uses `begin_delete_secret()` as a long-running operation: Fail
+      - Sync uses `LROPoller` — calls `.wait()` or `.result()` to wait for delete completion: Pass
+      - Async uses the async poller — `await poller.wait()` for delete completion: Fail
+      - Creates new secret only after delete completes (not concurrently): Fail
+      - Async version uses `azure.keyvault.secrets.aio.SecretClient`: Pass
+      - Returns a default value when secret is not found (`ResourceNotFoundError`): Pass
+      - NOT using fire-and-forget `delete_secret()` without the long-running operation: Fail
+      - NOT ignoring the poller and creating the new secret immediately: Fail
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for key-vault-dp-python-secret-config / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- secret-config.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (11/12)
+      - Secret versioning: retrieves specific version via `get_secret(name, version=version)`: Pass
+      - Secret expiry: accesses `secret.properties.expires_on`: Pass
+      - Configurable warning window for near-expiry detection: Pass
+      - In-memory caching (e.g., `dict`) with bulk-load and single-key refresh: Pass
+      - Secret rotation uses `begin_delete_secret()` as a long-running operation: Pass
+      - Sync uses `LROPoller` — calls `.wait()` or `.result()` to wait for delete completion: Pass
+      - Async uses the async poller — `await poller.wait()` for delete completion: Fail
+      - Creates new secret only after delete completes (not concurrently): Pass
+      - Async version uses `azure.keyvault.secrets.aio.SecretClient`: Pass
+      - Returns a default value when secret is not found (`ResourceNotFoundError`): Pass
+      - NOT using fire-and-forget `delete_secret()` without the long-running operation: Pass
+      - NOT ignoring the poller and creating the new secret immediately: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for app-configuration-dp-python-feature-flags / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- feature-flags.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (9/9)
+      - Lists settings filtered by key prefix using `key_filter`: Pass
+      - Implements conditional reads using `match_condition` with `MatchConditions.IfModified` and the setting's `etag`: Pass
+      - Handles 304 Not Modified (setting unchanged since last read): Pass
+      - Uses `.appconfig.featureflag/` prefix for feature flag keys: Pass
+      - Parses the JSON payload in feature flag setting values: Pass
+      - Implements deterministic percentage rollout (consistent hash via `hashlib`, not `random`): Pass
+      - Implements sentinel key watching with configurable polling interval: Pass
+      - Detects sentinel value change via ETag or value comparison and triggers full refresh: Pass
+      - Async version uses `azure.appconfiguration.aio.AzureAppConfigurationClient`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for resource-manager-mp-python-rg-crud / python-azure-skills/baseline:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `azure-mgmt-resource` and `azure-identity` pip packages: Pass
+      - `ResourceManagementClient` creation with credential and subscription_id: Pass
+      - `resource_groups.create_or_update()` with `ResourceGroup` model: Fail
+      - `resource_groups.list()` iteration: Pass
+      - `resource_groups.get()` for details: Pass
+      - Tag updates via `resource_groups.update()`: Pass
+      - `resource_groups.begin_delete()` with poller: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for resource-manager-mp-python-rg-crud / python-azure-skills/azure-skill-mcp:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `azure-mgmt-resource` and `azure-identity` pip packages: Pass
+      - `ResourceManagementClient` creation with credential and subscription_id: Pass
+      - `resource_groups.create_or_update()` with `ResourceGroup` model: Pass
+      - `resource_groups.list()` iteration: Pass
+      - `resource_groups.get()` for details: Pass
+      - Tag updates via `resource_groups.update()`: Pass
+      - `resource_groups.begin_delete()` with poller: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for resource-manager-mp-python-rg-crud / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `azure-mgmt-resource` and `azure-identity` pip packages: Pass
+      - `ResourceManagementClient` creation with credential and subscription_id: Pass
+      - `resource_groups.create_or_update()` with `ResourceGroup` model: Fail
+      - `resource_groups.list()` iteration: Pass
+      - `resource_groups.get()` for details: Pass
+      - Tag updates via `resource_groups.update()`: Pass
+      - `resource_groups.begin_delete()` with poller: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for service-bus-dp-python-order-processor / python-azure-skills/baseline:
+- order-processor.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (11/14)
+      - Sender uses `ServiceBusClient.get_queue_sender()` (or async equivalent): Pass
+      - Processor uses `ServiceBusClient.get_queue_receiver()` or session-enabled receiver: Pass
+      - Batch sending: creates `ServiceBusMessageBatch`, checks `add_message()` return or catches `MessageSizeExceededError`: Pass
+      - Handles the case where a message doesn't fit in the current batch: Pass
+      - Scheduled delivery: uses `schedule_messages()` or `ServiceBusMessage(scheduled_enqueue_time_utc=...)` (~30s delay): Pass
+      - Correlation: sets order ID via `correlation_id` property on `ServiceBusMessage`: Pass
+      - Dead-letter: explicitly dead-letters failed messages with `receiver.dead_letter_message()` and a reason string: Pass
+      - Dead-letter queue reading: uses `sub_queue=ServiceBusSubQueue.DEAD_LETTER` on receiver: Pass
+      - Session-aware processing: uses `session_id` on messages and session-enabled receiver: Pass
+      - Session ID keyed by customer name for ordered processing: Pass
+      - Context manager pattern (`with` statements) for all clients, senders, and receivers: Fail
+      - Catches `ServiceBusError` and distinguishes transient vs non-transient errors: Fail
+      - Error handler logs entity name and error details: Fail
+      - Async versions use `azure.servicebus.aio` module: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for service-bus-dp-python-order-processor / python-azure-skills/azure-skill-mcp:
+- order-processor.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (12/14)
+      - Sender uses `ServiceBusClient.get_queue_sender()` (or async equivalent): Pass
+      - Processor uses `ServiceBusClient.get_queue_receiver()` or session-enabled receiver: Pass
+      - Batch sending: creates `ServiceBusMessageBatch`, checks `add_message()` return or catches `MessageSizeExceededError`: Pass
+      - Handles the case where a message doesn't fit in the current batch: Pass
+      - Scheduled delivery: uses `schedule_messages()` or `ServiceBusMessage(scheduled_enqueue_time_utc=...)` (~30s delay): Pass
+      - Correlation: sets order ID via `correlation_id` property on `ServiceBusMessage`: Pass
+      - Dead-letter: explicitly dead-letters failed messages with `receiver.dead_letter_message()` and a reason string: Pass
+      - Dead-letter queue reading: uses `sub_queue=ServiceBusSubQueue.DEAD_LETTER` on receiver: Pass
+      - Session-aware processing: uses `session_id` on messages and session-enabled receiver: Pass
+      - Session ID keyed by customer name for ordered processing: Pass
+      - Context manager pattern (`with` statements) for all clients, senders, and receivers: Pass
+      - Catches `ServiceBusError` and distinguishes transient vs non-transient errors: Fail
+      - Error handler logs entity name and error details: Fail
+      - Async versions use `azure.servicebus.aio` module: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for service-bus-dp-python-order-processor / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- order-processor.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (11/14)
+      - Sender uses `ServiceBusClient.get_queue_sender()` (or async equivalent): Pass
+      - Processor uses `ServiceBusClient.get_queue_receiver()` or session-enabled receiver: Pass
+      - Batch sending: creates `ServiceBusMessageBatch`, checks `add_message()` return or catches `MessageSizeExceededError`: Fail
+      - Handles the case where a message doesn't fit in the current batch: Pass
+      - Scheduled delivery: uses `schedule_messages()` or `ServiceBusMessage(scheduled_enqueue_time_utc=...)` (~30s delay): Pass
+      - Correlation: sets order ID via `correlation_id` property on `ServiceBusMessage`: Pass
+      - Dead-letter: explicitly dead-letters failed messages with `receiver.dead_letter_message()` and a reason string: Pass
+      - Dead-letter queue reading: uses `sub_queue=ServiceBusSubQueue.DEAD_LETTER` on receiver: Pass
+      - Session-aware processing: uses `session_id` on messages and session-enabled receiver: Pass
+      - Session ID keyed by customer name for ordered processing: Pass
+      - Context manager pattern (`with` statements) for all clients, senders, and receivers: Pass
+      - Catches `ServiceBusError` and distinguishes transient vs non-transient errors: Fail
+      - Error handler logs entity name and error details: Fail
+      - Async versions use `azure.servicebus.aio` module: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for service-bus-dp-python-crud / python-azure-skills/baseline:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/7)
+      - `azure-servicebus` pip package: Pass
+      - `ServiceBusSender` via `get_queue_sender()` or `get_topic_sender()`: Pass
+      - `ServiceBusMessage` and `ServiceBusMessageBatch`: Fail
+      - `ServiceBusReceiver` via `get_queue_receiver()` or `get_subscription_receiver()`: Pass
+      - `complete_message()`, `abandon_message()`, `dead_letter_message()`: Fail
+      - Context manager pattern (`with` statements) for resource cleanup: Pass
+      - Async variants in `azure.servicebus.aio`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Fail
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for service-bus-dp-python-crud / python-azure-skills/azure-skill-mcp:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/7)
+      - `azure-servicebus` pip package: Pass
+      - `ServiceBusSender` via `get_queue_sender()` or `get_topic_sender()`: Pass
+      - `ServiceBusMessage` and `ServiceBusMessageBatch`: Fail
+      - `ServiceBusReceiver` via `get_queue_receiver()` or `get_subscription_receiver()`: Pass
+      - `complete_message()`, `abandon_message()`, `dead_letter_message()`: Fail
+      - Context manager pattern (`with` statements) for resource cleanup: Pass
+      - Async variants in `azure.servicebus.aio`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for service-bus-dp-python-crud / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `azure-servicebus` pip package: Pass
+      - `ServiceBusSender` via `get_queue_sender()` or `get_topic_sender()`: Pass
+      - `ServiceBusMessage` and `ServiceBusMessageBatch`: Pass
+      - `ServiceBusReceiver` via `get_queue_receiver()` or `get_subscription_receiver()`: Pass
+      - `complete_message()`, `abandon_message()`, `dead_letter_message()`: Fail
+      - Context manager pattern (`with` statements) for resource cleanup: Pass
+      - Async variants in `azure.servicebus.aio`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-blob-event-notifier / python-azure-skills/baseline:
+- blob-event-notifier.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (11/11)
+      - Deserializes Event Grid native schema events using the SDK's built-in deserialization (not manual JSON parsing): Pass
+      - Deserializes CloudEvents 1.0 schema events using the SDK's built-in deserialization (not manual JSON parsing): Pass
+      - Routes events by event type (blob-created vs blob-deleted vs unrecognized): Pass
+      - Logs a warning for unrecognized event types: Pass
+      - Parses container name and blob name from event subject: Pass
+      - Retrieves and prints blob access tier from blob properties: Pass
+      - Publishes custom events to an Event Grid topic using the SDK's publisher client: Pass
+      - Sets subject hierarchy on custom events for filtering: Pass
+      - Handles race condition where the blob may no longer exist by the time the handler runs: Pass
+      - Handles publishing errors with proper exception handling: Pass
+      - Async versions use the async variants of the Event Grid and Blob Storage clients: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for storage-dp-python-blob-event-notifier / python-azure-skills/azure-skill-mcp:
+- blob-event-notifier.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (9/11)
+      - Deserializes Event Grid native schema events using the SDK's built-in deserialization (not manual JSON parsing): Fail
+      - Deserializes CloudEvents 1.0 schema events using the SDK's built-in deserialization (not manual JSON parsing): Fail
+      - Routes events by event type (blob-created vs blob-deleted vs unrecognized): Pass
+      - Logs a warning for unrecognized event types: Pass
+      - Parses container name and blob name from event subject: Pass
+      - Retrieves and prints blob access tier from blob properties: Pass
+      - Publishes custom events to an Event Grid topic using the SDK's publisher client: Pass
+      - Sets subject hierarchy on custom events for filtering: Pass
+      - Handles race condition where the blob may no longer exist by the time the handler runs: Pass
+      - Handles publishing errors with proper exception handling: Pass
+      - Async versions use the async variants of the Event Grid and Blob Storage clients: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-blob-event-notifier / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- blob-event-notifier.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (11/11)
+      - Deserializes Event Grid native schema events using the SDK's built-in deserialization (not manual JSON parsing): Pass
+      - Deserializes CloudEvents 1.0 schema events using the SDK's built-in deserialization (not manual JSON parsing): Pass
+      - Routes events by event type (blob-created vs blob-deleted vs unrecognized): Pass
+      - Logs a warning for unrecognized event types: Pass
+      - Parses container name and blob name from event subject: Pass
+      - Retrieves and prints blob access tier from blob properties: Pass
+      - Publishes custom events to an Event Grid topic using the SDK's publisher client: Pass
+      - Sets subject hierarchy on custom events for filtering: Pass
+      - Handles race condition where the blob may no longer exist by the time the handler runs: Pass
+      - Handles publishing errors with proper exception handling: Pass
+      - Async versions use the async variants of the Event Grid and Blob Storage clients: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-blob-manager / python-azure-skills/baseline:
+- blob-storage-manager.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (10/10)
+      - Configures a custom retry policy with exponential backoff: Pass
+      - Enables HTTP request/response logging for debugging: Pass
+      - Does NOT use connection strings or account keys: Pass
+      - Handles large file upload efficiently without loading the entire file into memory: Pass
+      - Supports blob index tags on upload (distinct from metadata): Pass
+      - Implements blob lease acquisition to prevent concurrent overwrites: Pass
+      - Provides both sync and async implementations: Pass
+      - Catches and handles storage-specific errors from the Azure SDK: Pass
+      - Handles lease conflicts when another client holds a lease: Pass
+      - Includes per-operation timeout configuration: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for storage-dp-python-blob-manager / python-azure-skills/azure-skill-mcp:
+- blob-storage-manager.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (10/10)
+      - Configures a custom retry policy with exponential backoff: Pass
+      - Enables HTTP request/response logging for debugging: Pass
+      - Does NOT use connection strings or account keys: Pass
+      - Handles large file upload efficiently without loading the entire file into memory: Pass
+      - Supports blob index tags on upload (distinct from metadata): Pass
+      - Implements blob lease acquisition to prevent concurrent overwrites: Pass
+      - Provides both sync and async implementations: Pass
+      - Catches and handles storage-specific errors from the Azure SDK: Pass
+      - Handles lease conflicts when another client holds a lease: Pass
+      - Includes per-operation timeout configuration: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-blob-manager / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- blob-storage-manager.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (9/10)
+      - Configures a custom retry policy with exponential backoff: Pass
+      - Enables HTTP request/response logging for debugging: Pass
+      - Does NOT use connection strings or account keys: Pass
+      - Handles large file upload efficiently without loading the entire file into memory: Pass
+      - Supports blob index tags on upload (distinct from metadata): Pass
+      - Implements blob lease acquisition to prevent concurrent overwrites: Pass
+      - Provides both sync and async implementations: Pass
+      - Catches and handles storage-specific errors from the Azure SDK: Pass
+      - Handles lease conflicts when another client holds a lease: Fail
+      - Includes per-operation timeout configuration: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-crud / python-azure-skills/baseline:
+- crud-blobs.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Includes required Azure Storage and Identity SDK packages (via requirements.txt or install instructions): Pass
+      - Authenticates the blob service client with DefaultAzureCredential: Pass
+      - Creates a container (handling the case where it already exists): Pass
+      - Uploads a file as a blob with overwrite support: Pass
+      - Lists blobs in the container with their properties: Pass
+      - Downloads a blob to a local file: Pass
+      - Deletes the blob and the container: Pass
+      - Catches Azure-specific errors (both general HTTP errors and resource-exists errors): Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for storage-dp-python-crud / python-azure-skills/azure-skill-mcp:
+- crud-blobs.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Includes required Azure Storage and Identity SDK packages (via requirements.txt or install instructions): Pass
+      - Authenticates the blob service client with DefaultAzureCredential: Pass
+      - Creates a container (handling the case where it already exists): Pass
+      - Uploads a file as a blob with overwrite support: Pass
+      - Lists blobs in the container with their properties: Pass
+      - Downloads a blob to a local file: Pass
+      - Deletes the blob and the container: Pass
+      - Catches Azure-specific errors (both general HTTP errors and resource-exists errors): Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-crud / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-blobs.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Includes required Azure Storage and Identity SDK packages (via requirements.txt or install instructions): Pass
+      - Authenticates the blob service client with DefaultAzureCredential: Pass
+      - Creates a container (handling the case where it already exists): Pass
+      - Uploads a file as a blob with overwrite support: Pass
+      - Lists blobs in the container with their properties: Pass
+      - Downloads a blob to a local file: Pass
+      - Deletes the blob and the container: Pass
+      - Catches Azure-specific errors (both general HTTP errors and resource-exists errors): Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-encrypted-uploader / python-azure-skills/baseline:
+- encrypted-uploader.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (18/19)
+      - Uses the Key Vault Keys SDK (NOT Secrets) — critical distinction: Pass
+      - Uses a cryptography library for local AES-GCM encryption: Pass
+      - Uses Key Vault's cryptographic client for key wrap and unwrap operations (NOT a secrets client): Pass
+      - Specifies an RSA key wrap algorithm for protecting the DEK: Pass
+      - Key material never leaves Key Vault — wrap/unwrap happens server-side: Fail
+      - Generates a random 256-bit data encryption key (DEK) locally: Pass
+      - Encrypts data locally with AES-GCM using the DEK: Pass
+      - Wraps the DEK via Key Vault before storing: Pass
+      - Stores the wrapped DEK, nonce/IV, and vault key identifier as blob metadata: Pass
+      - Decryption retrieves metadata, unwraps the DEK via Key Vault, and decrypts locally: Pass
+      - Uses AES-GCM specifically (not CBC, ECB, or other modes): Pass
+      - Generates a fresh random nonce for each encryption: Pass
+      - Handles Key Vault errors (key disabled, key not found): Pass
+      - Handles blob not found: Pass
+      - Code must build and run without import errors or runtime crashes: Pass
+      - Async versions use the async variants of Blob Storage and Key Vault clients: Pass
+      - Does NOT use a secrets client instead of a keys/crypto client: Pass
+      - Does NOT encrypt data directly with the vault key (must be envelope encryption): Pass
+      - Does NOT store the raw DEK in plaintext: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for storage-dp-python-encrypted-uploader / python-azure-skills/azure-skill-mcp:
+- encrypted-uploader.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (19/19)
+      - Uses the Key Vault Keys SDK (NOT Secrets) — critical distinction: Pass
+      - Uses a cryptography library for local AES-GCM encryption: Pass
+      - Uses Key Vault's cryptographic client for key wrap and unwrap operations (NOT a secrets client): Pass
+      - Specifies an RSA key wrap algorithm for protecting the DEK: Pass
+      - Key material never leaves Key Vault — wrap/unwrap happens server-side: Pass
+      - Generates a random 256-bit data encryption key (DEK) locally: Pass
+      - Encrypts data locally with AES-GCM using the DEK: Pass
+      - Wraps the DEK via Key Vault before storing: Pass
+      - Stores the wrapped DEK, nonce/IV, and vault key identifier as blob metadata: Pass
+      - Decryption retrieves metadata, unwraps the DEK via Key Vault, and decrypts locally: Pass
+      - Uses AES-GCM specifically (not CBC, ECB, or other modes): Pass
+      - Generates a fresh random nonce for each encryption: Pass
+      - Handles Key Vault errors (key disabled, key not found): Pass
+      - Handles blob not found: Pass
+      - Code must build and run without import errors or runtime crashes: Pass
+      - Async versions use the async variants of Blob Storage and Key Vault clients: Pass
+      - Does NOT use a secrets client instead of a keys/crypto client: Pass
+      - Does NOT encrypt data directly with the vault key (must be envelope encryption): Pass
+      - Does NOT store the raw DEK in plaintext: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-dp-python-encrypted-uploader / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- encrypted-uploader.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (19/19)
+      - Uses the Key Vault Keys SDK (NOT Secrets) — critical distinction: Pass
+      - Uses a cryptography library for local AES-GCM encryption: Pass
+      - Uses Key Vault's cryptographic client for key wrap and unwrap operations (NOT a secrets client): Pass
+      - Specifies an RSA key wrap algorithm for protecting the DEK: Pass
+      - Key material never leaves Key Vault — wrap/unwrap happens server-side: Pass
+      - Generates a random 256-bit data encryption key (DEK) locally: Pass
+      - Encrypts data locally with AES-GCM using the DEK: Pass
+      - Wraps the DEK via Key Vault before storing: Pass
+      - Stores the wrapped DEK, nonce/IV, and vault key identifier as blob metadata: Pass
+      - Decryption retrieves metadata, unwraps the DEK via Key Vault, and decrypts locally: Pass
+      - Uses AES-GCM specifically (not CBC, ECB, or other modes): Pass
+      - Generates a fresh random nonce for each encryption: Pass
+      - Handles Key Vault errors (key disabled, key not found): Pass
+      - Handles blob not found: Pass
+      - Code must build and run without import errors or runtime crashes: Pass
+      - Async versions use the async variants of Blob Storage and Key Vault clients: Pass
+      - Does NOT use a secrets client instead of a keys/crypto client: Pass
+      - Does NOT encrypt data directly with the vault key (must be envelope encryption): Pass
+      - Does NOT store the raw DEK in plaintext: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for storage-mp-python-account-mgmt / python-azure-skills/baseline:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (1/8)
+      - Includes the required Azure management and identity SDK packages: Pass
+      - Creates a management client authenticated with credential and subscription ID: Fail
+      - Creates a storage account as a long-running operation with the correct SKU and kind: Fail
+      - Lists all storage accounts in the resource group: Fail
+      - Retrieves detailed properties of a specific storage account: Fail
+      - Enables blob versioning on the account (via account update or blob service properties): Fail
+      - Deletes the storage account: Fail
+      - Code builds and runs without import errors or API misuse: Fail
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Fail
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for storage-mp-python-account-mgmt / python-azure-skills/azure-skill-mcp:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Includes the required Azure management and identity SDK packages: Pass
+      - Creates a management client authenticated with credential and subscription ID: Pass
+      - Creates a storage account as a long-running operation with the correct SKU and kind: Pass
+      - Lists all storage accounts in the resource group: Pass
+      - Retrieves detailed properties of a specific storage account: Pass
+      - Enables blob versioning on the account (via account update or blob service properties): Pass
+      - Deletes the storage account: Pass
+      - Code builds and runs without import errors or API misuse: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for cosmos-db-dp-python-todo-repository / python-azure-skills/azure-skill-mcp:
+- todo-repository.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (11/13)
+      - Correct partition key usage: `/category` path, `partition_key` in all point operations: Pass
+      - ETag-based optimistic concurrency: captures `_etag` from read response, passes `if_match` on replace: Pass
+      - Handles 412 Precondition Failed as a specific error case for conflicts: Pass
+      - Parameterized queries using `parameters` list (no f-string or format-string concatenation): Pass
+      - Page-by-page iteration using `query_items(...).by_page()` with `max_item_count`: Pass
+      - Logs continuation token and item count per page: Fail
+      - Async version uses `azure.cosmos.aio.CosmosClient`: Pass
+      - TTL configured at 90 days (7776000 seconds) via `default_ttl` in container properties: Pass
+      - Indexing policy excludes `/description` path using `excludedPaths`: Pass
+      - RU cost extracted from response headers via `x-ms-request-charge` or `response_headers`: Pass
+      - Catches `CosmosHttpResponseError` with status code checks (404, 409, 412): Fail
+      - Handles 412 separately for ETag conflicts: Pass
+      - Does NOT flatten query results by calling `list()` without page iteration: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for cosmos-db-dp-python-crud / python-azure-skills/baseline:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `azure-cosmos` pip package: Pass
+      - `CosmosClient` creation: Pass
+      - `database_client.create_database_if_not_exists()`: Pass
+      - `database.create_container_if_not_exists()` with `PartitionKey`: Pass
+      - `container.query_items()` with `enable_cross_partition_query`: Fail
+      - `CosmosHttpResponseError` exception handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Fail
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for cosmos-db-dp-python-crud / python-azure-skills/azure-skill-mcp:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `azure-cosmos` pip package: Pass
+      - `CosmosClient` creation: Pass
+      - `database_client.create_database_if_not_exists()`: Pass
+      - `database.create_container_if_not_exists()` with `PartitionKey`: Pass
+      - `container.query_items()` with `enable_cross_partition_query`: Fail
+      - `CosmosHttpResponseError` exception handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Fail
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for cosmos-db-dp-python-crud / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `azure-cosmos` pip package: Pass
+      - `CosmosClient` creation: Pass
+      - `database_client.create_database_if_not_exists()`: Pass
+      - `database.create_container_if_not_exists()` with `PartitionKey`: Pass
+      - `container.query_items()` with `enable_cross_partition_query`: Fail
+      - `CosmosHttpResponseError` exception handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for cosmos-db-dp-python-todo-repository / python-azure-skills/baseline:
+- todo-repository.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (11/13)
+      - Correct partition key usage: `/category` path, `partition_key` in all point operations: Pass
+      - ETag-based optimistic concurrency: captures `_etag` from read response, passes `if_match` on replace: Pass
+      - Handles 412 Precondition Failed as a specific error case for conflicts: Pass
+      - Parameterized queries using `parameters` list (no f-string or format-string concatenation): Pass
+      - Page-by-page iteration using `query_items(...).by_page()` with `max_item_count`: Pass
+      - Logs continuation token and item count per page: Fail
+      - Async version uses `azure.cosmos.aio.CosmosClient`: Pass
+      - TTL configured at 90 days (7776000 seconds) via `default_ttl` in container properties: Pass
+      - Indexing policy excludes `/description` path using `excludedPaths`: Pass
+      - RU cost extracted from response headers via `x-ms-request-charge` or `response_headers`: Pass
+      - Catches `CosmosHttpResponseError` with status code checks (404, 409, 412): Fail
+      - Handles 412 separately for ETag conflicts: Pass
+      - Does NOT flatten query results by calling `list()` without page iteration: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for app-configuration-dp-python-crud / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (6/6)
+      - `azure-appconfiguration` pip package: Pass
+      - `set_configuration_setting()` with `ConfigurationSetting` objects: Pass
+      - `get_configuration_setting()` by key: Pass
+      - `list_configuration_settings()` with key_filter: Pass
+      - `FeatureFlagConfigurationSetting` for feature flags: Pass
+      - `delete_configuration_setting()` and `HttpResponseError` handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for app-configuration-dp-python-feature-flags / python-azure-skills/baseline:
+- feature-flags.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (8/9)
+      - Lists settings filtered by key prefix using `key_filter`: Pass
+      - Implements conditional reads using `match_condition` with `MatchConditions.IfModified` and the setting's `etag`: Fail
+      - Handles 304 Not Modified (setting unchanged since last read): Pass
+      - Uses `.appconfig.featureflag/` prefix for feature flag keys: Pass
+      - Parses the JSON payload in feature flag setting values: Pass
+      - Implements deterministic percentage rollout (consistent hash via `hashlib`, not `random`): Pass
+      - Implements sentinel key watching with configurable polling interval: Pass
+      - Detects sentinel value change via ETag or value comparison and triggers full refresh: Pass
+      - Async version uses `azure.appconfiguration.aio.AzureAppConfigurationClient`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for app-configuration-dp-python-feature-flags / python-azure-skills/azure-skill-mcp:
+- feature-flags.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (9/9)
+      - Lists settings filtered by key prefix using `key_filter`: Pass
+      - Implements conditional reads using `match_condition` with `MatchConditions.IfModified` and the setting's `etag`: Pass
+      - Handles 304 Not Modified (setting unchanged since last read): Pass
+      - Uses `.appconfig.featureflag/` prefix for feature flag keys: Pass
+      - Parses the JSON payload in feature flag setting values: Pass
+      - Implements deterministic percentage rollout (consistent hash via `hashlib`, not `random`): Pass
+      - Implements sentinel key watching with configurable polling interval: Pass
+      - Detects sentinel value change via ETag or value comparison and triggers full refresh: Pass
+      - Async version uses `azure.appconfiguration.aio.AzureAppConfigurationClient`: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for app-configuration-dp-python-crud / python-azure-skills/baseline:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `azure-appconfiguration` pip package: Pass
+      - `set_configuration_setting()` with `ConfigurationSetting` objects: Fail
+      - `get_configuration_setting()` by key: Pass
+      - `list_configuration_settings()` with key_filter: Pass
+      - `FeatureFlagConfigurationSetting` for feature flags: Pass
+      - `delete_configuration_setting()` and `HttpResponseError` handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Fail
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for event-hubs-dp-python-streaming / python-azure-skills/baseline:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `azure-eventhub` and `azure-eventhub-checkpointstoreblob-aio` pip packages: Pass
+      - `create_batch()` and `EventDataBatch.add()`: Pass
+      - `send_batch()` for publishing: Pass
+      - `EventHubConsumerClient` with `BlobCheckpointStore`: Pass
+      - `receive()` with `on_event` and `on_error` callbacks: Pass
+      - Async variants with `aio` module: Pass
+      - Context manager (async with) patterns: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Fail
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Fail (0/1)
+      - tool_used: any tool (source=mcp, server=azure): Fail
+
+Graders for cosmos-db-dp-python-todo-repository / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- todo-repository.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (11/13)
+      - Correct partition key usage: `/category` path, `partition_key` in all point operations: Pass
+      - ETag-based optimistic concurrency: captures `_etag` from read response, passes `if_match` on replace: Pass
+      - Handles 412 Precondition Failed as a specific error case for conflicts: Pass
+      - Parameterized queries using `parameters` list (no f-string or format-string concatenation): Pass
+      - Page-by-page iteration using `query_items(...).by_page()` with `max_item_count`: Pass
+      - Logs continuation token and item count per page: Fail
+      - Async version uses `azure.cosmos.aio.CosmosClient`: Pass
+      - TTL configured at 90 days (7776000 seconds) via `default_ttl` in container properties: Pass
+      - Indexing policy excludes `/description` path using `excludedPaths`: Pass
+      - RU cost extracted from response headers via `x-ms-request-charge` or `response_headers`: Pass
+      - Catches `CosmosHttpResponseError` with status code checks (404, 409, 412): Fail
+      - Handles 412 separately for ETag conflicts: Pass
+      - Does NOT flatten query results by calling `list()` without page iteration: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for event-hubs-dp-python-streaming / python-azure-skills/azure-skill-mcp:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `azure-eventhub` and `azure-eventhub-checkpointstoreblob-aio` pip packages: Pass
+      - `create_batch()` and `EventDataBatch.add()`: Pass
+      - `send_batch()` for publishing: Pass
+      - `EventHubConsumerClient` with `BlobCheckpointStore`: Pass
+      - `receive()` with `on_event` and `on_error` callbacks: Pass
+      - Async variants with `aio` module: Pass
+      - Context manager (async with) patterns: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Fail
+  - Context Manager for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Fail
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for event-hubs-dp-python-streaming / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (7/7)
+      - `azure-eventhub` and `azure-eventhub-checkpointstoreblob-aio` pip packages: Pass
+      - `create_batch()` and `EventDataBatch.add()`: Pass
+      - `send_batch()` for publishing: Pass
+      - `EventHubConsumerClient` with `BlobCheckpointStore`: Pass
+      - `receive()` with `on_event` and `on_error` callbacks: Pass
+      - Async variants with `aio` module: Pass
+      - Context manager (async with) patterns: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Fail
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+Graders for app-configuration-dp-python-crud / python-azure-skills/azure-skill-mcp:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (6/6)
+      - `azure-appconfiguration` pip package: Pass
+      - `set_configuration_setting()` with `ConfigurationSetting` objects: Pass
+      - `get_configuration_setting()` by key: Pass
+      - `list_configuration_settings()` with key_filter: Pass
+      - `FeatureFlagConfigurationSetting` for feature flags: Pass
+      - `delete_configuration_setting()` and `HttpResponseError` handling: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+🔍 Resource usage: Peak: 57 sessions, 0.0GB RAM, 0% CPU
+
+Run Summary:
+  Run ID:      20260829-032449
+  Evaluations: 57
+  Passed:      0
+  Failed:      56
+  Errors:      1
+  Duration:    15861.09s

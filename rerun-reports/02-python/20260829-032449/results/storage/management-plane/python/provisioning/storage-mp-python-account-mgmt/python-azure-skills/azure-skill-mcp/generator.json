@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-mp-python-account-mgmt",
+  "config_name": "python-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that manages\r\nAzure Storage Accounts using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new Storage Account with Standard_LRS SKU in \"eastus\"\r\n3. List all Storage Accounts in a resource group\r\n4. Get the properties of the created Storage Account\r\n5. Update the account to enable blob versioning\r\n6. Delete the Storage Account\r\n\r\nShow required pip packages and include proper error handling.",
+  "final_response": "Created `storage_account_manager.py` and `requirements.txt`.\n\n```powershell\npython -m pip install -r requirements.txt\n\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\n$env:AZURE_RESOURCE_GROUP = \"\u003cexisting-resource-group\u003e\"\n$env:AZURE_STORAGE_ACCOUNT_NAME = \"\u003cglobally-unique-name\u003e\"\n\n# Safe offline preview\npython storage_account_manager.py\n\n# Executes the lifecycle, including deletion\npython storage_account_manager.py --execute\n```\n\nThe script uses `DefaultAzureCredential`, creates a secure `StorageV2` account with `Standard_LRS` in `eastus`, lists and reads accounts, enables blob versioning through `blob_services.set_service_properties`, and deletes the account in a `finally` block. It handles configuration, authentication, HTTP, connectivity, missing-resource, and general Azure SDK errors.\n\nRequired packages:\n\n```text\nazure-identity\nazure-mgmt-storage\n```\n\nReferences: [Storage management client](https://learn.microsoft.com/python/api/azure-mgmt-storage/azure.mgmt.storage.storagemanagementclient) · [DefaultAzureCredential](https://learn.microsoft.com/python/api/azure-identity/azure.identity.defaultazurecredential)",
+  "workspace_delta": {
+    "bytes_added": 7177,
+    "bytes_removed": 0,
+    "bytes_net": 7177,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "storage_account_manager.py",
+        "size": 7141
+      },
+      {
+        "path": "requirements.txt",
+        "size": 36
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T06:46:55.4778096+08:00",
+  "ended_at": "2026-08-29T06:49:12.2097488+08:00",
+  "duration_ms": 136731,
+  "terminated_by": "completed"
+}

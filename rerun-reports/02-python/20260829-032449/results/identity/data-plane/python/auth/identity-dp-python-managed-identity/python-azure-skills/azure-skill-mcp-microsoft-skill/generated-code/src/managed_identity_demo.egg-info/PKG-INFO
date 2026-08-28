@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: managed-identity-demo
+Version: 0.1.0
+Summary: Azure SDK authentication examples for system- and user-assigned managed identities
+Requires-Python: >=3.9
+Requires-Dist: azure-identity<2,>=1.17
+Requires-Dist: azure-storage-blob<13,>=12.20

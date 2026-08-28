@@ -1,0 +1,85 @@
+{
+  "prompt_id": "identity-dp-python-managed-identity",
+  "config_name": "python-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a runnable Python project that authenticates Azure SDK clients using Managed Identity.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n1. System-assigned vs user-assigned managed identity differences\r\n2. How to create a ManagedIdentityCredential for each type\r\n3. Using it with Azure SDK clients\r\n4. Local development fallback strategies\r\n5. Error handling and troubleshooting\r\n\r\nProvide examples for both system-assigned and user-assigned identity.",
+  "final_response": "Created a runnable Python project demonstrating:\n\n- System-assigned and user-assigned `ManagedIdentityCredential`\n- User-assigned client ID configuration\n- Authentication with `BlobServiceClient`\n- Explicit, opt-in local `DefaultAzureCredential` fallback\n- Actionable authentication, authorization, configuration, and network errors\n- Offline mocked unit tests\n- Complete setup, execution, RBAC, and troubleshooting guidance in `README.md`\n\nThe project is installable with `python -m pip install -e \".[dev]\"`; all 7 tests pass.",
+  "workspace_delta": {
+    "bytes_added": 20676,
+    "bytes_removed": 0,
+    "bytes_net": 20676,
+    "new_file_count": 14,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "managed_identity_demo\\storage.py",
+        "size": 933
+      },
+      {
+        "path": "pyproject.toml",
+        "size": 677
+      },
+      {
+        "path": "azure_managed_identity_sample.egg-info\\entry_points.txt",
+        "size": 73
+      },
+      {
+        "path": "azure_managed_identity_sample.egg-info\\top_level.txt",
+        "size": 22
+      },
+      {
+        "path": "managed_identity_demo\\__init__.py",
+        "size": 73
+      },
+      {
+        "path": "managed_identity_demo\\cli.py",
+        "size": 3132
+      },
+      {
+        "path": "tests\\test_auth.py",
+        "size": 1287
+      },
+      {
+        "path": "tests\\test_cli.py",
+        "size": 1950
+      },
+      {
+        "path": "README.md",
+        "size": 4591
+      },
+      {
+        "path": "azure_managed_identity_sample.egg-info\\PKG-INFO",
+        "size": 4977
+      },
+      {
+        "path": "azure_managed_identity_sample.egg-info\\SOURCES.txt",
+        "size": 507
+      },
+      {
+        "path": "azure_managed_identity_sample.egg-info\\dependency_links.txt",
+        "size": 1
+      },
+      {
+        "path": "azure_managed_identity_sample.egg-info\\requires.txt",
+        "size": 78
+      },
+      {
+        "path": "managed_identity_demo\\auth.py",
+        "size": 2375
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 5,
+    "tool_calls": 0,
+    "reasoning_steps": 5,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T04:04:45.5763967+08:00",
+  "ended_at": "2026-08-29T04:06:37.4395803+08:00",
+  "duration_ms": 111863,
+  "terminated_by": "completed"
+}

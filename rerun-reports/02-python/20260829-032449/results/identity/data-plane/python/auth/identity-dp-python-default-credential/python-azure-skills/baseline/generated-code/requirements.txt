@@ -1,0 +1,3 @@
+azure-identity
+azure-identity-broker
+azure-storage-blob

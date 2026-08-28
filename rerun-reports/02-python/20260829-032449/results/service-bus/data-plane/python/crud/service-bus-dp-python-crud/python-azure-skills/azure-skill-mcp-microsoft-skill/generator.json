@@ -1,0 +1,45 @@
+{
+  "prompt_id": "service-bus-dp-python-crud",
+  "config_name": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that demonstrates messaging with Azure Service Bus.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n3. Send a batch of 5 messages using a ServiceBusMessageBatch\r\n4. Get a receiver for the queue and receive messages\r\n5. Complete a message with receiver.complete_message() after processing\r\n6. Demonstrate the async pattern using aio module for higher throughput\r\n7. Send to a topic and receive from a subscription\r\n\r\nShow required pip packages and proper context manager patterns (with statements).",
+  "final_response": "Created:\n\n- `sync_servicebus.py` — sends a five-message batch, receives queue messages, completes them, and demonstrates topic/subscription messaging.\n- `async_servicebus.py` — equivalent `aio` workflow with prefetching and concurrent processing.\n- `requirements.txt` — pinned `azure-servicebus` and `azure-identity` packages.\n- `README.md` — environment variables, authentication/RBAC guidance, installation, and run commands.\n\nAll clients, credentials, senders, and receivers use appropriate sync or async context managers.",
+  "workspace_delta": {
+    "bytes_added": 10090,
+    "bytes_removed": 0,
+    "bytes_net": 10090,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1785
+      },
+      {
+        "path": "async_servicebus.py",
+        "size": 4502
+      },
+      {
+        "path": "requirements.txt",
+        "size": 50
+      },
+      {
+        "path": "sync_servicebus.py",
+        "size": 3753
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T05:36:56.0723232+08:00",
+  "ended_at": "2026-08-29T05:39:02.91599+08:00",
+  "duration_ms": 126843,
+  "terminated_by": "completed"
+}

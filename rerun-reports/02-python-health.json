@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "suite": "python",
+  "run_id": "20260829-032449",
+  "status": "completed_with_issues",
+  "expected_reports": 57,
+  "actual_reports": 57,
+  "expected_prompts": 19,
+  "actual_prompts": 19,
+  "complete_triplets": 19,
+  "incomplete_triplets": 0,
+  "evaluation_summary": {
+    "passed": 0,
+    "failed": 56,
+    "errors": 1
+  },
+  "health": {
+    "session_timeouts": 1,
+    "test_timeouts": 0,
+    "mcp_timeouts": 0,
+    "skill_load_failures": 0,
+    "error_log_entries": 0,
+    "orphaned_hyoka_processes": 0,
+    "sessions_cleaned": 0
+  },
+  "azure_mcp": {
+    "completed_calls": 156,
+    "successful_calls": 156,
+    "failed_calls": 0,
+    "average_duration_ms": 6527.3,
+    "maximum_duration_ms": 27647,
+    "calls_at_least_60000_ms": 0
+  },
+  "debug_log": {
+    "original_size": 134796977,
+    "original_sha256": "B597C6117F2607AF0FC9CA788B7CFD33550A966D14EB1D07A5D36F5D4CB9ABE1",
+    "parts": [
+      "rerun-reports/02-python.log.part-001",
+      "rerun-reports/02-python.log.part-002",
+      "rerun-reports/02-python.log.part-003",
+      "rerun-reports/02-python.log.part-004"
+    ]
+  },
+  "summary_artifact": {
+    "path": "rerun-reports/02-python/20260829-032449/summary.json.gz",
+    "original_size": 119240021,
+    "compressed_size": 4166064,
+    "original_sha256": "D06ACA1A24A158F438D8023E93D436EE05BCCC11ECB16C9FAFB27196F09D2C57"
+  },
+  "variants": [
+    {
+      "name": "python-azure-skills/baseline",
+      "checks_passed": 227,
+      "checks_total": 305,
+      "rate_percent": 74.4,
+      "infrastructure_errors": 0
+    },
+    {
+      "name": "python-azure-skills/azure-skill-mcp",
+      "checks_passed": 259,
+      "checks_total": 305,
+      "rate_percent": 84.9,
+      "infrastructure_errors": 0
+    },
+    {
+      "name": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+      "checks_passed": 265,
+      "checks_total": 305,
+      "rate_percent": 86.9,
+      "infrastructure_errors": 1
+    }
+  ],
+  "issues": [
+    {
+      "prompt_id": "storage-mp-python-account-mgmt",
+      "config": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+      "phase": "generation",
+      "error": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+      "generated_output": true,
+      "generated_file_count": 2,
+      "mcp_involved": true,
+      "mcp_timed_out": false
+    }
+  ]
+}

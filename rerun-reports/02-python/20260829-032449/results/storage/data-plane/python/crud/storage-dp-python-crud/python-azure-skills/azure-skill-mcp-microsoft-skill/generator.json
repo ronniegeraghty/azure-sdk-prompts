@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-dp-python-crud",
+  "config_name": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that performs\r\nCRUD operations on Azure Blob Storage:\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n1. Create a BlobServiceClient using DefaultAzureCredential\r\n2. Create a container named \"my-container\" if it doesn't exist\r\n3. Upload a local file \"report.csv\" as a blob named \"reports/report.csv\"\r\n4. List all blobs in the container and print each blob's name and content length\r\n5. Download the blob and save it to \"report-downloaded.csv\"\r\n6. Delete the blob and then delete the container\r\n\r\nInclude a `requirements.txt` with `azure-storage-blob` and `azure-identity`, and add proper error handling with `HttpResponseError` and `ResourceExistsError`.",
+  "final_response": "Created:\n\n- `blob_crud.py` — complete Blob Storage CRUD workflow using `DefaultAzureCredential`, context-managed clients, and `HttpResponseError`/`ResourceExistsError` handling.\n- `requirements.txt` — includes `azure-storage-blob` and `azure-identity`.\n\nConfigure `AZURE_STORAGE_ACCOUNT_URL` or `AZURE_STORAGE_ACCOUNT_NAME`, provide `report.csv`, then run `python blob_crud.py`.\n\nReference: [Azure Blob Storage Python quickstart](https://learn.microsoft.com/azure/storage/blobs/storage-quickstart-blobs-python)",
+  "workspace_delta": {
+    "bytes_added": 2723,
+    "bytes_removed": 0,
+    "bytes_net": 2723,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "requirements.txt",
+        "size": 36
+      },
+      {
+        "path": "blob_crud.py",
+        "size": 2687
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 6,
+    "tool_calls": 0,
+    "reasoning_steps": 6,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T06:20:10.3723048+08:00",
+  "ended_at": "2026-08-29T06:21:35.0168284+08:00",
+  "duration_ms": 84644,
+  "terminated_by": "completed"
+}

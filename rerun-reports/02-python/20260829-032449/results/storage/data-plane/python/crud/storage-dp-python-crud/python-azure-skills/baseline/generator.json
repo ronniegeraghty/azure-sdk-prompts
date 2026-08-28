@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-dp-python-crud",
+  "config_name": "python-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that performs\r\nCRUD operations on Azure Blob Storage:\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n1. Create a BlobServiceClient using DefaultAzureCredential\r\n2. Create a container named \"my-container\" if it doesn't exist\r\n3. Upload a local file \"report.csv\" as a blob named \"reports/report.csv\"\r\n4. List all blobs in the container and print each blob's name and content length\r\n5. Download the blob and save it to \"report-downloaded.csv\"\r\n6. Delete the blob and then delete the container\r\n\r\nInclude a `requirements.txt` with `azure-storage-blob` and `azure-identity`, and add proper error handling with `HttpResponseError` and `ResourceExistsError`.",
+  "final_response": "Created:\n\n- `blob_crud.py` — performs the requested Azure Blob Storage CRUD workflow using `DefaultAzureCredential`, with `ResourceExistsError` and `HttpResponseError` handling.\n- `requirements.txt` — includes `azure-storage-blob` and `azure-identity`.\n\nSet `AZURE_STORAGE_ACCOUNT_URL` before running the script. It also expects `report.csv` in the working directory.",
+  "workspace_delta": {
+    "bytes_added": 2430,
+    "bytes_removed": 0,
+    "bytes_net": 2430,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "blob_crud.py",
+        "size": 2394
+      },
+      {
+        "path": "requirements.txt",
+        "size": 36
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 4,
+    "tool_calls": 0,
+    "reasoning_steps": 4,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T06:14:47.737313+08:00",
+  "ended_at": "2026-08-29T06:15:35.3904616+08:00",
+  "duration_ms": 47653,
+  "terminated_by": "completed"
+}

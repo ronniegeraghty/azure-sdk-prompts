@@ -1,0 +1,61 @@
+{
+  "prompt_id": "storage-dp-python-blob-manager",
+  "config_name": "python-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that provides a reusable Azure Blob Storage management utility.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **service module** (both sync and async versions) that wraps blob operations: upload (with optional metadata and blob index tags for later querying), download, list blobs in a container, and delete. The upload method should handle large files efficiently so that uploading a multi-gigabyte file doesn't load the entire thing into memory or fail on slow connections. The service should also prevent concurrent writers from overwriting each other's changes when updating the same blob.\r\n\r\n- A **configuration module** that connects to Azure securely using the storage account endpoint (from an environment variable). No connection strings or account keys should be used — the app will run in Azure with `DefaultAzureCredential`. The configuration should set up a custom retry policy (exponential backoff, configurable max retries and delay), so the app behaves predictably under transient failures. It should also enable HTTP request/response logging at a configurable level for debugging.\r\n\r\n- The service should **handle errors gracefully** — if a storage operation fails (e.g., blob not found, permission denied, or a lease is already held by another client), the error should be caught and handled with a clear message rather than crashing. Each operation should also accept an **optional timeout**, so callers can control how long they're willing to wait for a response.\r\n\r\n- A **main script** that wires everything together and demos each operation using the sync implementation first, then repeats the same operations using the async implementation: uploads a sample file with some index tags, lists blobs, downloads the file back, acquires a lease and overwrites it, and finally deletes it. Print status at each step.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the reusable Azure Blob Storage project with:\n\n- Sync and async services for streaming upload/download, listing, deletion, and lease management.\n- ETag-based optimistic concurrency protection and lease-aware overwrites.\n- `DefaultAzureCredential` authentication using `AZURE_STORAGE_ACCOUNT_URL`.\n- Configurable exponential retries, HTTP logging, transfer sizing, concurrency, and timeouts.\n- Graceful Azure Storage error handling with clear operation results.\n- A complete sync-then-async demo in `main.py`.\n- `requirements.txt`, configuration documentation, and `.gitignore`.\n\nThe demo expects an existing container via `AZURE_STORAGE_CONTAINER` and does not provision Azure resources.",
+  "workspace_delta": {
+    "bytes_added": 30219,
+    "bytes_removed": 0,
+    "bytes_net": 30219,
+    "new_file_count": 8,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1959
+      },
+      {
+        "path": "azure_blob_manager\\__init__.py",
+        "size": 468
+      },
+      {
+        "path": "azure_blob_manager\\async_service.py",
+        "size": 6900
+      },
+      {
+        "path": "azure_blob_manager\\config.py",
+        "size": 6071
+      },
+      {
+        "path": "azure_blob_manager\\models.py",
+        "size": 806
+      },
+      {
+        "path": "azure_blob_manager\\service.py",
+        "size": 8027
+      },
+      {
+        "path": "main.py",
+        "size": 5920
+      },
+      {
+        "path": "requirements.txt",
+        "size": 68
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 14,
+    "tool_calls": 0,
+    "reasoning_steps": 14,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T05:57:39.9068964+08:00",
+  "ended_at": "2026-08-29T06:01:47.7411471+08:00",
+  "duration_ms": 247834,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,6 @@
+aiohttp>=3.9,<4
+azure-core>=1.35,<2
+azure-identity>=1.25,<2
+azure-keyvault-keys>=4.11.2,<5
+azure-storage-blob>=12.27,<13
+cryptography>=46,<47

@@ -1,0 +1,65 @@
+{
+  "prompt_id": "key-vault-dp-python-secret-config",
+  "config_name": "python-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that implements an application configuration provider backed by Azure Key Vault.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **secret provider module** (both sync and async versions) that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.\r\n\r\n- A **caching layer** on top of the provider that stores secret values in memory after first retrieval. It should support bulk-loading a predefined set of required config keys at startup, on-demand refresh of individual keys, and automatic re-fetch of any secret whose expiry date is within a configurable warning window (e.g., 7 days out).\r\n\r\n- A **configuration/factory module** that connects securely to the Key Vault using the vault URL from an environment variable. The application runs in Azure and should authenticate using `DefaultAzureCredential` — no client secrets or certificates in code.\r\n\r\n- A **secret rotation helper** that safely rotates a secret: delete the old secret, ensure the deletion is fully complete, then create the new secret with an updated value and expiry date. The rotation must be safe — don't assume deletion is instantaneous, since Key Vault's soft-delete feature means the secret may not be immediately gone. Use the long-running operation poller returned by `begin_delete_secret()`.\r\n\r\n- A **main script** that demos both implementations: loading several config keys at startup, reading them from cache, refreshing one, printing a warning if any secret is near expiry, and performing a secret rotation (delete old, wait for completion, create new). Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "The project is implemented, including local mock-based coverage for versioned lookup, missing-secret defaults, expiry-driven refresh, and deletion/purge ordering. I’m running the smallest complete test pass and syntax compilation now.",
+  "workspace_delta": {
+    "bytes_added": 25201,
+    "bytes_removed": 0,
+    "bytes_net": 25201,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "azure_keyvault_config\\factory.py",
+        "size": 1432
+      },
+      {
+        "path": "azure_keyvault_config\\provider.py",
+        "size": 3966
+      },
+      {
+        "path": "azure_keyvault_config\\rotation.py",
+        "size": 4088
+      },
+      {
+        "path": "requirements.txt",
+        "size": 88
+      },
+      {
+        "path": "tests\\__init__.py",
+        "size": 22
+      },
+      {
+        "path": "tests\\test_keyvault_config.py",
+        "size": 6807
+      },
+      {
+        "path": "azure_keyvault_config\\__init__.py",
+        "size": 550
+      },
+      {
+        "path": "azure_keyvault_config\\cache.py",
+        "size": 5348
+      },
+      {
+        "path": "main.py",
+        "size": 2900
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 18,
+    "tool_calls": 0,
+    "reasoning_steps": 18,
+    "truncated": true
+  },
+  "started_at": "2026-08-29T04:43:22.2843931+08:00",
+  "ended_at": "2026-08-29T04:46:53.1319501+08:00",
+  "duration_ms": 210847,
+  "terminated_by": "completed"
+}

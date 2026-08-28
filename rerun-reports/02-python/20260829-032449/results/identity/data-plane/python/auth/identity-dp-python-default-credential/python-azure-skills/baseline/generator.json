@@ -1,0 +1,41 @@
+{
+  "prompt_id": "identity-dp-python-default-credential",
+  "config_name": "python-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Show me how to authenticate\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nan Azure SDK client using DefaultAzureCredential. Explain:\r\n1. What pip packages are needed\r\n2. How to create and use a DefaultAzureCredential instance\r\n3. The credential chain order and which credentials are tried\r\n4. How it works in local development (VS Code, Azure CLI) vs Azure deployments\r\n5. How to troubleshoot authentication failures with logging",
+  "final_response": "Created:\n\n- `authenticate.py` — constructs and safely closes a `BlobServiceClient` using `DefaultAzureCredential`, with optional identity debug logging.\n- `requirements.txt` — includes `azure-identity`, `azure-identity-broker`, and `azure-storage-blob`.\n- `README.md` — explains installation, credential usage, chain order, local versus Azure authentication, RBAC, and troubleshooting.\n\nThe default example runs entirely offline and makes no Azure requests.",
+  "workspace_delta": {
+    "bytes_added": 8829,
+    "bytes_removed": 0,
+    "bytes_net": 8829,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 7102
+      },
+      {
+        "path": "authenticate.py",
+        "size": 1668
+      },
+      {
+        "path": "requirements.txt",
+        "size": 59
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 5,
+    "tool_calls": 0,
+    "reasoning_steps": 5,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T03:52:12.51768+08:00",
+  "ended_at": "2026-08-29T03:54:58.4972255+08:00",
+  "duration_ms": 165979,
+  "terminated_by": "completed"
+}

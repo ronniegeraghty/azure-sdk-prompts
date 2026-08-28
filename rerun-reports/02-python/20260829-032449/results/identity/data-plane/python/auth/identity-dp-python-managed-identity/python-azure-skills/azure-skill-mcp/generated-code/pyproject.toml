@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "azure-managed-identity-demo"
+version = "1.0.0"
+description = "Runnable Azure SDK managed identity authentication examples"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "azure-identity>=1.25.1,<2",
+    "azure-storage-blob>=12.27.1,<13",
+]
+
+[project.scripts]
+managed-identity-demo = "managed_identity_demo.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

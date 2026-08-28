@@ -1,0 +1,57 @@
+{
+  "prompt_id": "key-vault-dp-python-secret-config",
+  "config_name": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that implements an application configuration provider backed by Azure Key Vault.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **secret provider module** (both sync and async versions) that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.\r\n\r\n- A **caching layer** on top of the provider that stores secret values in memory after first retrieval. It should support bulk-loading a predefined set of required config keys at startup, on-demand refresh of individual keys, and automatic re-fetch of any secret whose expiry date is within a configurable warning window (e.g., 7 days out).\r\n\r\n- A **configuration/factory module** that connects securely to the Key Vault using the vault URL from an environment variable. The application runs in Azure and should authenticate using `DefaultAzureCredential` — no client secrets or certificates in code.\r\n\r\n- A **secret rotation helper** that safely rotates a secret: delete the old secret, ensure the deletion is fully complete, then create the new secret with an updated value and expiry date. The rotation must be safe — don't assume deletion is instantaneous, since Key Vault's soft-delete feature means the secret may not be immediately gone. Use the long-running operation poller returned by `begin_delete_secret()`.\r\n\r\n- A **main script** that demos both implementations: loading several config keys at startup, reading them from cache, refreshing one, printing a warning if any secret is near expiry, and performing a secret rotation (delete old, wait for completion, create new). Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Python project with:\n\n- Sync/async Key Vault secret providers with defaults, version retrieval, and expiry inspection\n- Expiry-aware in-memory caches with bulk loading and refresh support\n- Secure `DefaultAzureCredential` factories using `AZURE_KEYVAULT_URL`\n- Safe rotation using deletion pollers, purge completion checks, and recreation\n- A sync-then-async demo in `main.py`\n- Azure SDK dependencies and unit tests\n\nSet `AZURE_KEYVAULT_URL` before running `python main.py`. Rotation requires Key Vault delete, purge, and set permissions; vaults with purge protection cannot use this delete-and-recreate workflow.\n\nReference: [Azure Key Vault Secrets client library for Python](https://learn.microsoft.com/python/api/overview/azure/keyvault-secrets-readme)",
+  "workspace_delta": {
+    "bytes_added": 22038,
+    "bytes_removed": 0,
+    "bytes_net": 22038,
+    "new_file_count": 7,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "configuration.py",
+        "size": 1535
+      },
+      {
+        "path": "main.py",
+        "size": 2659
+      },
+      {
+        "path": "requirements.txt",
+        "size": 40
+      },
+      {
+        "path": "secret_cache.py",
+        "size": 4339
+      },
+      {
+        "path": "secret_provider.py",
+        "size": 3561
+      },
+      {
+        "path": "secret_rotation.py",
+        "size": 2872
+      },
+      {
+        "path": "tests\\test_secret_config.py",
+        "size": 7032
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T04:48:47.4284643+08:00",
+  "ended_at": "2026-08-29T04:51:39.8247448+08:00",
+  "duration_ms": 172396,
+  "terminated_by": "completed"
+}

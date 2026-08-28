@@ -1,0 +1,3 @@
+azure-identity>=1.25.1,<2.0
+azure-keyvault-secrets>=4.11.2,<5.0
+aiohttp>=3.13.2,<4.0

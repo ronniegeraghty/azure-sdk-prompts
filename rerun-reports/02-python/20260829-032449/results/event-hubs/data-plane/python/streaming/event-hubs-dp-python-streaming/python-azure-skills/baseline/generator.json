@@ -1,0 +1,37 @@
+{
+  "prompt_id": "event-hubs-dp-python-streaming",
+  "config_name": "python-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that demonstrates sending and receiving events with Azure Event Hubs.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n3. Send the batch to the event hub\r\n4. Create an EventHubConsumerClient for receiving\r\n5. Create a BlobCheckpointStore for checkpointing\r\n6. Define an on_event callback that prints event body and updates checkpoint\r\n7. Start receiving with receive() or receive_batch() using the callback\r\n8. Handle errors with an on_error callback\r\n\r\nShow required pip packages (azure-eventhub and\r\nazure-eventhub-checkpointstoreblob-aio) and async patterns.",
+  "final_response": "Created:\n\n- `event_hubs_async.py` — async batch sending, receiving, blob checkpointing, event/error callbacks, and graceful shutdown.\n- `requirements.txt` — includes `azure-eventhub` and `azure-eventhub-checkpointstoreblob-aio`.\n\nConfiguration uses `EVENT_HUB_CONNECTION_STRING`, `EVENT_HUB_NAME`, `EVENT_HUB_CONSUMER_GROUP`, `AZURE_STORAGE_CONNECTION_STRING`, and `BLOB_CONTAINER_NAME` environment variables.",
+  "workspace_delta": {
+    "bytes_added": 2643,
+    "bytes_removed": 0,
+    "bytes_net": 2643,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "event_hubs_async.py",
+        "size": 2558
+      },
+      {
+        "path": "requirements.txt",
+        "size": 85
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 4,
+    "tool_calls": 0,
+    "reasoning_steps": 4,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T07:29:12.7157375+08:00",
+  "ended_at": "2026-08-29T07:30:01.2659819+08:00",
+  "duration_ms": 48550,
+  "terminated_by": "completed"
+}

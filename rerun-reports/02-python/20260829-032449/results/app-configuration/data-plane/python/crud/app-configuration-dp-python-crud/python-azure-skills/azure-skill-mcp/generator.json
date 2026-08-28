@@ -1,0 +1,37 @@
+{
+  "prompt_id": "app-configuration-dp-python-crud",
+  "config_name": "python-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that manages configuration settings in Azure App Configuration.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n1. Create an `AzureAppConfigurationClient`.\r\n2. Set a configuration setting with key \"app:Settings:FontSize\" and value \"24\"\r\n3. Set a setting with label \"Production\"\r\n4. Get the setting by key and print its value\r\n5. List all settings matching the key filter \"app:Settings:*\"\r\n6. Create a FeatureFlagConfigurationSetting for \"BetaFeature\" that is enabled\r\n7. Delete the setting by key\r\n\r\nShow required pip packages and proper error handling with HttpResponseError.",
+  "final_response": "Created:\n\n- `app_configuration_manager.py` — uses `DefaultAzureCredential`, performs all requested setting and feature-flag operations, and handles `HttpResponseError` and authentication failures.\n- `requirements.txt` — pins `azure-appconfiguration==1.9.0` and `azure-identity==1.25.3`.\n\nSet `AZURE_APPCONFIG_ENDPOINT` before running the script. References: [Azure App Configuration Python quickstart](https://learn.microsoft.com/azure/azure-app-configuration/quickstart-python) and [FeatureFlagConfigurationSetting API](https://learn.microsoft.com/python/api/azure-appconfiguration/azure.appconfiguration.featureflagconfigurationsetting).",
+  "workspace_delta": {
+    "bytes_added": 2729,
+    "bytes_removed": 0,
+    "bytes_net": 2729,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "app_configuration_manager.py",
+        "size": 2674
+      },
+      {
+        "path": "requirements.txt",
+        "size": 55
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 15,
+    "tool_calls": 0,
+    "reasoning_steps": 15,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T07:45:13.1085108+08:00",
+  "ended_at": "2026-08-29T07:47:30.2008472+08:00",
+  "duration_ms": 137092,
+  "terminated_by": "completed"
+}

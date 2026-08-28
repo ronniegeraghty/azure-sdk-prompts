@@ -3,3 +3,5 @@
 .squad/agents/*/history.md merge=union
 .squad/log/** merge=union
 .squad/orchestration-log/** merge=union
+rerun-reports/*.log.part-* -text
+rerun-reports/**/*.gz -text

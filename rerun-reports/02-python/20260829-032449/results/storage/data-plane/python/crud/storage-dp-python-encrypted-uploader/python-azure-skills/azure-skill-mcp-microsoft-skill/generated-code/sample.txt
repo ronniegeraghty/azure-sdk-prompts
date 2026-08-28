@@ -1,0 +1,1 @@
+Client-side encryption keeps this plaintext out of Azure Blob Storage.

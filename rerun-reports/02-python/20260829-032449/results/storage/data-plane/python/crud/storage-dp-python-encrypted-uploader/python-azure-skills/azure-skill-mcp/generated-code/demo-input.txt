@@ -1,0 +1,1 @@
+Client-side envelope encryption with Azure Blob Storage and Key Vault.

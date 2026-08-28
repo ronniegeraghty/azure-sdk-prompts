@@ -6,20 +6,20 @@ Progress comment: https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-
 
 Overall status: **Running**
 
-Current suite: **Python**
+Current suite: **None - Python audit complete**
 
 ## Suite status
 
 | Order | Suite | Prompts | Evaluations | Status | Run ID | Health |
 |---:|---|---:|---:|---|---|---|
 | 1 | .NET | 20 | 60 | Completed with 1 issue | `20260829-004156` | 60/60 reports; 20/20 triplets; MCP 261/261 |
-| 2 | Python | 19 | 57 | In progress (7 reports) | Pending | 1 SDK generation timeout; MCP healthy |
+| 2 | Python | 19 | 57 | Completed with 1 issue | `20260829-032449` | 57/57 reports; 19/19 triplets; MCP 156/156 |
 | 3 | Java | 19 | 57 | Pending | - | - |
 | 4 | JS/TS | 14 | 42 | Pending | - | - |
 
-Completed: .NET.
+Completed: .NET, Python.
 
-Remaining: Python, Java, JS/TS.
+Remaining: Java, JS/TS.
 
 ## Frozen environment
 
@@ -47,3 +47,4 @@ Remaining: Python, Java, JS/TS.
 | 2026-08-29 03:18 +08:00 | Completed the .NET suite audit: 60/60 reports, 20/20 triplets, one generation timeout, and no MCP/test timeouts. | `5c74a62d` |
 | 2026-08-29 03:25 +08:00 | Marked Python in progress after the .NET checkpoint was pushed. | Pending |
 | 2026-08-29 04:06 +08:00 | Recorded one Python full-arm SDK generation timeout at 7/57 reports; 28/28 Azure MCP calls had succeeded. | Pending |
+| 2026-08-29 07:49 +08:00 | Completed the Python suite audit: 57/57 reports, 19/19 triplets, one generation timeout, and no MCP/test timeouts. | Pending |

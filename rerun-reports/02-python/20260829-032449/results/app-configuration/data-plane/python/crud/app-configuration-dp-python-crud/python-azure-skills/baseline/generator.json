@@ -1,0 +1,37 @@
+{
+  "prompt_id": "app-configuration-dp-python-crud",
+  "config_name": "python-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that manages configuration settings in Azure App Configuration.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n1. Create an `AzureAppConfigurationClient`.\r\n2. Set a configuration setting with key \"app:Settings:FontSize\" and value \"24\"\r\n3. Set a setting with label \"Production\"\r\n4. Get the setting by key and print its value\r\n5. List all settings matching the key filter \"app:Settings:*\"\r\n6. Create a FeatureFlagConfigurationSetting for \"BetaFeature\" that is enabled\r\n7. Delete the setting by key\r\n\r\nShow required pip packages and proper error handling with HttpResponseError.",
+  "final_response": "Created:\n\n- `app_configuration.py` — implements setting, labeled setting, retrieval, filtered listing, enabled `BetaFeature` feature flag, deletion, and `HttpResponseError` handling.\n- `requirements.txt` — includes `azure-appconfiguration\u003e=1.7.0,\u003c2.0.0`.\n\nThe script reads the connection string from `AZURE_APP_CONFIG_CONNECTION_STRING` and does not contain credentials.",
+  "workspace_delta": {
+    "bytes_added": 1760,
+    "bytes_removed": 0,
+    "bytes_net": 1760,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "app_configuration.py",
+        "size": 1722
+      },
+      {
+        "path": "requirements.txt",
+        "size": 38
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 5,
+    "tool_calls": 0,
+    "reasoning_steps": 5,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T07:27:12.8140907+08:00",
+  "ended_at": "2026-08-29T07:27:54.0404075+08:00",
+  "duration_ms": 41226,
+  "terminated_by": "completed"
+}

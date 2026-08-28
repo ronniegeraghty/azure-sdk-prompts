@@ -1,0 +1,215 @@
+{
+  "run_id": "20260829-032449",
+  "timestamp": "2026-08-28T23:49:16Z",
+  "reports": [
+    {
+      "prompt_id": "app-configuration-dp-python-crud",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "app-configuration-dp-python-feature-flags",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "cosmos-db-dp-python-crud",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "cosmos-db-dp-python-todo-repository",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "event-hubs-dp-python-streaming",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-python-credential-chain",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-python-default-credential",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-python-managed-identity",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "identity-dp-python-service-principal",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-dp-python-crud",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "key-vault-dp-python-secret-config",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "resource-manager-mp-python-rg-crud",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "service-bus-dp-python-crud",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "service-bus-dp-python-order-processor",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-python-blob-event-notifier",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-python-blob-manager",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-python-crud",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-dp-python-encrypted-uploader",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    },
+    {
+      "prompt_id": "storage-mp-python-account-mgmt",
+      "baseline": {
+        "config_name": "python-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}
