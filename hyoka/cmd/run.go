@@ -58,6 +58,8 @@ type runFlags struct {
 	excludeDirs string
 	// Session timeout
 	sessionTimeout string
+	// Copilot CLI executable override
+	copilotCLIPath string
 	// Pairwise tool-ablation (#121)
 	pairwiseMode    bool
 	pairwiseVariant string
@@ -113,6 +115,7 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().StringVar(&f.excludeDirs, "exclude-dirs", "", "Comma-separated directories to exclude from generated_files output (e.g., node_modules,target,dist)")
 	// Session timeout
 	cmd.Flags().StringVar(&f.sessionTimeout, "session-timeout", "10m", "Maximum duration for a single generation or review session (e.g., 10m, 30m, 1h)")
+	cmd.Flags().StringVar(&f.copilotCLIPath, "copilot-cli-path", "", "Path to a specific Copilot CLI executable")
 	// Pairwise tool-ablation (#121)
 	cmd.Flags().BoolVarP(&f.pairwiseMode, "pairwise", "P", false, "Expand each config into N+1 pairwise tool-ablation variants")
 	cmd.Flags().StringVar(&f.pairwiseVariant, "pairwise-variant", "", "Run a specific pairwise variant (e.g., 'baseline', 'without-azure', 'without-azure/storage_blob_list'). Mutually exclusive with -P/--pairwise.")
@@ -394,8 +397,14 @@ func runCmd() *cobra.Command {
 				return err
 			}
 
+			copilotCLIPath, err := resolveCopilotCLIPath(f.copilotCLIPath)
+			if err != nil {
+				return err
+			}
+
 			// Create a real Copilot SDK evaluator
 			sdkEval := eval.NewCopilotPromptRunner(eval.PromptRunnerOptions{
+				CLIPath:           copilotCLIPath,
 				AllowCloud:        f.allowCloud,
 				MaxSessionActions: f.maxSessionActions,
 				MaxTurns:          f.maxTurns,
@@ -406,16 +415,19 @@ func runCmd() *cobra.Command {
 
 			// Skip SDK verification for dry-run — we don't need the Copilot CLI
 			if !f.dryRun {
+				clientOpts := eval.BuildBaseClientOpts()
+				if copilotCLIPath != "" {
+					clientOpts.Connection = copilot.StdioConnection{Path: copilotCLIPath}
+				}
+
 				// Verify Copilot CLI is available
-				client := copilot.NewClient(eval.BuildBaseClientOpts())
+				client := copilot.NewClient(clientOpts)
 				if err := client.Start(context.Background()); err != nil {
 					return fmt.Errorf("copilot SDK unavailable: %w", err)
 				}
 				defer client.Stop() // #65: ensure cleanup on any exit path
 				slog.Info("Using Copilot SDK evaluator")
 				fmt.Println("Using Copilot SDK evaluator")
-
-				clientOpts := eval.BuildBaseClientOpts()
 
 				// Reviewer skill resolution is now per-config inside the
 				// factory closure (WU-2). Previously this pooled reviewer
@@ -583,3 +595,23 @@ func runCmd() *cobra.Command {
 	return cmd
 }
 
+func resolveCopilotCLIPath(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("resolving --copilot-cli-path %q: %w", path, err)
+	}
+
+	info, err := os.Stat(absolutePath)
+	if err != nil {
+		return "", fmt.Errorf("invalid --copilot-cli-path %q: %w", path, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("invalid --copilot-cli-path %q: path is a directory", path)
+	}
+
+	return absolutePath, nil
+}
