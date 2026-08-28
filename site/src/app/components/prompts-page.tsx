@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router";
-import { fetchPrompts, fetchRuns, type PromptInfo } from "../data/api";
+import { fetchPrompts, type PromptInfo } from "../data/api";
 import type { RunSummary } from "../data/types";
 import { Search, ChevronRight, Loader2, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { motion } from "motion/react";
 import { pointsPassRate, evalPassFromPoints } from "../lib/evalPass";
+import { useRuns } from "../hooks/useRuns";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
@@ -28,6 +29,7 @@ interface PromptWithStats {
 }
 
 export function PromptsPage() {
+  const { runs, loading: runsLoading, error: runsError } = useRuns();
   const [allPrompts, setAllPrompts] = useState<PromptWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,10 +42,21 @@ export function PromptsPage() {
   const [sortBy, setSortBy] = useState<SortBy>("recent");
 
   useEffect(() => {
+    // If runs are still loading or errored, wait
+    if (runsLoading) {
+      setLoading(true);
+      return;
+    }
+    if (runsError) {
+      setError(runsError);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     async function load() {
       try {
-        const [prompts, runs] = await Promise.all([fetchPrompts(), fetchRuns()]);
+        const prompts = await fetchPrompts();
         if (cancelled) return;
 
         // Compute eval stats per prompt from runs
@@ -117,7 +130,7 @@ export function PromptsPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [runs, runsLoading, runsError]);
 
   const services = useMemo(() => [...new Set(allPrompts.map(p => p.metadata.service))].sort(), [allPrompts]);
   const langs = useMemo(() => [...new Set(allPrompts.map(p => p.metadata.language))].sort(), [allPrompts]);
