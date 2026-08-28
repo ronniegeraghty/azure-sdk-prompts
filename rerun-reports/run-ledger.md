@@ -4,15 +4,15 @@ Branch: `weidongxu-microsoft/issue-656-three-way-rerun`
 
 Progress comment: https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231
 
-Overall status: **Planned**
+Overall status: **Running**
 
-Current suite: **None**
+Current suite: **.NET**
 
 ## Suite status
 
 | Order | Suite | Prompts | Evaluations | Status | Run ID | Health |
 |---:|---|---:|---:|---|---|---|
-| 1 | .NET | 20 | 60 | Pending | - | - |
+| 1 | .NET | 20 | 60 | In progress | - | Pending post-suite audit |
 | 2 | Python | 19 | 57 | Pending | - | - |
 | 3 | Java | 19 | 57 | Pending | - | - |
 | 4 | JS/TS | 14 | 42 | Pending | - | - |
@@ -20,6 +20,13 @@ Current suite: **None**
 Completed: none.
 
 Remaining: .NET, Python, Java, JS/TS.
+
+## Frozen environment
+
+- Copilot CLI: `copilot.exe.old-60692-1787802413382`
+- Copilot CLI SHA-256: `72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF`
+- Copilot SDK: v1
+- Azure MCP: `@azure/mcp@3.0.0-beta.38`
 
 ## Crash-recovery protocol
 
@@ -35,3 +42,4 @@ Remaining: .NET, Python, Java, JS/TS.
 | Time | Event | Commit |
 |---|---|---|
 | 2026-08-29 00:35 +08:00 | Initialized the four-suite rerun plan. | Pending |
+| 2026-08-29 00:40 +08:00 | Froze the runtime versions and marked .NET in progress. | Pending |
