@@ -5,7 +5,7 @@
   "progress_comment_url": "https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231",
   "status": "running",
   "current_suite_id": "python",
-  "last_updated": "2026-08-29T03:25:00+08:00",
+  "last_updated": "2026-08-29T04:06:00+08:00",
   "environment": {
     "copilot_cli_path": "C:\\Users\\weidxu\\AppData\\Local\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe.old-60692-1787802413382",
     "copilot_cli_sha256": "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF",
@@ -53,7 +53,7 @@
       "completed_at": null,
       "run_id": null,
       "result_commit": null,
-      "health_summary": null
+      "health_summary": "Interim: 7/57 reports; one full-arm SDK generation timeout for storage-mp-python-account-mgmt; 28/28 Azure MCP calls succeeded."
     },
     {
       "id": "java",
