@@ -2,6 +2,8 @@
 
 Branch: `weidongxu-microsoft/issue-656-three-way-rerun`
 
+Progress comment: https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231
+
 Overall status: **Planned**
 
 Current suite: **None**
@@ -26,7 +28,7 @@ Remaining: .NET, Python, Java, JS/TS.
 3. Do not rerun completed evaluations until the partial output has been audited.
 4. Before starting a suite, mark it `in_progress`, update this ledger, commit, and push.
 5. After a suite, record its run ID and health summary, mark it completed, commit all output, and push.
-6. Post the same checkpoint to #656 before starting the next suite.
+6. Edit the single progress comment linked above with the same checkpoint before starting the next suite. Do not add a new progress comment for each suite.
 
 ## Checkpoint history
 
