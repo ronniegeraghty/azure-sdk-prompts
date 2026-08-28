@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config/tool"
@@ -52,10 +53,11 @@ func newToolVerifier(skillDirs []string, mcpNames map[string]bool) *toolVerifier
 	sk := make(map[string]bool, len(skillDirs))
 	loadedSkills := make(map[string]bool, len(skillDirs))
 	for _, dir := range skillDirs {
-		name := filepath.Base(dir)
-		if name == "" || name == "." || name == "/" || name == `\` {
+		cleaned := strings.TrimRight(filepath.Clean(dir), `/\`)
+		if cleaned == "" || cleaned == "." {
 			continue
 		}
+		name := filepath.Base(cleaned)
 		sk[name] = true
 		loadedSkills[name] = true
 	}
