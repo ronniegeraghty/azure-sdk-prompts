@@ -1,0 +1,28 @@
+{
+  "name": "azure-encrypted-blob-uploader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Client-side AES-GCM envelope encryption for Azure Blob Storage using Azure Key Vault Keys",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/main.ts",
+    "start": "node dist/main.js",
+    "test": "tsx --test test/encryptedBlobClient.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@azure/core-auth": "^1.10.0",
+    "@azure/identity": "^4.11.1",
+    "@azure/keyvault-keys": "^4.10.0",
+    "@azure/storage-blob": "^12.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

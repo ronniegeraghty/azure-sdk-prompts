@@ -1,0 +1,45 @@
+{
+  "prompt_id": "app-configuration-dp-js-ts-crud",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat manages configuration settings in Azure App Configuration:\r\n1. Create an AppConfigurationClient using a connection string\r\n2. Set a configuration setting with key \"app:Settings:FontSize\" and value \"24\"\r\n3. Set a setting with label \"Production\"\r\n4. Get the setting by key and print its value\r\n5. List all settings matching the key filter \"app:Settings:*\" using listConfigurationSettings\r\n6. Create a feature flag configuration setting for \"BetaFeature\"\r\n7. Delete the setting by key\r\n\r\nShow required npm package (@azure/app-configuration) and\r\nproper error handling with RestError.",
+  "final_response": "Implemented the TypeScript sample in `src/index.ts` with package configuration in `package.json`. It includes CRUD operations, a `Production` label, filtered listing, the `BetaFeature` feature flag, and typed `RestError` handling.\n\n```powershell\nnpm install\n$env:AZURE_APPCONFIG_CONNECTION_STRING=\"\u003cyour-connection-string\u003e\"\nnpm run build\nnpm start\n```\n\nRequired runtime packages:\n\n```powershell\nnpm install @azure/app-configuration @azure/core-rest-pipeline\n```\n\n`@azure/core-rest-pipeline` supplies `RestError`; the published `@azure/app-configuration` version does not currently re-export it. The delete operation removes the unlabeled `app:Settings:FontSize` setting; the separately labeled `Production` setting remains.",
+  "workspace_delta": {
+    "bytes_added": 14367,
+    "bytes_removed": 0,
+    "bytes_net": 14367,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "package-lock.json",
+        "size": 11358
+      },
+      {
+        "path": "package.json",
+        "size": 401
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 2291
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 317
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 15,
+    "tool_calls": 0,
+    "reasoning_steps": 15,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T05:43:25.7279092+08:00",
+  "ended_at": "2026-08-28T05:51:15.0603342+08:00",
+  "duration_ms": 469332,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,3419 @@
+{
+  "run_id": "20260827-224628",
+  "timestamp": "2026-08-27T14:46:28Z",
+  "total_prompts": 1,
+  "total_configs": 1,
+  "total_evaluations": 1,
+  "passed": 0,
+  "failed": 0,
+  "errors": 1,
+  "duration_seconds": 607.2167848,
+  "avg_generation_duration_seconds": 604.7654877,
+  "avg_review_duration_seconds": 0.5803173,
+  "report_paths": null,
+  "results": [
+    {
+      "schema_version": 4,
+      "prompt_id": "identity-dp-dotnet-default-credential",
+      "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+      "timestamp": "2026-08-27T14:46:28Z",
+      "duration_seconds": 607.1553424,
+      "generation_duration_seconds": 604.7654877,
+      "review_duration_seconds": 0.5803173,
+      "prompt_metadata": {
+        "category": "auth",
+        "description": "Can a developer set up DefaultAzureCredential for Azure SDK clients using the .NET SDK?\n",
+        "difficulty": "basic",
+        "language": "dotnet",
+        "plane": "data-plane",
+        "sdk_package": "Azure.Identity",
+        "service": "identity",
+        "tags": "authentication, default-azure-credential, getting-started"
+      },
+      "config_used": {
+        "model": "gpt-5.6-sol",
+        "name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill"
+      },
+      "generated_files": null,
+      "generator_artifact": {
+        "prompt_id": "identity-dp-dotnet-default-credential",
+        "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+        "generator_model": "gpt-5.6-sol",
+        "original_prompt": "Show me how to authenticate\r\nan Azure SDK client using DefaultAzureCredential in C#. Explain:\r\n1. What NuGet packages are needed\r\n2. How to create and use a DefaultAzureCredential instance\r\n3. The credential chain order (which credentials are tried and in what sequence)\r\n4. How it behaves differently in local development vs deployed Azure environments\r\n5. How to troubleshoot when authentication fails\r\n\r\nProvide a complete, runnable example that creates a BlobServiceClient using\r\nDefaultAzureCredential.",
+        "final_response": "",
+        "workspace_delta": {
+          "bytes_added": 0,
+          "bytes_removed": 0,
+          "bytes_net": 0,
+          "new_file_count": 0,
+          "modified_file_count": 0,
+          "deleted_file_count": 0,
+          "created_files": null,
+          "modified_files": null,
+          "deleted_files": null
+        },
+        "actions_summary": {
+          "total_actions": 5,
+          "tool_calls": 0,
+          "reasoning_steps": 5,
+          "truncated": false
+        },
+        "started_at": "2026-08-27T22:46:28.5032371+08:00",
+        "ended_at": "2026-08-27T22:56:35.0698946+08:00",
+        "duration_ms": 606566,
+        "terminated_by": "error",
+        "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded"
+      },
+      "grader_results": [
+        {
+          "grader_name": "Criteria from prompt file",
+          "grader_type": "prompt_review",
+          "score": 0,
+          "weight": 1,
+          "pass": false,
+          "message": "review grader error: review failed: no generated files found in C:\\Users\\weidxu\\AppData\\Local\\Temp\\hyoka-review-2110963894 and no agent response to review",
+          "points": [
+            {
+              "label": "grader executed",
+              "pass": false,
+              "message": "review grader error: review failed: no generated files found in C:\\Users\\weidxu\\AppData\\Local\\Temp\\hyoka-review-2110963894 and no agent response to review"
+            }
+          ],
+          "source_file": "prompts\\identity\\data-plane\\dotnet\\default-azure-credential.prompt.md",
+          "source_type": "prompt_file"
+        }
+      ],
+      "tool_availability": [
+        {
+          "name": "azure",
+          "type": "mcp",
+          "available": true,
+          "used": false
+        },
+        {
+          "name": "azure-identity-dotnet",
+          "type": "skill",
+          "available": true,
+          "used": true
+        },
+        {
+          "name": "azure-storage",
+          "type": "skill",
+          "available": true,
+          "used": true
+        }
+      ],
+      "session_events": [
+        {
+          "type": "session.managed_settings_resolved"
+        },
+        {
+          "type": "session.start"
+        },
+        {
+          "type": "pending_messages.modified"
+        },
+        {
+          "type": "session.mcp_server_status_changed"
+        },
+        {
+          "type": "session.mcp_server_status_changed"
+        },
+        {
+          "type": "session.mcp_server_status_changed"
+        },
+        {
+          "type": "session.mcp_server_status_changed"
+        },
+        {
+          "type": "pending_messages.modified"
+        },
+        {
+          "type": "session.mcp_server_status_changed"
+        },
+        {
+          "type": "session.mcp_server_status_changed"
+        },
+        {
+          "type": "session.mcp_servers_loaded",
+          "content": "azure, computer-use, github-mcp-server"
+        },
+        {
+          "type": "session.title_changed"
+        },
+        {
+          "type": "session.tools_updated"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "user.message"
+        },
+        {
+          "type": "system.message"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.turn_started"
+        },
+        {
+          "type": "assistant.turn_start",
+          "turnNumber": 1
+        },
+        {
+          "type": "session.usage_info"
+        },
+        {
+          "type": "model.call_start"
+        },
+        {
+          "type": "model.model_call_started"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "model.captured_assignment_context"
+        },
+        {
+          "type": "assistant.usage",
+          "inputTokens": 34902,
+          "outputTokens": 76
+        },
+        {
+          "type": "model.model_call_success"
+        },
+        {
+          "type": "model.call_finished"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "assistant.message"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "skill",
+          "tool_args": "{\"skill\":\"azure-identity-dotnet\"}"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "tool.execution_complete",
+          "tool_name": "skill",
+          "tool_result": "Skill loaded successfully ✅\n\n# Azure Identity library for .NET\n\nAuthentication library for Azure SDK clients using Microsoft Entra ID.\n\n## Installation\n\n```bash\ndotnet add package Azure.Identity\n\n# For ASP.NET Core integration\ndotnet add package Microsoft.Extensions.Azure\n\n# For brokered authentication and Visual Studio Code credential support\ndotnet add package Azure.Identity.Broker\n```\n\n## Environment Variables\n\n### Service Principal with Secret\n\n```bash\nAZURE_CLIENT_ID=\u003capplication-client-id\u003e\nAZURE_TENANT_ID=\u003cdirectory-tenant-id\u003e\nAZURE_CLIENT_SECRET=\u003cclient-secret-value\u003e\n```\n\n### Service Principal with Certificate\n\n```bash\nAZURE_CLIENT_ID=\u003capplication-client-id\u003e\nAZURE_TENANT_ID=\u003cdirectory-tenant-id\u003e\nAZURE_CLIENT_CERTIFICATE_PATH=\u003cpath-to-pfx-or-pem\u003e\nAZURE_CLIENT_CERTIFICATE_PASSWORD=\u003ccertificate-password\u003e  # Optional\n```\n\n### Managed Identity\n\n```bash\nAZURE_CLIENT_ID=\u003cuser-assigned-managed-identity-client-id\u003e  # Only for user-assigned\n```\n\n## DefaultAzureCredential\n\nThe recommended credential for most scenarios. Tries multiple authentication methods in order. See [DefaultAzureCredential overview](https://aka.ms/azsdk/net/identity/credential-chains#defaultazurecredential-overview) for the current credential chain order and defaults.\n\n### Basic Usage\n\n```csharp\nusing Azure.Identity;\nusing Azure.Storage.Blobs;\n\nvar credential = new DefaultAzureCredential();\nvar blobClient = new BlobServiceClient(\n    new Uri(\"https://myaccount.blob.core.windows.net\"),\n    credential);\n```\n\n### ASP.NET Core with Dependency Injection\n\n```csharp\nusing Azure.Identity;\nusing Microsoft.Extensions.Azure;\n\nbuilder.Services.AddAzureClients(clientBuilder =\u003e\n{\n    clientBuilder.AddBlobServiceClient(\n        new Uri(\"https://myaccount.blob.core.windows.net\"));\n    clientBuilder.AddSecretClient(\n        new Uri(\"https://myvault.vault.azure.net\"));\n    \n    // Uses DefaultAzureCredential by default\n    clientBuilder.UseCredential(new DefaultAzureCredential());\n});\n```\n\n### Customizing DefaultAzureCredential\n\n```csharp\nvar credential = new DefaultAzureCredential(\n    new DefaultAzureCredentialOptions\n    {\n        ExcludeEnvironmentCredential = true,\n        ExcludeManagedIdentityCredential = false,\n        ExcludeVisualStudioCredential = false,\n        ExcludeAzureCliCredential = false,\n        ExcludeInteractiveBrowserCredential = false, // Enable interactive\n        TenantId = \"\u003ctenant-id\u003e\",\n        ManagedIdentityClientId = \"\u003cuser-assigned-mi-client-id\u003e\"\n    });\n```\n\n## Credential Types\n\n### ManagedIdentityCredential (Production)\n\n```csharp\n// System-assigned managed identity\nvar credential = new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);\n\n// User-assigned by client ID\nvar credential = new ManagedIdentityCredential(\n    ManagedIdentityId.FromUserAssignedClientId(\"\u003cclient-id\u003e\"));\n\n// User-assigned by resource ID\nvar credential = new ManagedIdentityCredential(\n    ManagedIdentityId.FromUserAssignedResourceId(\"\u003cresource-id\u003e\"));\n\n// User-assigned by object ID\nvar credential = new ManagedIdentityCredential(\n    ManagedIdentityId.FromUserAssignedObjectId(\"\u003cobject-id\u003e\"));\n```\n\n### ClientSecretCredential\n\n```csharp\nvar credential = new ClientSecretCredential(\n    tenantId: \"\u003ctenant-id\u003e\",\n    clientId: \"\u003cclient-id\u003e\",\n    clientSecret: \"\u003cclient-secret\u003e\");\n\nvar client = new SecretClient(\n    new Uri(\"https://myvault.vault.azure.net\"),\n    credential);\n```\n\n### ClientCertificateCredential\n\n```csharp\nvar certificate = X509CertificateLoader.LoadCertificateFromFile(\"MyCertificate.pfx\");\nvar credential = new ClientCertificateCredential(\n    tenantId: \"\u003ctenant-id\u003e\",\n    clientId: \"\u003cclient-id\u003e\",\n    certificate);\n```\n\n### ChainedTokenCredential (Custom Chain)\n\n```csharp\nvar credential = new ChainedTokenCredential(\n    new ManagedIdentityCredential(),\n    new AzureCliCredential());\n\nvar client = new SecretClient(\n    new Uri(\"https://myvault.vault.azure.net\"),\n    credential);\n```\n\n### Developer Credentials\n\n```csharp\n// Azure CLI\nvar credential = new AzureCliCredential();\n\n// Azure PowerShell\nvar credential = new AzurePowerShellCredential();\n\n// Azure Developer CLI (azd)\nvar credential = new AzureDeveloperCliCredential();\n\n// Visual Studio\nvar credential = new VisualStudioCredential();\n\n// Interactive Browser\nvar credential = new InteractiveBrowserCredential();\n```\n\n## Environment-Based Configuration\n\n```csharp\n// Production vs Development\nTokenCredential credential = builder.Environment.IsProduction()\n    ? new ManagedIdentityCredential(\"\u003cclient-id\u003e\")\n    : new DefaultAzureCredential();\n```\n\n## Sovereign Clouds\n\n```csharp\nvar credential = new DefaultAzureCredential(\n    new DefaultAzureCredentialOptions\n    {\n        AuthorityHost = AzureAuthorityHosts.AzureGovernment\n    });\n\n// Available authority hosts:\n// AzureAuthorityHosts.AzurePublicCloud (default)\n// AzureAuthorityHosts.AzureGovernment\n// AzureAuthorityHosts.AzureChina\n```\n\n## Credential Types Reference\n\n| Category | Credential | Purpose |\n|----------|------------|---------|\n| **Chains** | `DefaultAzureCredential` | Preconfigured chain for dev-to-prod |\n| | `ChainedTokenCredential` | Custom credential chain |\n| **Azure-Hosted** | `ManagedIdentityCredential` | Azure managed identity |\n| | `WorkloadIdentityCredential` | Kubernetes workload identity |\n| | `EnvironmentCredential` | Environment variables |\n| **Service Principal** | `ClientSecretCredential` | Client ID + secret |\n| | `ClientCertificateCredential` | Client ID + certificate |\n| | `ClientAssertionCredential` | Signed client assertion |\n| **User** | `InteractiveBrowserCredential` | Browser-based auth |\n| | `DeviceCodeCredential` | Device code flow |\n| | `OnBehalfOfCredential` | Delegated identity |\n| **Developer** | `AzureCliCredential` | Azure CLI |\n| | `AzurePowerShellCredential` | Azure PowerShell |\n| | `AzureDeveloperCliCredential` | Azure Developer CLI |\n| | `VisualStudioCredential` | Visual Studio |\n\n## Best Practices\n\n### 1. Use Deterministic Credentials in Production\n\n```csharp\n// Development\nvar devCredential = new DefaultAzureCredential();\n\n// Production - use specific credential\nvar prodCredential = new ManagedIdentityCredential(\n    ManagedIdentityId.FromUserAssignedClientId(\"\u003cclient-id\u003e\"));\n```\n\n### 2. Reuse Credential Instances\n\n```csharp\n// Good: Single credential instance shared across clients\nvar credential = new DefaultAzureCredential();\nvar blobClient = new BlobServiceClient(blobUri, credential);\nvar secretClient = new SecretClient(vaultUri, credential);\n```\n\n### 3. Configure Retry Policies\n\n```csharp\nvar options = new ManagedIdentityCredentialOptions(\n    ManagedIdentityId.FromUserAssignedClientId(clientId))\n{\n    Retry =\n    {\n        MaxRetries = 3,\n        Delay = TimeSpan.FromSeconds(0.5),\n    }\n};\nvar credential = new ManagedIdentityCredential(options);\n```\n\n### 4. Enable Logging for Debugging\n\n```csharp\nusing Azure.Core.Diagnostics;\n\nusing AzureEventSourceListener listener = new((args, message) =\u003e\n{\n    if (args is { EventSource.Name: \"Azure-Identity\" })\n    {\n        Console.WriteLine(message);\n    }\n}, EventLevel.LogAlways);\n```\n\n## Error Handling\n\n```csharp\nusing Azure.Identity;\nusing Azure.Security.KeyVault.Secrets;\n\nvar client = new SecretClient(\n    new Uri(\"https://myvault.vault.azure.net\"),\n    new DefaultAzureCredential());\n\ntry\n{\n    KeyVaultSecret secret = await client.GetSecretAsync(\"secret1\");\n}\ncatch (AuthenticationFailedException e)\n{\n    Console.WriteLine($\"Authentication Failed: {e.Message}\");\n}\ncatch (CredentialUnavailableException e)\n{\n    Console.WriteLine($\"Credential Unavailable: {e.Message}\");\n}\n```\n\n## Key Exceptions\n\n| Exception | Description |\n|-----------|-------------|\n| `AuthenticationFailedException` | Base exception for authentication errors |\n| `CredentialUnavailableException` | Credential cannot authenticate in current environment |\n| `AuthenticationRequiredException` | Interactive authentication is required |\n\n## Managed Identity Support\n\nSupported Azure services:\n- Azure App Service and Azure Functions\n- Azure Arc\n- Azure Cloud Shell\n- Azure Kubernetes Service (AKS)\n- Azure Service Fabric\n- Azure Virtual Machines\n- Azure Virtual Machine Scale Sets\n\n## Thread Safety\n\nAll credential implementations are thread-safe. A single credential instance can be safely shared across multiple clients and threads.\n\n## Related packages\n\n| Package                      | Purpose                       | Install                                         |\n|------------------------------|-------------------------------|-------------------------------------------------|\n| `Azure.Identity`             | Authentication (this library) | `dotnet add package Azure.Identity`             |\n| `Microsoft.Extensions.Azure` | DI integration                | `dotnet add package Microsoft.Extensions.Azure` |\n| `Azure.Identity.Broker`      | Brokered auth                 | `dotnet add package Azure.Identity.Broker`      |\n\n## Reference Links\n\n| Resource | URL |\n|----------|-----|\n| NuGet Package | https://www.nuget.org/packages/Azure.Identity |\n| API Reference | https://learn.microsoft.com/dotnet/api/azure.identity |\n| Credential Chains | https://aka.ms/azsdk/net/identity/credential-chains |\n| Best Practices | https://learn.microsoft.com/dotnet/azure/sdk/authentication/best-practices |\n| GitHub Source | https://github.com/Azure/azure-sdk-for-net/tree/main/sdk/identity/Azure.Identity |\n",
+          "tool_success": true,
+          "duration_ms": 3964
+        },
+        {
+          "type": "skill.invoked",
+          "skillName": "azure-identity-dotnet"
+        },
+        {
+          "type": "model.tool_execution"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "model.turn_ended"
+        },
+        {
+          "type": "assistant.turn_end",
+          "turnNumber": 1
+        },
+        {
+          "type": "model.turn_started"
+        },
+        {
+          "type": "assistant.turn_start",
+          "turnNumber": 2
+        },
+        {
+          "type": "session.usage_info"
+        },
+        {
+          "type": "model.call_start"
+        },
+        {
+          "type": "model.model_call_started"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "model.captured_assignment_context"
+        },
+        {
+          "type": "assistant.usage",
+          "inputTokens": 37009,
+          "outputTokens": 55
+        },
+        {
+          "type": "model.model_call_success"
+        },
+        {
+          "type": "model.call_finished"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "assistant.message"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "skill",
+          "tool_args": "{\"skill\":\"azure-storage\"}"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "tool.execution_complete",
+          "tool_name": "skill",
+          "tool_result": "Skill loaded successfully ✅\n\n# Azure Storage Services\n\n## Services\n\n| Service | Use When | MCP Tools | CLI |\n|---------|----------|-----------|-----|\n| Blob Storage | Objects, files, backups, static content | `azure__storage` | `az storage blob` |\n| File Shares | SMB file shares, lift-and-shift | - | `az storage file` |\n| Queue Storage | Async messaging, task queues | - | `az storage queue` |\n| Table Storage | NoSQL key-value (consider Cosmos DB) | - | `az storage table` |\n| Data Lake | Big data analytics, hierarchical namespace | - | `az storage fs` |\n\n## MCP Server (Preferred)\n\nWhen Azure MCP is enabled:\n\n- `azure__storage` with command `storage_account_list` - List storage accounts\n- `azure__storage` with command `storage_container_list` - List containers in account\n- `azure__storage` with command `storage_blob_list` - List blobs in container\n- `azure__storage` with command `storage_blob_get` - Download blob content\n- `azure__storage` with command `storage_blob_put` - Upload blob content\n\n**If Azure MCP is not enabled:** Run `/azure:setup` or enable via `/mcp`.\n\n## CLI Fallback\n\n```bash\n# List storage accounts\naz storage account list --output table\n\n# List containers\naz storage container list --account-name ACCOUNT --output table\n\n# List blobs\naz storage blob list --account-name ACCOUNT --container-name CONTAINER --output table\n\n# Download blob\naz storage blob download --account-name ACCOUNT --container-name CONTAINER --name BLOB --file LOCAL_PATH\n\n# Upload blob\naz storage blob upload --account-name ACCOUNT --container-name CONTAINER --name BLOB --file LOCAL_PATH\n```\n\n## Storage Account Tiers\n\n| Tier | Use Case | Performance |\n|------|----------|-------------|\n| Standard | General purpose, backup | Milliseconds |\n| Premium | Databases, high IOPS | Sub-millisecond |\n\n## Blob Access Tiers\n\n| Tier | Access Frequency | Cost |\n|------|-----------------|------|\n| Hot | Frequent | Higher storage, lower access |\n| Cool | Infrequent (30+ days) | Lower storage, higher access |\n| Cold | Rare (90+ days) | Lower still |\n| Archive | Rarely (180+ days) | Lowest storage, rehydration required |\n\n## Redundancy Options\n\n| Type | Durability | Use Case |\n|------|------------|----------|\n| LRS | 11 nines | Dev/test, recreatable data |\n| ZRS | 12 nines | Regional high availability |\n| GRS | 16 nines | Disaster recovery |\n| GZRS | 16 nines | Best durability |\n\n## Service Details\n\nFor deep documentation on specific services:\n\n- Blob storage patterns and lifecycle -\u003e [Blob Storage documentation](https://learn.microsoft.com/azure/storage/blobs/storage-blobs-overview)\n- File shares and Azure File Sync -\u003e [Azure Files documentation](https://learn.microsoft.com/azure/storage/files/storage-files-introduction)\n- Queue patterns and poison handling -\u003e [Queue Storage documentation](https://learn.microsoft.com/azure/storage/queues/storage-queues-introduction)\n\n## SDK Quick References\n\nFor building applications with Azure Storage SDKs, see the condensed guides:\n\n- **Blob Storage**: [Python](references/sdk/azure-storage-blob-py.md) | [TypeScript](references/sdk/azure-storage-blob-ts.md) | [Java](references/sdk/azure-storage-blob-java.md) | [Rust](references/sdk/azure-storage-blob-rust.md)\n- **Queue Storage**: [Python](references/sdk/azure-storage-queue-py.md) | [TypeScript](references/sdk/azure-storage-queue-ts.md)\n- **File Shares**: [Python](references/sdk/azure-storage-file-share-py.md) | [TypeScript](references/sdk/azure-storage-file-share-ts.md)\n- **Data Lake**: [Python](references/sdk/azure-storage-file-datalake-py.md)\n- **Tables**: [Python](references/sdk/azure-data-tables-py.md) | [Java](references/sdk/azure-data-tables-java.md)\n\nFor full package listing across all languages, see [SDK Usage Guide](references/sdk-usage.md).\n\n## Azure SDKs\n\nFor building applications that interact with Azure Storage programmatically, Azure provides SDK packages in multiple languages (.NET, Java, JavaScript, Python, Go, Rust). See [SDK Usage Guide](references/sdk-usage.md) for package names, installation commands, and quick start examples.\n",
+          "tool_success": true,
+          "duration_ms": 3799
+        },
+        {
+          "type": "skill.invoked",
+          "skillName": "azure-storage"
+        },
+        {
+          "type": "model.tool_execution"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "model.turn_ended"
+        },
+        {
+          "type": "assistant.turn_end",
+          "turnNumber": 2
+        },
+        {
+          "type": "model.turn_started"
+        },
+        {
+          "type": "assistant.turn_start",
+          "turnNumber": 3
+        },
+        {
+          "type": "session.usage_info"
+        },
+        {
+          "type": "model.call_start"
+        },
+        {
+          "type": "model.model_call_started"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "model.captured_assignment_context"
+        },
+        {
+          "type": "assistant.usage",
+          "inputTokens": 38767,
+          "outputTokens": 149
+        },
+        {
+          "type": "model.model_call_success"
+        },
+        {
+          "type": "model.call_finished"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "assistant.message"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "azure-get_azure_bestpractices",
+          "tool_args": "{\"command\":\"get\",\"intent\":\"Provide a local-only C# example that authenticates Azure Blob Storage with DefaultAzureCredential, including package setup, credential-chain behavior, deployment differences, and troubleshooting.\"}",
+          "mcp_server_name": "azure",
+          "mcp_tool_name": "get_azure_bestpractices"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "tool.execution_progress"
+        },
+        {
+          "type": "sampling.requested"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "tool.execution_complete",
+          "tool_name": "azure-get_azure_bestpractices",
+          "error": "MCP server 'azure': McpError: MCP error -32001: Request timed out",
+          "tool_success": false,
+          "duration_ms": 182059
+        },
+        {
+          "type": "model.tool_execution"
+        },
+        {
+          "type": "model.turn_ended"
+        },
+        {
+          "type": "assistant.turn_end",
+          "turnNumber": 3
+        },
+        {
+          "type": "model.turn_started"
+        },
+        {
+          "type": "assistant.turn_start",
+          "turnNumber": 4
+        },
+        {
+          "type": "session.usage_info"
+        },
+        {
+          "type": "model.call_start"
+        },
+        {
+          "type": "model.model_call_started"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "model.captured_assignment_context"
+        },
+        {
+          "type": "assistant.usage",
+          "inputTokens": 38952,
+          "outputTokens": 288
+        },
+        {
+          "type": "model.model_call_success"
+        },
+        {
+          "type": "model.call_finished"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "assistant.message"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "azure-get_azure_bestpractices",
+          "tool_args": "{\"intent\":\"Discover the best-practices command for a local-only C# Azure SDK authentication example.\",\"learn\":true}",
+          "mcp_server_name": "azure",
+          "mcp_tool_name": "get_azure_bestpractices"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "glob",
+          "tool_args": "{\"paths\":\"C:\\\\Users\\\\weidxu\\\\.hyoka\\\\cache\\\\repos\\\\microsoft\\\\skills\\\\default\\\\.github\\\\plugins\\\\azure-sdk-dotnet\\\\skills\\\\azure-identity-dotnet\",\"pattern\":\"**/{acceptance-criteria.md,examples.md}\"}"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "view",
+          "tool_args": "{\"path\":\"C:\\\\Users\\\\weidxu\\\\.hyoka\\\\cache\\\\repos\\\\microsoft\\\\azure-skills\\\\default\\\\.github\\\\plugins\\\\azure-skills\\\\skills\\\\azure-storage\\\\references\\\\auth-best-practices.md\"}"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "view",
+          "tool_args": "{\"path\":\"C:\\\\Users\\\\weidxu\\\\.hyoka\\\\cache\\\\repos\\\\microsoft\\\\azure-skills\\\\default\\\\.github\\\\plugins\\\\azure-skills\\\\skills\\\\azure-storage\\\\references\\\\sdk-usage.md\"}"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "tool.execution_progress"
+        },
+        {
+          "type": "sampling.requested"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "tool.execution_complete",
+          "tool_name": "glob",
+          "tool_result": "No files matched the pattern.",
+          "tool_success": true,
+          "duration_ms": 186492
+        },
+        {
+          "type": "model.tool_execution"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "tool.execution_complete",
+          "tool_name": "view",
+          "tool_result": "\ndiff --git a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/sdk-usage.md b/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/sdk-usage.md\nindex 0000000..0000000 100644\n--- a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/sdk-usage.md\n+++ b/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/sdk-usage.md\n@@ -1,115 +1,115 @@\n # Azure Storage SDK Usage\n \n SDK packages and quick start examples for Azure Storage services.\n \n ## Storage SDKs by Language\n \n | Language | Blob | Queue | File Share | Data Lake |\n |----------|------|-------|------------|----------|\n | .NET | `Azure.Storage.Blobs` | `Azure.Storage.Queues` | `Azure.Storage.Files.Shares` | `Azure.Storage.Files.DataLake` |\n | Java | `azure-storage-blob` | `azure-storage-queue` | `azure-storage-file-share` | `azure-storage-file-datalake` |\n | JavaScript | `@azure/storage-blob` | `@azure/storage-queue` | `@azure/storage-file-share` | `@azure/storage-file-datalake` |\n | Python | `azure-storage-blob` | `azure-storage-queue` | `azure-storage-file-share` | `azure-storage-file-datalake` |\n | Go | `azblob` | `azqueue` | `azfile` | `azdatalake` |\n | Rust | `azure_storage_blob` | `azure_storage_queue` | - | - |\n \n ## Installation Commands\n \n | Language | Install Blob SDK + Identity |\n |----------|-----------------------------|\n | .NET | `dotnet add package Azure.Storage.Blobs` `dotnet add package Azure.Identity` |\n | Java | Maven: `com.azure:azure-storage-blob` `com.azure:azure-identity` |\n | JavaScript | `npm install @azure/storage-blob @azure/identity` |\n | Python | `pip install azure-storage-blob azure-identity` |\n | Go | `go get github.com/Azure/azure-sdk-for-go/sdk/storage/azblob github.com/Azure/azure-sdk-for-go/sdk/azidentity` |\n | Rust | `cargo add azure_storage_blob azure_identity` |\n \n ## Quick Start Examples\n \n All examples use `DefaultAzureCredential` for authentication, which is recommended for **local development only**. In production, use `ManagedIdentityCredential` — see [auth-best-practices.md](auth-best-practices.md). Rust uses `DeveloperToolsCredential` as it doesn't have a `DefaultAzureCredential` equivalent.\n \n **Python** - Upload Blob:\n ```python\n from azure.identity import DefaultAzureCredential\n from azure.storage.blob import BlobServiceClient\n \n service = BlobServiceClient(account_url=\"https://ACCOUNT.blob.core.windows.net/\", credential=DefaultAzureCredential())\n container = service.get_container_client(\"my-container\")\n blob = container.get_blob_client(\"my-blob.txt\")\n blob.upload_blob(b\"Hello, Azure Storage!\", overwrite=True)\n ```\n \n **JavaScript** - Upload Blob:\n ```javascript\n import { DefaultAzureCredential } from \"@azure/identity\";\n import { BlobServiceClient } from \"@azure/storage-blob\";\n \n const client = new BlobServiceClient(\"https://ACCOUNT.blob.core.windows.net/\", new DefaultAzureCredential());\n const container = client.getContainerClient(\"my-container\");\n const blob = container.getBlockBlobClient(\"my-blob.txt\");\n await blob.uploadData(Buffer.from(\"Hello, Azure Storage!\"));\n ```\n \n **C#** - Upload Blob:\n ```csharp\n using Azure.Identity;\n using Azure.Storage.Blobs;\n \n var client = new BlobServiceClient(new Uri(\"https://ACCOUNT.blob.core.windows.net/\"), new DefaultAzureCredential());\n var container = client.GetBlobContainerClient(\"my-container\");\n var blob = container.GetBlobClient(\"my-blob.txt\");\n await blob.UploadAsync(BinaryData.FromString(\"Hello, Azure Storage!\"), overwrite: true);\n ```\n \n **Java** - Upload Blob:\n ```java\n import com.azure.identity.*;\n import com.azure.storage.blob.*;\n import com.azure.core.util.BinaryData;\n \n BlobServiceClient client = new BlobServiceClientBuilder()\n     .endpoint(\"https://ACCOUNT.blob.core.windows.net/\")\n     .credential(new DefaultAzureCredentialBuilder().build())\n     .buildClient();\n BlobContainerClient container = client.getBlobContainerClient(\"my-container\");\n BlobClient blob = container.getBlobClient(\"my-blob.txt\");\n blob.upload(BinaryData.fromString(\"Hello, Azure Storage!\"), true);\n ```\n \n **Go** - Upload Blob:\n ```go\n package main\n \n import (\n     \"context\"\n \n     \"github.com/Azure/azure-sdk-for-go/sdk/azidentity\"\n     \"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob\"\n )\n \n func main() {\n     cred, _ := azidentity.NewDefaultAzureCredential(nil)\n     client, _ := azblob.NewClient(\"https://ACCOUNT.blob.core.windows.net/\", cred, nil)\n \n     data := []byte(\"Hello, Azure Storage!\")\n     _, _ = client.UploadBuffer(context.Background(), \"my-container\", \"my-blob.txt\", data, nil)\n }\n ```\n \n **Rust** - Upload Blob:\n ```rust\n use azure_identity::DeveloperToolsCredential;\n use azure_storage_blob::{BlobClient, BlobClientOptions};\n \n let credential = DeveloperToolsCredential::new(None)?;\n let blob_client = BlobClient::new(\n     \"https://ACCOUNT.blob.core.windows.net/\",\n     \"my-container\",\n     \"my-blob.txt\",\n     Some(credential),\n     Some(BlobClientOptions::default()),\n )?;\n let data = b\"Hello, Azure Storage!\";\n blob_client.upload(None, data.to_vec().into()).await?;\n ```\n \n",
+          "tool_success": true,
+          "duration_ms": 186886
+        },
+        {
+          "type": "model.tool_execution"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "tool.execution_complete",
+          "tool_name": "view",
+          "tool_result": "\ndiff --git a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/auth-best-practices.md b/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/auth-best-practices.md\nindex 0000000..0000000 100644\n--- a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/auth-best-practices.md\n+++ b/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/auth-best-practices.md\n@@ -1,129 +1,129 @@\n # Azure Authentication Best Practices\n \n \u003e Source: [Microsoft — Passwordless connections for Azure services](https://learn.microsoft.com/azure/developer/intro/passwordless-overview) and [Azure Identity client libraries](https://learn.microsoft.com/dotnet/azure/sdk/authentication/).\n \n ## Golden Rule\n \n Use **managed identities** and **Azure RBAC** in production. Reserve `DefaultAzureCredential` for **local development only**.\n \n ## Authentication by Environment\n \n | Environment | Recommended Credential | Why |\n |---|---|---|\n | **Production (Azure-hosted)** | `ManagedIdentityCredential` (system- or user-assigned) | No secrets to manage; auto-rotated by Azure |\n | **Production (on-premises)** | `ClientCertificateCredential` or `WorkloadIdentityCredential` | Deterministic; no fallback chain overhead |\n | **CI/CD pipelines** | `AzurePipelinesCredential` / `WorkloadIdentityCredential` | Scoped to pipeline identity |\n | **Local development** | `DefaultAzureCredential` | Chains CLI, PowerShell, and VS Code credentials for convenience |\n \n ## Why Not `DefaultAzureCredential` in Production?\n \n 1. **Unpredictable fallback chain** — walks through multiple credential types, adding latency and making failures harder to diagnose.\n 2. **Broad surface area** — checks environment variables, CLI tokens, and other sources that should not exist in production.\n 3. **Non-deterministic** — which credential actually authenticates depends on the environment, making behavior inconsistent across deployments.\n 4. **Performance** — each failed credential attempt adds network round-trips before falling back to the next.\n \n ## Production Patterns\n \n ### .NET\n \n ```csharp\n using Azure.Identity;\n \n var credential = Environment.GetEnvironmentVariable(\"AZURE_FUNCTIONS_ENVIRONMENT\") == \"Development\"\n     ? new DefaultAzureCredential()                          // local dev — uses CLI/VS credentials\n     : new ManagedIdentityCredential();                      // production — deterministic, no fallback chain\n // For user-assigned identity: new ManagedIdentityCredential(\"\u003cclient-id\u003e\")\n ```\n \n ### TypeScript / JavaScript\n \n ```typescript\n import { DefaultAzureCredential, ManagedIdentityCredential } from \"@azure/identity\";\n \n const credential = process.env.NODE_ENV === \"development\"\n   ? new DefaultAzureCredential()                          // local dev — uses CLI/VS credentials\n   : new ManagedIdentityCredential();                      // production — deterministic, no fallback chain\n // For user-assigned identity: new ManagedIdentityCredential(\"\u003cclient-id\u003e\")\n ```\n \n ### Python\n \n ```python\n import os\n from azure.identity import DefaultAzureCredential, ManagedIdentityCredential\n \n credential = (\n     DefaultAzureCredential()                              # local dev — uses CLI/VS credentials\n     if os.getenv(\"AZURE_FUNCTIONS_ENVIRONMENT\") == \"Development\"\n     else ManagedIdentityCredential()                      # production — deterministic, no fallback chain\n )\n # For user-assigned identity: ManagedIdentityCredential(client_id=\"\u003cclient-id\u003e\")\n ```\n \n ### Java\n \n ```java\n import com.azure.identity.DefaultAzureCredentialBuilder;\n import com.azure.identity.ManagedIdentityCredentialBuilder;\n \n var credential = \"Development\".equals(System.getenv(\"AZURE_FUNCTIONS_ENVIRONMENT\"))\n     ? new DefaultAzureCredentialBuilder().build()          // local dev — uses CLI/VS credentials\n     : new ManagedIdentityCredentialBuilder().build();      // production — deterministic, no fallback chain\n // For user-assigned identity: new ManagedIdentityCredentialBuilder().clientId(\"\u003cclient-id\u003e\").build()\n ```\n \n ## Local Development Setup\n \n `DefaultAzureCredential` is ideal for local dev because it automatically picks up credentials from developer tools:\n \n 1. **Azure CLI** — `az login`\n 2. **Azure Developer CLI** — `azd auth login`\n 3. **Azure PowerShell** — `Connect-AzAccount`\n 4. **Visual Studio / VS Code** — sign in via Azure extension\n \n ```typescript\n import { DefaultAzureCredential } from \"@azure/identity\";\n \n // Local development only — uses CLI/PowerShell/VS Code credentials\n const credential = new DefaultAzureCredential();\n ```\n \n ## Environment-Aware Pattern\n \n Detect the runtime environment and select the appropriate credential. The key principle: use `DefaultAzureCredential` only when running locally, and a specific credential in production.\n \n \u003e **Tip:** Azure Functions sets `AZURE_FUNCTIONS_ENVIRONMENT` to `\"Development\"` when running locally. For App Service or containers, use any environment variable you control (e.g. `NODE_ENV`, `ASPNETCORE_ENVIRONMENT`).\n \n ```typescript\n import { DefaultAzureCredential, ManagedIdentityCredential } from \"@azure/identity\";\n \n function getCredential() {\n   if (process.env.NODE_ENV === \"development\") {\n     return new DefaultAzureCredential();          // picks up az login / VS Code creds\n   }\n   return process.env.AZURE_CLIENT_ID\n     ? new ManagedIdentityCredential(process.env.AZURE_CLIENT_ID)  // user-assigned\n     : new ManagedIdentityCredential();                            // system-assigned\n }\n ```\n \n ## Security Checklist\n \n - [ ] Use managed identity for all Azure-hosted apps\n - [ ] Never hardcode credentials, connection strings, or keys\n - [ ] Apply least-privilege RBAC roles at the narrowest scope\n - [ ] Use `ManagedIdentityCredential` (not `DefaultAzureCredential`) in production\n - [ ] Store any required secrets in Azure Key Vault\n - [ ] Rotate secrets and certificates on a schedule\n - [ ] Enable Microsoft Defender for Cloud on production resources\n \n ## Further Reading\n \n - [Passwordless connections overview](https://learn.microsoft.com/azure/developer/intro/passwordless-overview)\n - [Managed identities overview](https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/overview)\n - [Azure RBAC overview](https://learn.microsoft.com/azure/role-based-access-control/overview)\n - [.NET authentication guide](https://learn.microsoft.com/dotnet/azure/sdk/authentication/)\n - [Python identity library](https://learn.microsoft.com/python/api/overview/azure/identity-readme)\n - [JavaScript identity library](https://learn.microsoft.com/javascript/api/overview/azure/identity-readme)\n - [Java identity library](https://learn.microsoft.com/java/api/overview/azure/identity-readme)\n \n",
+          "tool_success": true,
+          "duration_ms": 187301
+        },
+        {
+          "type": "model.tool_execution"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "tool.execution_complete",
+          "tool_name": "azure-get_azure_bestpractices",
+          "error": "MCP server 'azure': McpError: MCP error -32001: Request timed out",
+          "tool_success": false,
+          "duration_ms": 187308
+        },
+        {
+          "type": "model.tool_execution"
+        },
+        {
+          "type": "model.turn_ended"
+        },
+        {
+          "type": "assistant.turn_end",
+          "turnNumber": 4
+        },
+        {
+          "type": "model.turn_started"
+        },
+        {
+          "type": "assistant.turn_start",
+          "turnNumber": 5
+        },
+        {
+          "type": "session.usage_info"
+        },
+        {
+          "type": "model.call_start"
+        },
+        {
+          "type": "model.model_call_started"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "assistant.streaming_delta"
+        },
+        {
+          "type": "assistant.tool_call_delta"
+        },
+        {
+          "type": "model.captured_assignment_context"
+        },
+        {
+          "type": "assistant.usage",
+          "inputTokens": 41691,
+          "outputTokens": 104
+        },
+        {
+          "type": "model.model_call_success"
+        },
+        {
+          "type": "model.call_finished"
+        },
+        {
+          "type": "model.message"
+        },
+        {
+          "type": "assistant.message"
+        },
+        {
+          "type": "tool.execution_start",
+          "tool_name": "azure-documentation",
+          "tool_args": "{\"intent\":\"Find current official documentation for the Azure.Identity .NET DefaultAzureCredential chain order, local versus hosted behavior, and troubleshooting.\",\"learn\":true}",
+          "mcp_server_name": "azure",
+          "mcp_tool_name": "documentation"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "hook.start"
+        },
+        {
+          "type": "hook.end"
+        },
+        {
+          "type": "tool.execution_progress"
+        },
+        {
+          "type": "sampling.requested"
+        }
+      ],
+      "action_timeline": {
+        "events": [
+          {
+            "sequence": 0,
+            "type": "other"
+          },
+          {
+            "sequence": 1,
+            "type": "other"
+          },
+          {
+            "sequence": 2,
+            "type": "other"
+          },
+          {
+            "sequence": 3,
+            "type": "other"
+          },
+          {
+            "sequence": 4,
+            "type": "other"
+          },
+          {
+            "sequence": 5,
+            "type": "other"
+          },
+          {
+            "sequence": 6,
+            "type": "other"
+          },
+          {
+            "sequence": 7,
+            "type": "other"
+          },
+          {
+            "sequence": 8,
+            "type": "other"
+          },
+          {
+            "sequence": 9,
+            "type": "other"
+          },
+          {
+            "sequence": 10,
+            "type": "other",
+            "output": "azure, computer-use, github-mcp-server"
+          },
+          {
+            "sequence": 11,
+            "type": "other"
+          },
+          {
+            "sequence": 12,
+            "type": "other"
+          },
+          {
+            "sequence": 13,
+            "type": "other"
+          },
+          {
+            "sequence": 14,
+            "type": "other"
+          },
+          {
+            "sequence": 15,
+            "type": "other"
+          },
+          {
+            "sequence": 16,
+            "type": "other"
+          },
+          {
+            "sequence": 17,
+            "type": "other"
+          },
+          {
+            "sequence": 18,
+            "type": "other"
+          },
+          {
+            "sequence": 19,
+            "type": "other"
+          },
+          {
+            "sequence": 20,
+            "type": "other"
+          },
+          {
+            "sequence": 21,
+            "type": "other"
+          },
+          {
+            "sequence": 22,
+            "type": "turn_start",
+            "turn_number": 1
+          },
+          {
+            "sequence": 23,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 24,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 25,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 26,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 27,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 28,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 29,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 30,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 31,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 32,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 33,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 34,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 35,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 36,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 37,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 38,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 39,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 40,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 41,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 42,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 43,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 44,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 45,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 46,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 47,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 48,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 49,
+            "type": "message",
+            "turn_number": 1
+          },
+          {
+            "sequence": 50,
+            "type": "tool_call",
+            "tool": "skill",
+            "action": "start",
+            "input": "{\"skill\":\"azure-identity-dotnet\"}",
+            "turn_number": 1
+          },
+          {
+            "sequence": 51,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 52,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 53,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 54,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 55,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 56,
+            "type": "tool_call",
+            "tool": "skill",
+            "action": "complete",
+            "output": "Skill loaded successfully ✅\n\n# Azure Identity library for .NET\n\nAuthentication library for Azure SDK clients using Microsoft Entra ID.\n\n## Installation\n\n```bash\ndotnet add package Azure.Identity\n\n# For ASP.NET Core integration\ndotnet add package Microsoft.Extensions.Azure\n\n# For brokered authentication and Visual Studio Code credential support\ndotnet add package Azure.Identity.Broker\n```\n\n## Environment Variables\n\n### Service Principal with Secret\n\n```bash\nAZURE_CLIENT_ID=\u003capplication-client-id\u003e\nAZURE_TEN…",
+            "success": true,
+            "duration_ms": 3964,
+            "turn_number": 1
+          },
+          {
+            "sequence": 57,
+            "type": "skill",
+            "tool": "azure-identity-dotnet",
+            "turn_number": 1
+          },
+          {
+            "sequence": 58,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 59,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 60,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 61,
+            "type": "turn_end",
+            "turn_number": 1
+          },
+          {
+            "sequence": 62,
+            "type": "other",
+            "turn_number": 1
+          },
+          {
+            "sequence": 63,
+            "type": "turn_start",
+            "turn_number": 2
+          },
+          {
+            "sequence": 64,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 65,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 66,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 67,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 68,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 69,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 70,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 71,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 72,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 73,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 74,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 75,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 76,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 77,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 78,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 79,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 80,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 81,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 82,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 83,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 84,
+            "type": "message",
+            "turn_number": 2
+          },
+          {
+            "sequence": 85,
+            "type": "tool_call",
+            "tool": "skill",
+            "action": "start",
+            "input": "{\"skill\":\"azure-storage\"}",
+            "turn_number": 2
+          },
+          {
+            "sequence": 86,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 87,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 88,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 89,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 90,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 91,
+            "type": "tool_call",
+            "tool": "skill",
+            "action": "complete",
+            "output": "Skill loaded successfully ✅\n\n# Azure Storage Services\n\n## Services\n\n| Service | Use When | MCP Tools | CLI |\n|---------|----------|-----------|-----|\n| Blob Storage | Objects, files, backups, static content | `azure__storage` | `az storage blob` |\n| File Shares | SMB file shares, lift-and-shift | - | `az storage file` |\n| Queue Storage | Async messaging, task queues | - | `az storage queue` |\n| Table Storage | NoSQL key-value (consider Cosmos DB) | - | `az storage table` |\n| Data Lake | Big data analytics…",
+            "success": true,
+            "duration_ms": 3799,
+            "turn_number": 2
+          },
+          {
+            "sequence": 92,
+            "type": "skill",
+            "tool": "azure-storage",
+            "turn_number": 2
+          },
+          {
+            "sequence": 93,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 94,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 95,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 96,
+            "type": "turn_end",
+            "turn_number": 2
+          },
+          {
+            "sequence": 97,
+            "type": "other",
+            "turn_number": 2
+          },
+          {
+            "sequence": 98,
+            "type": "turn_start",
+            "turn_number": 3
+          },
+          {
+            "sequence": 99,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 100,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 101,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 102,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 103,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 104,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 105,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 106,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 107,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 108,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 109,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 110,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 111,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 112,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 113,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 114,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 115,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 116,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 117,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 118,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 119,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 120,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 121,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 122,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 123,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 124,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 125,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 126,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 127,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 128,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 129,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 130,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 131,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 132,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 133,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 134,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 135,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 136,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 137,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 138,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 139,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 140,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 141,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 142,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 143,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 144,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 145,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 146,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 147,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 148,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 149,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 150,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 151,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 152,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 153,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 154,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 155,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 156,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 157,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 158,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 159,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 160,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 161,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 162,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 163,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 164,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 165,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 166,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 167,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 168,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 169,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 170,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 171,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 172,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 173,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 174,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 175,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 176,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 177,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 178,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 179,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 180,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 181,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 182,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 183,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 184,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 185,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 186,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 187,
+            "type": "message",
+            "turn_number": 3
+          },
+          {
+            "sequence": 188,
+            "type": "mcp_call",
+            "tool": "azure-get_azure_bestpractices",
+            "action": "start",
+            "input": "{\"command\":\"get\",\"intent\":\"Provide a local-only C# example that authenticates Azure Blob Storage with DefaultAzureCredential, including package setup, credential-chain behavior, deployment differences, and troubleshooting.\"}",
+            "turn_number": 3,
+            "mcp_server": "azure"
+          },
+          {
+            "sequence": 189,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 190,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 191,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 192,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 193,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 194,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 195,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 196,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 197,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 198,
+            "type": "tool_call",
+            "tool": "azure-get_azure_bestpractices",
+            "action": "complete",
+            "error": "MCP server 'azure': McpError: MCP error -32001: Request timed out",
+            "success": false,
+            "duration_ms": 182059,
+            "turn_number": 3
+          },
+          {
+            "sequence": 199,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 200,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 201,
+            "type": "turn_end",
+            "turn_number": 3
+          },
+          {
+            "sequence": 202,
+            "type": "other",
+            "turn_number": 3
+          },
+          {
+            "sequence": 203,
+            "type": "turn_start",
+            "turn_number": 4
+          },
+          {
+            "sequence": 204,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 205,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 206,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 207,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 208,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 209,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 210,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 211,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 212,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 213,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 214,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 215,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 216,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 217,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 218,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 219,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 220,
+            "type": "message",
+            "turn_number": 4
+          },
+          {
+            "sequence": 221,
+            "type": "mcp_call",
+            "tool": "azure-get_azure_bestpractices",
+            "action": "start",
+            "input": "{\"intent\":\"Discover the best-practices command for a local-only C# Azure SDK authentication example.\",\"learn\":true}",
+            "turn_number": 4,
+            "mcp_server": "azure"
+          },
+          {
+            "sequence": 222,
+            "type": "tool_call",
+            "tool": "glob",
+            "action": "start",
+            "input": "{\"paths\":\"C:\\\\Users\\\\weidxu\\\\.hyoka\\\\cache\\\\repos\\\\microsoft\\\\skills\\\\default\\\\.github\\\\plugins\\\\azure-sdk-dotnet\\\\skills\\\\azure-identity-dotnet\",\"pattern\":\"**/{acceptance-criteria.md,examples.md}\"}",
+            "turn_number": 4
+          },
+          {
+            "sequence": 223,
+            "type": "file_read",
+            "tool": "view",
+            "action": "start",
+            "input": "{\"path\":\"C:\\\\Users\\\\weidxu\\\\.hyoka\\\\cache\\\\repos\\\\microsoft\\\\azure-skills\\\\default\\\\.github\\\\plugins\\\\azure-skills\\\\skills\\\\azure-storage\\\\references\\\\auth-best-practices.md\"}",
+            "turn_number": 4
+          },
+          {
+            "sequence": 224,
+            "type": "file_read",
+            "tool": "view",
+            "action": "start",
+            "input": "{\"path\":\"C:\\\\Users\\\\weidxu\\\\.hyoka\\\\cache\\\\repos\\\\microsoft\\\\azure-skills\\\\default\\\\.github\\\\plugins\\\\azure-skills\\\\skills\\\\azure-storage\\\\references\\\\sdk-usage.md\"}",
+            "turn_number": 4
+          },
+          {
+            "sequence": 225,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 226,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 227,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 228,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 229,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 230,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 231,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 232,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 233,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 234,
+            "type": "tool_call",
+            "tool": "glob",
+            "action": "complete",
+            "output": "No files matched the pattern.",
+            "success": true,
+            "duration_ms": 186492,
+            "turn_number": 4
+          },
+          {
+            "sequence": 235,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 236,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 237,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 238,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 239,
+            "type": "file_read",
+            "tool": "view",
+            "action": "complete",
+            "output": "\ndiff --git a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/sdk-usage.md b/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/sdk-usage.md\nindex 0000000..0000000 100644\n--- a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/sdk-usage.md\n+++ b/C:/Users/weidxu/.hyoka/cache/repos…",
+            "success": true,
+            "duration_ms": 186886,
+            "turn_number": 4
+          },
+          {
+            "sequence": 240,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 241,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 242,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 243,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 244,
+            "type": "file_read",
+            "tool": "view",
+            "action": "complete",
+            "output": "\ndiff --git a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/auth-best-practices.md b/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/auth-best-practices.md\nindex 0000000..0000000 100644\n--- a/C:/Users/weidxu/.hyoka/cache/repos/microsoft/azure-skills/default/.github/plugins/azure-skills/skills/azure-storage/references/auth-best-practices.md\n+++ b/C:/U…",
+            "success": true,
+            "duration_ms": 187301,
+            "turn_number": 4
+          },
+          {
+            "sequence": 245,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 246,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 247,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 248,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 249,
+            "type": "tool_call",
+            "tool": "azure-get_azure_bestpractices",
+            "action": "complete",
+            "error": "MCP server 'azure': McpError: MCP error -32001: Request timed out",
+            "success": false,
+            "duration_ms": 187308,
+            "turn_number": 4
+          },
+          {
+            "sequence": 250,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 251,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 252,
+            "type": "turn_end",
+            "turn_number": 4
+          },
+          {
+            "sequence": 253,
+            "type": "other",
+            "turn_number": 4
+          },
+          {
+            "sequence": 254,
+            "type": "turn_start",
+            "turn_number": 5
+          },
+          {
+            "sequence": 255,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 256,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 257,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 258,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 259,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 260,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 261,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 262,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 263,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 264,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 265,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 266,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 267,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 268,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 269,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 270,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 271,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 272,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 273,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 274,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 275,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 276,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 277,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 278,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 279,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 280,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 281,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 282,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 283,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 284,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 285,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 286,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 287,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 288,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 289,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 290,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 291,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 292,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 293,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 294,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 295,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 296,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 297,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 298,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 299,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 300,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 301,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 302,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 303,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 304,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 305,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 306,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 307,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 308,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 309,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 310,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 311,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 312,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 313,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 314,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 315,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 316,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 317,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 318,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 319,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 320,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 321,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 322,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 323,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 324,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 325,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 326,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 327,
+            "type": "message",
+            "turn_number": 5
+          },
+          {
+            "sequence": 328,
+            "type": "mcp_call",
+            "tool": "azure-documentation",
+            "action": "start",
+            "input": "{\"intent\":\"Find current official documentation for the Azure.Identity .NET DefaultAzureCredential chain order, local versus hosted behavior, and troubleshooting.\",\"learn\":true}",
+            "turn_number": 5,
+            "mcp_server": "azure"
+          },
+          {
+            "sequence": 329,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 330,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 331,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 332,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 333,
+            "type": "other",
+            "turn_number": 5
+          },
+          {
+            "sequence": 334,
+            "type": "other",
+            "turn_number": 5
+          }
+        ],
+        "summary": {
+          "total_events": 335,
+          "total_turns": 5,
+          "total_actions": 22,
+          "total_tool_calls": 8,
+          "tool_calls": 3,
+          "file_reads": 2,
+          "file_writes": 0,
+          "bash_commands": 0,
+          "mcp_calls": 3,
+          "errors": 2,
+          "tool_breakdown": {
+            "azure-documentation": 1,
+            "azure-get_azure_bestpractices": 2,
+            "glob": 1,
+            "skill": 2,
+            "view": 2
+          },
+          "total_duration_ms": 937809,
+          "tool_successes": 5,
+          "tool_failures": 2
+        }
+      },
+      "event_count": 335,
+      "tool_calls": [
+        "skill",
+        "azure-get_azure_bestpractices",
+        "glob",
+        "view",
+        "azure-documentation"
+      ],
+      "environment": {
+        "model": "gpt-5.6-sol",
+        "skillsInvoked": [
+          "azure-identity-dotnet",
+          "azure-storage"
+        ],
+        "mcpServers": [
+          "azure"
+        ],
+        "mcpToolsInvoked": [
+          "azure-get_azure_bestpractices",
+          "azure-documentation"
+        ],
+        "safetyBoundaries": true,
+        "allowCloud": false,
+        "workingDirectory": "C:\\github\\hyoka-azure-skills-three-way-comparison\\rerun-reports\\lane-b\\012\\20260827-224628\\results\\identity\\data-plane\\dotnet\\auth\\identity-dp-dotnet-default-credential\\dotnet-azure-skills\\azure-skill-mcp-microsoft-skill\\generated-code",
+        "totalInputTokens": 191321,
+        "totalOutputTokens": 672,
+        "turnCount": 5
+      },
+      "score_breakdown": {
+        "formula": "Final Score = Σ(grader_score × weight) / Σ(weights)",
+        "contributions": [
+          {
+            "name": "Criteria from prompt file",
+            "kind": "prompt_review",
+            "score": 0,
+            "weight": 1,
+            "weighted_score": 0,
+            "pass": false,
+            "contribution_pct": 0
+          }
+        ],
+        "total_weight": 1,
+        "weighted_sum": 0,
+        "final_score": 0,
+        "final_score_pct": 0
+      },
+      "session_setup": {
+        "mcp_servers": [
+          {
+            "name": "azure",
+            "status": "loaded",
+            "details": "npx -y @azure/mcp@latest server start",
+            "kind": "mcp"
+          }
+        ],
+        "skills": [
+          {
+            "name": "azure-skills",
+            "kind": "plugin"
+          },
+          {
+            "name": "airunway-aks-setup",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "appinsights-instrumentation",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-ai",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-aigateway",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-app-onboard",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-app-onboard-prereq",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-cloud-migrate",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-compliance",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-compute",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-cost",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-deploy",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-diagnostics",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-enterprise-infra-planner",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-kubernetes",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-kusto",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-messaging",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-prepare",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-quotas",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-reliability",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-lookup",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-visualizer",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-storage",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-upgrade",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-validate",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "entra-agent-id",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "entra-app-registration",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "microsoft-foundry",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "python-appservice-deploy",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-skills",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-sdk-dotnet",
+            "kind": "plugin"
+          },
+          {
+            "name": "azure-ai-agents-persistent-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-ai-document-intelligence-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-ai-openai-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-ai-projects-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-ai-voicelive-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-eventgrid-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-eventhub-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-identity-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-maps-search-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-apicenter-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-apimanagement-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-applicationinsights-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-arizeaiobservabilityeval-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-botservice-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-fabric-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-mongodbatlas-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-mgmt-weightsandbiases-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-manager-cosmosdb-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-manager-durabletask-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-manager-mysql-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-manager-playwright-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-manager-postgresql-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-manager-redis-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-resource-manager-sql-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-search-documents-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-security-keyvault-keys-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "azure-servicebus-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "m365-agents-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          },
+          {
+            "name": "microsoft-azure-webjobs-extensions-authentication-events-dotnet",
+            "status": "loaded",
+            "kind": "skill",
+            "parent": "azure-sdk-dotnet",
+            "parent_kind": "plugin"
+          }
+        ],
+        "system_prompt_status": "none (default)"
+      },
+      "workspace_delta": {
+        "bytes_added": 0,
+        "bytes_removed": 0,
+        "bytes_net": 0,
+        "new_file_count": 0,
+        "modified_file_count": 0,
+        "deleted_file_count": 0,
+        "new_files": null,
+        "modified_files": null,
+        "deleted_files": null
+      },
+      "success": false,
+      "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded",
+      "error_details": "sending prompt: waiting for session.idle: context deadline exceeded",
+      "error_category": "sdk_error",
+      "failure_reason": "SDK evaluation error: sending prompt: waiting for session.idle: context deadline exceeded",
+      "rerunCommand": "hyoka run --prompt-id identity-dp-dotnet-default-credential --config dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+      "generatorModel": "gpt-5.6-sol",
+      "guardrail_max_turns": 100,
+      "guardrail_max_files": 50,
+      "guardrail_max_session_actions": 50,
+      "graders_total": 1
+    }
+  ]
+}

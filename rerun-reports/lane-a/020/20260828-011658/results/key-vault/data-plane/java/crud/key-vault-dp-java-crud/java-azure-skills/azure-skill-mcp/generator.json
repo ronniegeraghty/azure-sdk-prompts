@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-dp-java-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that performs\r\nall four CRUD operations on Azure Key Vault secrets:\r\n1. Create a new secret called \"my-secret\" with value \"my-secret-value\"\r\n2. Read the secret back and print its value\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Show the Maven dependency\r\nfor azure-security-keyvault-secrets and azure-identity. Include proper exception handling.",
+  "final_response": "Implemented a complete Java 17 Maven application for Azure Key Vault secret CRUD:\n\n- Creates `my-secret` with `my-secret-value`\n- Reads and prints the value\n- Updates it to `updated-value`\n- Waits for soft deletion to complete, then purges it\n- Authenticates with `DefaultAzureCredential`\n- Handles configuration, credential, authentication, not-found, HTTP, and unexpected errors\n- Uses Azure SDK BOM `1.3.8` for compatible `azure-security-keyvault-secrets` and `azure-identity` dependencies\n\nFiles added:\n\n- `pom.xml`\n- `src\\main\\java\\com\\example\\KeyVaultSecretCrud.java`\n- `README.md`\n\nSet `AZURE_KEY_VAULT_URL` and an appropriate `DefaultAzureCredential` source, then run:\n\n```powershell\nmvn compile\nmvn exec:java\n```\n\nThe identity must have Key Vault permissions to get, set, delete, and purge secrets. Vaults with purge protection enabled will reject immediate purge until retention expires.",
+  "workspace_delta": {
+    "bytes_added": 7508,
+    "bytes_removed": 0,
+    "bytes_net": 7508,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1460
+      },
+      {
+        "path": "pom.xml",
+        "size": 2039
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\KeyVaultSecretCrud.java",
+        "size": 4009
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T01:16:58.881211+08:00",
+  "ended_at": "2026-08-28T01:25:25.0041962+08:00",
+  "duration_ms": 506122,
+  "terminated_by": "completed"
+}

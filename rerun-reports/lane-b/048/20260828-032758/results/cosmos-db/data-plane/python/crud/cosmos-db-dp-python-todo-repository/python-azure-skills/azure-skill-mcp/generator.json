@@ -1,0 +1,62 @@
+{
+  "prompt_id": "cosmos-db-dp-python-todo-repository",
+  "config_name": "python-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that implements a ToDo item CRUD repository backed by Azure Cosmos DB (NoSQL API).\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **model** (shared by both implementations) for a ToDo item with fields for id, title, description, completed status, created timestamp, and category (where category is the partition key). Use a dictionary or a dataclass.\r\n\r\n- A **synchronous repository module** that performs CRUD operations against Cosmos DB. It should support create, read, update, delete, and a query-by-category method. Each operation should log the request charge (RU cost consumed) from the response headers. The update operation should prevent lost updates — if another process modified the item since it was last read, the update should fail with a clear conflict error rather than silently overwriting the other process's changes. The query method should use safe, parameterized queries and must handle large result sets properly — paginate through results page by page rather than loading everything into memory at once, and log progress as each page is retrieved.\r\n\r\n- An **asynchronous repository module** that provides the same CRUD operations using the `azure.cosmos.aio` async client. The query method should iterate through pages asynchronously.\r\n\r\n- A **configuration/factory module** that connects to the Cosmos DB account using its endpoint from an environment variable. Authentication must use `DefaultAzureCredential` (no master keys). It should create the database and container if they don't already exist, setting a default TTL (time-to-live) of 90 days on the container and configuring the indexing policy to exclude the `description` field from indexing (since it's never queried on).\r\n\r\n- A **main script** that demos both implementations: runs the full CRUD cycle using the sync repository first (including paginated query output showing page-by-page results), then runs the same operations using the async repository. Print RU costs and results to the console.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "The files are in place. I’m now checking them against the installed SDK signatures and running an offline fake-container CRUD/paging test so no Azure resource is contacted.",
+  "workspace_delta": {
+    "bytes_added": 19010,
+    "bytes_removed": 0,
+    "bytes_net": 19010,
+    "new_file_count": 8,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 863
+      },
+      {
+        "path": "main.py",
+        "size": 3615
+      },
+      {
+        "path": "requirements.txt",
+        "size": 59
+      },
+      {
+        "path": "todo_cosmos\\__init__.py",
+        "size": 278
+      },
+      {
+        "path": "todo_cosmos\\factory.py",
+        "size": 4012
+      },
+      {
+        "path": "todo_cosmos\\model.py",
+        "size": 1652
+      },
+      {
+        "path": "todo_cosmos\\repository.py",
+        "size": 4274
+      },
+      {
+        "path": "todo_cosmos\\repository_async.py",
+        "size": 4257
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T03:27:58.5804692+08:00",
+  "ended_at": "2026-08-28T03:38:08.9679745+08:00",
+  "duration_ms": 610387,
+  "terminated_by": "error",
+  "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded"
+}

@@ -1,0 +1,28 @@
+{
+  "prompt_id": "storage-dp-dotnet-retries",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "How do I configure custom retry policies for Azure Blob Storage operations in .NET?\r\nMy application needs to:\r\n1. Set a custom retry policy with 5 max retries and exponential backoff\r\n2. Configure per-operation timeouts so a single upload doesn't hang forever\r\n3. Handle network errors (transient) differently from auth errors (non-transient)\r\n4. Use a custom retry policy for specific high-value operations\r\n5. Implement circuit-breaker patterns for sustained failures\r\n\r\nShow me how to configure BlobClientOptions with custom RetryOptions,\r\nand explain which HTTP status codes the SDK considers retryable by default.\r\nUse the Azure.Storage.Blobs SDK.",
+  "final_response": "The Azure documentation endpoint timed out, so I’m verifying the exact retry classification against the current official SDK documentation and source rather than relying on a potentially stale list.",
+  "workspace_delta": {
+    "bytes_added": 0,
+    "bytes_removed": 0,
+    "bytes_net": 0,
+    "new_file_count": 0,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": null,
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": true
+  },
+  "started_at": "2026-08-28T01:44:45.3982989+08:00",
+  "ended_at": "2026-08-28T01:53:55.3126422+08:00",
+  "duration_ms": 549914,
+  "terminated_by": "completed"
+}

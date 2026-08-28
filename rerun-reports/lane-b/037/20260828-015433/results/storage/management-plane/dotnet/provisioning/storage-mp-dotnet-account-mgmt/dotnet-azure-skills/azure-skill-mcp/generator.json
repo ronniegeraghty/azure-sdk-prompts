@@ -1,0 +1,37 @@
+{
+  "prompt_id": "storage-mp-dotnet-account-mgmt",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that manages\r\nAzure Storage Accounts using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new Storage Account with Standard_LRS SKU in \"eastus\"\r\n3. List all Storage Accounts in a resource group\r\n4. Get the properties of the created Storage Account\r\n5. Update the account to enable blob versioning\r\n6. Delete the Storage Account\r\n\r\nShow required NuGet packages and proper error handling.\r\nUse the Azure.ResourceManager.Storage SDK.",
+  "final_response": "Created a compile-ready C# console application:\n\n- [`Program.cs`](./Program.cs) — create, list, inspect, enable blob versioning, and delete the account, with cancellation, validation, Azure request, authentication, and cleanup error handling.\n- [`StorageAccountManager.csproj`](./StorageAccountManager.csproj) — references:\n  - `Azure.Identity` 1.21.0\n  - `Azure.ResourceManager.Storage` 1.7.0\n\nSet the required environment variables before running:\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\n$env:AZURE_RESOURCE_GROUP = \"\u003cexisting-resource-group\u003e\"\n$env:AZURE_STORAGE_ACCOUNT_NAME = \"\u003cglobally-unique-lowercase-name\u003e\"\n\ndotnet run\n```\n\nThe program uses `DefaultAzureCredential`, creates a `StorageV2` account with `Standard_LRS` in `eastus`, and deletes it in a `finally` block to prevent orphaned resources. No live Azure operations were executed.",
+  "workspace_delta": {
+    "bytes_added": 7336,
+    "bytes_removed": 0,
+    "bytes_net": 7336,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 6901
+      },
+      {
+        "path": "StorageAccountManager.csproj",
+        "size": 435
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 13,
+    "tool_calls": 0,
+    "reasoning_steps": 13,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T01:54:33.2039536+08:00",
+  "ended_at": "2026-08-28T02:03:52.7833482+08:00",
+  "duration_ms": 559579,
+  "terminated_by": "completed"
+}

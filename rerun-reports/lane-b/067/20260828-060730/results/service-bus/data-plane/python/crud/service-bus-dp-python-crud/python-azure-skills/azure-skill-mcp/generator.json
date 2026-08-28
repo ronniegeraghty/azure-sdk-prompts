@@ -1,0 +1,45 @@
+{
+  "prompt_id": "service-bus-dp-python-crud",
+  "config_name": "python-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that demonstrates messaging with Azure Service Bus.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n3. Send a batch of 5 messages using a ServiceBusMessageBatch\r\n4. Get a receiver for the queue and receive messages\r\n5. Complete a message with receiver.complete_message() after processing\r\n6. Demonstrate the async pattern using aio module for higher throughput\r\n7. Send to a topic and receive from a subscription\r\n\r\nShow required pip packages and proper context manager patterns (with statements).",
+  "final_response": "Created:\n\n- `sync_service_bus.py` — synchronous batch send, queue receive/complete, and topic/subscription messaging using `with`.\n- `async_service_bus.py` — equivalent higher-throughput `azure.servicebus.aio` pattern using `async with`.\n- `requirements.txt` — requires `azure-servicebus\u003e=7.12,\u003c8`.\n- `README.md` — installation, environment variables, and execution instructions.\n\nBoth scripts default to an offline dry run. Pass `--execute` after configuring the required Service Bus environment variables to perform network operations.",
+  "workspace_delta": {
+    "bytes_added": 11003,
+    "bytes_removed": 0,
+    "bytes_net": 11003,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1577
+      },
+      {
+        "path": "async_service_bus.py",
+        "size": 4873
+      },
+      {
+        "path": "requirements.txt",
+        "size": 27
+      },
+      {
+        "path": "sync_service_bus.py",
+        "size": 4526
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T06:07:30.1112966+08:00",
+  "ended_at": "2026-08-28T06:12:14.3836615+08:00",
+  "duration_ms": 284272,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "azure-event-hubs-typescript-example",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@azure/event-hubs": "^6.0.0",
+    "@azure/eventhubs-checkpointstore-blob": "^2.0.0",
+    "@azure/storage-blob": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

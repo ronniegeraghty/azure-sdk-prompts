@@ -1,0 +1,37 @@
+{
+  "prompt_id": "key-vault-dp-python-crud",
+  "config_name": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Python script that performs all four CRUD operations on Azure Key Vault secrets.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Include proper error handling\r\nand show required pip packages.",
+  "final_response": "Created:\n\n- `key_vault_secret_crud.py` — creates, reads, updates to `\"updated-value\"`, deletes, and purges a Key Vault secret using `DefaultAzureCredential`.\n- `requirements.txt` — includes `azure-identity` and `azure-keyvault-secrets`.\n\nThe script reads `AZURE_KEYVAULT_URL` and optionally `AZURE_KEYVAULT_SECRET_NAME`, avoids logging secret values, and handles configuration, authentication, authorization, not-found, and conflict errors. Install dependencies with:\n\n`pip install -r requirements.txt`",
+  "workspace_delta": {
+    "bytes_added": 4281,
+    "bytes_removed": 0,
+    "bytes_net": 4281,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "requirements.txt",
+        "size": 55
+      },
+      {
+        "path": "key_vault_secret_crud.py",
+        "size": 4226
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 6,
+    "tool_calls": 0,
+    "reasoning_steps": 6,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T05:22:40.1749172+08:00",
+  "ended_at": "2026-08-28T05:27:10.6137237+08:00",
+  "duration_ms": 270438,
+  "terminated_by": "completed"
+}

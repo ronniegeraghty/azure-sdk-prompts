@@ -1,0 +1,41 @@
+{
+  "prompt_id": "cosmos-db-dp-dotnet-pagination",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that queries\r\nitems in a Cosmos DB container with proper pagination:\r\n1. Execute a SQL query \"SELECT * FROM c WHERE c.category = 'electronics'\" against a container\r\n2. Process results page-by-page using FeedIterator, limiting each page to 50 items\r\n3. Print the continuation token after each page\r\n4. Implement a \"resume from token\" pattern where the query can restart from a saved token\r\n5. Track total RU consumption across all pages\r\n\r\nUse the Microsoft.Azure.Cosmos SDK v3. Show how to configure MaxItemCount\r\nand explain the difference between FeedIterator and LINQ-based queries.",
+  "final_response": "Implemented a complete .NET 8 Cosmos DB pagination sample:\n\n- `Program.cs` — SQL query, `FeedIterator\u003cJsonElement\u003e`, `MaxItemCount = 50`, continuation-token checkpoint/resume, per-page output, and total RU tracking.\n- `CosmosPaginationSample.csproj` — Microsoft.Azure.Cosmos SDK v3 dependencies.\n- `README.md` — configuration, execution, checkpoint behavior, `MaxItemCount` semantics, and FeedIterator versus LINQ explanation.\n\nRun using environment-based credentials:\n\n```powershell\n$env:COSMOS_ENDPOINT = \"https://localhost:8081\"\n$env:COSMOS_KEY = \"\u003cemulator-or-account-key\u003e\"\n$env:COSMOS_DATABASE_ID = \"\u003cdatabase-id\u003e\"\n$env:COSMOS_CONTAINER_ID = \"\u003ccontainer-id\u003e\"\n\ndotnet run -- --continuation-token-file \".cosmos-continuation-token\"\n```\n\nThe token file is updated after every non-final page, reused automatically after interruption, and removed when the query completes.",
+  "workspace_delta": {
+    "bytes_added": 7164,
+    "bytes_removed": 0,
+    "bytes_net": 7164,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "CosmosPaginationSample.csproj",
+        "size": 427
+      },
+      {
+        "path": "Program.cs",
+        "size": 3624
+      },
+      {
+        "path": "README.md",
+        "size": 3113
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T22:11:40.3742774+08:00",
+  "ended_at": "2026-08-27T22:19:48.2299995+08:00",
+  "duration_ms": 487855,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,17 @@
+{
+  "run_id": "20260828-044914",
+  "timestamp": "2026-08-27T20:53:15Z",
+  "reports": [
+    {
+      "prompt_id": "storage-dp-java-crud",
+      "baseline": {
+        "config_name": "java-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

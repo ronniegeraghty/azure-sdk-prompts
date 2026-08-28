@@ -1,0 +1,41 @@
+{
+  "prompt_id": "service-bus-dp-java-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that demonstrates\r\nmessaging with Azure Service Bus:\r\n1. Create a ServiceBusSenderClient using ServiceBusClientBuilder for a queue\r\n2. Send a single message with ServiceBusMessage\r\n3. Send a batch of 5 messages using ServiceBusMessageBatch\r\n4. Create a ServiceBusReceiverClient and receive messages using receiveMessages()\r\n5. Complete a message with complete() after processing\r\n6. Create a ServiceBusProcessorClient for continuous processing with handlers\r\n7. Demonstrate sending to a topic and receiving from a subscription\r\n\r\nShow required Maven dependency (com.azure:azure-messaging-servicebus) and\r\nproper resource cleanup with close().",
+  "final_response": "Created a complete Maven Java sample:\n\n- `src/main/java/com/example/ServiceBusDemo.java`\n  - Sends one queue message\n  - Sends a five-message `ServiceBusMessageBatch`\n  - Receives messages with `receiveMessages()`\n  - Completes messages after processing\n  - Runs a continuous `ServiceBusProcessorClient` with message/error handlers\n  - Sends to a topic and receives from a subscription\n  - Explicitly closes all senders, receivers, and processors\n- `pom.xml` includes `com.azure:azure-messaging-servicebus:7.17.17`\n- `README.md` documents the required environment variables and `mvn compile exec:java` command\n\nCredentials and entity names are read from environment variables; no secrets are embedded.",
+  "workspace_delta": {
+    "bytes_added": 9141,
+    "bytes_removed": 0,
+    "bytes_net": 9141,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 825
+      },
+      {
+        "path": "pom.xml",
+        "size": 1258
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\ServiceBusDemo.java",
+        "size": 7058
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 7,
+    "tool_calls": 0,
+    "reasoning_steps": 7,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T02:36:18.1669846+08:00",
+  "ended_at": "2026-08-28T02:44:45.2781624+08:00",
+  "duration_ms": 507111,
+  "terminated_by": "completed"
+}

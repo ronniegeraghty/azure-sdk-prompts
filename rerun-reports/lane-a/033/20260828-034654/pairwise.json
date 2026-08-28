@@ -1,0 +1,17 @@
+{
+  "run_id": "20260828-034654",
+  "timestamp": "2026-08-27T19:55:42Z",
+  "reports": [
+    {
+      "prompt_id": "storage-dp-java-blob-event-notifier",
+      "baseline": {
+        "config_name": "java-azure-skills/baseline",
+        "score": 1,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

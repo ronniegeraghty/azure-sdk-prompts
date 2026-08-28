@@ -1,0 +1,46 @@
+{
+  "prompt_id": "event-hubs-dp-js-ts-streaming",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat demonstrates sending and receiving events with Azure Event Hubs:\r\n1. Create an EventHubProducerClient using a connection string\r\n2. Create a batch with createBatch() and add 10 events with custom properties\r\n3. Send the batch using sendBatch()\r\n4. Create an EventHubConsumerClient with a BlobCheckpointStore\r\n5. Subscribe to events using subscribe() with processEvents and processError handlers\r\n6. Print received event bodies and update checkpoints\r\n7. Implement graceful shutdown with close()\r\n\r\nShow required npm packages (@azure/event-hubs and\r\n@azure/eventhubs-checkpointstore-blob) and proper async/await patterns.",
+  "final_response": "Dependency installation is still running against the public npm registry; I’m waiting for the compile result.",
+  "workspace_delta": {
+    "bytes_added": 5534,
+    "bytes_removed": 0,
+    "bytes_net": 5534,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\index.ts",
+        "size": 3500
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 287
+      },
+      {
+        "path": "README.md",
+        "size": 1267
+      },
+      {
+        "path": "package.json",
+        "size": 480
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 13,
+    "tool_calls": 0,
+    "reasoning_steps": 13,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T06:24:54.6385556+08:00",
+  "ended_at": "2026-08-28T06:35:04.4359637+08:00",
+  "duration_ms": 609797,
+  "terminated_by": "error",
+  "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded"
+}

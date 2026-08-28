@@ -1,0 +1,57 @@
+{
+  "prompt_id": "cosmos-db-dp-java-todo-repository",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that implements a ToDo item CRUD repository backed by Azure Cosmos DB (NoSQL API).\r\n\r\nThe project needs:\r\n\r\n- A **model class** (shared by both implementations) for a ToDo item with fields for id, title, description, completed status, created timestamp, and category (where category is the partition key).\r\n\r\n- A **synchronous repository class** that performs CRUD operations against Cosmos DB. It should support create, read, update, delete, and a query-by-category method. Each operation should log the request charge (RU cost consumed). The update operation should prevent lost updates — if another process modified the item since it was last read, the update should fail with a clear conflict error rather than silently overwriting the other process's changes. The query method should use safe, parameterized queries and must handle large result sets properly — paginate through results rather than loading everything into memory at once, and log progress as each page is retrieved.\r\n\r\n- An **asynchronous repository class** that provides the same CRUD operations. The query method should return results as a stream of pages, and the caller should be able to process each page as it arrives.\r\n\r\n- A **configuration/factory class** that connects to the Cosmos DB account using its endpoint from an environment variable. Authentication must use managed identity (no master keys). It should create the database and container if they don't already exist, setting a default TTL (time-to-live) of 90 days on the container and configuring the indexing policy to exclude the `description` field from indexing (since it's never queried on).\r\n\r\n- A **Main class** that demos both implementations: runs the full CRUD cycle using the sync repository first (including paginated query output showing page-by-page results), then runs the same operations using the async repository. Print RU costs and results to the console.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Java 17 Maven project with:\n\n- Shared `ToDoItem` model\n- Synchronous and Reactor-based asynchronous repositories\n- CRUD request-charge logging\n- ETag/`If-Match` optimistic concurrency protection\n- Parameterized, partition-scoped paginated queries\n- Managed identity authentication via `COSMOS_ENDPOINT` and optional `AZURE_CLIENT_ID`\n- 90-day default TTL and `/description/?` indexing exclusion\n- Full sync and async CRUD demonstrations in `Main`\n- Complete Azure Cosmos DB and Identity dependencies in `pom.xml`\n\nBuild succeeded with:\n\n```powershell\nmvn -q -DskipTests package\n```\n\nRun from an Azure environment with managed identity:\n\n```powershell\n$env:COSMOS_ENDPOINT = \"https://\u003caccount\u003e.documents.azure.com:443/\"\nmvn exec:java\n```",
+  "workspace_delta": {
+    "bytes_added": 24167,
+    "bytes_removed": 0,
+    "bytes_net": 24167,
+    "new_file_count": 7,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\OptimisticConcurrencyException.java",
+        "size": 221
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\SyncToDoRepository.java",
+        "size": 5284
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\ToDoItem.java",
+        "size": 2628
+      },
+      {
+        "path": "pom.xml",
+        "size": 2106
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\AsyncToDoRepository.java",
+        "size": 5252
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\CosmosToDoFactory.java",
+        "size": 4666
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\Main.java",
+        "size": 4010
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T23:06:08.6414587+08:00",
+  "ended_at": "2026-08-27T23:12:11.9862584+08:00",
+  "duration_ms": 363344,
+  "terminated_by": "completed"
+}

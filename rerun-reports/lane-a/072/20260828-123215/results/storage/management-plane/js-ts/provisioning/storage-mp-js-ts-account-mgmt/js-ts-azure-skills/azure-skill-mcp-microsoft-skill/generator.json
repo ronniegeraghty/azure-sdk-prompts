@@ -1,0 +1,45 @@
+{
+  "prompt_id": "storage-mp-js-ts-account-mgmt",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat manages Azure Storage Accounts using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential from @azure/identity\r\n2. Create a StorageManagementClient with the credential and subscription ID\r\n3. Create a new Storage Account with Standard_LRS SKU in \"eastus\"\r\n4. List all Storage Accounts in a resource group using async iteration\r\n5. Get the properties of the created Storage Account\r\n6. Update the account to enable blob versioning\r\n7. Delete the Storage Account\r\n\r\nShow required npm packages (@azure/arm-storage) and proper async/await patterns.",
+  "final_response": "Created a complete TypeScript example in `src/index.ts` with:\n\n- `DefaultAzureCredential`\n- `StorageManagementClient`\n- `Standard_LRS`/`StorageV2` account creation in `eastus`\n- Async iteration over resource-group accounts\n- Account property retrieval\n- Blob versioning through `blobServices.setServiceProperties`\n- Guaranteed cleanup using `try`/`finally`\n\nRequired runtime packages:\n\n```powershell\nnpm install @azure/arm-storage @azure/identity\n```\n\nConfigure and run:\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\n$env:AZURE_RESOURCE_GROUP_NAME = \"\u003cexisting-resource-group\u003e\"\n$env:AZURE_STORAGE_ACCOUNT_NAME = \"\u003cglobally-unique-account-name\u003e\"\nnpm start\n```\n\nThe program performs real create/update/delete operations when run and requires appropriate Azure RBAC permissions. Blob versioning is configured through the account’s blob-service properties because it is not a direct `storageAccounts.update` property.",
+  "workspace_delta": {
+    "bytes_added": 54246,
+    "bytes_removed": 0,
+    "bytes_net": 54246,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "package.json",
+        "size": 421
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 2568
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 295
+      },
+      {
+        "path": "package-lock.json",
+        "size": 50962
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T12:32:15.3406076+08:00",
+  "ended_at": "2026-08-28T12:40:23.208019+08:00",
+  "duration_ms": 487867,
+  "terminated_by": "completed"
+}

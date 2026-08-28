@@ -1,0 +1,41 @@
+{
+  "prompt_id": "storage-mp-java-account-mgmt",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that manages\r\nAzure Storage Accounts using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a StorageManager instance with the credential and subscription\r\n3. Create a new Storage Account with Standard_LRS SKU in \"eastus\"\r\n4. List all Storage Accounts in a resource group\r\n5. Get the properties of the created Storage Account\r\n6. Update the account to enable blob versioning\r\n7. Delete the Storage Account\r\n\r\nShow required Maven dependency (com.azure.resourcemanager:azure-resourcemanager-storage)\r\nand proper error handling.",
+  "final_response": "Created a complete Java 11 Maven sample:\n\n- `src\\main\\java\\example\\StorageAccountManager.java`\n- `pom.xml`\n- `README.md`\n\nIt authenticates with `DefaultAzureCredential`, creates a `StorageManager`, provisions a `Standard_LRS` account in `eastus`, lists and retrieves accounts, enables blob versioning through `BlobServiceProperties`, and guarantees deletion in a `finally` block. Authentication, HTTP, configuration, and cleanup errors are handled explicitly.\n\nThe required management dependency is:\n\n```xml\n\u003cdependency\u003e\n    \u003cgroupId\u003ecom.azure.resourcemanager\u003c/groupId\u003e\n    \u003cartifactId\u003eazure-resourcemanager-storage\u003c/artifactId\u003e\n    \u003cversion\u003e2.57.0\u003c/version\u003e\n\u003c/dependency\u003e\n```\n\nRun it with:\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\nmvn compile exec:java -Dexec.args=\"\u003cresource-group\u003e \u003cglobally-unique-storage-account-name\u003e\"\n```",
+  "workspace_delta": {
+    "bytes_added": 9866,
+    "bytes_removed": 0,
+    "bytes_net": 9866,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 915
+      },
+      {
+        "path": "pom.xml",
+        "size": 1860
+      },
+      {
+        "path": "src\\main\\java\\example\\StorageAccountManager.java",
+        "size": 7091
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 14,
+    "tool_calls": 0,
+    "reasoning_steps": 14,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T05:22:18.9298453+08:00",
+  "ended_at": "2026-08-28T05:31:40.7281683+08:00",
+  "duration_ms": 561798,
+  "terminated_by": "completed"
+}

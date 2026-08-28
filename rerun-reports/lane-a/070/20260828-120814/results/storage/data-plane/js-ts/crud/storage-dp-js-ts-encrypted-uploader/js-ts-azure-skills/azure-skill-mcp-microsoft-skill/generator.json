@@ -1,0 +1,66 @@
+{
+  "prompt_id": "storage-dp-js-ts-encrypted-uploader",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a TypeScript Node.js project that uploads files to Azure Blob Storage with client-side encryption, where the encryption key material is managed in Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **key management class** that interacts with Azure Key Vault's Keys service (not Secrets) to perform cryptographic operations. It should implement envelope encryption: generate a data encryption key locally, use Key Vault to protect (wrap) it, and store the protected key alongside the encrypted blob. For decryption, have Key Vault recover (unwrap) the data key, then decrypt locally. The raw data key should never be persisted anywhere, and the vault's key material should never leave Key Vault.\r\n\r\n- A **blob uploader/downloader class** that handles the actual encryption and storage. For upload: generate a data key, encrypt the data locally using AES-GCM, protect the data key via Key Vault, then upload the ciphertext to Blob Storage with the protected key and any necessary cryptographic parameters stored as blob metadata (including the initialization vector and the authentication tag, which in Node.js is separate from the ciphertext). For download: read the blob and its metadata, recover the data key via Key Vault, and decrypt. Should handle errors from both services (e.g., the vault key may have been disabled, or the blob may not exist).\r\n\r\n- A **configuration module** that builds the necessary Azure connections for both Blob Storage and Key Vault. It should read endpoints from environment variables and authenticate with managed identity. All connections should share a single credential instance.\r\n\r\n- A **main script** that demos the full encrypt-upload-download-decrypt round-trip: encrypts and uploads a sample string, then downloads and decrypts it back. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output to verify the round-trip.\r\n\r\nInclude a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.",
+  "final_response": "The project is scaffolded; I’m now resolving the SDK types and compiler output locally so any API mismatches are fixed before handoff.",
+  "workspace_delta": {
+    "bytes_added": 73062,
+    "bytes_removed": 0,
+    "bytes_net": 73062,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main.ts",
+        "size": 1343
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 465
+      },
+      {
+        "path": "README.md",
+        "size": 1491
+      },
+      {
+        "path": "package-lock.json",
+        "size": 47604
+      },
+      {
+        "path": "package.json",
+        "size": 795
+      },
+      {
+        "path": "src\\config.ts",
+        "size": 2198
+      },
+      {
+        "path": "src\\encryptedBlobClient.ts",
+        "size": 10107
+      },
+      {
+        "path": "test\\encryptedBlobClient.test.ts",
+        "size": 4133
+      },
+      {
+        "path": "src\\keyManagement.ts",
+        "size": 4926
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 14,
+    "tool_calls": 0,
+    "reasoning_steps": 14,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T12:08:14.8348908+08:00",
+  "ended_at": "2026-08-28T12:18:32.8231783+08:00",
+  "duration_ms": 617988,
+  "terminated_by": "error",
+  "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded"
+}

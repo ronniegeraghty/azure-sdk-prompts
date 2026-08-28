@@ -1,0 +1,45 @@
+{
+  "prompt_id": "identity-dp-js-ts-default-credential",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program that\r\nauthenticates an Azure SDK client using DefaultAzureCredential. The program should:\r\n1. Install and import the required npm packages\r\n2. Create a DefaultAzureCredential instance\r\n3. Use it to create a SecretClient from @azure/keyvault-secrets\r\n4. Retrieve a secret from the vault and print its value\r\n5. Handle AuthenticationError for credential failures\r\n\r\nInclude a package.json with all dependencies and use async/await throughout.",
+  "final_response": "Implemented the TypeScript Azure Key Vault client.\n\n- `package.json` includes `@azure/identity`, `@azure/keyvault-secrets`, TypeScript, and Node.js types.\n- `src/index.ts` uses `DefaultAzureCredential`, retrieves the configured secret, and prints its value.\n- Handles both `AuthenticationError` and `AggregateAuthenticationError`.\n- Dependencies are installed and the compiled output is in `dist/`.\n\nRun with PowerShell:\n\n```powershell\n$env:KEY_VAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net\"\n$env:SECRET_NAME = \"\u003csecret-name\u003e\"\nnpm start\n```",
+  "workspace_delta": {
+    "bytes_added": 38701,
+    "bytes_removed": 0,
+    "bytes_net": 38701,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "package-lock.json",
+        "size": 36706
+      },
+      {
+        "path": "package.json",
+        "size": 435
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 1202
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 358
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T07:00:53.3569709+08:00",
+  "ended_at": "2026-08-28T07:06:03.4891819+08:00",
+  "duration_ms": 310132,
+  "terminated_by": "completed"
+}

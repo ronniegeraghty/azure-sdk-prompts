@@ -1,0 +1,17 @@
+{
+  "run_id": "20260828-024820",
+  "timestamp": "2026-08-27T18:53:20Z",
+  "reports": [
+    {
+      "prompt_id": "service-bus-dp-java-crud",
+      "baseline": {
+        "config_name": "java-azure-skills/baseline",
+        "score": 0,
+        "max_score": 1,
+        "success": false
+      },
+      "variants": null,
+      "impacts": []
+    }
+  ]
+}

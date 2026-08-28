@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-dp-dotnet-crud",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# console application that performs\r\nall four CRUD operations on Azure Key Vault secrets:\r\n1. Create a new secret called \"my-secret\" with value \"my-secret-value\"\r\n2. Read the secret back and print its value\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Include proper error handling\r\nand show required NuGet packages.",
+  "final_response": "Implemented the C# console application in:\n\n- `Program.cs` — create, read, update, delete, and purge using `DefaultAzureCredential`, async APIs, cancellation, and error handling.\n- `README.md` — authentication, permissions, configuration, and execution instructions.\n- Project file — references `Azure.Identity` 1.21.0 and `Azure.Security.KeyVault.Secrets` 4.11.0.\n\nRun with:\n\n```powershell\n$env:KEY_VAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net/\"\ndotnet run\n```\n\nImmediate purge requires soft delete enabled and purge protection disabled.",
+  "workspace_delta": {
+    "bytes_added": 4850,
+    "bytes_removed": 0,
+    "bytes_net": 4850,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "Program.cs",
+        "size": 3099
+      },
+      {
+        "path": "README.md",
+        "size": 1257
+      },
+      {
+        "path": "hyoka-key-vault-dp-dotnet-crud-dotnet-azure-skills-azure-skill-mcp-3079164548.csproj",
+        "size": 494
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 9,
+    "tool_calls": 0,
+    "reasoning_steps": 9,
+    "truncated": false
+  },
+  "started_at": "2026-08-27T23:25:26.4821477+08:00",
+  "ended_at": "2026-08-27T23:34:03.3190083+08:00",
+  "duration_ms": 516836,
+  "terminated_by": "completed"
+}

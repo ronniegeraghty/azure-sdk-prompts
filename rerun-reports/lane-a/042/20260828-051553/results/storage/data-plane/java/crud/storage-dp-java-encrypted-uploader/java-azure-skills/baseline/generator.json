@@ -1,0 +1,65 @@
+{
+  "prompt_id": "storage-dp-java-encrypted-uploader",
+  "config_name": "java-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that uploads files to Azure Blob Storage with client-side encryption, where the encryption key material is managed in Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **key management class** (both sync and async versions) that interacts with Azure Key Vault's Keys service (not Secrets) to perform cryptographic operations. It should implement envelope encryption: generate a data encryption key locally, use Key Vault to protect (wrap) it, and store the protected key alongside the encrypted blob. For decryption, have Key Vault recover (unwrap) the data key, then decrypt locally. The raw data key should never be persisted anywhere, and the vault's key material should never leave Key Vault.\r\n\r\n- A **blob uploader/downloader class** (both sync and async versions) that handles the actual encryption and storage. For upload: generate a data key, encrypt the data locally, protect the data key via Key Vault, then upload the ciphertext to Blob Storage with the protected key and any necessary cryptographic parameters stored as blob metadata. For download: read the blob and its metadata, recover the data key via Key Vault, and decrypt. Should handle errors from both services (e.g., the vault key may have been disabled, or the blob may not exist).\r\n\r\n- A **configuration class** that builds the necessary Azure connections for both Blob Storage and Key Vault. It should read endpoints from environment variables and authenticate with managed identity. All connections should share a single credential instance.\r\n\r\n- A **Main class** that demos both implementations: runs the full encrypt-upload-download-decrypt round-trip using the sync implementation first, then repeats with the async implementation. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created a complete Java 17 Maven project with:\n\n- Synchronous and Reactor-based asynchronous envelope encryption\n- Local AES-256-GCM encryption with per-upload DEKs and IVs\n- Azure Key Vault Keys RSA-OAEP-256 wrapping/unwrapping\n- Versioned Key Vault key IDs stored in blob metadata for rotation support\n- Shared managed identity credential across Blob Storage and Key Vault clients\n- Explicit Blob Storage, missing-blob, Key Vault, and authentication-tag error handling\n- Sync and async round-trip demos in `Main`\n- Environment setup and permissions documented in `README.md`\n\nThe packaged artifact is `target\\azure-encrypted-blob-uploader-1.0.0.jar`. Configure the four documented environment variables and run with `mvn exec:java`.",
+  "workspace_delta": {
+    "bytes_added": 31387,
+    "bytes_removed": 0,
+    "bytes_net": 31387,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1024
+      },
+      {
+        "path": "pom.xml",
+        "size": 2402
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureencrypted\\AzureConfiguration.java",
+        "size": 5071
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureencrypted\\KeyManagement.java",
+        "size": 3592
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureencrypted\\Main.java",
+        "size": 2623
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureencrypted\\AsyncEncryptedBlobClient.java",
+        "size": 5172
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureencrypted\\AsyncKeyManagement.java",
+        "size": 3991
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureencrypted\\EncryptedBlobClient.java",
+        "size": 7189
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureencrypted\\EnvelopeEncryptionException.java",
+        "size": 323
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T05:15:53.9863189+08:00",
+  "ended_at": "2026-08-28T05:18:20.4028339+08:00",
+  "duration_ms": 146416,
+  "terminated_by": "completed"
+}

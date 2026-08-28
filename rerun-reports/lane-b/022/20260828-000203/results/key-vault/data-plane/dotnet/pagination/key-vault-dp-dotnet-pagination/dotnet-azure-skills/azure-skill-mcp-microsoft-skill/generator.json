@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-dp-dotnet-pagination",
+  "config_name": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a C# program that lists all\r\nsecrets in an Azure Key Vault that contains hundreds of secrets. The program should:\r\n1. Use SecretClient with DefaultAzureCredential\r\n2. Iterate through secrets page-by-page using AsyncPageable\r\n3. Print the name, content type, and enabled status of each secret\r\n4. Handle the case where some secrets are disabled\r\n5. Show both sync and async iteration patterns\r\n\r\nI want to understand how Azure.Page\u003cT\u003e and AsyncPageable\u003cT\u003e work\r\nfor large result sets. Show required NuGet packages.",
+  "final_response": "Created a complete .NET 8 console sample:\n\n- `Program.cs` — sync and async page-by-page iteration using `Page\u003cT\u003e`, `Pageable\u003cT\u003e`, and `AsyncPageable\u003cT\u003e`\n- `KeyVaultSecretPaging.csproj` — required NuGet references\n- `README.md` — setup, RBAC, and paging concepts\n\nThe sample prints each secret’s name, content type, and enabled/disabled status without retrieving secret values. It uses lazy paging with a page-size hint of 50, suitable for vaults containing hundreds of secrets.\n\nRun with:\n\n```powershell\n$env:AZURE_KEYVAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net/\"\ndotnet run\n```\n\nRequired packages:\n\n```powershell\ndotnet add package Azure.Identity\ndotnet add package Azure.Security.KeyVault.Secrets\n```",
+  "workspace_delta": {
+    "bytes_added": 4652,
+    "bytes_removed": 0,
+    "bytes_net": 4652,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "KeyVaultSecretPaging.csproj",
+        "size": 434
+      },
+      {
+        "path": "Program.cs",
+        "size": 2625
+      },
+      {
+        "path": "README.md",
+        "size": 1593
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 7,
+    "tool_calls": 0,
+    "reasoning_steps": 7,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T00:02:03.7812168+08:00",
+  "ended_at": "2026-08-28T00:06:47.5149993+08:00",
+  "duration_ms": 283733,
+  "terminated_by": "completed"
+}

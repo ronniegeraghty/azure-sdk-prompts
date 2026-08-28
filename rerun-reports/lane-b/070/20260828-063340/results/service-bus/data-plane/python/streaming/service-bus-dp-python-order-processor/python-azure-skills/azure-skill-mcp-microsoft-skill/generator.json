@@ -1,0 +1,73 @@
+{
+  "prompt_id": "service-bus-dp-python-order-processor",
+  "config_name": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a Python project that implements an order processing system using Azure Service Bus.\r\n\r\n**Write the code to files (use file-write tools, do not reply with code blocks).**\r\n\r\nThe project needs:\r\n\r\n- A **model** for an Order with fields for order ID, customer name, product, quantity, total price, and status (pending/processing/completed/failed). It should be serializable to and from JSON. Use a dataclass or dictionary.\r\n\r\n- A **sender module** (both sync and async versions) that publishes order messages to a Service Bus queue. It should support sending individual orders and sending a batch of orders efficiently (using `ServiceBusMessageBatch` and checking `add_message()` to respect the maximum batch size so messages aren't rejected). Each message should carry the order ID as a correlation property, and orders above a certain dollar threshold should be sent as high-priority with a scheduled delivery time of 30 seconds in the future (to allow for fraud review before processing).\r\n\r\n- A **processor module** (both sync and async versions) that receives and processes orders from the queue. It should handle messages as they arrive, deserialize them, and log the results. If processing fails (e.g., a deserialization error), the message should be sent to the dead-letter queue with a reason string using `dead_letter_message()` rather than being silently abandoned. The processor should also be able to read from the dead-letter queue so failed messages can be inspected and reprocessed. It should guarantee that orders from the same customer are processed in sequence, not interleaved with other customers' orders.\r\n\r\n- A **main script** that demos both implementations: connects to the Service Bus namespace (from an environment variable) with `DefaultAzureCredential`, runs the full send/receive/dead-letter cycle using the sync implementation first, then repeats with the async implementation.\r\n\r\nInclude a `requirements.txt` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Python Azure Service Bus order-processing project with:\n\n- Validated JSON-serializable `Order` model and status enum\n- Sync/async senders with size-aware batching, correlation IDs, customer sessions, and delayed high-priority orders\n- Sync/async session-based processors with explicit dead-lettering, inspection, repair, and reprocessing\n- Full sync-then-async demo in `main.py`\n- Azure SDK dependencies, setup documentation, and unit tests\n\nThe existing Service Bus queue must have **sessions enabled**. Configure `SERVICEBUS_FULLY_QUALIFIED_NAMESPACE` and `SERVICEBUS_QUEUE_NAME`, then run `python main.py`.",
+  "workspace_delta": {
+    "bytes_added": 38087,
+    "bytes_removed": 0,
+    "bytes_net": 38087,
+    "new_file_count": 11,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "order_processing\\model.py",
+        "size": 3314
+      },
+      {
+        "path": "order_processing\\sender.py",
+        "size": 7668
+      },
+      {
+        "path": "requirements.txt",
+        "size": 64
+      },
+      {
+        "path": "tests\\test_model.py",
+        "size": 961
+      },
+      {
+        "path": "tests\\test_sender.py",
+        "size": 3602
+      },
+      {
+        "path": "README.md",
+        "size": 1327
+      },
+      {
+        "path": "main.py",
+        "size": 4215
+      },
+      {
+        "path": "order_processing\\__init__.py",
+        "size": 129
+      },
+      {
+        "path": "order_processing\\messages.py",
+        "size": 1708
+      },
+      {
+        "path": "order_processing\\processor.py",
+        "size": 12168
+      },
+      {
+        "path": "tests\\test_processor.py",
+        "size": 2931
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 16,
+    "tool_calls": 0,
+    "reasoning_steps": 16,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T06:33:40.3385652+08:00",
+  "ended_at": "2026-08-28T06:43:24.3663661+08:00",
+  "duration_ms": 584027,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,2 @@
+azure-eventhub>=5.15,<6
+azure-eventhub-checkpointstoreblob-aio>=1.2,<2

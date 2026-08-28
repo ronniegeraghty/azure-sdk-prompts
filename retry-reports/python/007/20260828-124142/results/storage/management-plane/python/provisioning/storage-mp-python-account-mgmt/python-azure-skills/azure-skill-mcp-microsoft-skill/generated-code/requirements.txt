@@ -1,0 +1,2 @@
+azure-identity>=1.25.3,<2.0.0
+azure-mgmt-storage>=25.1.0,<26.0.0

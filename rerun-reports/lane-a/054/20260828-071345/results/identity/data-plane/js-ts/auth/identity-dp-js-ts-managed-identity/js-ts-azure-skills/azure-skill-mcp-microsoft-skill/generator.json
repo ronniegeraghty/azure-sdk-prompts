@@ -1,0 +1,29 @@
+{
+  "prompt_id": "identity-dp-js-ts-managed-identity",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program that\r\nuses Managed Identity to authenticate Azure SDK clients. The program should:\r\n1. Create a ManagedIdentityCredential for system-assigned identity\r\n2. Create a ManagedIdentityCredential for user-assigned identity (with client ID)\r\n3. Use ChainedTokenCredential to fall back to Azure CLI credential for local development\r\n4. Pass the credential to an Azure SDK client and perform an operation\r\n5. Handle CredentialUnavailableError when not running in Azure\r\n\r\nInclude a package.json with all dependencies and use async/await throughout.",
+  "final_response": "",
+  "workspace_delta": {
+    "bytes_added": 0,
+    "bytes_removed": 0,
+    "bytes_net": 0,
+    "new_file_count": 0,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": null,
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 0,
+    "tool_calls": 0,
+    "reasoning_steps": 0,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T07:13:45.2645906+08:00",
+  "ended_at": "2026-08-28T08:39:33.3091669+08:00",
+  "duration_ms": 5148044,
+  "terminated_by": "error",
+  "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded"
+}

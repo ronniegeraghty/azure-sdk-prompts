@@ -1,0 +1,29 @@
+{
+  "prompt_id": "identity-dp-java-credential-chain",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that demonstrates how to correctly build Azure credential chains tailored to different deployment environments — local development, CI/CD pipelines, and production.\r\n\r\nThe project needs:\r\n\r\n- A **credential factory class** that builds the appropriate Azure credential for each environment. For local development, it should chain together credentials that work from developer tools (CLI, IDE plugins, etc.). For CI pipelines, it should support credentials sourced from pipeline environment variables or Azure Pipelines service connections. For production, it should prefer managed identity (supporting both system-assigned and user-assigned, where the user-assigned identity's client ID comes from an environment variable), with workload identity as a fallback for Kubernetes scenarios. The factory should also support enabling Continuous Access Evaluation (CAE) on the credentials, which lets Azure revoke tokens mid-session for security events.\r\n\r\n- An **environment detector class** that auto-detects which environment the app is running in by probing for well-known environment variables (e.g., CI pipeline workspace variables, managed identity endpoint availability). It should classify the environment as dev, CI, or production.\r\n\r\n- A **connectivity tester class** (both sync and async versions) that verifies a credential works by requesting a token for a given Azure scope. It should print success/failure, the token's expiry time, and whether the token is CAE-enabled. It should handle and report the specific failure reason if authentication fails (expired cert, wrong tenant, no identity available, etc.) rather than just printing a generic error.\r\n\r\n- A **Main class** that detects the current environment, builds the right credential, and runs the connectivity test against Azure Resource Manager using the sync tester first, then repeats with the async tester. Print the detected environment, the selected credential strategy, and the test results from both.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Because CAE is requested per token acquisition in Azure Core rather than encoded as an inspectable flag on `AccessToken`, I’ll make CAE an explicit factory/tester setting and apply it to every `TokenRequestContext`.",
+  "workspace_delta": {
+    "bytes_added": 0,
+    "bytes_removed": 0,
+    "bytes_net": 0,
+    "new_file_count": 0,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": null,
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-28T11:14:53.8598835+08:00",
+  "ended_at": "2026-08-28T11:25:10.8469519+08:00",
+  "duration_ms": 616987,
+  "terminated_by": "error",
+  "error": "evaluation failed: sending prompt: waiting for session.idle: context deadline exceeded"
+}
