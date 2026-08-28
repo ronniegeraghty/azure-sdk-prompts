@@ -1,5 +1,36 @@
 # Active Decisions
 
+## Issue Triage: Quick-Win Recommendations (2026-05-22)
+
+**By:** Morpheus  
+**Status:** RECOMMENDED — awaiting team assignment and execution
+
+**Decision:** Post-dev-branch merge prep, identified 3 high-value, low-risk quick wins from 32 open issues.
+
+**Top 3 Recommendations:**
+
+1. **#644: Enforce evaluation_criteria removal** (XS, ~30 min) — Neo
+   - Drop loader support for deprecated field in internal/prompt (3 files)
+   - Dev-branch blocker carryover; zero risk, field already non-functional
+
+2. **#595: Extract useRuns hook** (XS, ~20 min) — Trinity
+   - Refactor shared fetch+cancel pattern from dashboard/prompts pages
+   - Pure React change; TypeScript ensures correctness
+
+3. **#72: Add early auth check** (S, ~45 min) — Neo
+   - Call GetAuthStatus() after client.Start() in engine init
+   - Fail fast with clear messaging; single-file change
+
+**Sequencing:** Start #644 (fastest, highest dependency), then #72 (auth), #595 in parallel (site-only).
+
+**Honorable Mentions:** #71, #633, #75 deferred for lower effort-to-value ratio.
+
+**Next Steps:** Backlog verification sweep after Phase 7 ships (several older issues #14, #78, #86 may be stale).
+
+**Full Details:** See `.squad/log/2026-05-22T21-44-13Z-issue-triage-quick-wins.md`
+
+---
+
 ## Report/Site Schema Cutover: Dual-Emit Alias Removed (2026-05-14)
 
 **By:** Trinity  
