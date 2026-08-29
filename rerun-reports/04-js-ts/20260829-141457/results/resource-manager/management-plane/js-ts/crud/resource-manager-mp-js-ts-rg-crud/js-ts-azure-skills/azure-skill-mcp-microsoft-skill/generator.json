@@ -1,0 +1,49 @@
+{
+  "prompt_id": "resource-manager-mp-js-ts-rg-crud",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat manages Azure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential from @azure/identity\r\n2. Create a ResourceManagementClient with the credential and subscription ID\r\n3. Create a new resource group in \"eastus\" region\r\n4. List all resource groups in the subscription using iteration\r\n5. Get details of the created resource group\r\n6. Update the resource group by adding a tag\r\n7. Delete the resource group using beginDeleteAndWait\r\n\r\nShow required npm packages and proper async/await patterns.\r\nUse the @azure/arm-resources package.",
+  "final_response": "Implemented the TypeScript Azure Resource Group management sample in `src/index.ts`.\n\nIt includes:\n\n- `DefaultAzureCredential` authentication\n- `ResourceManagementClient` creation\n- Resource group creation in `eastus`\n- Async iteration with `for await...of`\n- Get and tag update operations\n- Cleanup using `beginDeleteAndWait`\n- Environment-based configuration and error handling\n\nRequired packages and PowerShell run instructions are documented in `README.md`. The project uses `@azure/arm-resources`, `@azure/identity`, TypeScript, and Node.js types. Running `npm start` will create and then delete a real Azure resource group.",
+  "workspace_delta": {
+    "bytes_added": 39659,
+    "bytes_removed": 0,
+    "bytes_net": 39659,
+    "new_file_count": 5,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "tsconfig.json",
+        "size": 325
+      },
+      {
+        "path": "README.md",
+        "size": 1479
+      },
+      {
+        "path": "package-lock.json",
+        "size": 35321
+      },
+      {
+        "path": "package.json",
+        "size": 396
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 2138
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T16:58:52.1315407+08:00",
+  "ended_at": "2026-08-29T17:01:27.9486331+08:00",
+  "duration_ms": 155817,
+  "terminated_by": "completed"
+}

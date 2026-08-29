@@ -1,0 +1,49 @@
+{
+  "prompt_id": "resource-manager-mp-js-ts-rg-crud",
+  "config_name": "js-ts-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat manages Azure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential from @azure/identity\r\n2. Create a ResourceManagementClient with the credential and subscription ID\r\n3. Create a new resource group in \"eastus\" region\r\n4. List all resource groups in the subscription using iteration\r\n5. Get details of the created resource group\r\n6. Update the resource group by adding a tag\r\n7. Delete the resource group using beginDeleteAndWait\r\n\r\nShow required npm packages and proper async/await patterns.\r\nUse the @azure/arm-resources package.",
+  "final_response": "Implemented the complete TypeScript Azure Resource Group management example.\n\n- `src/index.ts` uses `DefaultAzureCredential` and `ResourceManagementClient`\n- Creates a resource group in `eastus`\n- Lists resource groups with `for await...of`\n- Gets and updates the created group with a tag\n- Deletes it using `beginDeleteAndWait`\n- `package.json` includes `@azure/identity` and `@azure/arm-resources`\n- `README.md` documents installation, authentication, and execution\n\nRun after configuring Azure credentials:\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\nnpm start\n```\n\nThis command performs real create, update, and delete operations against the configured subscription.",
+  "workspace_delta": {
+    "bytes_added": 38584,
+    "bytes_removed": 0,
+    "bytes_net": 38584,
+    "new_file_count": 5,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\index.ts",
+        "size": 1720
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 325
+      },
+      {
+        "path": "README.md",
+        "size": 806
+      },
+      {
+        "path": "package-lock.json",
+        "size": 35343
+      },
+      {
+        "path": "package.json",
+        "size": 390
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T16:47:25.5520419+08:00",
+  "ended_at": "2026-08-29T16:50:07.2696106+08:00",
+  "duration_ms": 161717,
+  "terminated_by": "completed"
+}

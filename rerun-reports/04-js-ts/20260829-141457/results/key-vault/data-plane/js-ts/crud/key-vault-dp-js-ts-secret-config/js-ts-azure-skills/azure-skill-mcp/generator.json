@@ -1,0 +1,69 @@
+{
+  "prompt_id": "key-vault-dp-js-ts-secret-config",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a TypeScript Node.js project that implements an application configuration provider backed by Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **secret provider class** that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.\r\n\r\n- A **caching layer** on top of the provider that stores secret values in memory after first retrieval. It should support bulk-loading a predefined set of required config keys at startup, on-demand refresh of individual keys, and automatic re-fetch of any secret whose expiry date is within a configurable warning window (e.g., 7 days out).\r\n\r\n- A **configuration module** that connects securely to the Key Vault using the vault URL from an environment variable. The application runs in Azure and should authenticate using managed identity — no client secrets or certificates in code.\r\n\r\n- A **secret rotation helper** that safely rotates a secret: create a new version of the secret with an updated value and expiry date (since Key Vault supports multiple versions per secret name), then optionally clean up old versions by deleting and purging the previous secret if full name reuse is needed. The cleanup must be safe — use the long-running delete operation and wait for completion before purging, since Key Vault's soft-delete feature means the secret is not immediately gone.\r\n\r\n- A **main script** that demos the full flow: loading several config keys at startup, reading them from cache, refreshing one, printing a warning if any secret is near expiry, and performing a secret rotation (creating a new version, then demonstrating the delete-and-purge cleanup flow). Print results at each step.\r\n\r\nInclude a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.",
+  "final_response": "Created the complete TypeScript Node.js project with:\n\n- Managed-identity authentication via `ManagedIdentityCredential`\n- Version-aware secret retrieval and 404-only default fallback\n- Expiry inspection and configurable warning window\n- In-memory bulk loading, on-demand refresh, access-triggered refresh, and periodic refresh\n- Secret rotation using new Key Vault versions\n- Explicit, safe delete-and-purge flow that waits for the deletion LRO\n- Opt-in destructive demo controls and redacted logging\n- Unit tests, `package.json`, `tsconfig.json`, `.env.example`, and usage documentation\n\nRun with:\n\n```powershell\nnpm test\n$env:KEY_VAULT_URL = \"https://your-vault.vault.azure.net\"\nnpm start\n```\n\nRotation and irreversible purge remain disabled unless explicitly enabled through the environment variables documented in `.env.example`. No Azure resources were accessed or modified.",
+  "workspace_delta": {
+    "bytes_added": 76728,
+    "bytes_removed": 0,
+    "bytes_net": 76728,
+    "new_file_count": 10,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1678
+      },
+      {
+        "path": "package-lock.json",
+        "size": 52309
+      },
+      {
+        "path": "src\\secret-cache.ts",
+        "size": 3551
+      },
+      {
+        "path": "src\\secret-provider.ts",
+        "size": 2129
+      },
+      {
+        "path": "src\\secret-rotation.ts",
+        "size": 1718
+      },
+      {
+        "path": "package.json",
+        "size": 778
+      },
+      {
+        "path": "src\\configuration.ts",
+        "size": 2584
+      },
+      {
+        "path": "src\\main.ts",
+        "size": 5703
+      },
+      {
+        "path": "test\\secret-config.test.ts",
+        "size": 5802
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 476
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 18,
+    "tool_calls": 0,
+    "reasoning_steps": 18,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T16:33:47.6540898+08:00",
+  "ended_at": "2026-08-29T16:38:12.905764+08:00",
+  "duration_ms": 265251,
+  "terminated_by": "completed"
+}

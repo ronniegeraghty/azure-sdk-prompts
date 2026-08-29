@@ -1,0 +1,25 @@
+{
+  "name": "azure-encrypted-blob-uploader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Client-side envelope encryption for Azure Blob Storage using Azure Key Vault Keys",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "demo": "npm run build && npm start"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/core-auth": "^1.10.1",
+    "@azure/identity": "^4.11.1",
+    "@azure/keyvault-keys": "^4.10.0",
+    "@azure/storage-blob": "^12.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.2"
+  }
+}

@@ -1,0 +1,2285 @@
+Found 14 prompt(s), 3 config(s) → 42 evaluation(s)
+Using Copilot SDK evaluator
+
+📊 Evaluation plan: 42 evaluations (14 prompts × 3 configs)
+   Estimated Copilot sessions: 84 (42 × 2 for generate/review)
+   Workers: 1 | Max sessions: 3
+
+
+Graders for storage-mp-js-ts-account-mgmt / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `@azure/arm-storage` and `@azure/identity` npm packages: Pass
+      - `StorageManagementClient` constructor with credential and subscriptionId: Pass
+      - `storageAccounts.beginCreateAndWait()` with `StorageAccountCreateParameters`: Fail
+      - SKU and kind configuration in create parameters: Pass
+      - `storageAccounts.listByResourceGroup()` with async iteration: Pass
+      - `storageAccounts.getProperties()` for details: Pass
+      - `storageAccounts.update()` for modifying properties: Fail
+      - `storageAccounts.delete()` for removal: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Fail
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-managed-identity / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `ManagedIdentityCredential` class from `@azure/identity`: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing the client ID in options: Pass
+      - Integration with `DefaultAzureCredential` chain: Fail
+      - `CredentialUnavailableError` when not running in Azure: Pass
+      - `ChainedTokenCredential` for local fallback: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for event-hubs-dp-js-ts-streaming / js-ts-azure-skills/baseline:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `@azure/event-hubs` and `@azure/eventhubs-checkpointstore-blob` npm packages: Pass
+      - `EventHubProducerClient` constructor: Pass
+      - `createBatch()` and `EventDataBatch.tryAdd()`: Pass
+      - `sendBatch()` for publishing: Pass
+      - `EventHubConsumerClient` with `BlobCheckpointStore`: Pass
+      - `subscribe()` with `SubscriptionEventHandlers` (processEvents, processError): Pass
+      - `updateCheckpoint()` in the processEvents handler: Pass
+      - `close()` for cleanup: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for event-hubs-dp-js-ts-streaming / js-ts-azure-skills/azure-skill-mcp:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `@azure/event-hubs` and `@azure/eventhubs-checkpointstore-blob` npm packages: Pass
+      - `EventHubProducerClient` constructor: Pass
+      - `createBatch()` and `EventDataBatch.tryAdd()`: Pass
+      - `sendBatch()` for publishing: Pass
+      - `EventHubConsumerClient` with `BlobCheckpointStore`: Pass
+      - `subscribe()` with `SubscriptionEventHandlers` (processEvents, processError): Pass
+      - `updateCheckpoint()` in the processEvents handler: Pass
+      - `close()` for cleanup: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for event-hubs-dp-js-ts-streaming / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `@azure/event-hubs` and `@azure/eventhubs-checkpointstore-blob` npm packages: Pass
+      - `EventHubProducerClient` constructor: Pass
+      - `createBatch()` and `EventDataBatch.tryAdd()`: Pass
+      - `sendBatch()` for publishing: Pass
+      - `EventHubConsumerClient` with `BlobCheckpointStore`: Pass
+      - `subscribe()` with `SubscriptionEventHandlers` (processEvents, processError): Pass
+      - `updateCheckpoint()` in the processEvents handler: Pass
+      - `close()` for cleanup: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-default-credential / js-ts-azure-skills/baseline:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - `@azure/identity` npm package installation: Pass
+      - `DefaultAzureCredential` constructor and options: Fail
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `AuthenticationError` handling and logging: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-default-credential / js-ts-azure-skills/azure-skill-mcp:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - `@azure/identity` npm package installation: Pass
+      - `DefaultAzureCredential` constructor and options: Fail
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `AuthenticationError` handling and logging: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-default-credential / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- default-azure-credential.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - `@azure/identity` npm package installation: Pass
+      - `DefaultAzureCredential` constructor and options: Fail
+      - Credential chain: Environment → Workload Identity → Managed Identity → Azure CLI → etc.: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - `AuthenticationError` handling and logging: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-managed-identity / js-ts-azure-skills/baseline:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `ManagedIdentityCredential` class from `@azure/identity`: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing the client ID in options: Pass
+      - Integration with `DefaultAzureCredential` chain: Fail
+      - `CredentialUnavailableError` when not running in Azure: Pass
+      - `ChainedTokenCredential` for local fallback: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-managed-identity / js-ts-azure-skills/azure-skill-mcp:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (5/6)
+      - `ManagedIdentityCredential` class from `@azure/identity`: Pass
+      - System-assigned: no parameters needed: Pass
+      - User-assigned: passing the client ID in options: Pass
+      - Integration with `DefaultAzureCredential` chain: Fail
+      - `CredentialUnavailableError` when not running in Azure: Pass
+      - `ChainedTokenCredential` for local fallback: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for app-configuration-dp-js-ts-crud / js-ts-azure-skills/baseline:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `@azure/app-configuration` npm package: Pass
+      - `AppConfigurationClient` constructor with connection string: Pass
+      - `setConfigurationSetting()` with key, value, label: Pass
+      - `getConfigurationSetting()` by key and label: Fail
+      - `listConfigurationSettings()` with `ListConfigurationSettingOptions`: Fail
+      - Feature flag settings with `featureFlagContentType`: Pass
+      - `deleteConfigurationSetting()` and `RestError` handling: Pass
+      - Async iteration with `for await...of` pattern: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Pass
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for cosmos-db-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `@azure/cosmos` npm package: Pass
+      - `CosmosClient` constructor with endpoint and key: Pass
+      - `client.databases.createIfNotExists()` and `database.containers.createIfNotExists()`: Pass
+      - `container.items.create()`, `container.item(id, partitionKey).read()`: Pass
+      - `container.items.query()` with `SqlQuerySpec`: Pass
+      - `container.item(id, partitionKey).replace()` and `.delete()`: Pass
+      - `FeedResponse` iteration and error status codes: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for app-configuration-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `@azure/app-configuration` npm package: Pass
+      - `AppConfigurationClient` constructor with connection string: Pass
+      - `setConfigurationSetting()` with key, value, label: Pass
+      - `getConfigurationSetting()` by key and label: Fail
+      - `listConfigurationSettings()` with `ListConfigurationSettingOptions`: Fail
+      - Feature flag settings with `featureFlagContentType`: Pass
+      - `deleteConfigurationSetting()` and `RestError` handling: Pass
+      - Async iteration with `for await...of` pattern: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Pass
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for app-configuration-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- config-values.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `@azure/app-configuration` npm package: Pass
+      - `AppConfigurationClient` constructor with connection string: Pass
+      - `setConfigurationSetting()` with key, value, label: Pass
+      - `getConfigurationSetting()` by key and label: Fail
+      - `listConfigurationSettings()` with `ListConfigurationSettingOptions`: Fail
+      - Feature flag settings with `featureFlagContentType`: Pass
+      - `deleteConfigurationSetting()` and `RestError` handling: Pass
+      - Async iteration with `for await...of` pattern: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Pass
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for cosmos-db-dp-js-ts-crud / js-ts-azure-skills/baseline:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `@azure/cosmos` npm package: Pass
+      - `CosmosClient` constructor with endpoint and key: Pass
+      - `client.databases.createIfNotExists()` and `database.containers.createIfNotExists()`: Pass
+      - `container.items.create()`, `container.item(id, partitionKey).read()`: Pass
+      - `container.items.query()` with `SqlQuerySpec`: Pass
+      - `container.item(id, partitionKey).replace()` and `.delete()`: Pass
+      - `FeedResponse` iteration and error status codes: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for cosmos-db-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp:
+- crud-items.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/7)
+      - `@azure/cosmos` npm package: Pass
+      - `CosmosClient` constructor with endpoint and key: Pass
+      - `client.databases.createIfNotExists()` and `database.containers.createIfNotExists()`: Pass
+      - `container.items.create()`, `container.item(id, partitionKey).read()`: Pass
+      - `container.items.query()` with `SqlQuerySpec`: Pass
+      - `container.item(id, partitionKey).replace()` and `.delete()`: Pass
+      - `FeedResponse` iteration and error status codes: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for service-bus-dp-js-ts-crud / js-ts-azure-skills/baseline:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `@azure/service-bus` npm package: Pass
+      - `ServiceBusClient` constructor with connection string: Pass
+      - `createSender()` for queue or topic: Pass
+      - `ServiceBusMessageBatch` with `tryAddMessage()`: Pass
+      - `createReceiver()` for queue or subscription: Pass
+      - `receiveMessages()` for batch receive and `subscribe()` for streaming: Pass
+      - `completeMessage()`, `abandonMessage()`, `deadLetterMessage()`: Fail
+      - `close()` on sender, receiver, and client for cleanup: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-service-principal / js-ts-azure-skills/baseline:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `@azure/identity` package with `ClientSecretCredential` class: Pass
+      - Constructor parameters: tenantId, clientId, clientSecret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - dotenv or environment variable patterns: Pass
+      - `AuthenticationError` handling: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-service-principal / js-ts-azure-skills/azure-skill-mcp:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `@azure/identity` package with `ClientSecretCredential` class: Pass
+      - Constructor parameters: tenantId, clientId, clientSecret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - dotenv or environment variable patterns: Pass
+      - `AuthenticationError` handling: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for identity-dp-js-ts-service-principal / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- service-principal-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (5/5)
+      - `@azure/identity` package with `ClientSecretCredential` class: Pass
+      - Constructor parameters: tenantId, clientId, clientSecret: Pass
+      - Passing credential to Azure SDK clients: Pass
+      - dotenv or environment variable patterns: Pass
+      - `AuthenticationError` handling: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for key-vault-dp-js-ts-crud / js-ts-azure-skills/baseline:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - Installing `@azure/keyvault-secrets` and `@azure/identity` npm packages: Pass
+      - Creating a `SecretClient` with vault URL and credential: Pass
+      - `setSecret()`, `getSecret()`, `beginDeleteSecret()`, `purgeDeletedSecret()`: Pass
+      - Awaiting the `DeleteSecretPoller` before purging: Pass
+      - Error handling for `RestError`: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Fail
+
+Graders for key-vault-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - Installing `@azure/keyvault-secrets` and `@azure/identity` npm packages: Pass
+      - Creating a `SecretClient` with vault URL and credential: Pass
+      - `setSecret()`, `getSecret()`, `beginDeleteSecret()`, `purgeDeletedSecret()`: Pass
+      - Awaiting the `DeleteSecretPoller` before purging: Pass
+      - Error handling for `RestError`: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for key-vault-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-secrets.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (4/5)
+      - Installing `@azure/keyvault-secrets` and `@azure/identity` npm packages: Pass
+      - Creating a `SecretClient` with vault URL and credential: Pass
+      - `setSecret()`, `getSecret()`, `beginDeleteSecret()`, `purgeDeletedSecret()`: Pass
+      - Awaiting the `DeleteSecretPoller` before purging: Pass
+      - Error handling for `RestError`: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for key-vault-dp-js-ts-secret-config / js-ts-azure-skills/baseline:
+- secret-config.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (12/13)
+      - Secret versioning: retrieves specific version via `client.getSecret(name, { version })`: Pass
+      - Secret expiry: accesses `properties.expiresOn` on the secret response: Pass
+      - Configurable warning window for near-expiry detection (compares expiresOn to current date): Pass
+      - In-memory caching (e.g., `Map<string, KeyVaultSecret>`) with bulk-load and single-key refresh: Pass
+      - Version-based rotation: calls `client.setSecret(name, newValue, { expiresOn })` to create a new version: Pass
+      - Cleanup uses `client.beginDeleteSecret(name)` as a long-running operation: Pass
+      - Awaits `poller.pollUntilDone()` before calling `client.purgeDeletedSecret(name)`: Pass
+      - Creates new secret only after delete+purge completes (not concurrently): Fail
+      - Returns a default value when secret is not found (404), does not crash: Pass
+      - Handles RestError with statusCode check for not-found scenarios: Pass
+      - NOT using fire-and-forget `deleteSecret()` without waiting for completion: Pass
+      - NOT assuming deletion is instantaneous (must use poller): Pass
+      - NOT hardcoding vault URL or credentials: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for key-vault-dp-js-ts-secret-config / js-ts-azure-skills/azure-skill-mcp:
+- secret-config.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (12/13)
+      - Secret versioning: retrieves specific version via `client.getSecret(name, { version })`: Pass
+      - Secret expiry: accesses `properties.expiresOn` on the secret response: Pass
+      - Configurable warning window for near-expiry detection (compares expiresOn to current date): Pass
+      - In-memory caching (e.g., `Map<string, KeyVaultSecret>`) with bulk-load and single-key refresh: Pass
+      - Version-based rotation: calls `client.setSecret(name, newValue, { expiresOn })` to create a new version: Pass
+      - Cleanup uses `client.beginDeleteSecret(name)` as a long-running operation: Pass
+      - Awaits `poller.pollUntilDone()` before calling `client.purgeDeletedSecret(name)`: Pass
+      - Creates new secret only after delete+purge completes (not concurrently): Fail
+      - Returns a default value when secret is not found (404), does not crash: Pass
+      - Handles RestError with statusCode check for not-found scenarios: Pass
+      - NOT using fire-and-forget `deleteSecret()` without waiting for completion: Pass
+      - NOT assuming deletion is instantaneous (must use poller): Pass
+      - NOT hardcoding vault URL or credentials: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for key-vault-dp-js-ts-secret-config / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- secret-config.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (12/13)
+      - Secret versioning: retrieves specific version via `client.getSecret(name, { version })`: Pass
+      - Secret expiry: accesses `properties.expiresOn` on the secret response: Pass
+      - Configurable warning window for near-expiry detection (compares expiresOn to current date): Pass
+      - In-memory caching (e.g., `Map<string, KeyVaultSecret>`) with bulk-load and single-key refresh: Pass
+      - Version-based rotation: calls `client.setSecret(name, newValue, { expiresOn })` to create a new version: Pass
+      - Cleanup uses `client.beginDeleteSecret(name)` as a long-running operation: Pass
+      - Awaits `poller.pollUntilDone()` before calling `client.purgeDeletedSecret(name)`: Pass
+      - Creates new secret only after delete+purge completes (not concurrently): Fail
+      - Returns a default value when secret is not found (404), does not crash: Pass
+      - Handles RestError with statusCode check for not-found scenarios: Pass
+      - NOT using fire-and-forget `deleteSecret()` without waiting for completion: Pass
+      - NOT assuming deletion is instantaneous (must use poller): Pass
+      - NOT hardcoding vault URL or credentials: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for resource-manager-mp-js-ts-rg-crud / js-ts-azure-skills/baseline:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `@azure/arm-resources` and `@azure/identity` npm packages: Pass
+      - `DefaultAzureCredential` for authentication: Pass
+      - `ResourceManagementClient` constructor with credential and subscriptionId: Pass
+      - `resourceGroups.createOrUpdate()` with resource group name and parameters: Pass
+      - `resourceGroups.list()` with async iteration (`for await...of`): Pass
+      - `resourceGroups.get()` for fetching details: Pass
+      - `resourceGroups.beginDeleteAndWait()` for long-running delete: Pass
+      - Tag updates via `resourceGroups.update()` with tags parameter: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Fail
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for resource-manager-mp-js-ts-rg-crud / js-ts-azure-skills/azure-skill-mcp:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `@azure/arm-resources` and `@azure/identity` npm packages: Pass
+      - `DefaultAzureCredential` for authentication: Pass
+      - `ResourceManagementClient` constructor with credential and subscriptionId: Pass
+      - `resourceGroups.createOrUpdate()` with resource group name and parameters: Pass
+      - `resourceGroups.list()` with async iteration (`for await...of`): Pass
+      - `resourceGroups.get()` for fetching details: Pass
+      - `resourceGroups.beginDeleteAndWait()` for long-running delete: Pass
+      - Tag updates via `resourceGroups.update()` with tags parameter: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Fail
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for resource-manager-mp-js-ts-rg-crud / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- resource-group-crud.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `@azure/arm-resources` and `@azure/identity` npm packages: Pass
+      - `DefaultAzureCredential` for authentication: Pass
+      - `ResourceManagementClient` constructor with credential and subscriptionId: Pass
+      - `resourceGroups.createOrUpdate()` with resource group name and parameters: Pass
+      - `resourceGroups.list()` with async iteration (`for await...of`): Pass
+      - `resourceGroups.get()` for fetching details: Pass
+      - `resourceGroups.beginDeleteAndWait()` for long-running delete: Pass
+      - Tag updates via `resourceGroups.update()` with tags parameter: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Fail
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp:
+- crud-blobs.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - Installing `@azure/storage-blob` and `@azure/identity` packages: Pass
+      - `BlobServiceClient` construction with `DefaultAzureCredential`: Pass
+      - `ContainerClient.createIfNotExists()`: Pass
+      - `BlockBlobClient.upload()` or `uploadData()` for string content: Pass
+      - `ContainerClient.listBlobsFlat()` async iteration: Pass
+      - `BlobClient.download()` and reading the response stream: Pass
+      - `BlobClient.delete()` and `ContainerClient.delete()`: Fail
+      - `RestError` handling with `statusCode`: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for service-bus-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `@azure/service-bus` npm package: Pass
+      - `ServiceBusClient` constructor with connection string: Pass
+      - `createSender()` for queue or topic: Pass
+      - `ServiceBusMessageBatch` with `tryAddMessage()`: Pass
+      - `createReceiver()` for queue or subscription: Pass
+      - `receiveMessages()` for batch receive and `subscribe()` for streaming: Pass
+      - `completeMessage()`, `abandonMessage()`, `deadLetterMessage()`: Fail
+      - `close()` on sender, receiver, and client for cleanup: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for service-bus-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- send-receive-messages.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (7/8)
+      - `@azure/service-bus` npm package: Pass
+      - `ServiceBusClient` constructor with connection string: Pass
+      - `createSender()` for queue or topic: Pass
+      - `ServiceBusMessageBatch` with `tryAddMessage()`: Pass
+      - `createReceiver()` for queue or subscription: Pass
+      - `receiveMessages()` for batch receive and `subscribe()` for streaming: Pass
+      - `completeMessage()`, `abandonMessage()`, `deadLetterMessage()`: Fail
+      - `close()` on sender, receiver, and client for cleanup: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-blob-manager / js-ts-azure-skills/baseline:
+- blob-storage-manager.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (9/12)
+      - Configures custom retry policy via `StorageRetryOptions` (exponential backoff, max retries, retry delay): Pass
+      - Enables SDK logging via `@azure/logger` `setLogLevel()` or `AZURE_LOG_LEVEL`: Pass
+      - Implements blob lease acquisition before overwrite using `BlobLeaseClient`: Pass
+      - Uses `BlockBlobClient.uploadStream()` for large file streaming upload (not `uploadData()` or `upload()` which buffer in memory): Pass
+      - Sets blob index tags on upload via `tags` property in `BlockBlobUploadStreamOptions`: Pass
+      - Downloads blob and reads response via `readableStreamBody` (Node.js Readable stream): Pass
+      - Lists blobs using `for await...of` async iteration over `ContainerClient.listBlobsFlat()`: Pass
+      - Handles lease conflict errors (409 status code) when blob is already leased: Fail
+      - Handles blob not found errors (404 status code) on download/delete: Fail
+      - NOT using `uploadData()` or `upload()` with full buffer for large files: Pass
+      - NOT using connection strings or account keys for authentication: Pass
+      - NOT collecting all listed blobs into an array before processing: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Pass
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-blob-manager / js-ts-azure-skills/azure-skill-mcp:
+- blob-storage-manager.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (9/12)
+      - Configures custom retry policy via `StorageRetryOptions` (exponential backoff, max retries, retry delay): Pass
+      - Enables SDK logging via `@azure/logger` `setLogLevel()` or `AZURE_LOG_LEVEL`: Pass
+      - Implements blob lease acquisition before overwrite using `BlobLeaseClient`: Pass
+      - Uses `BlockBlobClient.uploadStream()` for large file streaming upload (not `uploadData()` or `upload()` which buffer in memory): Pass
+      - Sets blob index tags on upload via `tags` property in `BlockBlobUploadStreamOptions`: Pass
+      - Downloads blob and reads response via `readableStreamBody` (Node.js Readable stream): Pass
+      - Lists blobs using `for await...of` async iteration over `ContainerClient.listBlobsFlat()`: Pass
+      - Handles lease conflict errors (409 status code) when blob is already leased: Fail
+      - Handles blob not found errors (404 status code) on download/delete: Fail
+      - NOT using `uploadData()` or `upload()` with full buffer for large files: Pass
+      - NOT using connection strings or account keys for authentication: Pass
+      - NOT collecting all listed blobs into an array before processing: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Pass
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-blob-manager / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- blob-storage-manager.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (10/12)
+      - Configures custom retry policy via `StorageRetryOptions` (exponential backoff, max retries, retry delay): Pass
+      - Enables SDK logging via `@azure/logger` `setLogLevel()` or `AZURE_LOG_LEVEL`: Pass
+      - Implements blob lease acquisition before overwrite using `BlobLeaseClient`: Pass
+      - Uses `BlockBlobClient.uploadStream()` for large file streaming upload (not `uploadData()` or `upload()` which buffer in memory): Pass
+      - Sets blob index tags on upload via `tags` property in `BlockBlobUploadStreamOptions`: Pass
+      - Downloads blob and reads response via `readableStreamBody` (Node.js Readable stream): Pass
+      - Lists blobs using `for await...of` async iteration over `ContainerClient.listBlobsFlat()`: Pass
+      - Handles lease conflict errors (409 status code) when blob is already leased: Pass
+      - Handles blob not found errors (404 status code) on download/delete: Fail
+      - NOT using `uploadData()` or `upload()` with full buffer for large files: Pass
+      - NOT using connection strings or account keys for authentication: Pass
+      - NOT collecting all listed blobs into an array before processing: Fail
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Fail
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Pass
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Pass
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-crud / js-ts-azure-skills/baseline:
+- crud-blobs.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Installing `@azure/storage-blob` and `@azure/identity` packages: Pass
+      - `BlobServiceClient` construction with `DefaultAzureCredential`: Pass
+      - `ContainerClient.createIfNotExists()`: Pass
+      - `BlockBlobClient.upload()` or `uploadData()` for string content: Pass
+      - `ContainerClient.listBlobsFlat()` async iteration: Pass
+      - `BlobClient.download()` and reading the response stream: Pass
+      - `BlobClient.delete()` and `ContainerClient.delete()`: Pass
+      - `RestError` handling with `statusCode`: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Pass
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-encrypted-uploader / js-ts-azure-skills/azure-skill-mcp:
+- encrypted-uploader.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (23/25)
+      - Uses `@azure/keyvault-keys` (Keys, NOT Secrets) — critical distinction: Pass
+      - Uses Node.js built-in `crypto` module for local AES-GCM encryption: Pass
+      - Uses `KeyClient` for key management and `CryptographyClient` for wrap/unwrap operations (NOT `SecretClient`): Pass
+      - Constructs `CryptographyClient` with the key ID or key name: Pass
+      - Uses `CryptographyClient` for `wrapKey()` and `unwrapKey()` operations: Pass
+      - Specifies RSA key wrap algorithm (e.g., `"RSA-OAEP"` or `"RSA-OAEP-256"`): Pass
+      - Key material never leaves Key Vault (wrap/unwrap is server-side): Pass
+      - Generates a random AES-256 DEK locally (32 bytes via `crypto.randomBytes`): Pass
+      - Encrypts data with AES-GCM locally using the DEK (`crypto.createCipheriv("aes-256-gcm", ...)`): Pass
+      - Wraps the DEK via Key Vault `wrapKey()`: Pass
+      - Stores wrapped DEK as blob metadata (base64-encoded): Pass
+      - Stores IV (initialization vector) in blob metadata (base64-encoded): Pass
+      - Stores GCM auth tag in blob metadata (base64-encoded) — in Node.js the auth tag is separate from ciphertext: Pass
+      - Stores vault key identifier in blob metadata: Pass
+      - For decryption: retrieves wrapped DEK from metadata, unwraps via Key Vault, sets auth tag via `decipher.setAuthTag()`, decrypts locally: Pass
+      - Uses AES-GCM (not AES-CBC, AES-ECB, or other modes): Pass
+      - Generates random IV for each encryption (typically 12 bytes for GCM): Pass
+      - Retrieves auth tag via `cipher.getAuthTag()` after encryption finalize: Pass
+      - Sets auth tag via `decipher.setAuthTag()` before decryption finalize: Pass
+      - Handles Key Vault errors (key disabled, key not found) via RestError: Fail
+      - Handles Storage errors (blob not found) via RestError with statusCode: Fail
+      - NOT using `SecretClient` instead of `KeyClient`/`CryptographyClient`: Pass
+      - NOT encrypting data directly with the vault key (should be envelope encryption): Pass
+      - NOT storing raw DEK in plaintext: Pass
+      - NOT omitting the GCM auth tag from blob metadata (decryption will fail): Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-mp-js-ts-account-mgmt / js-ts-azure-skills/baseline:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `@azure/arm-storage` and `@azure/identity` npm packages: Pass
+      - `StorageManagementClient` constructor with credential and subscriptionId: Pass
+      - `storageAccounts.beginCreateAndWait()` with `StorageAccountCreateParameters`: Fail
+      - SKU and kind configuration in create parameters: Pass
+      - `storageAccounts.listByResourceGroup()` with async iteration: Pass
+      - `storageAccounts.getProperties()` for details: Pass
+      - `storageAccounts.update()` for modifying properties: Fail
+      - `storageAccounts.delete()` for removal: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Fail
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-encrypted-uploader / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- encrypted-uploader.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (23/25)
+      - Uses `@azure/keyvault-keys` (Keys, NOT Secrets) — critical distinction: Pass
+      - Uses Node.js built-in `crypto` module for local AES-GCM encryption: Pass
+      - Uses `KeyClient` for key management and `CryptographyClient` for wrap/unwrap operations (NOT `SecretClient`): Pass
+      - Constructs `CryptographyClient` with the key ID or key name: Pass
+      - Uses `CryptographyClient` for `wrapKey()` and `unwrapKey()` operations: Pass
+      - Specifies RSA key wrap algorithm (e.g., `"RSA-OAEP"` or `"RSA-OAEP-256"`): Pass
+      - Key material never leaves Key Vault (wrap/unwrap is server-side): Pass
+      - Generates a random AES-256 DEK locally (32 bytes via `crypto.randomBytes`): Pass
+      - Encrypts data with AES-GCM locally using the DEK (`crypto.createCipheriv("aes-256-gcm", ...)`): Pass
+      - Wraps the DEK via Key Vault `wrapKey()`: Pass
+      - Stores wrapped DEK as blob metadata (base64-encoded): Pass
+      - Stores IV (initialization vector) in blob metadata (base64-encoded): Pass
+      - Stores GCM auth tag in blob metadata (base64-encoded) — in Node.js the auth tag is separate from ciphertext: Pass
+      - Stores vault key identifier in blob metadata: Pass
+      - For decryption: retrieves wrapped DEK from metadata, unwraps via Key Vault, sets auth tag via `decipher.setAuthTag()`, decrypts locally: Pass
+      - Uses AES-GCM (not AES-CBC, AES-ECB, or other modes): Pass
+      - Generates random IV for each encryption (typically 12 bytes for GCM): Pass
+      - Retrieves auth tag via `cipher.getAuthTag()` after encryption finalize: Pass
+      - Sets auth tag via `decipher.setAuthTag()` before decryption finalize: Pass
+      - Handles Key Vault errors (key disabled, key not found) via RestError: Fail
+      - Handles Storage errors (blob not found) via RestError with statusCode: Fail
+      - NOT using `SecretClient` instead of `KeyClient`/`CryptographyClient`: Pass
+      - NOT encrypting data directly with the vault key (should be envelope encryption): Pass
+      - NOT storing raw DEK in plaintext: Pass
+      - NOT omitting the GCM auth tag from blob metadata (decryption will fail): Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-crud / js-ts-azure-skills/azure-skill-mcp-microsoft-skill:
+- crud-blobs.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Installing `@azure/storage-blob` and `@azure/identity` packages: Pass
+      - `BlobServiceClient` construction with `DefaultAzureCredential`: Pass
+      - `ContainerClient.createIfNotExists()`: Pass
+      - `BlockBlobClient.upload()` or `uploadData()` for string content: Pass
+      - `ContainerClient.listBlobsFlat()` async iteration: Pass
+      - `BlobClient.download()` and reading the response stream: Pass
+      - `BlobClient.delete()` and `ContainerClient.delete()`: Pass
+      - `RestError` handling with `statusCode`: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Pass
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-mp-js-ts-account-mgmt / js-ts-azure-skills/azure-skill-mcp:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (6/8)
+      - `@azure/arm-storage` and `@azure/identity` npm packages: Pass
+      - `StorageManagementClient` constructor with credential and subscriptionId: Pass
+      - `storageAccounts.beginCreateAndWait()` with `StorageAccountCreateParameters`: Fail
+      - SKU and kind configuration in create parameters: Pass
+      - `storageAccounts.listByResourceGroup()` with async iteration: Pass
+      - `storageAccounts.getProperties()` for details: Pass
+      - `storageAccounts.update()` for modifying properties: Fail
+      - `storageAccounts.delete()` for removal: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Fail
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Fail
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+Graders for storage-dp-js-ts-encrypted-uploader / js-ts-azure-skills/baseline:
+- encrypted-uploader.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (23/25)
+      - Uses `@azure/keyvault-keys` (Keys, NOT Secrets) — critical distinction: Pass
+      - Uses Node.js built-in `crypto` module for local AES-GCM encryption: Pass
+      - Uses `KeyClient` for key management and `CryptographyClient` for wrap/unwrap operations (NOT `SecretClient`): Pass
+      - Constructs `CryptographyClient` with the key ID or key name: Pass
+      - Uses `CryptographyClient` for `wrapKey()` and `unwrapKey()` operations: Pass
+      - Specifies RSA key wrap algorithm (e.g., `"RSA-OAEP"` or `"RSA-OAEP-256"`): Pass
+      - Key material never leaves Key Vault (wrap/unwrap is server-side): Pass
+      - Generates a random AES-256 DEK locally (32 bytes via `crypto.randomBytes`): Pass
+      - Encrypts data with AES-GCM locally using the DEK (`crypto.createCipheriv("aes-256-gcm", ...)`): Pass
+      - Wraps the DEK via Key Vault `wrapKey()`: Pass
+      - Stores wrapped DEK as blob metadata (base64-encoded): Pass
+      - Stores IV (initialization vector) in blob metadata (base64-encoded): Pass
+      - Stores GCM auth tag in blob metadata (base64-encoded) — in Node.js the auth tag is separate from ciphertext: Pass
+      - Stores vault key identifier in blob metadata: Pass
+      - For decryption: retrieves wrapped DEK from metadata, unwraps via Key Vault, sets auth tag via `decipher.setAuthTag()`, decrypts locally: Pass
+      - Uses AES-GCM (not AES-CBC, AES-ECB, or other modes): Pass
+      - Generates random IV for each encryption (typically 12 bytes for GCM): Pass
+      - Retrieves auth tag via `cipher.getAuthTag()` after encryption finalize: Pass
+      - Sets auth tag via `decipher.setAuthTag()` before decryption finalize: Pass
+      - Handles Key Vault errors (key disabled, key not found) via RestError: Fail
+      - Handles Storage errors (blob not found) via RestError with statusCode: Fail
+      - NOT using `SecretClient` instead of `KeyClient`/`CryptographyClient`: Pass
+      - NOT encrypting data directly with the vault key (should be envelope encryption): Pass
+      - NOT storing raw DEK in plaintext: Pass
+      - NOT omitting the GCM auth tag from blob metadata (decryption will fail): Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Pass
+  - Client Constructor with Endpoint and Credential (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Pass
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+🔍 Resource usage: Peak: 42 sessions, 0.0GB RAM, 0% CPU
+
+Run Summary:
+  Run ID:      20260829-141457
+  Evaluations: 42
+  Passed:      0
+  Failed:      39
+  Errors:      3
+  Duration:    14702.77s

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "pending_primary_suites",
+  "status": "ready",
   "output_dir": "rerun-reports/05-retries",
   "selection_manifest": "rerun-reports/selected-results.json",
   "runtime": {

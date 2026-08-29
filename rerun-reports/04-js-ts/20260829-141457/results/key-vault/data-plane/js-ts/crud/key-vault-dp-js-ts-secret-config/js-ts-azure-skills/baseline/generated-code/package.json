@@ -1,0 +1,24 @@
+{
+  "name": "azure-key-vault-config-provider",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Managed-identity Azure Key Vault configuration provider with caching and rotation helpers",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.11.1",
+    "@azure/keyvault-secrets": "^4.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

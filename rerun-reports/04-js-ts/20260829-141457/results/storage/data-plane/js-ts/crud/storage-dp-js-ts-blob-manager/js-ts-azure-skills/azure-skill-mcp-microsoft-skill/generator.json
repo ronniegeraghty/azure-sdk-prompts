@@ -1,0 +1,61 @@
+{
+  "prompt_id": "storage-dp-js-ts-blob-manager",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a TypeScript Node.js project that provides a reusable Azure Blob Storage management utility.\r\n\r\nThe project needs:\r\n\r\n- A **service class** that wraps blob operations: upload (with optional metadata and blob index tags for later querying), download, list blobs in a container, and delete. The upload method should handle large files efficiently using streaming — uploading a multi-gigabyte file should not load the entire thing into memory. The service should also prevent concurrent writers from overwriting each other's changes when updating the same blob by acquiring a lease before writing.\r\n\r\n- A **configuration module** that connects to Azure securely using the storage account endpoint (from an environment variable). No connection strings or account keys should be used — the app will run in Azure with managed identity. The configuration should set up a custom retry policy (exponential backoff, configurable max retries and delay) and enable SDK logging at a configurable level for debugging.\r\n\r\n- A **main script** that wires everything together and demos each operation: uploads a sample file with some index tags, lists all blobs in the container, downloads the file back and prints its content, acquires a lease and overwrites the blob, then finally deletes it. Print status at each step.\r\n\r\nInclude a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.",
+  "final_response": "Created the complete TypeScript Node.js project with:\n\n- `BlobStorageService` for streaming uploads, downloads, listing, deletion, metadata, tags, and lease-protected overwrites.\n- Managed identity authentication through `AZURE_STORAGE_ACCOUNT_ENDPOINT`.\n- Configurable exponential retries, SDK logging, upload buffering/concurrency, and lease waiting.\n- A demo covering every requested operation.\n- Complete `package.json`, `tsconfig.json`, `.env.example`, exports, and usage documentation.\n\nDependencies are installed and the compiled reusable library is available under `dist/`.\n\nReferences: [Azure Blob Storage SDK](https://learn.microsoft.com/javascript/api/overview/azure/storage-blob-readme), [streaming uploads](https://learn.microsoft.com/azure/storage/blobs/storage-blob-upload-javascript), and [blob leases](https://learn.microsoft.com/azure/storage/blobs/storage-blob-lease-javascript).",
+  "workspace_delta": {
+    "bytes_added": 58090,
+    "bytes_removed": 0,
+    "bytes_net": 58090,
+    "new_file_count": 8,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main.ts",
+        "size": 2548
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 486
+      },
+      {
+        "path": "README.md",
+        "size": 2434
+      },
+      {
+        "path": "package-lock.json",
+        "size": 41717
+      },
+      {
+        "path": "package.json",
+        "size": 774
+      },
+      {
+        "path": "src\\blob-storage-service.ts",
+        "size": 6240
+      },
+      {
+        "path": "src\\config.ts",
+        "size": 3657
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 234
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T17:34:58.8013438+08:00",
+  "ended_at": "2026-08-29T17:38:35.6573251+08:00",
+  "duration_ms": 216855,
+  "terminated_by": "completed"
+}

@@ -3,9 +3,9 @@
   "branch": "weidongxu-microsoft/issue-656-three-way-rerun",
   "source_pr": "https://github.com/ronniegeraghty/hyoka/pull/656",
   "progress_comment_url": "https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231",
-  "status": "running",
-  "current_suite_id": "js-ts",
-  "last_updated": "2026-08-29T16:21:00+08:00",
+  "status": "primary_suites_completed",
+  "current_suite_id": null,
+  "last_updated": "2026-08-29T18:05:00+08:00",
   "environment": {
     "copilot_cli_path": "C:\\Users\\weidxu\\AppData\\Local\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe.old-60692-1787802413382",
     "copilot_cli_sha256": "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF",
@@ -16,7 +16,7 @@
   },
   "retry_policy": {
     "phase": "after_all_primary_suites",
-    "status": "pending",
+    "status": "ready",
     "output_dir": "rerun-reports/05-retries",
     "selection_manifest": "rerun-reports/selected-results.json",
     "use_retry_when": "The retry completes without an infrastructure error and produces the expected output.",
@@ -33,11 +33,10 @@
   "completed_suite_ids": [
     "dotnet",
     "python",
-    "java"
-  ],
-  "remaining_suite_ids": [
+    "java",
     "js-ts"
   ],
+  "remaining_suite_ids": [],
   "suites": [
     {
       "id": "dotnet",
@@ -96,12 +95,12 @@
       "expected_evaluations": 42,
       "output_dir": "rerun-reports/04-js-ts",
       "log_file": "rerun-reports/04-js-ts.log",
-      "status": "in_progress",
+      "status": "completed_with_issues",
       "started_at": "2026-08-29T14:12:00+08:00",
-      "completed_at": null,
-      "run_id": null,
+      "completed_at": "2026-08-29T18:03:00+08:00",
+      "run_id": "20260829-141457",
       "result_commit": null,
-      "health_summary": "Interim: 21/42 reports. All three event-hubs-dp-js-ts-streaming arms timed out waiting for session idle after generating four files each. key-vault-dp-js-ts-crud baseline produced no files or tool calls. No Azure MCP timeout observed."
+      "health_summary": "42/42 reports and 14/14 triplets. Three Event Hubs session-idle timeouts and one Key Vault baseline no-output generation. Azure MCP: 103/103 calls succeeded; no MCP or test timeouts."
     }
   ]
 }

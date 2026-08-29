@@ -1,0 +1,49 @@
+{
+  "prompt_id": "key-vault-dp-js-ts-crud",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Node.js script\r\n(TypeScript preferred) that performs all four CRUD operations on Azure Key Vault secrets:\r\n1. Create a new secret called \"my-secret\" with value \"my-secret-value\"\r\n2. Read the secret back and print its value\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Show required npm packages\r\nand include proper error handling with try/catch.",
+  "final_response": "Implemented the TypeScript Azure Key Vault CRUD sample in `src/key-vault-crud.ts`.\n\nIt uses:\n\n- `@azure/identity` with `DefaultAzureCredential`\n- `@azure/keyvault-secrets` with `SecretClient`\n- Create, read, update, soft-delete, and purge operations\n- `KEY_VAULT_URL` environment configuration\n- Typed error handling and nonzero exit status\n\nRun it with:\n\n```powershell\n$env:KEY_VAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net\"\nnpm start\n```\n\nThe identity needs get, set, delete, and purge secret permissions. Purging fails if vault purge protection is enabled. SDK reference: https://learn.microsoft.com/javascript/api/overview/azure/keyvault-secrets-readme",
+  "workspace_delta": {
+    "bytes_added": 56032,
+    "bytes_removed": 0,
+    "bytes_net": 56032,
+    "new_file_count": 5,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 865
+      },
+      {
+        "path": "package-lock.json",
+        "size": 52248
+      },
+      {
+        "path": "package.json",
+        "size": 422
+      },
+      {
+        "path": "src\\key-vault-crud.ts",
+        "size": 2238
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 259
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 7,
+    "tool_calls": 0,
+    "reasoning_steps": 7,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T16:23:31.3387847+08:00",
+  "ended_at": "2026-08-29T16:26:00.2832966+08:00",
+  "duration_ms": 148944,
+  "terminated_by": "completed"
+}

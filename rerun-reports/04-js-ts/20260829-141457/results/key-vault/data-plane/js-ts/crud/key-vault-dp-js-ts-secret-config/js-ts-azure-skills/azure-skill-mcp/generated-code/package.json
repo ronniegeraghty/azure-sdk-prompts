@@ -1,0 +1,26 @@
+{
+  "name": "azure-key-vault-config-provider",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A managed-identity Azure Key Vault configuration provider with caching and rotation support.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "start": "node dist\\src\\main.js",
+    "dev": "tsx src\\main.ts",
+    "test": "npm run build && node --test dist\\test\\secret-config.test.js"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.2",
+    "@azure/keyvault-secrets": "^4.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.20.6",
+    "typescript": "^7.0.2"
+  }
+}

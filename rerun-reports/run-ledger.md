@@ -4,9 +4,9 @@ Branch: `weidongxu-microsoft/issue-656-three-way-rerun`
 
 Progress comment: https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231
 
-Overall status: **Running**
+Overall status: **Primary suites completed; controlled retries ready**
 
-Current suite: **JS/TS**
+Current suite: **Controlled retries**
 
 ## Suite status
 
@@ -15,11 +15,11 @@ Current suite: **JS/TS**
 | 1 | .NET | 20 | 60 | Completed with 1 issue | `20260829-004156` | 60/60 reports; 20/20 triplets; MCP 261/261 |
 | 2 | Python | 19 | 57 | Completed with 1 issue | `20260829-032449` | 57/57 reports; 19/19 triplets; MCP 156/156 |
 | 3 | Java | 19 | 57 | Completed with 1 issue | `20260829-075759` | 57/57 reports; 19/19 triplets; MCP 177/177 |
-| 4 | JS/TS | 14 | 42 | In progress | - | Pending post-suite audit |
+| 4 | JS/TS | 14 | 42 | Completed with 4 issues | `20260829-141457` | 42/42 reports; 14/14 triplets; MCP 103/103 |
 
-Completed: .NET, Python, Java.
+Completed: .NET, Python, Java, JS/TS.
 
-Remaining: JS/TS.
+Remaining: Controlled retries and final report publication.
 
 ## Retry and finalization policy
 
@@ -68,3 +68,4 @@ Remaining: JS/TS.
 | 2026-08-29 14:56 +08:00 | At 4/42 JS/TS reports, recorded session-idle timeouts for the Event Hubs baseline and Azure Skill + MCP arms; both produced four files. No Azure MCP timeout was observed. | Pending |
 | 2026-08-29 15:18 +08:00 | At 7/42 JS/TS reports, recorded the same Event Hubs session-idle timeout in the full arm. All three arms produced four files and are queued for controlled retry. | Pending |
 | 2026-08-29 16:21 +08:00 | At 21/42 JS/TS reports, recorded a Key Vault baseline no-output generation with no executed tool calls. The evaluation is queued for controlled retry. | Pending |
+| 2026-08-29 18:05 +08:00 | Completed the JS/TS suite audit: 42/42 reports, 14/14 triplets, three session-idle timeouts, one no-output generation, and no MCP/test timeouts. | Pending |

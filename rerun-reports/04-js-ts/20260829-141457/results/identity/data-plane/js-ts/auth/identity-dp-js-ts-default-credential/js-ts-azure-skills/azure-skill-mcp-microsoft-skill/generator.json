@@ -1,0 +1,45 @@
+{
+  "prompt_id": "identity-dp-js-ts-default-credential",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program that\r\nauthenticates an Azure SDK client using DefaultAzureCredential. The program should:\r\n1. Install and import the required npm packages\r\n2. Create a DefaultAzureCredential instance\r\n3. Use it to create a SecretClient from @azure/keyvault-secrets\r\n4. Retrieve a secret from the vault and print its value\r\n5. Handle AuthenticationError for credential failures\r\n\r\nInclude a package.json with all dependencies and use async/await throughout.",
+  "final_response": "Created a complete TypeScript project:\n\n- `src/index.ts` — uses `DefaultAzureCredential`, creates `SecretClient`, retrieves and prints the secret, and handles `AuthenticationError` plus chained credential failures.\n- `package.json` — includes current Azure SDK and TypeScript dependencies.\n- `tsconfig.json` and `package-lock.json` — strict TypeScript configuration and reproducible installs.\n\nRun it with:\n\n```powershell\n$env:KEY_VAULT_URL = \"https://\u003cvault-name\u003e.vault.azure.net\"\n$env:SECRET_NAME = \"\u003csecret-name\u003e\"\nnpm start\n```\n\nThe authenticated identity needs Key Vault secret `get` permission, such as the **Key Vault Secrets User** role.\n\nReferences: [Azure Identity for JavaScript](https://learn.microsoft.com/javascript/api/overview/azure/identity-readme?view=azure-node-latest) and [Azure Key Vault Secrets for JavaScript](https://learn.microsoft.com/javascript/api/overview/azure/keyvault-secrets-readme?view=azure-node-latest).",
+  "workspace_delta": {
+    "bytes_added": 38935,
+    "bytes_removed": 0,
+    "bytes_net": 38935,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "package-lock.json",
+        "size": 36652
+      },
+      {
+        "path": "package.json",
+        "size": 393
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 1388
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 502
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T15:14:26.2978086+08:00",
+  "ended_at": "2026-08-29T15:16:57.5150298+08:00",
+  "duration_ms": 151217,
+  "terminated_by": "completed"
+}

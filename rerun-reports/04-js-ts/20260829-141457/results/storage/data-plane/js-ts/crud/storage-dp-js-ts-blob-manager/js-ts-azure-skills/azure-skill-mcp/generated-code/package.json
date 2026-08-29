@@ -1,0 +1,35 @@
+{
+  "name": "azure-blob-manager",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reusable, managed-identity-based Azure Blob Storage management utility.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "demo": "node dist/main.js",
+    "dev": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.2",
+    "@azure/logger": "^1.4.0",
+    "@azure/storage-blob": "^12.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.20.6",
+    "typescript": "^7.0.2"
+  }
+}

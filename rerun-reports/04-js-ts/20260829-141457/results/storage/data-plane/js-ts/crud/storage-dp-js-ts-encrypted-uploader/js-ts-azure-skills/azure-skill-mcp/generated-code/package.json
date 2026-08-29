@@ -1,0 +1,26 @@
+{
+  "name": "azure-client-side-encrypted-blob",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Client-side AES-GCM envelope encryption for Azure Blob Storage using an Azure Key Vault key.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.2",
+    "@azure/keyvault-keys": "^4.10.2",
+    "@azure/storage-blob": "^12.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

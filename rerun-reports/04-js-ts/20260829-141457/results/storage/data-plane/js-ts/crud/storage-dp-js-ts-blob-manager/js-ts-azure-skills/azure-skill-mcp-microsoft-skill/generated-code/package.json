@@ -1,0 +1,34 @@
+{
+  "name": "azure-blob-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reusable Azure Blob Storage management utility for Node.js and TypeScript",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "demo": "npm run build && node dist/main.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@azure/identity": "4.13.2",
+    "@azure/logger": "1.4.0",
+    "@azure/storage-blob": "12.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "typescript": "7.0.2"
+  }
+}

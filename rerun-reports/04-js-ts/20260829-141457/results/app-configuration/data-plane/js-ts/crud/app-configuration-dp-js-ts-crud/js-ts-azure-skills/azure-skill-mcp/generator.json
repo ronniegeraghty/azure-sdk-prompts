@@ -1,0 +1,45 @@
+{
+  "prompt_id": "app-configuration-dp-js-ts-crud",
+  "config_name": "js-ts-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat manages configuration settings in Azure App Configuration:\r\n1. Create an AppConfigurationClient using a connection string\r\n2. Set a configuration setting with key \"app:Settings:FontSize\" and value \"24\"\r\n3. Set a setting with label \"Production\"\r\n4. Get the setting by key and print its value\r\n5. List all settings matching the key filter \"app:Settings:*\" using listConfigurationSettings\r\n6. Create a feature flag configuration setting for \"BetaFeature\"\r\n7. Delete the setting by key\r\n\r\nShow required npm package (@azure/app-configuration) and\r\nproper error handling with RestError.",
+  "final_response": "Implemented a runnable TypeScript sample in `src/index.ts` with:\n\n- Connection-string authentication via `AZURE_APPCONFIG_CONNECTION_STRING`\n- Unlabeled and `Production` settings\n- Get, filtered list, feature-flag creation, and deletion operations\n- Typed `RestError` handling\n- `@azure/app-configuration` 1.12.1 and required TypeScript configuration\n\nRun it with:\n\n```powershell\n$env:AZURE_APPCONFIG_CONNECTION_STRING=\"\u003cyour-connection-string\u003e\"\nnpm install\nnpm run build\nnpm start\n```\n\nReference: [Azure App Configuration JavaScript quickstart](https://learn.microsoft.com/azure/azure-app-configuration/quickstart-javascript#run-the-app)",
+  "workspace_delta": {
+    "bytes_added": 14445,
+    "bytes_removed": 0,
+    "bytes_net": 14445,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\index.ts",
+        "size": 2343
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 325
+      },
+      {
+        "path": "package-lock.json",
+        "size": 11370
+      },
+      {
+        "path": "package.json",
+        "size": 407
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T15:37:28.0655158+08:00",
+  "ended_at": "2026-08-29T15:39:41.0844943+08:00",
+  "duration_ms": 133018,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,45 @@
+{
+  "prompt_id": "cosmos-db-dp-js-ts-crud",
+  "config_name": "js-ts-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a TypeScript program\r\nthat performs CRUD operations on items in an Azure Cosmos DB NoSQL container:\r\n1. Create a CosmosClient using endpoint and key\r\n2. Create a database \"TestDB\" and container \"Items\" with partition key \"/category\"\r\n3. Create an item with properties: id, category, name, quantity\r\n4. Read the item back using item().read()\r\n5. Query items where category equals \"electronics\" using parameterized query\r\n6. Replace the item with updated quantity using item().replace()\r\n7. Delete the item using item().delete()\r\n\r\nShow required npm package and handle errors with appropriate status code checks.",
+  "final_response": "Created a complete TypeScript CRUD example in `src\\index.ts` using `@azure/cosmos`. It creates `TestDB` and the partitioned `Items` container, then creates, reads, queries, replaces, and deletes an item. Cosmos errors handle common status codes including `401`, `403`, `404`, `409`, and `429`.\n\nRun it with:\n\n```powershell\n$env:COSMOS_ENDPOINT = \"https://\u003caccount\u003e.documents.azure.com:443/\"\n$env:COSMOS_KEY = \"\u003ccosmos-key\u003e\"\nnpm install\nnpm run build\nnpm start\n```\n\nRequired runtime package:\n\n```powershell\nnpm install @azure/cosmos\n```",
+  "workspace_delta": {
+    "bytes_added": 17163,
+    "bytes_removed": 0,
+    "bytes_net": 17163,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "package-lock.json",
+        "size": 12482
+      },
+      {
+        "path": "package.json",
+        "size": 313
+      },
+      {
+        "path": "src\\index.ts",
+        "size": 4094
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 274
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 4,
+    "tool_calls": 0,
+    "reasoning_steps": 4,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T15:47:11.5110613+08:00",
+  "ended_at": "2026-08-29T15:48:25.5106554+08:00",
+  "duration_ms": 73999,
+  "terminated_by": "completed"
+}
