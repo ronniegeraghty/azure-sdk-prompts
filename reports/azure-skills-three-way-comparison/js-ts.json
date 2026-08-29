@@ -1,0 +1,635 @@
+{
+  "language": "js-ts",
+  "label": "JavaScript/TypeScript",
+  "complete_triplets": 13,
+  "valid_evaluations": 39,
+  "excluded": [
+    {
+      "language": "js-ts",
+      "prompt_id": "event-hubs-dp-js-ts-streaming",
+      "affected_config": "js-ts-azure-skills/azure-skill-mcp",
+      "reason": "Both the primary and retry generated files but timed out waiting for session.idle.",
+      "action": "exclude_triplet"
+    }
+  ],
+  "variants": {
+    "baseline": {
+      "label": "Baseline",
+      "prompt": {
+        "passed": 103,
+        "total": 118,
+        "rate": 87.3
+      },
+      "language": {
+        "passed": 88,
+        "total": 130,
+        "rate": 67.7
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "tool": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      }
+    },
+    "azure-skill-mcp": {
+      "label": "Azure Skill + MCP",
+      "prompt": {
+        "passed": 102,
+        "total": 118,
+        "rate": 86.4
+      },
+      "language": {
+        "passed": 92,
+        "total": 130,
+        "rate": 70.8
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "tool": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      }
+    },
+    "azure-skill-mcp-microsoft-skill": {
+      "label": "Azure Skill + MCP + Microsoft Skills",
+      "prompt": {
+        "passed": 104,
+        "total": 118,
+        "rate": 88.1
+      },
+      "language": {
+        "passed": 91,
+        "total": 130,
+        "rate": 70
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "tool": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      }
+    }
+  },
+  "pairwise_prompt_outcomes": {
+    "azure_vs_baseline": {
+      "label": "Azure Skill + MCP vs baseline",
+      "improved": 0,
+      "regressed": 1,
+      "tied": 12
+    },
+    "microsoft_vs_baseline": {
+      "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
+      "improved": 1,
+      "regressed": 0,
+      "tied": 12
+    }
+  },
+  "prompts": [
+    {
+      "prompt_id": "app-configuration-dp-js-ts-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/app-configuration/data-plane/js-ts/crud/app-configuration-dp-js-ts-crud/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/app-configuration/data-plane/js-ts/crud/app-configuration-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/app-configuration/data-plane/js-ts/crud/app-configuration-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "cosmos-db-dp-js-ts-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 5,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/cosmos-db/data-plane/js-ts/crud/cosmos-db-dp-js-ts-crud/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 5,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/cosmos-db/data-plane/js-ts/crud/cosmos-db-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 5,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/cosmos-db/data-plane/js-ts/crud/cosmos-db-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-js-ts-default-credential",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-default-credential/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-default-credential/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-default-credential/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-js-ts-managed-identity",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-managed-identity/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-managed-identity/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-managed-identity/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-js-ts-service-principal",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-service-principal/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-service-principal/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/identity/data-plane/js-ts/auth/identity-dp-js-ts-service-principal/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-dp-js-ts-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/05-retries/07-js-ts-key-vault-baseline/20260829-192138/results/key-vault/data-plane/js-ts/crud/key-vault-dp-js-ts-crud/js-ts-azure-skills/baseline/report.json",
+          "source": "retry/20260829-192138"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/key-vault/data-plane/js-ts/crud/key-vault-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/key-vault/data-plane/js-ts/crud/key-vault-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-dp-js-ts-secret-config",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 12,
+          "prompt_total": 13,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/key-vault/data-plane/js-ts/crud/key-vault-dp-js-ts-secret-config/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 12,
+          "prompt_total": 13,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/key-vault/data-plane/js-ts/crud/key-vault-dp-js-ts-secret-config/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 12,
+          "prompt_total": 13,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/key-vault/data-plane/js-ts/crud/key-vault-dp-js-ts-secret-config/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "resource-manager-mp-js-ts-rg-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/resource-manager/management-plane/js-ts/crud/resource-manager-mp-js-ts-rg-crud/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/resource-manager/management-plane/js-ts/crud/resource-manager-mp-js-ts-rg-crud/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/resource-manager/management-plane/js-ts/crud/resource-manager-mp-js-ts-rg-crud/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "service-bus-dp-js-ts-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/service-bus/data-plane/js-ts/crud/service-bus-dp-js-ts-crud/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/service-bus/data-plane/js-ts/crud/service-bus-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 5,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/service-bus/data-plane/js-ts/crud/service-bus-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-js-ts-blob-manager",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 9,
+          "prompt_total": 12,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-blob-manager/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 9,
+          "prompt_total": 12,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-blob-manager/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 10,
+          "prompt_total": 12,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-blob-manager/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-js-ts-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-crud/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-crud/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-js-ts-encrypted-uploader",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 23,
+          "prompt_total": 25,
+          "language_passed": 8,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-encrypted-uploader/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 23,
+          "prompt_total": 25,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-encrypted-uploader/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 23,
+          "prompt_total": 25,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/data-plane/js-ts/crud/storage-dp-js-ts-encrypted-uploader/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-mp-js-ts-account-mgmt",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/management-plane/js-ts/provisioning/storage-mp-js-ts-account-mgmt/js-ts-azure-skills/baseline/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 6,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/management-plane/js-ts/provisioning/storage-mp-js-ts-account-mgmt/js-ts-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-141457"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 7,
+          "language_total": 10,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/04-js-ts/20260829-141457/results/storage/management-plane/js-ts/provisioning/storage-mp-js-ts-account-mgmt/js-ts-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-141457"
+        }
+      }
+    }
+  ]
+}

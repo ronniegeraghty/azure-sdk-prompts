@@ -1,0 +1,873 @@
+{
+  "language": "python",
+  "label": "Python",
+  "complete_triplets": 19,
+  "valid_evaluations": 57,
+  "excluded": [],
+  "variants": {
+    "baseline": {
+      "label": "Baseline",
+      "prompt": {
+        "passed": 150,
+        "total": 172,
+        "rate": 87.2
+      },
+      "language": {
+        "passed": 77,
+        "total": 95,
+        "rate": 81.1
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 19,
+        "rate": 0
+      },
+      "tool": {
+        "passed": 0,
+        "total": 19,
+        "rate": 0
+      }
+    },
+    "azure-skill-mcp": {
+      "label": "Azure Skill + MCP",
+      "prompt": {
+        "passed": 156,
+        "total": 172,
+        "rate": 90.7
+      },
+      "language": {
+        "passed": 84,
+        "total": 95,
+        "rate": 88.4
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 19,
+        "rate": 0
+      },
+      "tool": {
+        "passed": 19,
+        "total": 19,
+        "rate": 100
+      }
+    },
+    "azure-skill-mcp-microsoft-skill": {
+      "label": "Azure Skill + MCP + Microsoft Skills",
+      "prompt": {
+        "passed": 159,
+        "total": 172,
+        "rate": 92.4
+      },
+      "language": {
+        "passed": 90,
+        "total": 95,
+        "rate": 94.7
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 19,
+        "rate": 0
+      },
+      "tool": {
+        "passed": 17,
+        "total": 19,
+        "rate": 89.5
+      }
+    }
+  },
+  "pairwise_prompt_outcomes": {
+    "azure_vs_baseline": {
+      "label": "Azure Skill + MCP vs baseline",
+      "improved": 7,
+      "regressed": 2,
+      "tied": 10
+    },
+    "microsoft_vs_baseline": {
+      "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
+      "improved": 5,
+      "regressed": 2,
+      "tied": 12
+    }
+  },
+  "prompts": [
+    {
+      "prompt_id": "app-configuration-dp-python-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 3,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/app-configuration/data-plane/python/crud/app-configuration-dp-python-crud/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 6,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/app-configuration/data-plane/python/crud/app-configuration-dp-python-crud/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 6,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/app-configuration/data-plane/python/crud/app-configuration-dp-python-crud/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "app-configuration-dp-python-feature-flags",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 8,
+          "prompt_total": 9,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/app-configuration/data-plane/python/crud/app-configuration-dp-python-feature-flags/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 9,
+          "prompt_total": 9,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/app-configuration/data-plane/python/crud/app-configuration-dp-python-feature-flags/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 9,
+          "prompt_total": 9,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/app-configuration/data-plane/python/crud/app-configuration-dp-python-feature-flags/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "cosmos-db-dp-python-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 3,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/cosmos-db/data-plane/python/crud/cosmos-db-dp-python-crud/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 3,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/cosmos-db/data-plane/python/crud/cosmos-db-dp-python-crud/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/cosmos-db/data-plane/python/crud/cosmos-db-dp-python-crud/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "cosmos-db-dp-python-todo-repository",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 11,
+          "prompt_total": 13,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/cosmos-db/data-plane/python/crud/cosmos-db-dp-python-todo-repository/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 11,
+          "prompt_total": 13,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/cosmos-db/data-plane/python/crud/cosmos-db-dp-python-todo-repository/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 11,
+          "prompt_total": 13,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/cosmos-db/data-plane/python/crud/cosmos-db-dp-python-todo-repository/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "event-hubs-dp-python-streaming",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 3,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/event-hubs/data-plane/python/streaming/event-hubs-dp-python-streaming/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 2,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/event-hubs/data-plane/python/streaming/event-hubs-dp-python-streaming/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/event-hubs/data-plane/python/streaming/event-hubs-dp-python-streaming/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-python-credential-chain",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 14,
+          "prompt_total": 14,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-credential-chain/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 14,
+          "prompt_total": 14,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-credential-chain/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 14,
+          "prompt_total": 14,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-credential-chain/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-python-default-credential",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-default-credential/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-default-credential/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 3,
+          "prompt_total": 5,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-default-credential/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-python-managed-identity",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-managed-identity/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-managed-identity/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 6,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-managed-identity/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-python-service-principal",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-service-principal/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-service-principal/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/identity/data-plane/python/auth/identity-dp-python-service-principal/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-dp-python-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/key-vault/data-plane/python/crud/key-vault-dp-python-crud/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/key-vault/data-plane/python/crud/key-vault-dp-python-crud/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/key-vault/data-plane/python/crud/key-vault-dp-python-crud/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-dp-python-secret-config",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 11,
+          "prompt_total": 12,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/key-vault/data-plane/python/crud/key-vault-dp-python-secret-config/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 12,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/key-vault/data-plane/python/crud/key-vault-dp-python-secret-config/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 11,
+          "prompt_total": 12,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/key-vault/data-plane/python/crud/key-vault-dp-python-secret-config/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "resource-manager-mp-python-rg-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/resource-manager/management-plane/python/crud/resource-manager-mp-python-rg-crud/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/resource-manager/management-plane/python/crud/resource-manager-mp-python-rg-crud/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/resource-manager/management-plane/python/crud/resource-manager-mp-python-rg-crud/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "service-bus-dp-python-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 7,
+          "language_passed": 3,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/service-bus/data-plane/python/crud/service-bus-dp-python-crud/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 7,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/service-bus/data-plane/python/crud/service-bus-dp-python-crud/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/service-bus/data-plane/python/crud/service-bus-dp-python-crud/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "service-bus-dp-python-order-processor",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 11,
+          "prompt_total": 14,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/service-bus/data-plane/python/streaming/service-bus-dp-python-order-processor/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 12,
+          "prompt_total": 14,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/service-bus/data-plane/python/streaming/service-bus-dp-python-order-processor/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 11,
+          "prompt_total": 14,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/service-bus/data-plane/python/streaming/service-bus-dp-python-order-processor/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-python-blob-event-notifier",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 11,
+          "prompt_total": 11,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/streaming/storage-dp-python-blob-event-notifier/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 9,
+          "prompt_total": 11,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/streaming/storage-dp-python-blob-event-notifier/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 11,
+          "prompt_total": 11,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/streaming/storage-dp-python-blob-event-notifier/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-python-blob-manager",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 10,
+          "prompt_total": 10,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-blob-manager/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 10,
+          "prompt_total": 10,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-blob-manager/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 9,
+          "prompt_total": 10,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-blob-manager/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-python-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-crud/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-crud/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-crud/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-python-encrypted-uploader",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 18,
+          "prompt_total": 19,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-encrypted-uploader/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 19,
+          "prompt_total": 19,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-encrypted-uploader/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 19,
+          "prompt_total": 19,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/data-plane/python/crud/storage-dp-python-encrypted-uploader/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-032449"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-mp-python-account-mgmt",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 1,
+          "prompt_total": 8,
+          "language_passed": 4,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 0,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/management-plane/python/provisioning/storage-mp-python-account-mgmt/python-azure-skills/baseline/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/02-python/20260829-032449/results/storage/management-plane/python/provisioning/storage-mp-python-account-mgmt/python-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-032449"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 5,
+          "language_total": 5,
+          "workspace_passed": 0,
+          "workspace_total": 1,
+          "tool_passed": 1,
+          "tool_total": 1,
+          "report_path": "rerun-reports/05-retries/02-python-storage-account-mgmt/20260829-183421/results/storage/management-plane/python/provisioning/storage-mp-python-account-mgmt/python-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "retry/20260829-183421"
+        }
+      }
+    }
+  ]
+}

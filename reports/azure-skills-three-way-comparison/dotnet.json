@@ -1,0 +1,881 @@
+{
+  "language": "dotnet",
+  "label": ".NET",
+  "complete_triplets": 19,
+  "valid_evaluations": 57,
+  "excluded": [
+    {
+      "language": "dotnet",
+      "prompt_id": "identity-dp-dotnet-managed-identity",
+      "affected_config": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
+      "reason": "The primary timed out with no output; the retry completed without a timeout but still produced no generated files.",
+      "action": "exclude_triplet"
+    }
+  ],
+  "variants": {
+    "baseline": {
+      "label": "Baseline",
+      "prompt": {
+        "passed": 109,
+        "total": 129,
+        "rate": 84.5
+      },
+      "language": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "tool": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      }
+    },
+    "azure-skill-mcp": {
+      "label": "Azure Skill + MCP",
+      "prompt": {
+        "passed": 101,
+        "total": 129,
+        "rate": 78.3
+      },
+      "language": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "tool": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      }
+    },
+    "azure-skill-mcp-microsoft-skill": {
+      "label": "Azure Skill + MCP + Microsoft Skills",
+      "prompt": {
+        "passed": 109,
+        "total": 129,
+        "rate": 84.5
+      },
+      "language": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "workspace": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      },
+      "tool": {
+        "passed": 0,
+        "total": 0,
+        "rate": null
+      }
+    }
+  },
+  "pairwise_prompt_outcomes": {
+    "azure_vs_baseline": {
+      "label": "Azure Skill + MCP vs baseline",
+      "improved": 1,
+      "regressed": 3,
+      "tied": 15
+    },
+    "microsoft_vs_baseline": {
+      "label": "Azure Skill + MCP + Microsoft Skills vs baseline",
+      "improved": 2,
+      "regressed": 2,
+      "tied": 15
+    }
+  },
+  "prompts": [
+    {
+      "prompt_id": "app-configuration-dp-dotnet-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/app-configuration/data-plane/dotnet/crud/app-configuration-dp-dotnet-crud/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/app-configuration/data-plane/dotnet/crud/app-configuration-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/app-configuration/data-plane/dotnet/crud/app-configuration-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "cosmos-db-dp-dotnet-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/crud/cosmos-db-dp-dotnet-crud/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/crud/cosmos-db-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/crud/cosmos-db-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "cosmos-db-dp-dotnet-error-handling",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/error-handling/cosmos-db-dp-dotnet-error-handling/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/error-handling/cosmos-db-dp-dotnet-error-handling/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/error-handling/cosmos-db-dp-dotnet-error-handling/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "cosmos-db-dp-dotnet-pagination",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/pagination/cosmos-db-dp-dotnet-pagination/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/pagination/cosmos-db-dp-dotnet-pagination/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 8,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/cosmos-db/data-plane/dotnet/pagination/cosmos-db-dp-dotnet-pagination/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "event-hubs-dp-dotnet-streaming",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/event-hubs/data-plane/dotnet/streaming/event-hubs-dp-dotnet-streaming/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/event-hubs/data-plane/dotnet/streaming/event-hubs-dp-dotnet-streaming/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 7,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/event-hubs/data-plane/dotnet/streaming/event-hubs-dp-dotnet-streaming/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-dotnet-default-credential",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/identity/data-plane/dotnet/auth/identity-dp-dotnet-default-credential/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/identity/data-plane/dotnet/auth/identity-dp-dotnet-default-credential/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/identity/data-plane/dotnet/auth/identity-dp-dotnet-default-credential/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "identity-dp-dotnet-service-principal",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/identity/data-plane/dotnet/auth/identity-dp-dotnet-service-principal/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/identity/data-plane/dotnet/auth/identity-dp-dotnet-service-principal/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/identity/data-plane/dotnet/auth/identity-dp-dotnet-service-principal/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-dp-dotnet-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/crud/key-vault-dp-dotnet-crud/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/crud/key-vault-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 4,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/crud/key-vault-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-dp-dotnet-error-handling",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 4,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/error-handling/key-vault-dp-dotnet-error-handling/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 4,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/error-handling/key-vault-dp-dotnet-error-handling/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 4,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/error-handling/key-vault-dp-dotnet-error-handling/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-dp-dotnet-pagination",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/pagination/key-vault-dp-dotnet-pagination/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/pagination/key-vault-dp-dotnet-pagination/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/data-plane/dotnet/pagination/key-vault-dp-dotnet-pagination/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "key-vault-mp-dotnet-polling",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/management-plane/dotnet/polling/key-vault-mp-dotnet-polling/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 0,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/management-plane/dotnet/polling/key-vault-mp-dotnet-polling/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/key-vault/management-plane/dotnet/polling/key-vault-mp-dotnet-polling/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "resource-manager-mp-dotnet-rg-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 6,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/resource-manager/management-plane/dotnet/crud/resource-manager-mp-dotnet-rg-crud/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 6,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/resource-manager/management-plane/dotnet/crud/resource-manager-mp-dotnet-rg-crud/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 6,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/resource-manager/management-plane/dotnet/crud/resource-manager-mp-dotnet-rg-crud/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "service-bus-dp-dotnet-crud",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/service-bus/data-plane/dotnet/crud/service-bus-dp-dotnet-crud/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/service-bus/data-plane/dotnet/crud/service-bus-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/service-bus/data-plane/dotnet/crud/service-bus-dp-dotnet-crud/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-auth",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 3,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/authentication/storage-dp-dotnet-auth/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 3,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/authentication/storage-dp-dotnet-auth/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 3,
+          "prompt_total": 5,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/authentication/storage-dp-dotnet-auth/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-batch",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 5,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/batch/storage-dp-dotnet-batch/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 5,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/batch/storage-dp-dotnet-batch/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 5,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/batch/storage-dp-dotnet-batch/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-error-handling",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 4,
+          "prompt_total": 6,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/error-handling/storage-dp-dotnet-error-handling/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 4,
+          "prompt_total": 6,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/error-handling/storage-dp-dotnet-error-handling/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 4,
+          "prompt_total": 6,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/error-handling/storage-dp-dotnet-error-handling/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-dp-dotnet-retries",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/retries/storage-dp-dotnet-retries/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/retries/storage-dp-dotnet-retries/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 7,
+          "prompt_total": 8,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/data-plane/dotnet/retries/storage-dp-dotnet-retries/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-mp-dotnet-account-mgmt",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/management-plane/dotnet/provisioning/storage-mp-dotnet-account-mgmt/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/management-plane/dotnet/provisioning/storage-mp-dotnet-account-mgmt/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/management-plane/dotnet/provisioning/storage-mp-dotnet-account-mgmt/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    },
+    {
+      "prompt_id": "storage-mp-dotnet-polling",
+      "arms": {
+        "baseline": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/management-plane/dotnet/polling/storage-mp-dotnet-polling/dotnet-azure-skills/baseline/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/management-plane/dotnet/polling/storage-mp-dotnet-polling/dotnet-azure-skills/azure-skill-mcp/report.json",
+          "source": "primary/20260829-004156"
+        },
+        "azure-skill-mcp-microsoft-skill": {
+          "prompt_passed": 6,
+          "prompt_total": 7,
+          "language_passed": 0,
+          "language_total": 0,
+          "workspace_passed": 0,
+          "workspace_total": 0,
+          "tool_passed": 0,
+          "tool_total": 0,
+          "report_path": "rerun-reports/01-dotnet/20260829-004156/results/storage/management-plane/dotnet/polling/storage-mp-dotnet-polling/dotnet-azure-skills/azure-skill-mcp-microsoft-skill/report.json",
+          "source": "primary/20260829-004156"
+        }
+      }
+    }
+  ]
+}
