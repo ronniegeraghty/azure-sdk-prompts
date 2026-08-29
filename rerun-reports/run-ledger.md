@@ -21,6 +21,18 @@ Completed: .NET, Python.
 
 Remaining: Java, JS/TS.
 
+## Retry and finalization policy
+
+1. Finish all four primary language suites before running retries.
+2. Retry every evaluation with an infrastructure timeout, missing response, or missing generated output using the same frozen runtime.
+3. Store retries under `rerun-reports/05-retries` and keep the primary result unchanged.
+4. If a retry is healthy, select it for that prompt/config in `selected-results.json`.
+5. If a retry still has an infrastructure problem, retain both attempts and explicitly flag or exclude the unresolved triplet in the final report.
+6. Generate final reports only from the selection manifest.
+7. Commit and push every primary and retry artifact to `weidongxu-microsoft/issue-656-three-way-rerun`.
+8. Replace #656's prior-run report data and analysis with the new selected results. Remove obsolete comments about the prior MCP timeout behavior and its usage/causal analysis instead of leaving contradictory results.
+9. Replacing the original `weidongxu-microsoft/azure-skills-three-way-comparison` branch is deferred until the final rerun is reviewed.
+
 ## Frozen environment
 
 - Copilot CLI: `copilot.exe.old-60692-1787802413382`
@@ -50,3 +62,4 @@ Remaining: Java, JS/TS.
 | 2026-08-29 07:49 +08:00 | Completed the Python suite audit: 57/57 reports, 19/19 triplets, one generation timeout, and no MCP/test timeouts. | `ddaeb546` |
 | 2026-08-29 07:55 +08:00 | Marked Java in progress after the Python checkpoint was pushed. | Pending |
 | 2026-08-29 08:18 +08:00 | Recorded one Java full-arm no-output generation at 3/57 reports; 9/9 Azure MCP calls had succeeded. | Pending |
+| 2026-08-29 12:03 +08:00 | Recorded the post-suite retry, result-selection, and #656 replacement policy. | Pending |
