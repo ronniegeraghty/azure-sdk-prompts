@@ -11,6 +11,15 @@
       "retry_run_id": "20260829-183421",
       "retry_output_dir": "rerun-reports/05-retries/02-python-storage-account-mgmt",
       "reason": "The retry completed without an infrastructure error and generated the expected Python script and requirements file."
+    },
+    {
+      "language": "js-ts",
+      "prompt_id": "event-hubs-dp-js-ts-streaming",
+      "config": "js-ts-azure-skills/baseline",
+      "primary_run_id": "20260829-141457",
+      "retry_run_id": "20260829-184916",
+      "retry_output_dir": "rerun-reports/05-retries/04-js-ts-event-hubs-baseline",
+      "reason": "The retry reached session.idle, completed without an SDK error, and generated the expected four-file TypeScript project."
     }
   ],
   "unresolved": [

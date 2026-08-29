@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "language": "js-ts",
+  "prompt_id": "event-hubs-dp-js-ts-streaming",
+  "config": "js-ts-azure-skills/baseline",
+  "retry_run_id": "20260829-184916",
+  "status": "completed_healthy",
+  "sdk_error": null,
+  "generated_files": 4,
+  "tool_calls": 3,
+  "skill_load_failures": 0,
+  "orphaned_copilot_processes_terminated": 0,
+  "azure_mcp": {
+    "completed_calls": 0,
+    "successful_calls": 0,
+    "failed_calls": 0,
+    "average_duration_ms": 0,
+    "maximum_duration_ms": 0
+  },
+  "selected": true,
+  "selection_reason": "The retry reached session.idle, completed without an SDK error, and generated the expected four-file TypeScript project.",
+  "notes": [
+    "Dependency installation was blocked by an invalid npm authentication token, so the generated project was not compiled.",
+    "The Baseline variant does not configure Azure MCP."
+  ]
+}
