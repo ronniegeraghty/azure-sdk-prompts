@@ -71,3 +71,4 @@ Remaining: Controlled retries and final report publication.
 | 2026-08-29 18:05 +08:00 | Completed the JS/TS suite audit: 42/42 reports, 14/14 triplets, three session-idle timeouts, one no-output generation, and no MCP/test timeouts. | `cdbe6f36` |
 | 2026-08-29 18:12 +08:00 | Started the controlled retry phase with the .NET managed-identity full-arm timeout case. | Pending |
 | 2026-08-29 18:36 +08:00 | The .NET retry completed without an SDK timeout but still generated no files, so it was not selected. Started the Python storage-account retry. | Pending |
+| 2026-08-29 18:42 +08:00 | The Python retry completed without an SDK error and generated the expected Python script and requirements file, so it was selected. Started the Java storage-account retry. | Pending |

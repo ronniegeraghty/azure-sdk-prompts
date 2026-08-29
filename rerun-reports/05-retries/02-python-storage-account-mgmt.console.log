@@ -1,0 +1,54 @@
+Found 1 prompt(s), 1 config(s) → 1 evaluation(s)
+Using Copilot SDK evaluator
+
+📊 Evaluation plan: 1 evaluations (1 prompts × 1 configs)
+   Estimated Copilot sessions: 2 (1 × 2 for generate/review)
+   Workers: 1 | Max sessions: 3
+
+
+Graders for storage-mp-python-account-mgmt / python-azure-skills/azure-skill-mcp-microsoft-skill:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - Includes the required Azure management and identity SDK packages: Pass
+      - Creates a management client authenticated with credential and subscription ID: Pass
+      - Creates a storage account as a long-running operation with the correct SKU and kind: Pass
+      - Lists all storage accounts in the resource group: Pass
+      - Retrieves detailed properties of a specific storage account: Pass
+      - Enables blob versioning on the account (via account update or blob service properties): Pass
+      - Deletes the storage account: Pass
+      - Code builds and runs without import errors or API misuse: Pass
+- python.yaml (criteria file):
+  - Correct Package Imports (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Package Imports**: Imports use the latest azure-sdk-for-python package structure (azure.*), not deprecated packages.: Pass
+  - DefaultAzureCredential Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Usage**: Authentication matches what the prompt asks for. If the prompt explicitly requires a connection string (or other key-based auth), using `from_connection_string()` / connection-string-based clients is correct and should pass. Otherwise, authentication must use DefaultAzureCredential from azure-identity (or another `azure.identity` credential), not connection strings or hardcoded keys. Hardcoded secrets/keys/connection strings in source code always fail — required values should come from environment variables or a secret store.: Pass
+  - Context Manager for Clients (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Context Manager for Clients**: Azure SDK clients that support context managers are used with `with` statements or explicitly closed.: Pass
+  - Async Client Usage (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Client Usage**: If async operations are requested, code uses the async client variant with proper await patterns.: Pass
+  - Proper Exception Handling (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Proper Exception Handling**: Azure SDK exceptions (HttpResponseError and subclasses) are caught and handled appropriately.: Pass
+  - Output Files Exist (workspace): Fail (0/1)
+      - file: *.py (state=present): Fail
+  - Tool Usage Verification (tool): Pass (1/1)
+      - tool_used: any tool (source=mcp, server=azure): Pass
+
+🔍 Resource usage: Peak: 1 sessions, 0.0GB RAM, 0% CPU
+
+Run Summary:
+  Run ID:      20260829-183421
+  Evaluations: 1
+  Passed:      0
+  Failed:      1
+  Errors:      0
+  Duration:    278.64s
