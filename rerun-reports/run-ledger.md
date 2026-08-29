@@ -72,3 +72,4 @@ Remaining: Controlled retries and final report publication.
 | 2026-08-29 18:12 +08:00 | Started the controlled retry phase with the .NET managed-identity full-arm timeout case. | Pending |
 | 2026-08-29 18:36 +08:00 | The .NET retry completed without an SDK timeout but still generated no files, so it was not selected. Started the Python storage-account retry. | Pending |
 | 2026-08-29 18:42 +08:00 | The Python retry completed without an SDK error and generated the expected Python script and requirements file, so it was selected. Started the Java storage-account retry. | Pending |
+| 2026-08-29 18:50 +08:00 | The Java retry completed without an SDK error but again generated no files, so it was not selected. Started the JS/TS Event Hubs baseline retry. | Pending |

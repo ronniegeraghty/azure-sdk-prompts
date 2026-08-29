@@ -55,10 +55,17 @@
       "config": "java-azure-skills/azure-skill-mcp-microsoft-skill",
       "primary_run_id": "20260829-075759",
       "reason": "Generation completed with no response, files, or tool calls.",
-      "status": "in_progress",
+      "status": "completed_unhealthy",
       "started_at": "2026-08-29T18:42:00+08:00",
       "output_dir": "rerun-reports/05-retries/03-java-storage-account-mgmt",
-      "log_file": "rerun-reports/05-retries/03-java-storage-account-mgmt.log"
+      "log_file": "rerun-reports/05-retries/03-java-storage-account-mgmt.log",
+      "completed_at": "2026-08-29T18:47:00+08:00",
+      "retry_run_id": "20260829-184106",
+      "retry_error": null,
+      "generated_files": 0,
+      "selected": false,
+      "selection_reason": "The retry completed without an SDK error but again produced no generated files.",
+      "unresolved_action": "exclude_triplet"
     },
     {
       "language": "js-ts",
@@ -66,7 +73,10 @@
       "config": "js-ts-azure-skills/baseline",
       "primary_run_id": "20260829-141457",
       "reason": "SDK generation timed out waiting for session idle after producing four files.",
-      "status": "pending"
+      "status": "in_progress",
+      "started_at": "2026-08-29T18:50:00+08:00",
+      "output_dir": "rerun-reports/05-retries/04-js-ts-event-hubs-baseline",
+      "log_file": "rerun-reports/05-retries/04-js-ts-event-hubs-baseline.log"
     },
     {
       "language": "js-ts",

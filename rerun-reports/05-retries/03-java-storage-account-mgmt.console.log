@@ -1,0 +1,78 @@
+Found 1 prompt(s), 1 config(s) → 1 evaluation(s)
+Using Copilot SDK evaluator
+
+📊 Evaluation plan: 1 evaluations (1 prompts × 1 configs)
+   Estimated Copilot sessions: 2 (1 × 2 for generate/review)
+   Workers: 1 | Max sessions: 3
+
+
+Graders for storage-mp-java-account-mgmt / java-azure-skills/azure-skill-mcp-microsoft-skill:
+- storage-account-mgmt.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (0/8)
+      - `azure-resourcemanager-storage` Maven dependency: Fail
+      - `StorageManager.authenticate()` with credential and profile: Fail
+      - `storageAccounts().define().withRegion().withExistingResourceGroup().withSku().create()`: Fail
+      - Fluent builder pattern for account creation: Fail
+      - `storageAccounts().listByResourceGroup()` for listing: Fail
+      - `storageAccounts().getByResourceGroup()` for details: Fail
+      - `update().withBlobAccessTier()` or service properties update: Fail
+      - `storageAccounts().deleteByResourceGroup()`: Fail
+- java.yaml (criteria file):
+  - Correct Dependencies (com.azure, not com.microsoft.azure) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Dependencies (com.azure, not com.microsoft.azure)**: Uses com.azure group ID for all Azure SDK packages. No com.microsoft.azure (legacy SDK) dependencies. Includes azure-identity for authentication.: Fail
+  - Azure SDK BOM for Version Management (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Azure SDK BOM for Version Management**: Uses azure-sdk-bom in dependencyManagement to manage Azure SDK versions instead of hardcoding individual artifact versions. Dependencies should omit <version> tags when managed by the BOM.: Fail
+  - Correct Imports (no legacy, no internal packages) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Correct Imports (no legacy, no internal packages)**: All imports use com.azure.* packages. No com.microsoft.azure.* (legacy) or com.azure.*.implementation.* (internal API) imports.: Fail
+  - DefaultAzureCredential Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**DefaultAzureCredential Authentication**: Uses DefaultAzureCredential or another com.azure.identity credential. No hardcoded connection strings, account keys, SAS tokens, or secrets.: Fail
+  - Client Builder Pattern (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Builder Pattern**: SDK clients constructed using *ClientBuilder classes with .endpoint() or .vaultUrl() and .credential(). No legacy constructors (CloudStorageAccount, DocumentClient, KeyVaultClient).: Fail
+  - No Deprecated/Legacy Classes (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated/Legacy Classes**: No deprecated classes from the old SDK (CloudStorageAccount, CloudBlobClient, DocumentClient, QueueClient, ApplicationTokenCredentials, MSICredentials, ConnectionStringBuilder).: Pass
+  - Pagination (PagedIterable/PagedFlux) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination (PagedIterable/PagedFlux)**: List/query operations return PagedIterable (sync) or PagedFlux (async). Does not flatten all pages into a raw List or Stream in memory.: Fail
+  - LRO Pattern (SyncPoller/PollerFlux) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (SyncPoller/PollerFlux)**: Long-running operations use SyncPoller (sync) or PollerFlux (async) with begin* method prefix. No Thread.sleep() polling loops.: Fail
+  - Async Uses Project Reactor (Mono/Flux) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async Uses Project Reactor (Mono/Flux)**: Async code uses Project Reactor types (Mono, Flux). Not CompletableFuture (wrong), not RxJava (wrong), not sync wrapped in ExecutorService. No .block() inside async service implementations.: Pass
+  - Service-Specific Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Service-Specific Exception Handling**: Catches service-specific exceptions (BlobStorageException, CosmosException, ServiceBusException, HttpResponseException) with status code inspection. Not just generic Exception catches.: Fail
+  - Code Compiles (mvn compile / gradle compileJava) (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Code Compiles (mvn compile / gradle compileJava)**: The generated code compiles without errors. Attempt build verification if build tools are available.: Fail
+  - Try-With-Resources for Clients (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Try-With-Resources for Clients**: All Azure SDK client instances that implement AutoCloseable are used within try-with-resources blocks or explicitly closed in a finally block.: Fail
+
+🔍 Resource usage: Peak: 1 sessions, 0.0GB RAM, 0% CPU
+
+Run Summary:
+  Run ID:      20260829-184106
+  Evaluations: 1
+  Passed:      0
+  Failed:      1
+  Errors:      0
+  Duration:    369.38s

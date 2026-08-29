@@ -5,7 +5,7 @@
   "progress_comment_url": "https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231",
   "status": "running_retries",
   "current_suite_id": null,
-  "last_updated": "2026-08-29T18:42:00+08:00",
+  "last_updated": "2026-08-29T18:50:00+08:00",
   "environment": {
     "copilot_cli_path": "C:\\Users\\weidxu\\AppData\\Local\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe.old-60692-1787802413382",
     "copilot_cli_sha256": "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF",
@@ -18,11 +18,11 @@
     "phase": "after_all_primary_suites",
     "status": "running",
     "current_retry": {
-      "language": "java",
-      "prompt_id": "storage-mp-java-account-mgmt",
-      "config": "java-azure-skills/azure-skill-mcp-microsoft-skill",
-      "output_dir": "rerun-reports/05-retries/03-java-storage-account-mgmt",
-      "shell_id": "retry-java-storage-account"
+      "language": "js-ts",
+      "prompt_id": "event-hubs-dp-js-ts-streaming",
+      "config": "js-ts-azure-skills/baseline",
+      "output_dir": "rerun-reports/05-retries/04-js-ts-event-hubs-baseline",
+      "shell_id": "retry-js-ts-event-hubs-baseline"
     },
     "output_dir": "rerun-reports/05-retries",
     "selection_manifest": "rerun-reports/selected-results.json",
