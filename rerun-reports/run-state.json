@@ -99,7 +99,7 @@
       "started_at": "2026-08-29T14:12:00+08:00",
       "completed_at": "2026-08-29T18:03:00+08:00",
       "run_id": "20260829-141457",
-      "result_commit": null,
+      "result_commit": "cdbe6f36",
       "health_summary": "42/42 reports and 14/14 triplets. Three Event Hubs session-idle timeouts and one Key Vault baseline no-output generation. Azure MCP: 103/103 calls succeeded; no MCP or test timeouts."
     }
   ]

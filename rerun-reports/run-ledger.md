@@ -68,4 +68,4 @@ Remaining: Controlled retries and final report publication.
 | 2026-08-29 14:56 +08:00 | At 4/42 JS/TS reports, recorded session-idle timeouts for the Event Hubs baseline and Azure Skill + MCP arms; both produced four files. No Azure MCP timeout was observed. | Pending |
 | 2026-08-29 15:18 +08:00 | At 7/42 JS/TS reports, recorded the same Event Hubs session-idle timeout in the full arm. All three arms produced four files and are queued for controlled retry. | Pending |
 | 2026-08-29 16:21 +08:00 | At 21/42 JS/TS reports, recorded a Key Vault baseline no-output generation with no executed tool calls. The evaluation is queued for controlled retry. | Pending |
-| 2026-08-29 18:05 +08:00 | Completed the JS/TS suite audit: 42/42 reports, 14/14 triplets, three session-idle timeouts, one no-output generation, and no MCP/test timeouts. | Pending |
+| 2026-08-29 18:05 +08:00 | Completed the JS/TS suite audit: 42/42 reports, 14/14 triplets, three session-idle timeouts, one no-output generation, and no MCP/test timeouts. | `cdbe6f36` |
