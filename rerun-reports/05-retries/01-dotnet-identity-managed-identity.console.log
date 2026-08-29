@@ -1,0 +1,27 @@
+Found 1 prompt(s), 1 config(s) → 1 evaluation(s)
+Using Copilot SDK evaluator
+
+📊 Evaluation plan: 1 evaluations (1 prompts × 1 configs)
+   Estimated Copilot sessions: 2 (1 × 2 for generate/review)
+   Workers: 1 | Max sessions: 3
+
+
+Graders for identity-dp-dotnet-managed-identity / dotnet-azure-skills/azure-skill-mcp-microsoft-skill:
+- managed-identity-auth.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Fail (3/6)
+      - `ManagedIdentityCredential` class and constructors: Pass
+      - System-assigned: no parameters needed: Fail
+      - User-assigned: passing the client ID: Pass
+      - Integration with `DefaultAzureCredential` (managed identity in the chain): Fail
+      - `CredentialUnavailableException` when not running in Azure: Pass
+      - Combining with `ChainedTokenCredential` for local fallback: Fail
+
+🔍 Resource usage: Peak: 1 sessions, 0.0GB RAM, 0% CPU
+
+Run Summary:
+  Run ID:      20260829-183008
+  Evaluations: 1
+  Passed:      0
+  Failed:      1
+  Errors:      0
+  Duration:    129.32s

@@ -70,3 +70,4 @@ Remaining: Controlled retries and final report publication.
 | 2026-08-29 16:21 +08:00 | At 21/42 JS/TS reports, recorded a Key Vault baseline no-output generation with no executed tool calls. The evaluation is queued for controlled retry. | Pending |
 | 2026-08-29 18:05 +08:00 | Completed the JS/TS suite audit: 42/42 reports, 14/14 triplets, three session-idle timeouts, one no-output generation, and no MCP/test timeouts. | `cdbe6f36` |
 | 2026-08-29 18:12 +08:00 | Started the controlled retry phase with the .NET managed-identity full-arm timeout case. | Pending |
+| 2026-08-29 18:36 +08:00 | The .NET retry completed without an SDK timeout but still generated no files, so it was not selected. Started the Python storage-account retry. | Pending |

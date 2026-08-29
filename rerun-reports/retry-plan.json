@@ -20,10 +20,17 @@
       "config": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
       "primary_run_id": "20260829-004156",
       "reason": "SDK generation timeout with no generated output.",
-      "status": "in_progress",
+      "status": "completed_unhealthy",
       "started_at": "2026-08-29T18:12:00+08:00",
       "output_dir": "rerun-reports/05-retries/01-dotnet-identity-managed-identity",
-      "log_file": "rerun-reports/05-retries/01-dotnet-identity-managed-identity.log"
+      "log_file": "rerun-reports/05-retries/01-dotnet-identity-managed-identity.log",
+      "completed_at": "2026-08-29T18:32:00+08:00",
+      "retry_run_id": "20260829-183008",
+      "retry_error": null,
+      "generated_files": 0,
+      "selected": false,
+      "selection_reason": "The retry avoided the SDK timeout but still produced no generated files, so it did not meet the healthy-retry selection policy.",
+      "unresolved_action": "exclude_triplet"
     },
     {
       "language": "python",
@@ -31,7 +38,10 @@
       "config": "python-azure-skills/azure-skill-mcp-microsoft-skill",
       "primary_run_id": "20260829-032449",
       "reason": "SDK generation timeout after producing two files.",
-      "status": "pending"
+      "status": "in_progress",
+      "started_at": "2026-08-29T18:36:00+08:00",
+      "output_dir": "rerun-reports/05-retries/02-python-storage-account-mgmt",
+      "log_file": "rerun-reports/05-retries/02-python-storage-account-mgmt.log"
     },
     {
       "language": "java",

@@ -5,7 +5,7 @@
   "progress_comment_url": "https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231",
   "status": "running_retries",
   "current_suite_id": null,
-  "last_updated": "2026-08-29T18:12:00+08:00",
+  "last_updated": "2026-08-29T18:36:00+08:00",
   "environment": {
     "copilot_cli_path": "C:\\Users\\weidxu\\AppData\\Local\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe.old-60692-1787802413382",
     "copilot_cli_sha256": "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF",
@@ -18,10 +18,11 @@
     "phase": "after_all_primary_suites",
     "status": "running",
     "current_retry": {
-      "language": "dotnet",
-      "prompt_id": "identity-dp-dotnet-managed-identity",
-      "config": "dotnet-azure-skills/azure-skill-mcp-microsoft-skill",
-      "output_dir": "rerun-reports/05-retries/01-dotnet-identity-managed-identity"
+      "language": "python",
+      "prompt_id": "storage-mp-python-account-mgmt",
+      "config": "python-azure-skills/azure-skill-mcp-microsoft-skill",
+      "output_dir": "rerun-reports/05-retries/02-python-storage-account-mgmt",
+      "shell_id": "retry-python-storage-account"
     },
     "output_dir": "rerun-reports/05-retries",
     "selection_manifest": "rerun-reports/selected-results.json",
