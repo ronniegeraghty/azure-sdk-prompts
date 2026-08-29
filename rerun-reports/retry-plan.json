@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "running",
+  "status": "completed",
   "output_dir": "rerun-reports/05-retries",
   "selection_manifest": "rerun-reports/selected-results.json",
   "runtime": {
@@ -125,10 +125,16 @@
       "config": "js-ts-azure-skills/baseline",
       "primary_run_id": "20260829-141457",
       "reason": "Generation completed with no files or executed tool calls after emitting malformed tool-invocation text.",
-      "status": "in_progress",
+      "status": "completed_healthy",
       "started_at": "2026-08-29T19:21:00+08:00",
       "output_dir": "rerun-reports/05-retries/07-js-ts-key-vault-baseline",
-      "log_file": "rerun-reports/05-retries/07-js-ts-key-vault-baseline.log"
+      "log_file": "rerun-reports/05-retries/07-js-ts-key-vault-baseline.log",
+      "completed_at": "2026-08-29T19:25:00+08:00",
+      "retry_run_id": "20260829-192138",
+      "retry_error": null,
+      "generated_files": 4,
+      "selected": true,
+      "selection_reason": "The retry reached session.idle, completed without an SDK error, generated the TypeScript project, and successfully installed dependencies and type-checked it."
     }
   ]
 }
