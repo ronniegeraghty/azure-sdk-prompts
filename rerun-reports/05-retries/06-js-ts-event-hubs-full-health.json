@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "language": "js-ts",
+  "prompt_id": "event-hubs-dp-js-ts-streaming",
+  "config": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
+  "retry_run_id": "20260829-191313",
+  "status": "completed_healthy",
+  "sdk_error": null,
+  "generated_files": 4,
+  "tool_calls": 6,
+  "skill_load_failures": 0,
+  "orphaned_copilot_processes_terminated": 0,
+  "azure_mcp": {
+    "completed_calls": 2,
+    "successful_calls": 2,
+    "failed_calls": 0,
+    "average_duration_ms": 6168.5,
+    "maximum_duration_ms": 9926
+  },
+  "selected": true,
+  "selection_reason": "The retry reached session.idle, completed without an SDK error, generated the TypeScript project, and successfully installed dependencies and compiled it.",
+  "notes": [
+    "The full Event Hubs triplet remains excluded because the Azure Skill + MCP arm was unresolved after its retry."
+  ]
+}

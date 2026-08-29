@@ -75,3 +75,4 @@ Remaining: Controlled retries and final report publication.
 | 2026-08-29 18:50 +08:00 | The Java retry completed without an SDK error but again generated no files, so it was not selected. Started the JS/TS Event Hubs baseline retry. | Pending |
 | 2026-08-29 18:59 +08:00 | The JS/TS Event Hubs Baseline retry reached session idle and generated the expected four files, so it was selected. Started the Azure Skill + MCP retry. | Pending |
 | 2026-08-29 19:12 +08:00 | The JS/TS Event Hubs Azure Skill + MCP retry again timed out waiting for session idle despite four generated files and 4/4 successful MCP calls, so it was not selected. Started the full-arm retry. | Pending |
+| 2026-08-29 19:21 +08:00 | The JS/TS Event Hubs full-arm retry reached session idle, generated the project, and passed dependency installation and compilation, so it was selected. The triplet remains excluded because the middle arm is unresolved. Started the Key Vault Baseline retry. | Pending |

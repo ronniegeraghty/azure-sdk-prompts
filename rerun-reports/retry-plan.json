@@ -108,10 +108,16 @@
       "config": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
       "primary_run_id": "20260829-141457",
       "reason": "SDK generation timed out waiting for session idle after producing four files.",
-      "status": "in_progress",
-      "started_at": "2026-08-29T19:12:00+08:00",
+      "status": "completed_healthy",
+      "started_at": "2026-08-29T19:13:00+08:00",
       "output_dir": "rerun-reports/05-retries/06-js-ts-event-hubs-full",
-      "log_file": "rerun-reports/05-retries/06-js-ts-event-hubs-full.log"
+      "log_file": "rerun-reports/05-retries/06-js-ts-event-hubs-full.log",
+      "completed_at": "2026-08-29T19:20:00+08:00",
+      "retry_run_id": "20260829-191313",
+      "retry_error": null,
+      "generated_files": 4,
+      "selected": true,
+      "selection_reason": "The retry reached session.idle, completed without an SDK error, generated the TypeScript project, and successfully installed dependencies and compiled it."
     },
     {
       "language": "js-ts",
@@ -119,7 +125,10 @@
       "config": "js-ts-azure-skills/baseline",
       "primary_run_id": "20260829-141457",
       "reason": "Generation completed with no files or executed tool calls after emitting malformed tool-invocation text.",
-      "status": "pending"
+      "status": "in_progress",
+      "started_at": "2026-08-29T19:21:00+08:00",
+      "output_dir": "rerun-reports/05-retries/07-js-ts-key-vault-baseline",
+      "log_file": "rerun-reports/05-retries/07-js-ts-key-vault-baseline.log"
     }
   ]
 }
