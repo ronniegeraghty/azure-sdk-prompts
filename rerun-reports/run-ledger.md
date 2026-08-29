@@ -63,4 +63,4 @@ Remaining: JS/TS.
 | 2026-08-29 07:55 +08:00 | Marked Java in progress after the Python checkpoint was pushed. | Pending |
 | 2026-08-29 08:18 +08:00 | Recorded one Java full-arm no-output generation at 3/57 reports; 9/9 Azure MCP calls had succeeded. | Pending |
 | 2026-08-29 12:03 +08:00 | Recorded the post-suite retry, result-selection, and #656 replacement policy. | Pending |
-| 2026-08-29 14:06 +08:00 | Completed the Java suite audit: 57/57 reports, 19/19 triplets, one no-output generation, and no MCP/session/test timeouts. | Pending |
+| 2026-08-29 14:06 +08:00 | Completed the Java suite audit: 57/57 reports, 19/19 triplets, one no-output generation, and no MCP/session/test timeouts. | `326de281` |
