@@ -61,6 +61,14 @@
       "primary_run_id": "20260829-141457",
       "reason": "SDK generation timed out waiting for session idle after producing four files.",
       "status": "pending"
+    },
+    {
+      "language": "js-ts",
+      "prompt_id": "key-vault-dp-js-ts-crud",
+      "config": "js-ts-azure-skills/baseline",
+      "primary_run_id": "20260829-141457",
+      "reason": "Generation completed with no files or executed tool calls after emitting malformed tool-invocation text.",
+      "status": "pending"
     }
   ]
 }
