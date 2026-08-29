@@ -1,0 +1,41 @@
+{
+  "prompt_id": "event-hubs-dp-java-streaming",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that demonstrates\r\nsending and receiving events with Azure Event Hubs:\r\n1. Create an EventHubProducerClient using EventHubClientBuilder with a connection string\r\n2. Create an EventDataBatch and add 10 events with custom properties\r\n3. Send the batch to the event hub\r\n4. Create an EventProcessorClient with BlobCheckpointStore for checkpointing\r\n5. Register processEvent and processError consumer functions\r\n6. Start the processor, wait for events, and print received event bodies\r\n7. Implement checkpointing with EventContext.updateCheckpoint()\r\n\r\nShow required Maven dependencies (azure-messaging-eventhubs and\r\nazure-messaging-eventhubs-checkpointstore-blob) and proper resource cleanup.",
+  "final_response": "Implemented a complete Maven sample:\n\n- `src\\main\\java\\com\\example\\EventHubsBatchProcessorDemo.java`\n- `pom.xml`\n- `README.md`\n\nIt sends 10 property-tagged events in one `EventDataBatch`, receives them through `EventProcessorClient`, uses `BlobCheckpointStore`, calls `EventContext.updateCheckpoint()`, handles processing errors and timeouts, and safely stops/closes clients. Maven dependencies use `azure-messaging-eventhubs:5.21.6` and `azure-messaging-eventhubs-checkpointstore-blob:1.21.7`.\n\nConfigure `EVENT_HUB_CONNECTION_STRING`, `BLOB_STORAGE_CONNECTION_STRING`, and `BLOB_CONTAINER_NAME`, then run `mvn compile exec:java`. References: [Event Hubs Java quickstart](https://learn.microsoft.com/azure/event-hubs/event-hubs-java-get-started-send) and [Blob checkpoint store sample](https://github.com/Azure/azure-sdk-for-java/blob/main/sdk/eventhubs/azure-messaging-eventhubs-checkpointstore-blob/src/samples/java/com/azure/messaging/eventhubs/checkpointstore/blob/EventProcessorBlobCheckpointStoreSample.java).",
+  "workspace_delta": {
+    "bytes_added": 8663,
+    "bytes_removed": 0,
+    "bytes_net": 8663,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1635
+      },
+      {
+        "path": "pom.xml",
+        "size": 1489
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\EventHubsBatchProcessorDemo.java",
+        "size": 5539
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T08:33:08.2862704+08:00",
+  "ended_at": "2026-08-29T08:35:28.1845866+08:00",
+  "duration_ms": 139898,
+  "terminated_by": "completed"
+}

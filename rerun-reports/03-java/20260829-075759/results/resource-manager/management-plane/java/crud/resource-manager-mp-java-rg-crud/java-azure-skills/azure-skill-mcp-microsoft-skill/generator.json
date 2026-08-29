@@ -1,0 +1,41 @@
+{
+  "prompt_id": "resource-manager-mp-java-rg-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that manages\r\nAzure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new resource group in \"eastus\" region\r\n3. List all resource groups in the subscription\r\n4. Get details of the created resource group\r\n5. Add a tag to the resource group\r\n6. Delete the resource group\r\n\r\nShow required Maven dependencies and include proper exception handling.\r\nUse the modern azure-resourcemanager SDK.",
+  "final_response": "Implemented the Java Maven application using:\n\n- `azure-resourcemanager` **2.63.0**\n- `azure-identity` **1.18.5**\n- `DefaultAzureCredential`\n- Create, list, retrieve, tag, and delete operations\n- Specific handling for configuration, authentication, HTTP, and Azure SDK failures\n- Best-effort cleanup if an operation fails after resource-group creation\n\nKey files:\n\n- `pom.xml`\n- `src\\main\\java\\com\\example\\azure\\ResourceGroupManagerApp.java`\n- `README.md`\n\nRun with:\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\n$env:RESOURCE_GROUP_NAME = \"my-java-sdk-rg\" # optional\nmvn compile\nmvn exec:java\n```\n\nRunning `mvn exec:java` performs real Azure create/delete operations.\n\nReferences: [Azure Resource Manager SDK for Java](https://learn.microsoft.com/java/api/overview/azure/resourcemanager-readme?view=azure-java-stable) and [Azure SDK authentication](https://learn.microsoft.com/azure/developer/java/sdk/authentication/overview).",
+  "workspace_delta": {
+    "bytes_added": 10181,
+    "bytes_removed": 0,
+    "bytes_net": 10181,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 2061
+      },
+      {
+        "path": "pom.xml",
+        "size": 1681
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azure\\ResourceGroupManagerApp.java",
+        "size": 6439
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T10:52:55.311527+08:00",
+  "ended_at": "2026-08-29T10:55:27.3158295+08:00",
+  "duration_ms": 152004,
+  "terminated_by": "completed"
+}

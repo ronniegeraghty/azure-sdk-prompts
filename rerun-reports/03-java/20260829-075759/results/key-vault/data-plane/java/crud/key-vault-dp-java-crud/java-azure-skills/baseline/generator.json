@@ -1,0 +1,41 @@
+{
+  "prompt_id": "key-vault-dp-java-crud",
+  "config_name": "java-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that performs\r\nall four CRUD operations on Azure Key Vault secrets:\r\n1. Create a new secret called \"my-secret\" with value \"my-secret-value\"\r\n2. Read the secret back and print its value\r\n3. Update the secret to a new value \"updated-value\"\r\n4. Delete the secret and purge it (soft-delete enabled vault)\r\n\r\nUse DefaultAzureCredential for authentication. Show the Maven dependency\r\nfor azure-security-keyvault-secrets and azure-identity. Include proper exception handling.",
+  "final_response": "Implemented a Java 17 Maven application with:\n\n- Create, read, update, delete, and purge operations for `my-secret`\n- `DefaultAzureCredential` authentication\n- Soft-delete completion polling before purge\n- Azure HTTP, SDK/authentication, and configuration exception handling\n- Maven dependencies for `azure-security-keyvault-secrets` and `azure-identity`\n- Setup and execution instructions in `README.md`\n\nMain implementation: `src/main/java/com/example/KeyVaultSecretCrud.java`  \nMaven configuration: `pom.xml`\n\nThe project compiles successfully with `mvn compile`. No Azure resources were accessed or modified.",
+  "workspace_delta": {
+    "bytes_added": 5356,
+    "bytes_removed": 0,
+    "bytes_net": 5356,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1045
+      },
+      {
+        "path": "pom.xml",
+        "size": 1443
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\KeyVaultSecretCrud.java",
+        "size": 2868
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 4,
+    "tool_calls": 0,
+    "reasoning_steps": 4,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T10:01:59.5970155+08:00",
+  "ended_at": "2026-08-29T10:02:59.976074+08:00",
+  "duration_ms": 60379,
+  "terminated_by": "completed"
+}

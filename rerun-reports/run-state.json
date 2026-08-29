@@ -4,8 +4,8 @@
   "source_pr": "https://github.com/ronniegeraghty/hyoka/pull/656",
   "progress_comment_url": "https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231",
   "status": "running",
-  "current_suite_id": "java",
-  "last_updated": "2026-08-29T08:18:00+08:00",
+  "current_suite_id": null,
+  "last_updated": "2026-08-29T14:06:00+08:00",
   "environment": {
     "copilot_cli_path": "C:\\Users\\weidxu\\AppData\\Local\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe.old-60692-1787802413382",
     "copilot_cli_sha256": "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF",
@@ -32,10 +32,10 @@
   },
   "completed_suite_ids": [
     "dotnet",
-    "python"
+    "python",
+    "java"
   ],
   "remaining_suite_ids": [
-    "java",
     "js-ts"
   ],
   "suites": [
@@ -80,12 +80,12 @@
       "expected_evaluations": 57,
       "output_dir": "rerun-reports/03-java",
       "log_file": "rerun-reports/03-java.log",
-      "status": "in_progress",
+      "status": "completed_with_issues",
       "started_at": "2026-08-29T07:55:00+08:00",
-      "completed_at": null,
-      "run_id": null,
+      "completed_at": "2026-08-29T14:06:00+08:00",
+      "run_id": "20260829-075759",
       "result_commit": null,
-      "health_summary": "Interim: 3/57 reports; one full-arm no-output generation for storage-mp-java-account-mgmt; 9/9 Azure MCP calls succeeded."
+      "health_summary": "57/57 reports and 19/19 triplets. One full-arm generation produced no output. Azure MCP: 177/177 calls succeeded; no MCP, session, or test timeouts."
     },
     {
       "id": "js-ts",

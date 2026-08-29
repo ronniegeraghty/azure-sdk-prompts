@@ -1,0 +1,73 @@
+{
+  "prompt_id": "key-vault-dp-java-secret-config",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that implements an application configuration provider backed by Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **secret provider class** (both sync and async versions) that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.\r\n\r\n- A **caching layer** on top of the provider that stores secret values in memory after first retrieval. It should support bulk-loading a predefined set of required config keys at startup, on-demand refresh of individual keys, and automatic re-fetch of any secret whose expiry date is within a configurable warning window (e.g., 7 days out).\r\n\r\n- A **configuration/factory class** that connects securely to the Key Vault using the vault URL from an environment variable. The application runs in Azure and should authenticate using managed identity — no client secrets or certificates in code.\r\n\r\n- A **secret rotation helper** that safely rotates a secret: delete the old secret, ensure the deletion is fully complete, then create the new secret with an updated value and expiry date. The rotation must be safe — don't assume deletion is instantaneous, since Key Vault's soft-delete feature means the secret may not be immediately gone.\r\n\r\n- A **Main class** that demos both implementations: loading several config keys at startup, reading them from cache, refreshing one, printing a warning if any secret is near expiry, and performing a secret rotation (delete old, wait for completion, create new). Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Java 17 Maven project with:\n\n- Sync/async secret providers supporting defaults, versions, and expiry metadata\n- Thread-safe in-memory caches with startup loading, refresh, and expiry-aware re-fetch\n- Managed identity client factory using `AZURE_KEYVAULT_URL`\n- Sync/async soft-delete-aware rotation helpers\n- Full sync-then-async demo without logging secret values\n- Azure SDK BOM `1.3.8` and Key Vault/Identity dependencies\n- Build and runtime instructions in `README.md`\n\nRun with:\n\n```powershell\n$env:AZURE_KEYVAULT_URL = \"https://your-vault.vault.azure.net\"\n$env:DEMO_ROTATED_SECRET_VALUE = \"replacement-value\"\nmvn exec:java\n```\n\nRotation requires `get`, `set`, `delete`, and `purge` permissions. Delete/recreate cannot complete promptly when purge protection is enabled; in that environment, creating a new secret version is the appropriate rotation model.\n\nReference: https://learn.microsoft.com/java/api/overview/azure/security-keyvault-secrets-readme",
+  "workspace_delta": {
+    "bytes_added": 27683,
+    "bytes_removed": 0,
+    "bytes_net": 27683,
+    "new_file_count": 11,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1749
+      },
+      {
+        "path": "pom.xml",
+        "size": 2298
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\AsyncSecretCache.java",
+        "size": 3142
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\AsyncSecretProvider.java",
+        "size": 2105
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\AsyncSecretRotator.java",
+        "size": 3207
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\SecretValue.java",
+        "size": 711
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\SyncSecretCache.java",
+        "size": 2876
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\SyncSecretRotator.java",
+        "size": 3161
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\KeyVaultClientFactory.java",
+        "size": 2012
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\Main.java",
+        "size": 4473
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\keyvaultconfig\\SyncSecretProvider.java",
+        "size": 1949
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T10:33:40.3806519+08:00",
+  "ended_at": "2026-08-29T10:36:02.0906372+08:00",
+  "duration_ms": 141709,
+  "terminated_by": "completed"
+}

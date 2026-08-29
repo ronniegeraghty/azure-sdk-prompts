@@ -1,0 +1,65 @@
+{
+  "prompt_id": "storage-dp-java-blob-event-notifier",
+  "config_name": "java-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that processes Azure Blob Storage lifecycle events delivered via Event Grid.\r\n\r\nThe project needs:\r\n\r\n- An **event receiver class** (both sync and async versions) that accepts a JSON payload (as if received from an Event Grid webhook endpoint) and deserializes it into structured event objects. It should support both Event Grid schema and CloudEvents 1.0 schema (since Event Grid supports both and the configured schema may vary). It should route events by type — blob-created events get processed one way, blob-deleted another, and unrecognized types are logged as warnings.\r\n\r\n- A **blob event handler class** that processes individual blob events. For blob-created events, it should parse the blob's container and name from the event subject, download the blob, and print a summary (name, size, content type, and the blob's access tier). For blob-deleted events, it should just log the deletion. It should handle race conditions gracefully — the blob may have already been deleted or moved to a different tier by the time we try to read it.\r\n\r\n- An **event publisher class** (both sync and async versions) that can publish custom events to an Event Grid topic. Given a topic endpoint and a list of custom event objects, it should send them to Event Grid. This would be used for downstream notifications (e.g., \"document processed\" events). It should support setting a subject hierarchy for event filtering (e.g., \"/documents/invoices/processed\").\r\n\r\n- A **configuration class** that connects to Azure Blob Storage and Event Grid securely. Authentication should use managed identity — no access keys or SAS tokens.\r\n\r\n- A **Main class** that demos both implementations: constructs a sample Event Grid JSON payload (with both CloudEvents and EventGrid-schema examples) containing mock blob-created and blob-deleted events with realistic structure, feeds them through the receiver and handler, and publishes a custom downstream event. Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created a complete Java 17 Maven project with:\n\n- Event Grid and CloudEvents 1.0 payload normalization\n- Synchronous and Reactor-based asynchronous receivers\n- Blob-created/deleted routing with unknown-event warnings\n- Azure Blob download, metadata summary, and lifecycle race handling\n- Sync/async custom Event Grid publishers with hierarchical subjects\n- Managed identity authentication through `DefaultAzureCredential`\n- Local-only demo payloads for both schemas and execution paths\n- Azure SDK BOM, Blob Storage, Event Grid, Identity, Jackson, Reactor, and logging dependencies\n- Usage documentation in `README.md`\n\nRun the demo with:\n\n```powershell\nmvn compile exec:java\n```\n\nAzure publishing remains disabled unless `EVENT_GRID_TOPIC_ENDPOINT` is set; no access keys or SAS tokens are used.",
+  "workspace_delta": {
+    "bytes_added": 27376,
+    "bytes_removed": 0,
+    "bytes_net": 27376,
+    "new_file_count": 9,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 817
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blobevents\\AzureConfiguration.java",
+        "size": 1907
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blobevents\\EventPublisher.java",
+        "size": 2582
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blobevents\\LifecycleEvent.java",
+        "size": 410
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blobevents\\Main.java",
+        "size": 7954
+      },
+      {
+        "path": "pom.xml",
+        "size": 2610
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blobevents\\AsyncBlobEventHandler.java",
+        "size": 2823
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blobevents\\BlobEventHandler.java",
+        "size": 4112
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\blobevents\\EventReceiver.java",
+        "size": 4161
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T11:41:04.5381855+08:00",
+  "ended_at": "2026-08-29T11:43:15.9812479+08:00",
+  "duration_ms": 131443,
+  "terminated_by": "completed"
+}

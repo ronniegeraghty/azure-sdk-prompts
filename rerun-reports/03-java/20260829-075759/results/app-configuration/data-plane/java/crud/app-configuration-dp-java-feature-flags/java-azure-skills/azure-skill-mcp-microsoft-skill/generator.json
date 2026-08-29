@@ -1,0 +1,85 @@
+{
+  "prompt_id": "app-configuration-dp-java-feature-flags",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that implements a feature flag and configuration management system backed by Azure App Configuration.\r\n\r\nThe project needs:\r\n\r\n- A **configuration service class** (both sync and async versions) that retrieves settings from App Configuration. It should support fetching a single setting by key, fetching a setting with a specific label (to distinguish between environments like \"production\" vs \"staging\"), and listing all settings that match a key prefix (returned as a map). It should also avoid re-downloading values that haven't changed since the last read — minimize unnecessary network traffic when polling for config changes.\r\n\r\n- A **feature flag evaluator class** that reads feature flags from App Configuration. Feature flags in App Configuration use a special key prefix and store their state as a JSON payload. The evaluator should be able to check if a flag is enabled, and also support percentage-based rollout — if a flag is configured for a percentage rollout (e.g., 30% of users), the evaluator should deterministically decide whether a given user ID falls within the rollout percentage using a consistent hash, so the same user always gets the same result.\r\n\r\n- A **configuration watcher class** that periodically polls for configuration changes. It should accept a list of \"sentinel\" keys to watch and a polling interval. When a sentinel key's value changes, the watcher should trigger a full refresh of all cached configuration. This is the recommended pattern for coordinating config updates in App Configuration.\r\n\r\n- A **Main class** that demos both implementations: connecting to App Configuration (endpoint from environment variable, authenticated with managed identity), reading some config values with labels, evaluating feature flags for a few sample user IDs with percentage rollout, and starting the config watcher to detect a change. Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created a complete Java 17 Maven project with:\n\n- Sync and Reactor-based async configuration services with labels, prefix listing, caching, and ETag conditional reads.\n- Sync and async feature-flag evaluators with deterministic SHA-256 percentage rollout.\n- Sentinel-based sync and async configuration watchers that refresh all cached values.\n- Managed Identity authentication using `AZURE_APPCONFIG_ENDPOINT`.\n- A runnable `Main` demo, unit tests, and setup documentation in `README.md`.\n\nRun with:\n\n```powershell\n$env:AZURE_APPCONFIG_ENDPOINT = \"https://\u003cstore-name\u003e.azconfig.io\"\nmvn clean test exec:java\n```\n\nSDK reference: https://learn.microsoft.com/java/api/overview/azure/data-appconfiguration-readme",
+  "workspace_delta": {
+    "bytes_added": 35716,
+    "bytes_removed": 0,
+    "bytes_net": 35716,
+    "new_file_count": 14,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\Main.java",
+        "size": 5506
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\SettingProvider.java",
+        "size": 185
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\appconfig\\FeatureFlagEvaluatorTest.java",
+        "size": 3133
+      },
+      {
+        "path": "pom.xml",
+        "size": 2597
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\AsyncConfigurationService.java",
+        "size": 5555
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\AsyncFeatureFlagEvaluator.java",
+        "size": 1311
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\ConfigurationService.java",
+        "size": 5032
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\ConfigurationWatcher.java",
+        "size": 2876
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\Sentinel.java",
+        "size": 317
+      },
+      {
+        "path": "README.md",
+        "size": 1630
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\AsyncConfigurationWatcher.java",
+        "size": 2879
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\AsyncSettingProvider.java",
+        "size": 195
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\FeatureFlagEvaluator.java",
+        "size": 1276
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\FeatureFlagRules.java",
+        "size": 3224
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 16,
+    "tool_calls": 0,
+    "reasoning_steps": 16,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T13:16:45.0748471+08:00",
+  "ended_at": "2026-08-29T13:20:03.2312885+08:00",
+  "duration_ms": 198156,
+  "terminated_by": "completed"
+}

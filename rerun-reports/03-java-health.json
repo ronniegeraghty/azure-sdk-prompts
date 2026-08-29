@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "suite": "java",
+  "run_id": "20260829-075759",
+  "status": "completed_with_issues",
+  "expected_reports": 57,
+  "actual_reports": 57,
+  "expected_prompts": 19,
+  "actual_prompts": 19,
+  "complete_triplets": 19,
+  "incomplete_triplets": 0,
+  "evaluation_summary": {
+    "passed": 2,
+    "failed": 55,
+    "errors": 0
+  },
+  "health": {
+    "no_output_evaluations": 1,
+    "session_timeouts": 0,
+    "test_timeouts": 0,
+    "mcp_timeouts": 0,
+    "skill_load_failures": 0,
+    "error_log_entries": 13,
+    "orphaned_hyoka_processes": 0,
+    "sessions_cleaned": 0
+  },
+  "azure_mcp": {
+    "completed_calls": 177,
+    "successful_calls": 177,
+    "failed_calls": 0,
+    "average_duration_ms": 6802.7,
+    "maximum_duration_ms": 21394,
+    "calls_at_least_60000_ms": 0
+  },
+  "debug_log": {
+    "original_size": 114951987,
+    "original_sha256": "94C70E5D2F0E1CFC2DB6F9FE2F37821E3D3D8285E0087F420C68DCF6679607AD",
+    "parts": [
+      "rerun-reports/03-java.log.part-001",
+      "rerun-reports/03-java.log.part-002",
+      "rerun-reports/03-java.log.part-003"
+    ]
+  },
+  "summary_artifact": {
+    "path": "rerun-reports/03-java/20260829-075759/summary.json.gz",
+    "original_size": 106518533,
+    "compressed_size": 4205337,
+    "original_sha256": "37255396C61696E3F1B5774EE21830C6B9FCACFF9A65EFD886313C32211FF5F1"
+  },
+  "variants": [
+    {
+      "name": "java-azure-skills/baseline",
+      "checks_passed": 304,
+      "checks_total": 395,
+      "rate_percent": 77.0,
+      "no_output_evaluations": 0
+    },
+    {
+      "name": "java-azure-skills/azure-skill-mcp",
+      "checks_passed": 341,
+      "checks_total": 395,
+      "rate_percent": 86.3,
+      "no_output_evaluations": 0
+    },
+    {
+      "name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+      "checks_passed": 326,
+      "checks_total": 388,
+      "rate_percent": 84.0,
+      "no_output_evaluations": 1
+    }
+  ],
+  "issues": [
+    {
+      "prompt_id": "storage-mp-java-account-mgmt",
+      "config": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+      "phase": "generation",
+      "error": "Generation completed with no response, generated files, or tool calls.",
+      "generated_output": false,
+      "mcp_involved": false
+    }
+  ]
+}

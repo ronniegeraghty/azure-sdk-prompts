@@ -1,0 +1,41 @@
+{
+  "prompt_id": "resource-manager-mp-java-rg-crud",
+  "config_name": "java-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that manages\r\nAzure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new resource group in \"eastus\" region\r\n3. List all resource groups in the subscription\r\n4. Get details of the created resource group\r\n5. Add a tag to the resource group\r\n6. Delete the resource group\r\n\r\nShow required Maven dependencies and include proper exception handling.\r\nUse the modern azure-resourcemanager SDK.",
+  "final_response": "Implemented the Java Maven application:\n\n- `pom.xml` — modern `azure-resourcemanager:2.63.0` and `azure-identity:1.18.5`\n- `ResourceGroupManager.java` — authenticates, creates in `eastus`, lists, retrieves, tags, and deletes the Resource Group\n- `README.md` — configuration and execution instructions\n\nThe application defaults to a safe offline dry run. Live operations require `AZURE_RESOURCE_GROUP_NAME` and the explicit `--execute` argument. Cleanup runs in `finally`, with Azure, authentication, application, and deletion failures reported appropriately.",
+  "workspace_delta": {
+    "bytes_added": 8231,
+    "bytes_removed": 0,
+    "bytes_net": 8231,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\azure\\ResourceGroupManager.java",
+        "size": 5052
+      },
+      {
+        "path": "README.md",
+        "size": 1525
+      },
+      {
+        "path": "pom.xml",
+        "size": 1654
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T10:40:06.6398835+08:00",
+  "ended_at": "2026-08-29T10:42:37.9416399+08:00",
+  "duration_ms": 151301,
+  "terminated_by": "completed"
+}

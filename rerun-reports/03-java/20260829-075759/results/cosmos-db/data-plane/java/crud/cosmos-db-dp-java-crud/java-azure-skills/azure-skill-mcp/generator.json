@@ -1,0 +1,37 @@
+{
+  "prompt_id": "cosmos-db-dp-java-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that performs\r\nCRUD operations on items in an Azure Cosmos DB NoSQL container:\r\n1. Create a CosmosClient using endpoint and key with CosmosClientBuilder\r\n2. Create a database \"TestDB\" and container \"Items\" with partition key \"/category\"\r\n3. Insert a POJO item with properties: id, category, name, quantity\r\n4. Read the item back by id and partition key value\r\n5. Query items where category equals \"electronics\" using parameterized SQL\r\n6. Replace the item with updated quantity\r\n7. Delete the item by id and partition key\r\n\r\nShow required Maven dependency and handle CosmosException appropriately.",
+  "final_response": "Implemented a runnable Maven project:\n\n- `pom.xml` — Azure Cosmos DB Java SDK `4.80.0`\n- `src\\main\\java\\com\\example\\CosmosCrudExample.java` — database/container creation and complete POJO CRUD workflow\n- Uses a parameterized SQL query, partition-key-scoped operations, try-with-resources, and detailed `CosmosException` diagnostics\n- Reads credentials from environment variables; no credentials are hardcoded\n\nRun against a local Cosmos DB emulator:\n\n```powershell\n$env:COSMOS_ENDPOINT = \"https://localhost:8081\"\n$env:COSMOS_KEY = \"\u003cemulator-key\u003e\"\nmvn exec:java\n```\n\nReference: [Azure Cosmos DB Java SDK documentation](https://learn.microsoft.com/java/api/overview/azure/cosmos-readme?view=azure-java-stable)",
+  "workspace_delta": {
+    "bytes_added": 7489,
+    "bytes_removed": 0,
+    "bytes_net": 7489,
+    "new_file_count": 2,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "pom.xml",
+        "size": 1250
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\CosmosCrudExample.java",
+        "size": 6239
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 11,
+    "tool_calls": 0,
+    "reasoning_steps": 11,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T13:43:58.7755858+08:00",
+  "ended_at": "2026-08-29T13:46:42.2173534+08:00",
+  "duration_ms": 163441,
+  "terminated_by": "completed"
+}

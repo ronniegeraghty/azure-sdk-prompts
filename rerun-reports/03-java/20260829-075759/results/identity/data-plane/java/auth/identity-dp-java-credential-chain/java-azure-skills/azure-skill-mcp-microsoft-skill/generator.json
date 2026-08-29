@@ -1,0 +1,89 @@
+{
+  "prompt_id": "identity-dp-java-credential-chain",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that demonstrates how to correctly build Azure credential chains tailored to different deployment environments — local development, CI/CD pipelines, and production.\r\n\r\nThe project needs:\r\n\r\n- A **credential factory class** that builds the appropriate Azure credential for each environment. For local development, it should chain together credentials that work from developer tools (CLI, IDE plugins, etc.). For CI pipelines, it should support credentials sourced from pipeline environment variables or Azure Pipelines service connections. For production, it should prefer managed identity (supporting both system-assigned and user-assigned, where the user-assigned identity's client ID comes from an environment variable), with workload identity as a fallback for Kubernetes scenarios. The factory should also support enabling Continuous Access Evaluation (CAE) on the credentials, which lets Azure revoke tokens mid-session for security events.\r\n\r\n- An **environment detector class** that auto-detects which environment the app is running in by probing for well-known environment variables (e.g., CI pipeline workspace variables, managed identity endpoint availability). It should classify the environment as dev, CI, or production.\r\n\r\n- A **connectivity tester class** (both sync and async versions) that verifies a credential works by requesting a token for a given Azure scope. It should print success/failure, the token's expiry time, and whether the token is CAE-enabled. It should handle and report the specific failure reason if authentication fails (expired cert, wrong tenant, no identity available, etc.) rather than just printing a generic error.\r\n\r\n- A **Main class** that detects the current environment, builds the right credential, and runs the connectivity test against Azure Resource Manager using the sync tester first, then repeats with the async tester. Print the detected environment, the selected credential strategy, and the test results from both.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Java 17 Maven project with:\n\n- Environment-specific credential chains for development, CI/CD, and production\n- Azure Pipelines workload federation and generic environment credentials\n- System/user-assigned managed identity with AKS workload identity fallback\n- Configurable CAE token requests\n- Sync and async Azure Resource Manager connectivity testers\n- Detailed authentication failure classification\n- Environment auto-detection with explicit override support\n- Unit coverage for factory selection, detection, diagnostics, and token requests\n- Complete usage and configuration guidance in `README.md`\n\nRun with:\n\n```text\nmvn test\nmvn exec:java\n```\n\nReferences: [Azure credential chains](https://learn.microsoft.com/azure/developer/java/sdk/authentication/credential-chains), [AzurePipelinesCredentialBuilder](https://learn.microsoft.com/java/api/com.azure.identity.azurepipelinescredentialbuilder), and [TokenRequestContext CAE](https://learn.microsoft.com/java/api/com.azure.core.credential.tokenrequestcontext).",
+  "workspace_delta": {
+    "bytes_added": 29246,
+    "bytes_removed": 0,
+    "bytes_net": 29246,
+    "new_file_count": 15,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\DeploymentEnvironment.java",
+        "size": 117
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\azureauth\\AuthenticationFailureAnalyzerTest.java",
+        "size": 1246
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\azureauth\\ConnectivityTesterTest.java",
+        "size": 2317
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\azureauth\\EnvironmentDetectorTest.java",
+        "size": 1914
+      },
+      {
+        "path": "README.md",
+        "size": 2283
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\CredentialSelection.java",
+        "size": 394
+      },
+      {
+        "path": "pom.xml",
+        "size": 2073
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\ConnectivityTestResult.java",
+        "size": 591
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\EnvironmentDetector.java",
+        "size": 2476
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\Main.java",
+        "size": 1179
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\SyncCredentialConnectivityTester.java",
+        "size": 1947
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\azureauth\\AzureCredentialFactoryTest.java",
+        "size": 2721
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\AsyncCredentialConnectivityTester.java",
+        "size": 1147
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\AuthenticationFailureAnalyzer.java",
+        "size": 3451
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azureauth\\AzureCredentialFactory.java",
+        "size": 5390
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 21,
+    "tool_calls": 0,
+    "reasoning_steps": 21,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T08:59:37.6142287+08:00",
+  "ended_at": "2026-08-29T09:03:42.7791871+08:00",
+  "duration_ms": 245164,
+  "terminated_by": "completed"
+}

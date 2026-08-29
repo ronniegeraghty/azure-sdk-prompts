@@ -1,0 +1,73 @@
+{
+  "prompt_id": "service-bus-dp-java-order-processor",
+  "config_name": "java-azure-skills/baseline",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that implements an order processing system using Azure Service Bus.\r\n\r\nThe project needs:\r\n\r\n- A **model class** for an Order with fields for order ID, customer name, product, quantity, total price, and status (pending/processing/completed/failed). It should be serializable to and from JSON.\r\n\r\n- A **sender class** (both sync and async versions) that publishes order messages to a Service Bus queue. It should support sending individual orders and sending a batch of orders efficiently (respecting the maximum batch size so messages aren't rejected). Each message should carry the order ID as a correlation property, and orders above a certain dollar threshold should be sent as high-priority with a scheduled delivery delay of 30 seconds (to allow for fraud review before processing).\r\n\r\n- A **processor class** (both sync and async versions) that receives and processes orders from the queue. It should handle messages as they arrive, deserialize them, and log the results. If processing fails (e.g., a deserialization error), the message should be sent to the dead-letter queue with a reason string rather than being silently abandoned. The processor should also be able to read from the dead-letter queue so failed messages can be inspected and reprocessed. It should guarantee that orders from the same customer are processed in sequence, not interleaved with other customers' orders.\r\n\r\n- A **Main class** that demos both implementations: connects to the Service Bus namespace (from an environment variable) with managed identity, runs the full send/receive/dead-letter cycle using the sync implementation first, then repeats with the async implementation.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created a complete Java 17 Maven project with:\n\n- JSON-serializable `Order` model and lowercase statuses\n- Synchronous and asynchronous senders with size-aware batching\n- Correlation IDs, customer session IDs, high-priority metadata, and 30-second scheduling\n- Session-aware sync/async processors with explicit dead-letter handling\n- Dead-letter inspection and reprocessing support\n- Managed identity authentication, including optional `AZURE_CLIENT_ID`\n- Demo flows for both implementations\n- Setup and execution instructions in `README.md`\n\nThe packaged artifact is available at `target\\service-bus-order-processor-1.0.0.jar`. No Azure resources were created or modified.",
+  "workspace_delta": {
+    "bytes_added": 33113,
+    "bytes_removed": 0,
+    "bytes_net": 33113,
+    "new_file_count": 11,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\OrderProcessor.java",
+        "size": 3435
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\AsyncOrderProcessor.java",
+        "size": 3034
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\AsyncOrderSender.java",
+        "size": 2458
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\Main.java",
+        "size": 5211
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\Order.java",
+        "size": 2880
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\OrderSender.java",
+        "size": 2082
+      },
+      {
+        "path": "README.md",
+        "size": 1621
+      },
+      {
+        "path": "pom.xml",
+        "size": 2357
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\AsyncDeadLetterQueueProcessor.java",
+        "size": 3590
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\DeadLetterQueueProcessor.java",
+        "size": 4248
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\OrderMessageFactory.java",
+        "size": 2197
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 14,
+    "tool_calls": 0,
+    "reasoning_steps": 14,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T10:59:13.7843954+08:00",
+  "ended_at": "2026-08-29T11:02:14.9667205+08:00",
+  "duration_ms": 181182,
+  "terminated_by": "completed"
+}

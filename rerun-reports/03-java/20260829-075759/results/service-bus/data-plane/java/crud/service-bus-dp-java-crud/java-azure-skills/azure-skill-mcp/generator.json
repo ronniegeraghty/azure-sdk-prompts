@@ -1,0 +1,41 @@
+{
+  "prompt_id": "service-bus-dp-java-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that demonstrates\r\nmessaging with Azure Service Bus:\r\n1. Create a ServiceBusSenderClient using ServiceBusClientBuilder for a queue\r\n2. Send a single message with ServiceBusMessage\r\n3. Send a batch of 5 messages using ServiceBusMessageBatch\r\n4. Create a ServiceBusReceiverClient and receive messages using receiveMessages()\r\n5. Complete a message with complete() after processing\r\n6. Create a ServiceBusProcessorClient for continuous processing with handlers\r\n7. Demonstrate sending to a topic and receiving from a subscription\r\n\r\nShow required Maven dependency (com.azure:azure-messaging-servicebus) and\r\nproper resource cleanup with close().",
+  "final_response": "Implemented a complete Maven-based Azure Service Bus Java demo:\n\n- `pom.xml` — `azure-messaging-servicebus:7.17.20` and `azure-identity:1.18.5`\n- `src\\main\\java\\com\\example\\ServiceBusMessagingDemo.java` — queue send/batch/receive/complete, continuous processor handlers, topic/subscription messaging, and explicit `close()`\n- `README.md` — configuration, RBAC requirements, and run instructions\n\nAuthentication uses `DefaultAzureCredential`; no credentials are embedded. Without the required environment variables, the program exits without contacting Azure.\n\nReference: [Azure Service Bus topics and subscriptions for Java](https://learn.microsoft.com/azure/service-bus-messaging/service-bus-java-how-to-use-topics-subscriptions)",
+  "workspace_delta": {
+    "bytes_added": 11162,
+    "bytes_removed": 0,
+    "bytes_net": 11162,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\ServiceBusMessagingDemo.java",
+        "size": 7786
+      },
+      {
+        "path": "README.md",
+        "size": 1717
+      },
+      {
+        "path": "pom.xml",
+        "size": 1659
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 15,
+    "tool_calls": 0,
+    "reasoning_steps": 15,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T11:26:49.7124138+08:00",
+  "ended_at": "2026-08-29T11:30:45.9622315+08:00",
+  "duration_ms": 236249,
+  "terminated_by": "completed"
+}

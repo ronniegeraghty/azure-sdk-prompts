@@ -1,0 +1,89 @@
+{
+  "prompt_id": "storage-dp-java-encrypted-uploader",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that uploads files to Azure Blob Storage with client-side encryption, where the encryption key material is managed in Azure Key Vault.\r\n\r\nThe project needs:\r\n\r\n- A **key management class** (both sync and async versions) that interacts with Azure Key Vault's Keys service (not Secrets) to perform cryptographic operations. It should implement envelope encryption: generate a data encryption key locally, use Key Vault to protect (wrap) it, and store the protected key alongside the encrypted blob. For decryption, have Key Vault recover (unwrap) the data key, then decrypt locally. The raw data key should never be persisted anywhere, and the vault's key material should never leave Key Vault.\r\n\r\n- A **blob uploader/downloader class** (both sync and async versions) that handles the actual encryption and storage. For upload: generate a data key, encrypt the data locally, protect the data key via Key Vault, then upload the ciphertext to Blob Storage with the protected key and any necessary cryptographic parameters stored as blob metadata. For download: read the blob and its metadata, recover the data key via Key Vault, and decrypt. Should handle errors from both services (e.g., the vault key may have been disabled, or the blob may not exist).\r\n\r\n- A **configuration class** that builds the necessary Azure connections for both Blob Storage and Key Vault. It should read endpoints from environment variables and authenticate with managed identity. All connections should share a single credential instance.\r\n\r\n- A **Main class** that demos both implementations: runs the full encrypt-upload-download-decrypt round-trip using the sync implementation first, then repeats with the async implementation. Print the vault key ID used, the wrapped DEK (base64), and the decrypted output.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created a complete Java 17 Maven project with:\n\n- Sync and async Key Vault envelope-key management using RSA-OAEP-256.\n- Local AES-256-GCM file encryption with authenticated metadata.\n- Sync and async Blob Storage upload/download clients.\n- Shared `ManagedIdentityCredential` across all Azure clients.\n- Secure in-memory DEK cleanup and service-specific error handling.\n- A `Main` demo performing both round trips and printing key ID, wrapped DEK, and plaintext.\n- Environment configuration and usage instructions in `README.md`.\n- Successful Maven package build.\n\nRun with:\n\n```powershell\n$env:AZURE_STORAGE_BLOB_ENDPOINT = \"https://\u003caccount\u003e.blob.core.windows.net\"\n$env:AZURE_STORAGE_CONTAINER = \"\u003ccontainer\u003e\"\n$env:AZURE_KEY_VAULT_ENDPOINT = \"https://\u003cvault\u003e.vault.azure.net\"\n$env:AZURE_KEY_VAULT_KEY_NAME = \"\u003crsa-key-name\u003e\"\n$env:AZURE_CLIENT_ID = \"\u003coptional-user-assigned-identity-client-id\u003e\"\n\nmvn compile exec:java\n```\n\nReferences: [Blob Storage Java quickstart](https://learn.microsoft.com/azure/storage/blobs/storage-quickstart-blobs-java), [Key Vault keys](https://learn.microsoft.com/azure/key-vault/keys/about-keys), and [Azure Identity for Java](https://learn.microsoft.com/java/api/overview/azure/identity-readme).",
+  "workspace_delta": {
+    "bytes_added": 35857,
+    "bytes_removed": 0,
+    "bytes_net": 35857,
+    "new_file_count": 15,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\AsyncKeyManagementService.java",
+        "size": 3293
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\AzureClientConfiguration.java",
+        "size": 3501
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\EncryptedBlobClient.java",
+        "size": 4522
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\EncryptedBlobInfo.java",
+        "size": 119
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\EncryptionStorageException.java",
+        "size": 319
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\KeyManagementException.java",
+        "size": 220
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\BlobEncryptionMetadata.java",
+        "size": 2981
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\EncryptedBlobAsyncClient.java",
+        "size": 5848
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\EnvelopeCrypto.java",
+        "size": 3206
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\Main.java",
+        "size": 2792
+      },
+      {
+        "path": "pom.xml",
+        "size": 2436
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\DataKey.java",
+        "size": 833
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\KeyManagementService.java",
+        "size": 3366
+      },
+      {
+        "path": "README.md",
+        "size": 1778
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\encryptedblob\\ProtectedDataKey.java",
+        "size": 643
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 16,
+    "tool_calls": 0,
+    "reasoning_steps": 16,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T12:51:58.0812059+08:00",
+  "ended_at": "2026-08-29T12:55:11.9196586+08:00",
+  "duration_ms": 193838,
+  "terminated_by": "completed"
+}

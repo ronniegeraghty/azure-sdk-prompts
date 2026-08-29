@@ -1,0 +1,61 @@
+{
+  "prompt_id": "cosmos-db-dp-java-todo-repository",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that implements a ToDo item CRUD repository backed by Azure Cosmos DB (NoSQL API).\r\n\r\nThe project needs:\r\n\r\n- A **model class** (shared by both implementations) for a ToDo item with fields for id, title, description, completed status, created timestamp, and category (where category is the partition key).\r\n\r\n- A **synchronous repository class** that performs CRUD operations against Cosmos DB. It should support create, read, update, delete, and a query-by-category method. Each operation should log the request charge (RU cost consumed). The update operation should prevent lost updates — if another process modified the item since it was last read, the update should fail with a clear conflict error rather than silently overwriting the other process's changes. The query method should use safe, parameterized queries and must handle large result sets properly — paginate through results rather than loading everything into memory at once, and log progress as each page is retrieved.\r\n\r\n- An **asynchronous repository class** that provides the same CRUD operations. The query method should return results as a stream of pages, and the caller should be able to process each page as it arrives.\r\n\r\n- A **configuration/factory class** that connects to the Cosmos DB account using its endpoint from an environment variable. Authentication must use managed identity (no master keys). It should create the database and container if they don't already exist, setting a default TTL (time-to-live) of 90 days on the container and configuring the indexing policy to exclude the `description` field from indexing (since it's never queried on).\r\n\r\n- A **Main class** that demos both implementations: runs the full CRUD cycle using the sync repository first (including paginated query output showing page-by-page results), then runs the same operations using the async repository. Print RU costs and results to the console.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Java 17 Maven project with:\n\n- Shared `ToDoItem` model, including Cosmos `_etag`\n- Synchronous and Reactor-based asynchronous CRUD repositories\n- RU logging for every operation and query page\n- ETag/`If-Match` optimistic concurrency protection\n- Parameterized, partition-scoped, paginated category queries\n- Managed identity authentication\n- Automatic database/container initialization\n- 90-day default TTL and `/description/?` indexing exclusion\n- `Main` demonstrating complete sync and async CRUD cycles\n\nRun in a managed-identity-enabled environment:\n\n```powershell\n$env:AZURE_COSMOS_ENDPOINT = \"https://\u003caccount\u003e.documents.azure.com:443/\"\n$env:AZURE_COSMOS_DATABASE = \"todo-db\"   # optional\n$env:AZURE_COSMOS_CONTAINER = \"items\"    # optional\n$env:AZURE_CLIENT_ID = \"\u003cidentity-client-id\u003e\" # optional for user-assigned identity\nmvn exec:java\n```\n\nReferences: [Azure Cosmos DB Java quickstart](https://learn.microsoft.com/azure/cosmos-db/nosql/quickstart-java), [optimistic concurrency control](https://learn.microsoft.com/azure/cosmos-db/nosql/database-transactions-optimistic-concurrency).",
+  "workspace_delta": {
+    "bytes_added": 22669,
+    "bytes_removed": 0,
+    "bytes_net": 22669,
+    "new_file_count": 8,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\SyncToDoRepository.java",
+        "size": 5127
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\ToDoItem.java",
+        "size": 2456
+      },
+      {
+        "path": "pom.xml",
+        "size": 2062
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\AsyncToDoRepository.java",
+        "size": 5197
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\CosmosConfiguration.java",
+        "size": 4242
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\Main.java",
+        "size": 3288
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\QueryPage.java",
+        "size": 197
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\todo\\RepositoryResult.java",
+        "size": 100
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 10,
+    "tool_calls": 0,
+    "reasoning_steps": 10,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T08:13:14.1385439+08:00",
+  "ended_at": "2026-08-29T08:16:15.7358519+08:00",
+  "duration_ms": 181597,
+  "terminated_by": "completed"
+}

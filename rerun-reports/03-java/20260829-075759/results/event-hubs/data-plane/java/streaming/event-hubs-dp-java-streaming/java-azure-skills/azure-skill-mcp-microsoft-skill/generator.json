@@ -1,0 +1,41 @@
+{
+  "prompt_id": "event-hubs-dp-java-streaming",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that demonstrates\r\nsending and receiving events with Azure Event Hubs:\r\n1. Create an EventHubProducerClient using EventHubClientBuilder with a connection string\r\n2. Create an EventDataBatch and add 10 events with custom properties\r\n3. Send the batch to the event hub\r\n4. Create an EventProcessorClient with BlobCheckpointStore for checkpointing\r\n5. Register processEvent and processError consumer functions\r\n6. Start the processor, wait for events, and print received event bodies\r\n7. Implement checkpointing with EventContext.updateCheckpoint()\r\n\r\nShow required Maven dependencies (azure-messaging-eventhubs and\r\nazure-messaging-eventhubs-checkpointstore-blob) and proper resource cleanup.",
+  "final_response": "Implemented a complete Maven sample:\n\n- `src/main/java/com/example/EventHubsSample.java` — sends 10 events with custom properties, receives them using `EventProcessorClient`, prints bodies, and checkpoints with `EventContext.updateCheckpoint()`.\n- `pom.xml` — includes `azure-messaging-eventhubs` 5.21.0 and `azure-messaging-eventhubs-checkpointstore-blob` 1.21.0.\n- `README.md` — documents required environment variables and run commands.\n\nThe producer uses try-with-resources, the processor stops in a `finally` block, and no credentials are hardcoded. Run with:\n\n```powershell\nmvn compile\nmvn exec:java\n```\n\nReference: [Azure Event Hubs Java quickstart](https://learn.microsoft.com/azure/event-hubs/event-hubs-java-get-started-send)",
+  "workspace_delta": {
+    "bytes_added": 8737,
+    "bytes_removed": 0,
+    "bytes_net": 8737,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1778
+      },
+      {
+        "path": "pom.xml",
+        "size": 1475
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\EventHubsSample.java",
+        "size": 5484
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 6,
+    "tool_calls": 0,
+    "reasoning_steps": 6,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T08:39:28.0811896+08:00",
+  "ended_at": "2026-08-29T08:41:26.9600058+08:00",
+  "duration_ms": 118878,
+  "terminated_by": "completed"
+}

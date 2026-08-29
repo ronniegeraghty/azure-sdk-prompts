@@ -1,0 +1,45 @@
+{
+  "prompt_id": "storage-dp-java-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that performs\r\nCRUD operations on Azure Blob Storage:\r\n1. Create a BlobServiceClient using DefaultAzureCredential\r\n2. Create a container named \"my-container\" if it doesn't exist\r\n3. Upload a local file \"data.txt\" as a blob named \"uploads/data.txt\"\r\n4. List all blobs in the container and print their names and sizes\r\n5. Download the blob back to a local file \"data-downloaded.txt\"\r\n6. Delete the blob and then delete the container\r\n\r\nShow required Maven dependencies and proper error handling with BlobStorageException.",
+  "final_response": "Implemented a complete Java 17 Maven application:\n\n- `pom.xml` — Azure Blob Storage `12.35.1` and Azure Identity `1.18.5`\n- `BlobStorageCrudApp.java` — create container, upload, list names/sizes, download, delete blob, and delete container\n- `data.txt` — sample upload file\n- `README.md` — authentication, RBAC, configuration, and run instructions\n- Handles `BlobStorageException` with HTTP status, service error code, and message\n\nRun with:\n\n```powershell\n$env:AZURE_STORAGE_ACCOUNT_URL = \"https://\u003caccount-name\u003e.blob.core.windows.net\"\nmvn compile\nmvn exec:java\n```\n\nThe authenticated identity needs **Storage Blob Data Contributor** access. References: [Blob Storage SDK](https://learn.microsoft.com/java/api/overview/azure/storage-blob-readme) and [Azure Identity SDK](https://learn.microsoft.com/java/api/overview/azure/identity-readme).",
+  "workspace_delta": {
+    "bytes_added": 6213,
+    "bytes_removed": 0,
+    "bytes_net": 6213,
+    "new_file_count": 4,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1322
+      },
+      {
+        "path": "data.txt",
+        "size": 48
+      },
+      {
+        "path": "pom.xml",
+        "size": 1426
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\BlobStorageCrudApp.java",
+        "size": 3417
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T12:30:08.9805061+08:00",
+  "ended_at": "2026-08-29T12:31:38.8290587+08:00",
+  "duration_ms": 89848,
+  "terminated_by": "completed"
+}

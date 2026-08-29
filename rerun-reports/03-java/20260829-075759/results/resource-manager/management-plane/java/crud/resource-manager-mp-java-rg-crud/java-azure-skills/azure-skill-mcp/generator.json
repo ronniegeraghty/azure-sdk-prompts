@@ -1,0 +1,41 @@
+{
+  "prompt_id": "resource-manager-mp-java-rg-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java application that manages\r\nAzure Resource Groups using the management plane SDK:\r\n1. Authenticate using DefaultAzureCredential\r\n2. Create a new resource group in \"eastus\" region\r\n3. List all resource groups in the subscription\r\n4. Get details of the created resource group\r\n5. Add a tag to the resource group\r\n6. Delete the resource group\r\n\r\nShow required Maven dependencies and include proper exception handling.\r\nUse the modern azure-resourcemanager SDK.",
+  "final_response": "Implemented a complete Java 17 Maven application:\n\n- `pom.xml` — Azure SDK BOM `1.3.8`, `azure-resourcemanager`, and `azure-identity`\n- `src\\main\\java\\com\\example\\azure\\ResourceGroupManagerApp.java`\n- `README.md` — configuration, permissions, dependencies, usage, and official references\n\nThe application authenticates with `DefaultAzureCredential`, creates an `eastus` resource group, lists resource groups, retrieves details, adds a tag, and deletes it. It handles authentication, HTTP, Azure SDK, and runtime failures, with cleanup after partial failures.\n\nRun with:\n\n```powershell\n$env:AZURE_SUBSCRIPTION_ID = \"\u003csubscription-id\u003e\"\nmvn clean package\nmvn exec:java -Dexec.args=\"example-java-sdk-rg\"\n```\n\nThe execution command creates and deletes a real Azure resource group.",
+  "workspace_delta": {
+    "bytes_added": 9419,
+    "bytes_removed": 0,
+    "bytes_net": 9419,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "pom.xml",
+        "size": 2062
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\azure\\ResourceGroupManagerApp.java",
+        "size": 5663
+      },
+      {
+        "path": "README.md",
+        "size": 1694
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 12,
+    "tool_calls": 0,
+    "reasoning_steps": 12,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T10:46:19.1063481+08:00",
+  "ended_at": "2026-08-29T10:48:38.4261216+08:00",
+  "duration_ms": 139319,
+  "terminated_by": "completed"
+}

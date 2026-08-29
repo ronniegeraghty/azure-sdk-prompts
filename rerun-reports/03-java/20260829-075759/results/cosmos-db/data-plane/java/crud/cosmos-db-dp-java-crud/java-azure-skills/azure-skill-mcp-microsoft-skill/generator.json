@@ -1,0 +1,41 @@
+{
+  "prompt_id": "cosmos-db-dp-java-crud",
+  "config_name": "java-azure-skills/azure-skill-mcp-microsoft-skill",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Write a Java program that performs\r\nCRUD operations on items in an Azure Cosmos DB NoSQL container:\r\n1. Create a CosmosClient using endpoint and key with CosmosClientBuilder\r\n2. Create a database \"TestDB\" and container \"Items\" with partition key \"/category\"\r\n3. Insert a POJO item with properties: id, category, name, quantity\r\n4. Read the item back by id and partition key value\r\n5. Query items where category equals \"electronics\" using parameterized SQL\r\n6. Replace the item with updated quantity\r\n7. Delete the item by id and partition key\r\n\r\nShow required Maven dependency and handle CosmosException appropriately.",
+  "final_response": "Implemented a complete Java 17 Maven sample:\n\n- `src\\main\\java\\com\\example\\cosmos\\CosmosCrudExample.java` — database/container creation, POJO CRUD, partition-key point read, parameterized query, and detailed `CosmosException` logging.\n- `pom.xml` — uses `com.azure:azure-cosmos:4.82.0`.\n- `README.md` — emulator configuration and execution instructions.\n\nThe program reads `COSMOS_ENDPOINT` and `COSMOS_KEY` from environment variables and restricts execution to loopback Cosmos DB emulator endpoints, preventing accidental changes to live Azure resources. References: [Azure Cosmos DB Java samples](https://github.com/Azure-Samples/azure-cosmos-java-sql-api-samples) and [SDK documentation](https://azuresdkdocs.z19.web.core.windows.net/java/azure-cosmos/latest/index.html).",
+  "workspace_delta": {
+    "bytes_added": 10205,
+    "bytes_removed": 0,
+    "bytes_net": 10205,
+    "new_file_count": 3,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "README.md",
+        "size": 1132
+      },
+      {
+        "path": "pom.xml",
+        "size": 1462
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\cosmos\\CosmosCrudExample.java",
+        "size": 7611
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 8,
+    "tool_calls": 0,
+    "reasoning_steps": 8,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T07:57:59.4654265+08:00",
+  "ended_at": "2026-08-29T07:59:49.0050985+08:00",
+  "duration_ms": 109539,
+  "terminated_by": "completed"
+}

@@ -1,0 +1,77 @@
+{
+  "prompt_id": "service-bus-dp-java-order-processor",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that implements an order processing system using Azure Service Bus.\r\n\r\nThe project needs:\r\n\r\n- A **model class** for an Order with fields for order ID, customer name, product, quantity, total price, and status (pending/processing/completed/failed). It should be serializable to and from JSON.\r\n\r\n- A **sender class** (both sync and async versions) that publishes order messages to a Service Bus queue. It should support sending individual orders and sending a batch of orders efficiently (respecting the maximum batch size so messages aren't rejected). Each message should carry the order ID as a correlation property, and orders above a certain dollar threshold should be sent as high-priority with a scheduled delivery delay of 30 seconds (to allow for fraud review before processing).\r\n\r\n- A **processor class** (both sync and async versions) that receives and processes orders from the queue. It should handle messages as they arrive, deserialize them, and log the results. If processing fails (e.g., a deserialization error), the message should be sent to the dead-letter queue with a reason string rather than being silently abandoned. The processor should also be able to read from the dead-letter queue so failed messages can be inspected and reprocessed. It should guarantee that orders from the same customer are processed in sequence, not interleaved with other customers' orders.\r\n\r\n- A **Main class** that demos both implementations: connects to the Service Bus namespace (from an environment variable) with managed identity, runs the full send/receive/dead-letter cycle using the sync implementation first, then repeats with the async implementation.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "Created the Java 17 Maven project with:\n\n- JSON-serializable `Order` model and lowercase status enum.\n- Synchronous and reactive asynchronous senders with size-safe batching.\n- Correlation IDs, customer session IDs, priority properties, and 30-second fraud-review scheduling.\n- Session-aware sync/async processors with explicit settlement and dead-letter handling.\n- DLQ inspection, recovery, requeueing, and subsequent processing.\n- Managed-identity-compatible `DefaultAzureCredential` authentication.\n- Executable `Main` demo, tests, configuration instructions, and complete `pom.xml`.\n\nRun against an existing **session-enabled** queue:\n\n```powershell\n$env:SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE = \"your-namespace.servicebus.windows.net\"\n$env:SERVICE_BUS_QUEUE_NAME = \"orders\"\n$env:HIGH_PRIORITY_THRESHOLD = \"1000.00\"\nmvn exec:java\n```\n\nReferences: [Azure Service Bus Java SDK](https://learn.microsoft.com/java/api/overview/azure/messaging-servicebus-readme), [message sessions](https://learn.microsoft.com/azure/service-bus-messaging/message-sessions), and [dead-letter queues](https://learn.microsoft.com/azure/service-bus-messaging/service-bus-dead-letter-queues).",
+  "workspace_delta": {
+    "bytes_added": 32460,
+    "bytes_removed": 0,
+    "bytes_net": 32460,
+    "new_file_count": 12,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "pom.xml",
+        "size": 2651
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\AsyncOrderProcessor.java",
+        "size": 5265
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\Main.java",
+        "size": 6662
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\Order.java",
+        "size": 1207
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\OrderJson.java",
+        "size": 1018
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\OrderMessageFactory.java",
+        "size": 1308
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\SyncOrderProcessor.java",
+        "size": 5029
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\SyncOrderSender.java",
+        "size": 2406
+      },
+      {
+        "path": "README.md",
+        "size": 1667
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\AsyncOrderSender.java",
+        "size": 2760
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\orders\\OrderStatus.java",
+        "size": 501
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\orders\\OrderJsonTest.java",
+        "size": 1986
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 17,
+    "tool_calls": 0,
+    "reasoning_steps": 17,
+    "truncated": false
+  },
+  "started_at": "2026-08-29T11:06:18.9936963+08:00",
+  "ended_at": "2026-08-29T11:10:26.8892901+08:00",
+  "duration_ms": 247895,
+  "terminated_by": "completed"
+}

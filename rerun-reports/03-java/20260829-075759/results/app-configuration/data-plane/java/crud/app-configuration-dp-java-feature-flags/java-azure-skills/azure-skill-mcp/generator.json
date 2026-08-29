@@ -1,0 +1,73 @@
+{
+  "prompt_id": "app-configuration-dp-java-feature-flags",
+  "config_name": "java-azure-skills/azure-skill-mcp",
+  "generator_model": "gpt-5.6-sol",
+  "original_prompt": "Create a small Java 17 Maven project that implements a feature flag and configuration management system backed by Azure App Configuration.\r\n\r\nThe project needs:\r\n\r\n- A **configuration service class** (both sync and async versions) that retrieves settings from App Configuration. It should support fetching a single setting by key, fetching a setting with a specific label (to distinguish between environments like \"production\" vs \"staging\"), and listing all settings that match a key prefix (returned as a map). It should also avoid re-downloading values that haven't changed since the last read — minimize unnecessary network traffic when polling for config changes.\r\n\r\n- A **feature flag evaluator class** that reads feature flags from App Configuration. Feature flags in App Configuration use a special key prefix and store their state as a JSON payload. The evaluator should be able to check if a flag is enabled, and also support percentage-based rollout — if a flag is configured for a percentage rollout (e.g., 30% of users), the evaluator should deterministically decide whether a given user ID falls within the rollout percentage using a consistent hash, so the same user always gets the same result.\r\n\r\n- A **configuration watcher class** that periodically polls for configuration changes. It should accept a list of \"sentinel\" keys to watch and a polling interval. When a sentinel key's value changes, the watcher should trigger a full refresh of all cached configuration. This is the recommended pattern for coordinating config updates in App Configuration.\r\n\r\n- A **Main class** that demos both implementations: connecting to App Configuration (endpoint from environment variable, authenticated with managed identity), reading some config values with labels, evaluating feature flags for a few sample user IDs with percentage rollout, and starting the config watcher to detect a change. Run the full demo with the sync implementation first, then repeat with the async implementation.\r\n\r\nInclude a complete `pom.xml` with the necessary Azure SDK dependencies.",
+  "final_response": "The project now compiles; I found and corrected the null-value cache edge case, and I’m running the clean Java 17 test build as the final verification.",
+  "workspace_delta": {
+    "bytes_added": 38610,
+    "bytes_removed": 0,
+    "bytes_net": 38610,
+    "new_file_count": 11,
+    "modified_file_count": 0,
+    "deleted_file_count": 0,
+    "created_files": [
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\FeatureFlag.java",
+        "size": 4034
+      },
+      {
+        "path": "README.md",
+        "size": 1869
+      },
+      {
+        "path": "pom.xml",
+        "size": 2917
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\AsyncFeatureFlagEvaluator.java",
+        "size": 1109
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\ConfigurationService.java",
+        "size": 6244
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\FeatureFlagEvaluator.java",
+        "size": 1032
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\Main.java",
+        "size": 5254
+      },
+      {
+        "path": "src\\test\\java\\com\\example\\appconfig\\FeatureFlagTest.java",
+        "size": 2231
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\AsyncConfigurationService.java",
+        "size": 6600
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\AsyncConfigurationWatcher.java",
+        "size": 3722
+      },
+      {
+        "path": "src\\main\\java\\com\\example\\appconfig\\ConfigurationWatcher.java",
+        "size": 3598
+      }
+    ],
+    "modified_files": null,
+    "deleted_files": null
+  },
+  "actions_summary": {
+    "total_actions": 19,
+    "tool_calls": 0,
+    "reasoning_steps": 19,
+    "truncated": true
+  },
+  "started_at": "2026-08-29T13:56:09.2958222+08:00",
+  "ended_at": "2026-08-29T14:00:55.802961+08:00",
+  "duration_ms": 286507,
+  "terminated_by": "completed"
+}
