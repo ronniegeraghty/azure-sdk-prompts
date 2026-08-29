@@ -90,10 +90,17 @@
       "config": "js-ts-azure-skills/azure-skill-mcp",
       "primary_run_id": "20260829-141457",
       "reason": "SDK generation timed out waiting for session idle after producing four files.",
-      "status": "in_progress",
-      "started_at": "2026-08-29T18:59:00+08:00",
+      "status": "completed_unhealthy",
+      "started_at": "2026-08-29T18:56:00+08:00",
       "output_dir": "rerun-reports/05-retries/05-js-ts-event-hubs-azure-skill-mcp",
-      "log_file": "rerun-reports/05-retries/05-js-ts-event-hubs-azure-skill-mcp.log"
+      "log_file": "rerun-reports/05-retries/05-js-ts-event-hubs-azure-skill-mcp.log",
+      "completed_at": "2026-08-29T19:11:00+08:00",
+      "retry_run_id": "20260829-185622",
+      "retry_error": "sending prompt: waiting for session.idle: context deadline exceeded",
+      "generated_files": 4,
+      "selected": false,
+      "selection_reason": "The retry generated four files and all Azure MCP calls succeeded, but it again timed out waiting for session.idle.",
+      "unresolved_action": "exclude_triplet"
     },
     {
       "language": "js-ts",
@@ -101,7 +108,10 @@
       "config": "js-ts-azure-skills/azure-skill-mcp-microsoft-skill",
       "primary_run_id": "20260829-141457",
       "reason": "SDK generation timed out waiting for session idle after producing four files.",
-      "status": "pending"
+      "status": "in_progress",
+      "started_at": "2026-08-29T19:12:00+08:00",
+      "output_dir": "rerun-reports/05-retries/06-js-ts-event-hubs-full",
+      "log_file": "rerun-reports/05-retries/06-js-ts-event-hubs-full.log"
     },
     {
       "language": "js-ts",

@@ -40,6 +40,15 @@
       "retry_run_id": "20260829-184106",
       "reason": "Both the primary and retry completed without generated files.",
       "action": "exclude_triplet"
+    },
+    {
+      "language": "js-ts",
+      "prompt_id": "event-hubs-dp-js-ts-streaming",
+      "config": "js-ts-azure-skills/azure-skill-mcp",
+      "primary_run_id": "20260829-141457",
+      "retry_run_id": "20260829-185622",
+      "reason": "Both the primary and retry generated files but timed out waiting for session.idle.",
+      "action": "exclude_triplet"
     }
   ]
 }

@@ -1,0 +1,70 @@
+Found 1 prompt(s), 1 config(s) → 1 evaluation(s)
+Using Copilot SDK evaluator
+
+📊 Evaluation plan: 1 evaluations (1 prompts × 1 configs)
+   Estimated Copilot sessions: 2 (1 × 2 for generate/review)
+   Workers: 1 | Max sessions: 3
+
+
+Graders for event-hubs-dp-js-ts-streaming / js-ts-azure-skills/baseline:
+- send-receive-events.prompt.md (prompt file):
+  - Criteria from prompt file (prompt): Pass (8/8)
+      - `@azure/event-hubs` and `@azure/eventhubs-checkpointstore-blob` npm packages: Pass
+      - `EventHubProducerClient` constructor: Pass
+      - `createBatch()` and `EventDataBatch.tryAdd()`: Pass
+      - `sendBatch()` for publishing: Pass
+      - `EventHubConsumerClient` with `BlobCheckpointStore`: Pass
+      - `subscribe()` with `SubscriptionEventHandlers` (processEvents, processError): Pass
+      - `updateCheckpoint()` in the processEvents handler: Pass
+      - `close()` for cleanup: Pass
+- js-ts.yaml (criteria file):
+  - Correct @azure/ Scoped Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Correct @azure/ Scoped Packages**: All Azure SDK dependencies use @azure/ scoped packages (e.g., @azure/storage-blob, @azure/keyvault-secrets, @azure/identity). No deprecated unscoped packages (azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-*).: Pass
+  - @azure/identity for Authentication (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**@azure/identity for Authentication**: Includes @azure/identity as a dependency. For local development, DefaultAzureCredential is acceptable. For production code, uses a specific Entra token credential (e.g., ManagedIdentityCredential, ClientSecretCredential, WorkloadIdentityCredential) or configures DefaultAzureCredential with the AZURE_TOKEN_CREDENTIALS environment variable set to "prod" or a specific token credential. No hardcoded connection strings, account keys, SAS tokens, or secrets in code.: Fail
+  - Client Constructor with Endpoint and Credential (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Client Constructor with Endpoint and Credential**: SDK clients constructed with endpoint URL and credential object, e.g. new BlobServiceClient(url, credential) or new SecretClient(vaultUrl, credential). No legacy constructor patterns or connection string-based construction when identity-based auth is available.: Fail
+  - Async/Await Pattern (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Async/Await Pattern**: Uses async/await for all asynchronous operations. No raw .then()/.catch() chains when await is cleaner. No callback-based patterns. Top-level async function or IIFE for entry point.: Pass
+  - Pagination with for-await-of (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**Pagination with for-await-of**: List/query operations use for-await-of iteration over the PagedAsyncIterableIterator returned by SDK methods. Does not collect all pages into an array in memory (e.g., no Array.from() or manual page accumulation). Uses byPage() when per-page control is needed.: Pass
+  - LRO Pattern (beginXxx + pollUntilDone) (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**LRO Pattern (beginXxx + pollUntilDone)**: Long-running operations use the begin* method prefix (e.g., beginDeleteSecret, beginCreateOrUpdate) and await poller.pollUntilDone(). No manual setTimeout/setInterval polling loops.: Pass
+  - RestError Exception Handling (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**RestError Exception Handling**: Catches RestError (from @azure/core-rest-pipeline or the service package) with statusCode inspection for error-specific handling. Not just generic Error or try/catch without type checking.: Fail
+  - No Deprecated Packages (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**No Deprecated Packages**: No deprecated or legacy Azure packages in package.json: azure-storage, azure-arm-*, ms-rest-azure, @azure/ms-rest-js, @azure/ms-rest-nodeauth, @azure/ms-rest-azure-js. All dependencies use the current @azure/* track.: Pass
+  - Logging via @azure/logger (prompt): Fail (0/1)
+      - ### Attribute-Matched Criteria
+
+**Logging via @azure/logger**: Uses @azure/logger with setLogLevel() or the AZURE_LOG_LEVEL environment variable for SDK diagnostic logging. No custom logging wrappers around SDK internals.: Fail
+  - package.json with Correct Dependencies (prompt): Pass (1/1)
+      - ### Attribute-Matched Criteria
+
+**package.json with Correct Dependencies**: Includes a valid package.json with all required @azure/* dependencies listed. TypeScript projects include tsconfig.json and appropriate @types/* packages or use a recent TypeScript version with built-in types.: Pass
+
+🔍 Resource usage: Peak: 1 sessions, 0.0GB RAM, 0% CPU
+
+Run Summary:
+  Run ID:      20260829-184916
+  Evaluations: 1
+  Passed:      0
+  Failed:      1
+  Errors:      0
+  Duration:    265.69s
