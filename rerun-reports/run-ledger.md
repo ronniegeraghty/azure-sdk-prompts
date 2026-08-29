@@ -4,7 +4,7 @@ Branch: `weidongxu-microsoft/issue-656-three-way-rerun`
 
 Progress comment: https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231
 
-Overall status: **Primary suites and controlled retries completed; consolidating selected results**
+Overall status: **Completed**
 
 Current suite: **Controlled retries**
 
@@ -19,7 +19,7 @@ Current suite: **Controlled retries**
 
 Completed: .NET, Python, Java, JS/TS.
 
-Remaining: Selected-result consolidation and final report publication.
+Remaining: None. The selected-result report is published on the rerun branch and #656.
 
 ## Retry and finalization policy
 
@@ -77,3 +77,4 @@ Remaining: Selected-result consolidation and final report publication.
 | 2026-08-29 19:12 +08:00 | The JS/TS Event Hubs Azure Skill + MCP retry again timed out waiting for session idle despite four generated files and 4/4 successful MCP calls, so it was not selected. Started the full-arm retry. | Pending |
 | 2026-08-29 19:21 +08:00 | The JS/TS Event Hubs full-arm retry reached session idle, generated the project, and passed dependency installation and compilation, so it was selected. The triplet remains excluded because the middle arm is unresolved. Started the Key Vault Baseline retry. | Pending |
 | 2026-08-29 19:26 +08:00 | The JS/TS Key Vault Baseline retry reached session idle, generated the project, and passed dependency installation and type-checking, so it was selected. All seven controlled retries are complete. | Pending |
+| 2026-08-29 19:31 +08:00 | Finalized 69 complete triplets and 207 selected evaluations. Selected four healthy retries, excluded three unresolved prompt triplets, and generated the replacement comparison report. | Pending |

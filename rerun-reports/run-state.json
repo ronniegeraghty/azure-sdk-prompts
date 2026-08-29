@@ -3,9 +3,9 @@
   "branch": "weidongxu-microsoft/issue-656-three-way-rerun",
   "source_pr": "https://github.com/ronniegeraghty/hyoka/pull/656",
   "progress_comment_url": "https://github.com/ronniegeraghty/hyoka/pull/656#issuecomment-5455143231",
-  "status": "consolidating_selected_results",
+  "status": "completed",
   "current_suite_id": null,
-  "last_updated": "2026-08-29T19:26:00+08:00",
+  "last_updated": "2026-08-29T19:31:00+08:00",
   "environment": {
     "copilot_cli_path": "C:\\Users\\weidxu\\AppData\\Local\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe.old-60692-1787802413382",
     "copilot_cli_sha256": "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF",
@@ -30,6 +30,15 @@
     "replace_prior_report_data": true,
     "remove_outdated_analysis": true,
     "replace_branch_later": "weidongxu-microsoft/azure-skills-three-way-comparison"
+  },
+  "final_report": {
+    "path": "reports/azure-skills-three-way-comparison/summary.md",
+    "complete_triplets": 69,
+    "selected_evaluations": 207,
+    "selected_retries": 4,
+    "excluded_triplets": 3,
+    "primary_mcp_calls": "697/697",
+    "retry_mcp_calls": "29/29"
   },
   "completed_suite_ids": [
     "dotnet",
