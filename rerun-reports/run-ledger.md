@@ -65,3 +65,4 @@ Remaining: JS/TS.
 | 2026-08-29 12:03 +08:00 | Recorded the post-suite retry, result-selection, and #656 replacement policy. | Pending |
 | 2026-08-29 14:06 +08:00 | Completed the Java suite audit: 57/57 reports, 19/19 triplets, one no-output generation, and no MCP/session/test timeouts. | `326de281` |
 | 2026-08-29 14:12 +08:00 | Marked JS/TS in progress after the Java checkpoint was pushed. | Pending |
+| 2026-08-29 14:56 +08:00 | At 4/42 JS/TS reports, recorded session-idle timeouts for the Event Hubs baseline and Azure Skill + MCP arms; both produced four files. No Azure MCP timeout was observed. | Pending |
