@@ -59,6 +59,31 @@ Go version: 1.26.1+ required. Module path: `github.com/ronniegeraghty/hyoka`.
 
 ## Running Evaluations
 
+### Temporary Three-Way Evaluation Runtime
+
+For the four `configs/*-azure-skills-three-way.yaml` configurations, temporarily
+use Copilot CLI `v1.0.81-11` on Windows x64 instead of the CLI on `PATH`.
+
+```powershell
+$cliDir = Join-Path $env:TEMP "hyoka-copilot-v1.0.81-11"
+$archive = Join-Path $cliDir "copilot-win32-x64.zip"
+$cliPath = Join-Path $cliDir "copilot.exe"
+
+New-Item -ItemType Directory -Force $cliDir | Out-Null
+Invoke-WebRequest `
+  "https://github.com/github/copilot-cli/releases/download/v1.0.81-11/copilot-win32-x64.zip" `
+  -OutFile $archive
+Expand-Archive -LiteralPath $archive -DestinationPath $cliDir -Force
+
+$expected = "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF"
+if ((Get-FileHash -LiteralPath $cliPath -Algorithm SHA256).Hash -ne $expected) {
+  throw "Unexpected Copilot CLI checksum"
+}
+```
+
+Pass `--copilot-cli-path $cliPath` to every three-way `hyoka run` command.
+This pin is temporary and exists only to keep these comparison runs consistent.
+
 ### Config Naming Convention
 
 Config YAML files live in `configs/`. The `--config` flag takes the `name:` field from **inside** the YAML file, **NOT** the filename.
