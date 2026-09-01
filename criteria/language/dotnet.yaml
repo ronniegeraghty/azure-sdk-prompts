@@ -1,0 +1,11 @@
+when:
+  language: dotnet
+graders:
+  - name: Azure Identity Authentication
+    type: prompt
+    weight: 1.0
+    prompt: >
+      Check that authentication follows the prompt and uses the appropriate
+      modern .NET Azure SDK mechanism.
+    checks:
+      - When token-based authentication is requested, uses an appropriate credential from Azure.Identity and passes it to the SDK client. When the prompt explicitly requests a connection string, connection-string construction is valid. Credentials, connection strings, and secrets are not hardcoded.
