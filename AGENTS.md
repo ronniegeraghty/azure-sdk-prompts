@@ -231,10 +231,10 @@ This pin is temporary and exists only to keep these comparison runs consistent.
 
 ### Run Health Monitoring
 
-1. Before starting a full suite from a dedicated evaluation branch, ask the
-   user whether to upload the complete reports and raw evaluation data. Confirm
-   the destination and visibility, and do not upload these artifacts without
-   approval.
+1. Before starting a full suite on a dedicated evaluation branch, ask the user
+   whether to retain the complete reports and raw evaluation data remotely. If
+   approved, commit and push those artifacts to the branch as needed during or
+   after the run. Do not upload them without approval.
 2. Run one complete prompt across all configured arms as a smoke check before
    starting a long suite.
 3. Check health after the first complete triplet or first three reports.
