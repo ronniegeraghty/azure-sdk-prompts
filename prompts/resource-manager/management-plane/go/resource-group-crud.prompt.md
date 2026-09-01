@@ -43,7 +43,7 @@ The generated code should include:
 - `github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources` module
 - `azidentity.NewDefaultAzureCredential()` for authentication
 - `armresources.NewResourceGroupsClient()` with subscription ID and credential
-- `BeginCreateOrUpdate()` with `armresources.ResourceGroup` and location
+- `CreateOrUpdate()` with `armresources.ResourceGroup` and location
 - `NewListPager()` for listing with pager iteration
 - `Get()` for fetching resource group details
 - `BeginDelete()` and poller pattern for long-running operations
