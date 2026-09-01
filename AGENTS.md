@@ -199,10 +199,10 @@ Quick overview:
 - **Prompt frontmatter**: Prompts have YAML frontmatter with `id`, `service`, `language`, `plane`, `category`, `difficulty`
 - **Guardrails**: Turn limits (25), file limits (50), output size limits (1 MB)
 
-## Temporary Three-Way Evaluation Instructions
+## Temporary Azure Skills Comparison Instructions
 
-These instructions apply only to the four
-`configs/*-azure-skills-three-way.yaml` configurations.
+These instructions apply only to `configs/*-azure-skills-three-way.yaml` and
+`configs/go-azure-skills-two-way.yaml`.
 
 ### Runtime Pin
 
@@ -226,13 +226,13 @@ if ((Get-FileHash -LiteralPath $cliPath -Algorithm SHA256).Hash -ne $expected) {
 }
 ```
 
-Pass `--copilot-cli-path $cliPath` to every three-way `hyoka run` command.
+Pass `--copilot-cli-path $cliPath` to every comparison `hyoka run` command.
 This pin is temporary and exists only to keep these comparison runs consistent.
 
 ### Run Health Monitoring
 
-1. Run one complete three-arm prompt as a smoke check before starting a long
-   suite.
+1. Run one complete prompt across all configured arms as a smoke check before
+   starting a long suite.
 2. Check health after the first complete triplet or first three reports.
 3. Check again every 30 minutes or 10 completed evaluations.
 4. Report progress and anomalies to the user. Include completed versus expected
