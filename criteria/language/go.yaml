@@ -1,0 +1,11 @@
+when:
+  language: go
+graders:
+  - name: Go Project Compiles and Vets
+    type: program
+    weight: 1.0
+    checks:
+      - kind: command
+        command: go
+        args: [test, -mod=readonly, ./...]
+        timeout: 180

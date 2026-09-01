@@ -247,3 +247,20 @@ This pin is temporary and exists only to keep these comparison runs consistent.
 7. Before generating comparisons, report the final expected report count,
    triplet completeness, MCP health totals, anomaly inventory, and any retry
    candidates to the user.
+
+### Compilation grader prerequisites
+
+Install these tools on the machine that runs Hyoka and make them available on
+`PATH`:
+
+| Language | Required tools | Generated project requirement |
+| --- | --- | --- |
+| .NET | .NET SDK 8.0 or later (`dotnet`), compatible with the generated target framework; .NET Framework alone is insufficient | A project file such as `.csproj` at the workspace root |
+| Java | JDK 17 or later and Maven 3.9 or later (`mvn`) | `pom.xml` at the workspace root |
+| JavaScript and TypeScript | Node.js 20 or later with npm and npx | `package.json`, `tsconfig.json`, and a local TypeScript dependency |
+| Python | Python 3.10 or later (`python`) | Python source files and a dependency manifest such as `requirements.txt` or `pyproject.toml` |
+| Go | Go 1.26.1 or later (`go`) | `go.mod` at the workspace root |
+
+The build environment must also be able to restore declared dependencies from
+the configured NuGet, Maven, npm, Python, and Go module sources. Missing
+toolchains or unavailable dependency sources cause program graders to fail.
