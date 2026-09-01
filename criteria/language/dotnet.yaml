@@ -1,0 +1,112 @@
+when:
+  language: dotnet
+graders:
+  - name: Resource Group Management SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: resource-manager
+      plane: management-plane
+    prompt: >
+      Check only the SDK boundary for Azure Resource Group management.
+    checks:
+      - Uses the modern Azure.ResourceManager SDK and ArmClient rather than the legacy Microsoft.Azure.Management packages.
+
+  - name: Storage Management SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: storage
+      plane: management-plane
+    prompt: >
+      Check only the SDK boundary for Azure Storage account management.
+    checks:
+      - Uses Azure.ResourceManager.Storage with ArmClient and ARM resource navigation; Azure.Storage.Blobs is not used as a substitute for storage account provisioning.
+
+  - name: Key Vault Management SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: key-vault
+      plane: management-plane
+    prompt: >
+      Check only the SDK boundary for Azure Key Vault resource management.
+    checks:
+      - Uses Azure.ResourceManager.KeyVault for vault provisioning; Azure.Security.KeyVault.Secrets is used only for data-plane secret access or post-provisioning verification.
+
+  - name: Blob Storage Data-Plane SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: storage
+      plane: data-plane
+    prompt: >
+      Check only the SDK boundary for Azure Blob Storage data access.
+    checks:
+      - Uses Azure.Storage.Blobs, plus Azure.Storage.Blobs.Batch when batch operations are requested; Azure.ResourceManager.Storage is not used as a substitute for blob data operations.
+
+  - name: Key Vault Secrets Data-Plane SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: key-vault
+      plane: data-plane
+    prompt: >
+      Check only the SDK boundary for Azure Key Vault secret access.
+    checks:
+      - Uses Azure.Security.KeyVault.Secrets and SecretClient rather than Azure.ResourceManager.KeyVault for secret data operations.
+
+  - name: Cosmos DB Data-Plane SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: cosmos-db
+      plane: data-plane
+    prompt: >
+      Check only the SDK boundary for Azure Cosmos DB for NoSQL data access.
+    checks:
+      - Uses the current Microsoft.Azure.Cosmos v3 package and CosmosClient; the Microsoft.Azure.Cosmos namespace is valid and must not be rejected as a legacy management SDK.
+
+  - name: Event Hubs Data-Plane SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: event-hubs
+      plane: data-plane
+    prompt: >
+      Check only the SDK boundary for Azure Event Hubs messaging.
+    checks:
+      - Uses Azure.Messaging.EventHubs and, when event processing is requested, Azure.Messaging.EventHubs.Processor.
+
+  - name: Service Bus Data-Plane SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: service-bus
+      plane: data-plane
+    prompt: >
+      Check only the SDK boundary for Azure Service Bus messaging.
+    checks:
+      - Uses Azure.Messaging.ServiceBus and its ServiceBusClient APIs.
+
+  - name: App Configuration Data-Plane SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: app-configuration
+      plane: data-plane
+    prompt: >
+      Check only the SDK boundary for Azure App Configuration data access.
+    checks:
+      - Uses Azure.Data.AppConfiguration and ConfigurationClient.
+
+  - name: Azure Identity SDK
+    type: prompt
+    weight: 1.0
+    when:
+      service: identity
+      plane: data-plane
+    prompt: >
+      Check only the SDK boundary for Azure Identity authentication.
+    checks:
+      - Uses Azure.Identity and the credential class requested by the prompt, such as DefaultAzureCredential, ManagedIdentityCredential, or ClientSecretCredential.
