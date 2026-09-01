@@ -201,7 +201,8 @@ Quick overview:
 
 ## Temporary Azure Skills Comparison Instructions
 
-These instructions apply only to `configs/*-azure-skills-three-way.yaml`.
+These instructions apply only to `configs/*-azure-skills-three-way.yaml` and
+`configs/go-azure-skills-two-way.yaml`.
 
 ### Runtime Pin
 
