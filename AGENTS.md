@@ -236,9 +236,10 @@ This pin is temporary and exists only to keep these comparison runs consistent.
    evaluation branch and open a draft pull request against the upstream default
    branch before the run. Use the draft pull request to record the run scope,
    progress, anomalies, final summary, and links to committed reports and raw
-   data, following the pattern in #656. Push artifacts as needed
-   during or after the run. Otherwise, do not create a branch or pull request
-   for the artifacts or upload them.
+   data, following the pattern in #656. Present prompt checks, language checks,
+   and program checks in separate sections and aggregates; do not combine their
+   scores. Push artifacts as needed during or after the run. Otherwise, do not
+   create a branch or pull request for the artifacts or upload them.
 2. Run one complete prompt across all configured arms as a smoke check before
    starting a long suite.
 3. Check health after the first complete triplet or first three reports.
