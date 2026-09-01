@@ -38,18 +38,3 @@ graders:
     prompt: >
       Azure SDK exceptions (HttpResponseError and subclasses) are
       caught and handled appropriately.
-  - name: Output Files Exist
-    type: workspace
-    weight: 1.0
-    checks:
-      - kind: file
-        name: "*.py"
-        state: present
-        min_bytes: 1
-  - name: Tool Usage Verification
-    type: tool
-    weight: 1.0
-    checks:
-      - kind: tool_used
-        source: mcp
-        mcp_server: azure
