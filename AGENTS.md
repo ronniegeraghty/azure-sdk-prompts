@@ -59,31 +59,6 @@ Go version: 1.26.1+ required. Module path: `github.com/ronniegeraghty/hyoka`.
 
 ## Running Evaluations
 
-### Temporary Three-Way Evaluation Runtime
-
-For the four `configs/*-azure-skills-three-way.yaml` configurations, temporarily
-use Copilot CLI `v1.0.81-11` on Windows x64 instead of the CLI on `PATH`.
-
-```powershell
-$cliDir = Join-Path $env:TEMP "hyoka-copilot-v1.0.81-11"
-$archive = Join-Path $cliDir "copilot-win32-x64.zip"
-$cliPath = Join-Path $cliDir "copilot.exe"
-
-New-Item -ItemType Directory -Force $cliDir | Out-Null
-Invoke-WebRequest `
-  "https://github.com/github/copilot-cli/releases/download/v1.0.81-11/copilot-win32-x64.zip" `
-  -OutFile $archive
-Expand-Archive -LiteralPath $archive -DestinationPath $cliDir -Force
-
-$expected = "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF"
-if ((Get-FileHash -LiteralPath $cliPath -Algorithm SHA256).Hash -ne $expected) {
-  throw "Unexpected Copilot CLI checksum"
-}
-```
-
-Pass `--copilot-cli-path $cliPath` to every three-way `hyoka run` command.
-This pin is temporary and exists only to keep these comparison runs consistent.
-
 ### Config Naming Convention
 
 Config YAML files live in `configs/`. The `--config` flag takes the `name:` field from **inside** the YAML file, **NOT** the filename.
@@ -223,3 +198,52 @@ Quick overview:
 - **Config-driven evaluation**: Each YAML config defines a generator model, reviewer models, skills, and MCP servers
 - **Prompt frontmatter**: Prompts have YAML frontmatter with `id`, `service`, `language`, `plane`, `category`, `difficulty`
 - **Guardrails**: Turn limits (25), file limits (50), output size limits (1 MB)
+
+## Temporary Three-Way Evaluation Instructions
+
+These instructions apply only to the four
+`configs/*-azure-skills-three-way.yaml` configurations.
+
+### Runtime Pin
+
+Temporarily use Copilot CLI `v1.0.81-11` on Windows x64 instead of the CLI on
+`PATH`.
+
+```powershell
+$cliDir = Join-Path $env:TEMP "hyoka-copilot-v1.0.81-11"
+$archive = Join-Path $cliDir "copilot-win32-x64.zip"
+$cliPath = Join-Path $cliDir "copilot.exe"
+
+New-Item -ItemType Directory -Force $cliDir | Out-Null
+Invoke-WebRequest `
+  "https://github.com/github/copilot-cli/releases/download/v1.0.81-11/copilot-win32-x64.zip" `
+  -OutFile $archive
+Expand-Archive -LiteralPath $archive -DestinationPath $cliDir -Force
+
+$expected = "72CA06C41930B83FC323D5C4F5FE97863557DB3F79DA5A198DA16C315577E4EF"
+if ((Get-FileHash -LiteralPath $cliPath -Algorithm SHA256).Hash -ne $expected) {
+  throw "Unexpected Copilot CLI checksum"
+}
+```
+
+Pass `--copilot-cli-path $cliPath` to every three-way `hyoka run` command.
+This pin is temporary and exists only to keep these comparison runs consistent.
+
+### Run Health Monitoring
+
+1. Run one complete three-arm prompt as a smoke check before starting a long
+   suite.
+2. Check health after the first complete triplet or first three reports.
+3. Check again every 30 minutes or 10 completed evaluations.
+4. Report progress and anomalies to the user. Include completed versus expected
+   reports, complete triplets, MCP success/failure/timeout totals, generation or
+   session timeouts, missing responses, missing generated files, missing tool
+   calls, malformed tool invocation text, and stalled output.
+5. Highlight systemic risks immediately, including a runtime checksum or config
+   mismatch, any MCP load or tool-call timeout, repeated tool failures, or the
+   same infrastructure anomaly in multiple arms.
+6. Do not stop, cancel, retry, replace, or exclude results without the user's
+   direction. Preserve failed attempts so the user can decide how to proceed.
+7. Before generating comparisons, report the final expected report count,
+   triplet completeness, MCP health totals, anomaly inventory, and any retry
+   candidates to the user.
