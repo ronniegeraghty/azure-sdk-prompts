@@ -233,8 +233,12 @@ This pin is temporary and exists only to keep these comparison runs consistent.
 
 1. Before starting a full suite, ask the user whether to commit and push the
    complete reports and raw evaluation data. If approved, use a dedicated
-   evaluation branch and push those artifacts as needed during or after the
-   run. Otherwise, do not create a branch for the artifacts or upload them.
+   evaluation branch and open a draft pull request against the upstream default
+   branch before the run. Use the draft pull request to record the run scope,
+   progress, anomalies, final summary, and links to committed reports and raw
+   data, following the pattern in #656. Push artifacts as needed
+   during or after the run. Otherwise, do not create a branch or pull request
+   for the artifacts or upload them.
 2. Run one complete prompt across all configured arms as a smoke check before
    starting a long suite.
 3. Check health after the first complete triplet or first three reports.
