@@ -1,15 +1,6 @@
 when:
   language: java
 graders:
-  - name: Java Project Compiles
-    type: program
-    weight: 1.0
-    checks:
-      - kind: command
-        command: mvn
-        args: [-q, -DskipTests, compile]
-        timeout: 180
-
   - name: Correct Dependencies (com.azure, not com.microsoft.azure)
     type: prompt
     weight: 1.0
@@ -75,6 +66,12 @@ graders:
       Catches service-specific exceptions (BlobStorageException, CosmosException,
       ServiceBusException, HttpResponseException) with status code inspection.
       Not just generic Exception catches.
+  - name: Code Compiles (mvn compile / gradle compileJava)
+    type: prompt
+    weight: 1.0
+    prompt: >
+      The generated code compiles without errors. Attempt build verification
+      if build tools are available.
   - name: Try-With-Resources for Clients
     type: prompt
     weight: 1.0

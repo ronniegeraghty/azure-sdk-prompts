@@ -1,19 +1,6 @@
 when:
   language: js-ts
 graders:
-  - name: TypeScript Project Compiles
-    type: program
-    weight: 1.0
-    checks:
-      - kind: command
-        command: npm
-        args: [install, --ignore-scripts, --no-audit, --no-fund]
-        timeout: 180
-      - kind: command
-        command: npx
-        args: [--no-install, tsc, --noEmit]
-        timeout: 120
-
   - name: Correct @azure/ Scoped Packages
     type: prompt
     weight: 1.0

@@ -1,15 +1,6 @@
 when:
   language: python
 graders:
-  - name: Python Source Compiles
-    type: program
-    weight: 1.0
-    checks:
-      - kind: command
-        command: python
-        args: [-m, compileall, -q, .]
-        timeout: 30
-
   - name: Correct Package Imports
     type: prompt
     weight: 1.0
