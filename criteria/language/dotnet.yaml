@@ -1,6 +1,15 @@
 when:
   language: dotnet
 graders:
+  - name: .NET Project Compiles
+    type: program
+    weight: 1.0
+    checks:
+      - kind: command
+        command: dotnet
+        args: [build, --nologo]
+        timeout: 180
+
   - name: Azure Identity Authentication
     type: prompt
     weight: 1.0
