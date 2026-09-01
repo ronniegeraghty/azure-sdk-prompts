@@ -1,0 +1,74 @@
+# Three-arm comparison: baseline, Azure skills, and Azure skills plus SDK skills.
+# Do not run with --pairwise; select all three config names explicitly.
+configs:
+  - name: java-azure-skills/baseline
+    description: "Java baseline without Azure MCP or skills"
+    generator:
+      model: "gpt-5.6-sol"
+    reviewer:
+      models:
+        - "gpt-5.6-sol"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    limits:
+      max_turns: 100
+
+  - name: java-azure-skills/azure-skill-mcp
+    description: "Java with Azure MCP and general Azure skills"
+    generator:
+      model: "gpt-5.6-sol"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@3.0.0-beta.38", "server", "start"]
+          mcp_tools: ["*"]
+        - name: azure-skills
+          type: plugin
+          source: remote
+          repo: microsoft/azure-skills
+    reviewer:
+      models:
+        - "gpt-5.6-sol"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    limits:
+      max_turns: 100
+
+  - name: java-azure-skills/azure-skill-mcp-microsoft-skill
+    description: "Java with Azure MCP, general Azure skills, and Java SDK skills"
+    generator:
+      model: "gpt-5.6-sol"
+      tools:
+        - name: azure
+          type: mcp
+          command: npx
+          args: ["-y", "@azure/mcp@3.0.0-beta.38", "server", "start"]
+          mcp_tools: ["*"]
+        - name: azure-skills
+          type: plugin
+          source: remote
+          repo: microsoft/azure-skills
+        - name: azure-sdk-java
+          type: plugin
+          source: remote
+          repo: microsoft/skills
+    reviewer:
+      models:
+        - "gpt-5.6-sol"
+      tools:
+        - name: reviewer-skills
+          type: skill
+          source: local
+          skill_dir: true
+          path: "./skills/reviewer"
+    limits:
+      max_turns: 100
