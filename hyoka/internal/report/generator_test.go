@@ -2,8 +2,10 @@ package report
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
@@ -16,6 +18,7 @@ func TestWriteReport(t *testing.T) {
 	dir := t.TempDir()
 
 	r := &EvalReport{
+		SchemaVersion:  CurrentSchemaVersion,
 		PromptID:       "test-prompt",
 		ConfigName:     "baseline",
 		Timestamp:      "2024-01-15T10:00:00Z",
@@ -118,7 +121,7 @@ func TestWriteSummary(t *testing.T) {
 }
 
 func TestWriteReportInvalidDir(t *testing.T) {
-	r := &EvalReport{PromptID: "test", ConfigName: "cfg"}
+	r := &EvalReport{SchemaVersion: CurrentSchemaVersion, PromptID: "test", ConfigName: "cfg"}
 	p := &prompt.Prompt{ID: "test", Properties: map[string]string{"service": "svc", "plane": "plane", "language": "lang", "category": "cat"}}
 
 	// Use a path containing characters that are invalid on both Unix and Windows.
@@ -135,22 +138,26 @@ func TestGraderResultsRoundTrip(t *testing.T) {
 
 	graders := []GraderResult{
 		{
-			GraderName:   "claude-opus-4.6",
-			GraderType:   "review",
-			Model:        "claude-opus-4.6",
-			OverallScore: 4,
-			MaxScore:     5,
-			Summary:      "Good code",
-			Issues:       []string{"missing retry"},
-			Strengths:    []string{"clean design"},
+			GraderName: "claude-opus-4.6",
+			GraderType: "review",
+			Score:      0.8,
+			Weight:     1.0,
+			Pass:       true,
+			Message:    "Good code",
+			Checks: []GraderPoint{
+				{Label: "design", Pass: true, Weight: 1.0},
+			},
 		},
 		{
-			GraderName:   "consensus",
-			GraderType:   "review",
-			OverallScore: 4,
-			MaxScore:     5,
-			Summary:      "Consensus result",
-			IsConsensus:  true,
+			GraderName: "consensus",
+			GraderType: "review",
+			Score:      0.8,
+			Weight:     1.0,
+			Pass:       true,
+			Message:    "Consensus result",
+			Checks: []GraderPoint{
+				{Label: "overall", Pass: true, Weight: 1.0},
+			},
 		},
 	}
 
@@ -196,8 +203,8 @@ func TestGraderResultsRoundTrip(t *testing.T) {
 	if parsed.GraderResults[0].GraderName != "claude-opus-4.6" {
 		t.Errorf("expected grader name claude-opus-4.6, got %q", parsed.GraderResults[0].GraderName)
 	}
-	if !parsed.GraderResults[1].IsConsensus {
-		t.Error("expected second grader result to be consensus")
+	if parsed.GraderResults[1].GraderName != "consensus" {
+		t.Errorf("expected second grader name consensus, got %q", parsed.GraderResults[1].GraderName)
 	}
 }
 
@@ -225,8 +232,8 @@ func TestGraderResultsFromReviewPanel(t *testing.T) {
 	if results[0].GraderName != "model-a" {
 		t.Errorf("expected first grader model-a, got %q", results[0].GraderName)
 	}
-	if !results[2].IsConsensus {
-		t.Error("expected last grader result to be consensus")
+	if results[2].GraderName != "consolidator" {
+		t.Errorf("expected last grader to be consolidator (consensus), got %q", results[2].GraderName)
 	}
 }
 
@@ -242,8 +249,8 @@ func TestGraderResultsFromSingleReview(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 grader result, got %d", len(results))
 	}
-	if results[0].IsConsensus {
-		t.Error("single reviewer should not be marked as consensus")
+	if results[0].GraderName != "claude-sonnet" {
+		t.Errorf("expected grader name claude-sonnet, got %q", results[0].GraderName)
 	}
 }
 
@@ -479,8 +486,8 @@ func TestMigrateToV2(t *testing.T) {
 
 	MigrateToV2(r)
 
-	if r.SchemaVersion != CurrentSchemaVersion {
-		t.Errorf("expected schema version %d, got %d", CurrentSchemaVersion, r.SchemaVersion)
+	if r.SchemaVersion != 2 {
+		t.Errorf("MigrateToV2 should land at schema version 2, got %d", r.SchemaVersion)
 	}
 	if len(r.GraderResults) != 2 {
 		t.Fatalf("expected 2 grader results (1 panel + 1 consensus), got %d", len(r.GraderResults))
@@ -492,6 +499,32 @@ func TestMigrateToV2(t *testing.T) {
 	if r.GraderResults[0].GraderName != "modified" {
 		t.Error("MigrateToV2 should be idempotent")
 	}
+}
+
+// TestMigrateToV3Panic verifies that MigrateToV3 panics on v < 4 reports
+// (hard cutover enforced as of v4). Old reports must be regenerated.
+func TestMigrateToV3Panic(t *testing.T) {
+	r := &EvalReport{
+		PromptID:   "migrate-v3",
+		ConfigName: "baseline",
+		Review: &review.ReviewResult{
+			Model: "test-model", OverallScore: 3, MaxScore: 5, Summary: "S",
+		},
+		SchemaVersion: 0, // Explicitly set to v0
+	}
+	
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MigrateToV3 should panic on v0 reports, but it did not")
+		} else {
+			msg := fmt.Sprint(r)
+			if !strings.Contains(msg, "no longer supported") {
+				t.Errorf("expected panic message to contain 'no longer supported', got: %s", msg)
+			}
+		}
+	}()
+	
+	MigrateToV3(r)
 }
 
 // --- Session Setup in Action Timeline tests (#219) ---
@@ -637,9 +670,9 @@ func TestSessionSetupOmittedWhenEmpty(t *testing.T) {
 
 func TestBuildScoreBreakdownWeightedAverage(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: boolPtr(true)},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: boolPtr(true)},
-		{GraderName: "build", GraderType: "program", Score: 0.6, Weight: 1.0, Pass: boolPtr(true)},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "build", GraderType: "program", Score: 0.6, Weight: 1.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -684,8 +717,8 @@ func TestBuildScoreBreakdownWeightedAverage(t *testing.T) {
 
 func TestBuildScoreBreakdownGateFailure(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "file_exists", GraderType: "file", Score: 0.0, Weight: 1.0, Gate: true, Pass: boolPtr(false)},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.9, Weight: 2.0, Pass: boolPtr(true)},
+		{GraderName: "file_exists", GraderType: "file", Score: 0.0, Weight: 1.0, Gate: true, Pass: false, Checks: []GraderPoint{{Label: "check", Pass: false, Weight: 1.0}}},
+		{GraderName: "code_review", GraderType: "prompt", Score: 0.9, Weight: 2.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -783,8 +816,8 @@ func TestSessionSetupJSONRoundTrip(t *testing.T) {
 
 func TestBuildScoreBreakdownDefaultWeight(t *testing.T) {
 	results := []GraderResult{
-		{GraderName: "grader_a", GraderType: "file", Score: 1.0, Weight: 0, Pass: boolPtr(true)},
-		{GraderName: "grader_b", GraderType: "file", Score: 0.5, Weight: 0, Pass: boolPtr(true)},
+		{GraderName: "grader_a", GraderType: "file", Score: 1.0, Weight: 0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "grader_b", GraderType: "file", Score: 0.5, Weight: 0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	sb := BuildScoreBreakdown(results)
@@ -816,13 +849,14 @@ func TestBuildScoreBreakdownNilForEmpty(t *testing.T) {
 }
 
 func TestBuildScoreBreakdownNilForLegacyReview(t *testing.T) {
-	// Legacy review-only results have no Score/Weight/Gate data
+	// Legacy review-only results have no Score/Weight/Gate data (all zero-valued),
+	// so BuildScoreBreakdown omits the section entirely.
 	results := []GraderResult{
-		{GraderName: "reviewer", GraderType: "review", OverallScore: 4, MaxScore: 5},
+		{GraderName: "reviewer", GraderType: "review", Score: 0, Weight: 0, Checks: []GraderPoint{{Label: "review", Pass: true, Weight: 1.0}}},
 	}
 	sb := BuildScoreBreakdown(results)
 	if sb != nil {
-		t.Error("expected nil for legacy review-only results (no weighted data)")
+		t.Error("expected nil ScoreBreakdown for legacy review-only results")
 	}
 }
 
@@ -830,8 +864,8 @@ func TestScoreBreakdownJSONRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
 	graderResults := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: boolPtr(true), Gate: true},
-		{GraderName: "review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: boolPtr(true)},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 1.0, Pass: true, Gate: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "review", GraderType: "prompt", Score: 0.8, Weight: 2.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	r := &EvalReport{
@@ -885,59 +919,13 @@ func TestScoreBreakdownJSONRoundTrip(t *testing.T) {
 	}
 }
 
-func TestScoreBreakdownInHTMLReport(t *testing.T) {
-	dir := t.TempDir()
-
-	graderResults := []GraderResult{
-		{GraderName: "build_check", GraderType: "program", Score: 1.0, Weight: 1.0, Pass: boolPtr(true), Gate: true},
-		{GraderName: "code_review", GraderType: "prompt", Score: 0.7, Weight: 2.0, Pass: boolPtr(true)},
-	}
-
-	r := &EvalReport{
-		SchemaVersion:  CurrentSchemaVersion,
-		PromptID:       "html-breakdown",
-		ConfigName:     "baseline",
-		Timestamp:      "2024-01-15T10:00:00Z",
-		Duration:       10.0,
-		PromptMeta:     map[string]any{"service": "identity", "plane": "data-plane", "language": "python", "category": "auth"},
-		ConfigUsed:     map[string]any{"name": "baseline"},
-		GeneratedFiles: []string{"main.py"},
-		GraderResults:  graderResults,
-		ScoreBreakdown: BuildScoreBreakdown(graderResults),
-		Success:        true,
-	}
-
-	htmlPath, err := WriteHTMLReport(r, dir, "run-html-bd", "identity", "data-plane", "python", "auth")
-	if err != nil {
-		t.Fatalf("WriteHTMLReport failed: %v", err)
-	}
-
-	data, err := os.ReadFile(htmlPath)
-	if err != nil {
-		t.Fatalf("failed to read HTML: %v", err)
-	}
-
-	html := string(data)
-	if !containsStr(html, "Score Breakdown") {
-		t.Error("HTML report should contain 'Score Breakdown' section")
-	}
-	if !containsStr(html, "build_check") {
-		t.Error("HTML report should contain grader name 'build_check'")
-	}
-	if !containsStr(html, "code_review") {
-		t.Error("HTML report should contain grader name 'code_review'")
-	}
-	if !containsStr(html, "Σ(grader_score") {
-		t.Error("HTML report should contain the formula")
-	}
-}
 
 func TestScoreBreakdownInMarkdownReport(t *testing.T) {
 	dir := t.TempDir()
 
 	graderResults := []GraderResult{
-		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 0.5, Pass: boolPtr(true)},
-		{GraderName: "review", GraderType: "prompt", Score: 0.6, Weight: 1.0, Pass: boolPtr(true)},
+		{GraderName: "file_check", GraderType: "file", Score: 1.0, Weight: 0.5, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
+		{GraderName: "review", GraderType: "prompt", Score: 0.6, Weight: 1.0, Pass: true, Checks: []GraderPoint{{Label: "check", Pass: true, Weight: 1.0}}},
 	}
 
 	r := &EvalReport{

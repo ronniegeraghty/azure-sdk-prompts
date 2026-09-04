@@ -2,9 +2,12 @@
 package checkenv
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+
+	copilot "github.com/github/copilot-sdk/go"
 )
 
 type checkResult struct {
@@ -14,8 +17,11 @@ type checkResult struct {
 	hint    string
 }
 
-// Run checks for language toolchains, Copilot CLI, and MCP prerequisites, then prints results.
-func Run() {
+// Run checks for language toolchains, Copilot CLI, and MCP prerequisites,
+// prints results, and returns an error if any required tool is missing.
+// Required tools: Copilot CLI (via SDK) and gh auth. Language toolchains
+// are optional.
+func Run() error {
 	fmt.Println("Language Toolchains:")
 	langChecks := []checkResult{
 		checkPython(),
@@ -32,13 +38,10 @@ func Run() {
 
 	fmt.Println()
 	fmt.Println("Copilot:")
-	copilotChecks := []checkResult{
-		checkCopilotCLI(),
-		checkCopilotAuth(),
-	}
-	for _, c := range copilotChecks {
-		printCheck(c)
-	}
+	copilotSDKCheck := checkCopilotSDK()
+	printCheck(copilotSDKCheck)
+	authCheck := checkCopilotAuth()
+	printCheck(authCheck)
 
 	fmt.Println()
 	fmt.Println("MCP Servers:")
@@ -48,6 +51,19 @@ func Run() {
 	for _, c := range mcpChecks {
 		printCheck(c)
 	}
+
+	// Return error if required tools are missing
+	var missing []string
+	if !copilotSDKCheck.ok {
+		missing = append(missing, copilotSDKCheck.name)
+	}
+	if !authCheck.ok {
+		missing = append(missing, authCheck.name)
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("required tools missing: %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func printCheck(c checkResult) {
@@ -186,12 +202,18 @@ func checkCpp() checkResult {
 	return checkResult{name: "C/C++", ok: true, version: strings.Join(versions, ", ")}
 }
 
-func checkCopilotCLI() checkResult {
-	out, err := runCmd("copilot", "--version")
-	if err != nil {
-		return checkResult{name: "Copilot CLI", ok: false, hint: "not found (install: https://docs.github.com/en/copilot)"}
+func checkCopilotSDK() checkResult {
+	client := copilot.NewClient(&copilot.ClientOptions{})
+	if err := client.Start(context.Background()); err != nil {
+		return checkResult{name: "Copilot SDK", ok: false, hint: fmt.Sprintf("SDK unavailable (%v)", err)}
 	}
-	return checkResult{name: "Copilot CLI", ok: true, version: extractVersion(out)}
+	client.Stop()
+	// Also get CLI version for display
+	ver := "SDK available"
+	if out, err := runCmd("copilot", "--version"); err == nil {
+		ver = extractVersion(out)
+	}
+	return checkResult{name: "Copilot SDK", ok: true, version: ver}
 }
 
 func checkCopilotAuth() checkResult {

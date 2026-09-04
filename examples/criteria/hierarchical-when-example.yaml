@@ -1,0 +1,98 @@
+# Example: Hierarchical `when` syntax demonstrating all levels and forms
+#
+# This file demonstrates the three levels at which `when` conditions can be applied:
+#
+# 1. FILE-LEVEL when:  Condition applied to ALL graders in the file (and groups)
+# 2. GROUP-LEVEL when: Condition applied to a group of graders (override/supplement file-level)
+# 3. GRADER-LEVEL when: Condition applied to individual graders (override/supplement group-level)
+#
+# Multiple groups use the top-level `groups:` list — NOT YAML document separators.
+# When multiple levels are present, they are AND-ed together: a grader applies only
+# if ALL applicable `when` conditions match.
+#
+# Each property in a `when:` block accepts THREE forms (all backwards-compatible):
+#
+#   - Short scalar:    language: python
+#   - Short list:      language: [python, java]
+#   - Object form:     language:
+#                        is:  [python, java]    # candidate must be in this set
+#                        not: [legacy-python]   # candidate must NOT be in this set
+#
+# The `tags:` field matches against the prompt's frontmatter `tags:` list
+# (set-intersection semantics for `is`, set-disjoint for `not`).
+#
+# See also: hyoka/internal/criteria/hierarchical_test.go and matchset_test.go.
+
+# FILE-LEVEL when: applies to ALL graders (file-level graders AND all groups)
+# Short form — equivalent to `language: { is: [python] }`.
+when:
+  language: python
+
+# FILE-LEVEL graders: inherit the `language: python` condition
+graders:
+  - name: "General Python Quality"
+    type: prompt
+    weight: 1.0
+    prompt: >
+      This grader applies to all Python prompts because it inherits
+      the file-level `when: language: python` condition.
+
+# GROUP-LEVEL: Multiple groups, each with their own `when` conditions
+groups:
+  # Group 1: Auth-focused criteria for Python — demonstrates tag matching.
+  - name: "Python Auth Group"
+    when:
+      category: auth
+      # Object form on `tags`: prompt must have at least one of these tags
+      # AND must not have any of the `not` tags.
+      tags:
+        is:  [authentication, identity]
+        not: [deprecated]
+    graders:
+      - name: "DefaultAzureCredential Usage"
+        type: prompt
+        weight: 1.0
+        prompt: >
+          Grader applies to Python prompts with `category: auth` whose
+          frontmatter tags include `authentication` or `identity` (and not
+          `deprecated`). Checks for proper use of DefaultAzureCredential
+          instead of hardcoded secrets.
+
+      - name: "Error Handling for Auth Failures"
+        type: prompt
+        weight: 1.0
+        prompt: >
+          Grader applies to Python prompts with `category: auth`.
+          Checks that auth failures are caught and handled gracefully.
+
+  # Group 2: CRUD-focused criteria for Python — demonstrates per-property
+  # negation via the object form.
+  - name: "Python CRUD Group"
+    when:
+      category: crud
+      # Object form: exclude services that don't make sense for CRUD checks.
+      service:
+        not: [identity, key-vault]
+    graders:
+      - name: "Connection Pooling"
+        type: prompt
+        weight: 1.0
+        prompt: >
+          Grader applies to Python CRUD prompts EXCEPT for identity/key-vault
+          services. Checks that the code uses connection pooling for database
+          operations.
+
+      - name: "Query Efficiency"
+        type: prompt
+        weight: 1.0
+        when:
+          plane: data-plane
+          # Object form combining `is` and `not` on the same property.
+          difficulty:
+            is:  [intermediate, advanced]
+            not: [trivial]
+        prompt: >
+          Grader applies to Python CRUD prompts on the data plane at
+          intermediate or advanced difficulty (and never `trivial`). The
+          grader-level `when` AND-composes with file and group conditions.
+          Checks for N+1 query patterns and appropriate indexing usage.

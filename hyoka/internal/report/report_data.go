@@ -1,0 +1,475 @@
+package report
+
+import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/review"
+)
+
+// MatrixData holds the cross-config comparison matrix used by summary reports.
+type MatrixData struct {
+	Configs []string
+	Prompts []string
+	Cells   map[string]map[string]*MatrixCell // [promptID][configName]
+}
+
+// MatrixCell holds the data for one cell in the matrix.
+type MatrixCell struct {
+	Success    bool
+	Score      int
+	MaxScore   int
+	HasReview  bool
+	Duration   float64
+	Error      string
+	FileCount  int
+	ToolCalls  []string
+	ReportLink string
+}
+
+func buildMatrix(s *RunSummary) *MatrixData {
+	m := &MatrixData{
+		Cells: make(map[string]map[string]*MatrixCell),
+	}
+
+	configSet := make(map[string]bool)
+	promptSet := make(map[string]bool)
+
+	for _, r := range s.Results {
+		if !promptSet[r.PromptID] {
+			promptSet[r.PromptID] = true
+			m.Prompts = append(m.Prompts, r.PromptID)
+		}
+		if !configSet[r.ConfigName] {
+			configSet[r.ConfigName] = true
+			m.Configs = append(m.Configs, r.ConfigName)
+		}
+
+		if m.Cells[r.PromptID] == nil {
+			m.Cells[r.PromptID] = make(map[string]*MatrixCell)
+		}
+
+		cell := &MatrixCell{
+			Success:   r.Success,
+			Duration:  r.Duration,
+			Error:     r.Error,
+			FileCount: len(r.GeneratedFiles),
+			ToolCalls: r.ToolCalls,
+		}
+		if passed, total := TotalGraderChecks(r.GraderResults); total > 0 {
+			cell.Score = passed
+			cell.MaxScore = total
+			cell.HasReview = true
+		} else if r.Review != nil {
+			cell.Score = r.Review.OverallScore
+			cell.MaxScore = r.Review.MaxScore
+			cell.HasReview = true
+		}
+		service, _ := r.PromptMeta["service"].(string)
+		plane, _ := r.PromptMeta["plane"].(string)
+		language, _ := r.PromptMeta["language"].(string)
+		category, _ := r.PromptMeta["category"].(string)
+		if service != "" && plane != "" && language != "" && category != "" {
+			cell.ReportLink = strings.Join([]string{"results", service, plane, language, category, r.PromptID, r.ConfigName, "report.md"}, "/")
+		}
+		m.Cells[r.PromptID][r.ConfigName] = cell
+	}
+
+	return m
+}
+
+// ReportTemplateData is the enriched data passed to report rendering.
+type ReportTemplateData struct {
+	*EvalReport
+	Prompt         string
+	Reasoning      string
+	FinalReply     string
+	ToolActions    []ToolAction
+	TimelineSteps  []TimelineStep
+	ReviewTimeline []TimelineStep            // timeline for consolidated review
+	PanelTimelines map[string][]TimelineStep // model name → timeline for each panel reviewer
+	FileCount      int
+	FileContents   map[string]string // filename → content for expandable display
+	BackPath       string            // relative path back to summary
+	ToolCallCounts []ToolCallCount   // per-tool call counts, sorted by count desc
+}
+
+// ToolCallCount pairs a tool (or skill) name with its invocation count.
+type ToolCallCount struct {
+	Name      string
+	Count     int
+	MCPServer string // non-empty if all calls went through the same MCP server
+}
+
+// ToolAction represents one tool invocation extracted from session events.
+type ToolAction struct {
+	Index     int
+	ToolName  string
+	Args      string
+	Result    string
+	Error     string
+	Success   *bool
+	Duration  float64
+	MCPServer string
+}
+
+// TimelineStep represents one chronological step in the agent workflow.
+type TimelineStep struct {
+	Index     int
+	Phase     string // "generation", "review"
+	StepType  string // "prompt", "reasoning", "tool_call", "message", "complete"
+	Icon      string
+	Title     string
+	Content   string  // main content (tool result, reasoning text)
+	Detail    string  // collapsible detail (tool args, full text)
+	Duration  float64 // milliseconds
+	Success   *bool
+	Error     string
+	ToolName  string
+	MCPServer string
+}
+
+func buildReportData(r *EvalReport) *ReportTemplateData {
+	d := &ReportTemplateData{
+		EvalReport: r,
+		FileCount:  len(r.GeneratedFiles),
+	}
+
+	var reasoningParts []string
+	var messageParts []string
+	stepIndex := 0
+
+	type pendingTool struct {
+		stepIdx int
+		name    string
+	}
+	var pendingTools []pendingTool
+
+	for _, ev := range r.SessionEvents {
+		switch ev.Type {
+		case "user.message":
+			if d.Prompt == "" && ev.Content != "" {
+				d.Prompt = ev.Content
+			}
+			if ev.Content != "" {
+				stepIndex++
+				d.TimelineSteps = append(d.TimelineSteps, TimelineStep{
+					Index:    stepIndex,
+					Phase:    "generation",
+					StepType: "prompt",
+					Icon:     "📝",
+					Title:    "Prompt sent",
+					Content:  ev.Content,
+				})
+			}
+		case "assistant.reasoning":
+			if ev.Content != "" {
+				reasoningParts = append(reasoningParts, ev.Content)
+			}
+			stepIndex++
+			title := ev.Content
+			if title == "" {
+				title = "(thinking)"
+			} else if len(title) > 80 {
+				title = title[:80] + "…"
+			}
+			d.TimelineSteps = append(d.TimelineSteps, TimelineStep{
+				Index:    stepIndex,
+				Phase:    "generation",
+				StepType: "reasoning",
+				Icon:     "🤔",
+				Title:    title,
+				Content:  ev.Content,
+			})
+		case "tool.execution_start":
+			toolName := ev.ToolName
+			if toolName == "" {
+				toolName = "(unknown)"
+			}
+			d.ToolActions = append(d.ToolActions, ToolAction{
+				Index:     len(d.ToolActions) + 1,
+				ToolName:  toolName,
+				Args:      ev.ToolArgs,
+				MCPServer: ev.MCPServerName,
+			})
+			stepIndex++
+			toolTitle := toolName
+			icon := "🔧"
+			stepType := "tool_call"
+			if ev.FilePath != "" {
+				toolTitle += " → " + ev.FilePath
+			}
+			if toolName == "skill" {
+				icon = "📚"
+				stepType = "skill"
+				if skillArg := extractJSONField(ev.ToolArgs, "skill"); skillArg != "" {
+					toolTitle = "Skill invoked: " + skillArg
+				} else {
+					toolTitle = "Skill invoked"
+				}
+			} else if toolName == "view" && strings.Contains(ev.ToolArgs, "skills") && strings.Contains(ev.ToolArgs, "references") {
+				icon = "📖"
+				stepType = "skill_ref"
+				toolTitle = "Skill reference fetch"
+				if ev.FilePath != "" {
+					toolTitle += " → " + filepath.Base(ev.FilePath)
+				} else if refFile := extractJSONField(ev.ToolArgs, "path"); refFile != "" {
+					toolTitle += " → " + filepath.Base(refFile)
+				}
+			}
+			step := TimelineStep{
+				Index:     stepIndex,
+				Phase:     "generation",
+				StepType:  stepType,
+				Icon:      icon,
+				Title:     toolTitle,
+				Detail:    ev.ToolArgs,
+				ToolName:  toolName,
+				MCPServer: ev.MCPServerName,
+			}
+			d.TimelineSteps = append(d.TimelineSteps, step)
+			pendingTools = append(pendingTools, pendingTool{len(d.TimelineSteps) - 1, toolName})
+		case "tool.execution_complete":
+			for i := len(d.ToolActions) - 1; i >= 0; i-- {
+				if d.ToolActions[i].ToolName == ev.ToolName && d.ToolActions[i].Result == "" && d.ToolActions[i].Error == "" {
+					d.ToolActions[i].Result = ev.ToolResult
+					d.ToolActions[i].Error = ev.Error
+					d.ToolActions[i].Success = ev.ToolSuccess
+					d.ToolActions[i].Duration = ev.Duration
+					break
+				}
+			}
+			for i := len(pendingTools) - 1; i >= 0; i-- {
+				if pendingTools[i].name == ev.ToolName {
+					idx := pendingTools[i].stepIdx
+					d.TimelineSteps[idx].Content = ev.ToolResult
+					d.TimelineSteps[idx].Duration = ev.Duration
+					d.TimelineSteps[idx].Success = ev.ToolSuccess
+					if ev.Error != "" {
+						d.TimelineSteps[idx].Error = ev.Error
+					}
+					pendingTools = append(pendingTools[:i], pendingTools[i+1:]...)
+					break
+				}
+			}
+		case "assistant.message":
+			if ev.Content != "" {
+				messageParts = append(messageParts, ev.Content)
+			}
+			stepIndex++
+			title := "Agent reply"
+			d.TimelineSteps = append(d.TimelineSteps, TimelineStep{
+				Index:    stepIndex,
+				Phase:    "generation",
+				StepType: "message",
+				Icon:     "💬",
+				Title:    title,
+				Content:  ev.Content,
+			})
+		case "skill.invoked":
+			skillName := ev.SkillName
+			if skillName == "" && ev.Content != "" {
+				for _, line := range strings.Split(ev.Content, "\n") {
+					line = strings.TrimSpace(line)
+					if strings.HasPrefix(line, "name:") {
+						skillName = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
+						break
+					}
+				}
+			}
+			merged := false
+			for i := len(d.TimelineSteps) - 1; i >= 0; i-- {
+				if d.TimelineSteps[i].StepType == "skill" {
+					d.TimelineSteps[i].Content = truncateStr(ev.Content, 2000)
+					if skillName != "" {
+						d.TimelineSteps[i].Title = "Skill loaded: " + skillName
+					}
+					merged = true
+					break
+				}
+			}
+			if !merged && (skillName != "" || ev.Content != "") {
+				if skillName == "" {
+					skillName = "(unknown)"
+				}
+				stepIndex++
+				d.TimelineSteps = append(d.TimelineSteps, TimelineStep{
+					Index:    stepIndex,
+					Phase:    "generation",
+					StepType: "skill",
+					Icon:     "📚",
+					Title:    "Skill loaded: " + skillName,
+					Content:  truncateStr(ev.Content, 2000),
+				})
+			}
+		}
+	}
+
+	if len(d.TimelineSteps) > 0 {
+		stepIndex++
+		summary := fmt.Sprintf("%d files created", d.FileCount)
+		d.TimelineSteps = append(d.TimelineSteps, TimelineStep{
+			Index:    stepIndex,
+			Phase:    "generation",
+			StepType: "complete",
+			Icon:     "✅",
+			Title:    "Generation complete",
+			Content:  summary,
+		})
+	}
+
+	toolCounts := map[string]int{}
+	toolMCP := map[string]string{}
+	for _, ta := range d.ToolActions {
+		name := ta.ToolName
+		if name == "skill" {
+			if skillArg := extractJSONField(ta.Args, "skill"); skillArg != "" {
+				name = "skill: " + skillArg
+			}
+		}
+		toolCounts[name]++
+		if ta.MCPServer != "" {
+			if prev, ok := toolMCP[name]; !ok {
+				toolMCP[name] = ta.MCPServer
+			} else if prev != ta.MCPServer {
+				toolMCP[name] = ""
+			}
+		}
+	}
+	for name, count := range toolCounts {
+		d.ToolCallCounts = append(d.ToolCallCounts, ToolCallCount{
+			Name:      name,
+			Count:     count,
+			MCPServer: toolMCP[name],
+		})
+	}
+	sort.Slice(d.ToolCallCounts, func(i, j int) bool {
+		if d.ToolCallCounts[i].Count != d.ToolCallCounts[j].Count {
+			return d.ToolCallCounts[i].Count > d.ToolCallCounts[j].Count
+		}
+		return d.ToolCallCounts[i].Name < d.ToolCallCounts[j].Name
+	})
+
+	d.Reasoning = strings.Join(reasoningParts, "\n\n")
+	d.FinalReply = strings.Join(messageParts, "\n\n")
+
+	if r.Review != nil && len(r.Review.Events) > 0 {
+		d.ReviewTimeline = buildReviewTimeline(r.Review.Events)
+	}
+	if len(r.ReviewPanel) > 0 {
+		d.PanelTimelines = make(map[string][]TimelineStep, len(r.ReviewPanel))
+		for _, pr := range r.ReviewPanel {
+			if len(pr.Events) > 0 {
+				d.PanelTimelines[pr.Model] = buildReviewTimeline(pr.Events)
+			}
+		}
+	}
+
+	return d
+}
+
+// buildReviewTimeline converts review events into a chronological timeline.
+func buildReviewTimeline(events []review.ReviewEvent) []TimelineStep {
+	var steps []TimelineStep
+	stepIndex := 0
+
+	type pendingTool struct {
+		stepIdx int
+		name    string
+	}
+	var pendingTools []pendingTool
+
+	for _, ev := range events {
+		switch ev.Type {
+		case "assistant.turn_start":
+		// Skip — implicit from other events
+		case "assistant.reasoning":
+			if ev.Content != "" {
+				stepIndex++
+				title := ev.Content
+				if len(title) > 80 {
+					title = title[:80] + "…"
+				}
+				steps = append(steps, TimelineStep{
+					Index:    stepIndex,
+					Phase:    "review",
+					StepType: "reasoning",
+					Icon:     "🤔",
+					Title:    title,
+					Content:  ev.Content,
+				})
+			}
+		case "tool.execution_start":
+			if ev.ToolName != "" {
+				stepIndex++
+				steps = append(steps, TimelineStep{
+					Index:    stepIndex,
+					Phase:    "review",
+					StepType: "tool_call",
+					Icon:     "🔧",
+					Title:    "Tool call: " + ev.ToolName,
+					Detail:   ev.ToolArgs,
+					ToolName: ev.ToolName,
+				})
+				pendingTools = append(pendingTools, pendingTool{len(steps) - 1, ev.ToolName})
+			}
+		case "tool.execution_complete":
+			matched := false
+			for i := len(pendingTools) - 1; i >= 0; i-- {
+				if pendingTools[i].name == ev.ToolName {
+					idx := pendingTools[i].stepIdx
+					steps[idx].Content = ev.Result
+					steps[idx].Duration = ev.Duration
+					if ev.Error != "" {
+						steps[idx].Error = ev.Error
+					}
+					pendingTools = append(pendingTools[:i], pendingTools[i+1:]...)
+					matched = true
+					break
+				}
+			}
+			if !matched && ev.ToolName != "" {
+				stepIndex++
+				steps = append(steps, TimelineStep{
+					Index:    stepIndex,
+					Phase:    "review",
+					StepType: "tool_call",
+					Icon:     "🔧",
+					Title:    "Tool call: " + ev.ToolName,
+					Content:  ev.Result,
+					Duration: ev.Duration,
+					ToolName: ev.ToolName,
+					Error:    ev.Error,
+				})
+			}
+		case "assistant.message":
+			if ev.Content != "" {
+				stepIndex++
+				steps = append(steps, TimelineStep{
+					Index:    stepIndex,
+					Phase:    "review",
+					StepType: "message",
+					Icon:     "💬",
+					Title:    "Reviewer response",
+					Content:  ev.Content,
+				})
+			}
+		}
+	}
+	return steps
+}
+
+// extractJSONField extracts a string field from a JSON args string.
+func extractJSONField(jsonStr, field string) string {
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &m); err != nil {
+		return ""
+	}
+	if v, ok := m[field].(string); ok {
+		return v
+	}
+	return ""
+}

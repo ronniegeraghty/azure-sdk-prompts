@@ -1,58 +1,257 @@
 package cmd
 
 import (
-"encoding/json"
-"fmt"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
-"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
-"github.com/spf13/cobra"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/prompt"
+	"github.com/spf13/cobra"
 )
 
 func listCmd() *cobra.Command {
-f := &runFlags{}
-var jsonOutput bool
-cmd := &cobra.Command{
-Use:     "list",
-Aliases: []string{"ls"},
-Short:   "List matching prompts",
-Long:    "List prompts matching the given filters (dry-run equivalent).",
-RunE: func(cmd *cobra.Command, args []string) error {
-f.prompts = resolvePromptsDir(cmd)
+	f := &runFlags{}
+	var jsonOutput bool
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List prompts, configs, and criteria",
+		Long:    "List prompts matching the given filters alongside available configs and criteria.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Honor a config-driven prompt_directory override (#598). Load
+			// configs first so the override is available when resolving the
+			// prompts directory; fall back to the standard chain on errors.
+			configDir := resolveConfigDir(cmd)
+			var configs []config.ToolConfig
+			var configPromptDir string
+			if cfgFile, err := config.LoadDir(configDir); err == nil {
+				configs = cfgFile.Configs
+				configPromptDir = cfgFile.PromptDirectory
+			} else {
+				configPromptDir = config.PeekPromptDirectory(configDir)
+			}
 
-prompts, err := prompt.LoadPrompts(f.prompts)
-if err != nil {
-return fmt.Errorf("loading prompts: %w", err)
+			f.prompts = resolvePromptsDirWithConfig(cmd, configPromptDir)
+
+			prompts, err := prompt.LoadPrompts(f.prompts)
+			if err != nil {
+				return fmt.Errorf("loading prompts: %w", err)
+			}
+
+			filter := buildFilter(f)
+			filtered := prompt.FilterPrompts(prompts, filter)
+
+			// Load graders (unified schema; Phase 3 of grader unification).
+			baseDir := filepath.Dir(f.prompts)
+			criteriaDir := resolveCriteriaDir(cmd)
+			if criteriaDir == "" {
+				criteriaDir = filepath.Join(baseDir, "criteria")
+			}
+			var graderConfigs []criteria.UnifiedGraderConfig
+			if _, err := os.Stat(criteriaDir); err == nil {
+				if bundle, loadErr := criteria.LoadUnifiedDir(criteriaDir); loadErr == nil && bundle != nil {
+					graderConfigs = bundle.Configs
+				}
+			}
+
+			if jsonOutput {
+				return listJSON(filtered, configs, graderConfigs)
+			}
+
+			// ── Prompts ───────────────────────────────────────────
+			if len(filtered) == 0 {
+				fmt.Println("No prompts matched the given filters.")
+			} else {
+				fmt.Printf("Prompts (%d):\n\n", len(filtered))
+				for _, p := range filtered {
+					fmt.Printf("  %-40s %s/%s/%s [%s]\n", p.ID, p.Service(), p.Plane(), p.Language(), p.Category())
+					if p.Description() != "" {
+						fmt.Printf("  %-40s %s\n", "", p.Description())
+					}
+				}
+			}
+
+			// ── Configs ───────────────────────────────────────────
+			if len(configs) > 0 {
+				fmt.Printf("\nConfigs (%d):\n\n", len(configs))
+				for _, c := range configs {
+					model := ""
+					toolCount := 0
+					if c.Generator != nil {
+						model = c.Generator.Model
+						toolCount = len(c.Generator.Tools)
+					}
+					fmt.Printf("  %-40s model: %-25s tools: %d\n", c.Name, model, toolCount)
+				}
+			}
+
+			// ── Criteria ──────────────────────────────────────────
+			if len(graderConfigs) > 0 {
+				fmt.Printf("\nCriteria (%d):\n\n", len(graderConfigs))
+				for _, gc := range graderConfigs {
+					source := gc.Source
+					if rel, err := filepath.Rel(".", source); err == nil {
+						source = rel
+					}
+					whenStr := "*"
+					if !gc.When.IsEmpty() {
+						whenStr = formatWhenClause(gc.When)
+					}
+					fmt.Printf("  %-40s when: %-25s graders: %d\n", source, whenStr, totalGraders(gc))
+				}
+			}
+
+			return nil
+		},
+	}
+
+	addFilterFlags(cmd, f)
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON (prompts, configs, criteria)")
+	return cmd
 }
 
-filter := buildFilter(f)
-filtered := prompt.FilterPrompts(prompts, filter)
-
-if len(filtered) == 0 {
-fmt.Println("No prompts matched the given filters.")
-return nil
+// listOutput is the JSON structure for `hyoka list --json`.
+type listOutput struct {
+	Prompts  []*prompt.Prompt    `json:"prompts"`
+	Configs  []listConfigEntry   `json:"configs"`
+	Criteria []listCriteriaEntry `json:"criteria"`
 }
 
-if jsonOutput {
-data, err := json.MarshalIndent(filtered, "", "  ")
-if err != nil {
-return fmt.Errorf("marshaling prompts: %w", err)
-}
-fmt.Println(string(data))
-return nil
+type listConfigEntry struct {
+	Name      string `json:"name"`
+	Model     string `json:"model"`
+	ToolCount int    `json:"tool_count"`
 }
 
-fmt.Printf("Found %d prompt(s):\n\n", len(filtered))
-for _, p := range filtered {
-fmt.Printf("  %-30s %s/%s/%s [%s]\n", p.ID, p.Service(), p.Plane(), p.Language(), p.Category())
-if p.Description() != "" {
-fmt.Printf("  %-30s %s\n", "", p.Description())
-}
-}
-return nil
-},
+type listCriteriaEntry struct {
+	Source      string              `json:"source"`
+	When        criteria.WhenClause `json:"when,omitempty"`
+	GraderCount int                 `json:"grader_count"`
 }
 
-addFilterFlags(cmd, f)
-cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output prompts as JSON array")
-return cmd
+func listJSON(prompts []*prompt.Prompt, configs []config.ToolConfig, graderConfigs []criteria.UnifiedGraderConfig) error {
+	out := listOutput{
+		Prompts:  prompts,
+		Configs:  make([]listConfigEntry, 0, len(configs)),
+		Criteria: make([]listCriteriaEntry, 0, len(graderConfigs)),
+	}
+	if out.Prompts == nil {
+		out.Prompts = []*prompt.Prompt{}
+	}
+
+	for _, c := range configs {
+		model := ""
+		toolCount := 0
+		if c.Generator != nil {
+			model = c.Generator.Model
+			toolCount = len(c.Generator.Tools)
+		}
+		out.Configs = append(out.Configs, listConfigEntry{
+			Name:      c.Name,
+			Model:     model,
+			ToolCount: toolCount,
+		})
+	}
+
+	for _, gc := range graderConfigs {
+		source := gc.Source
+		if rel, err := filepath.Rel(".", source); err == nil {
+			source = rel
+		}
+		out.Criteria = append(out.Criteria, listCriteriaEntry{
+			Source:      source,
+			When:        gc.When,
+			GraderCount: totalGraders(gc),
+		})
+	}
+
+	data, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling output: %w", err)
+	}
+	fmt.Println(string(data))
+	return nil
+}
+
+// totalGraders returns the total grader count across top-level graders and
+// every group in a unified grader config.
+func totalGraders(gc criteria.UnifiedGraderConfig) int {
+	n := len(gc.Graders)
+	for _, g := range gc.Groups {
+		n += len(g.Graders)
+	}
+	return n
+}
+
+// formatWhenClause renders a WhenClause as a compact human-readable string.
+// Example: "language=python,java; service=key-vault; tool=skill:markdown-headings"
+func formatWhenClause(w criteria.WhenClause) string {
+	var parts []string
+	if s := formatMatchSet("language", w.Language); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("service", w.Service); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("plane", w.Plane); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("category", w.Category); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("sdk", w.SDK); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("difficulty", w.Difficulty); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("generator", w.Generator); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("config", w.Config); s != "" {
+		parts = append(parts, s)
+	}
+	if s := formatMatchSet("tags", w.Tags); s != "" {
+		parts = append(parts, s)
+	}
+	if len(w.Tool) > 0 {
+		var toolStrs []string
+		for _, tf := range w.Tool {
+			s := tf.Source + ":" + tf.Name
+			if tf.MCPServer != "" {
+				s += "/" + tf.MCPServer
+			}
+			if tf.Negate {
+				s = "!" + s
+			}
+			toolStrs = append(toolStrs, s)
+		}
+		parts = append(parts, "tool="+strings.Join(toolStrs, ","))
+	}
+	return strings.Join(parts, "; ")
+}
+
+// formatMatchSet formats a MatchSet for human display. Returns empty string if empty.
+// Examples: "language=python,java", "service=!identity,!key-vault"
+func formatMatchSet(name string, ms criteria.MatchSet) string {
+	if ms.IsEmpty() {
+		return ""
+	}
+	var vals []string
+	// Show "is" values first
+	for _, v := range ms.Is {
+		vals = append(vals, v)
+	}
+	// Then "not" values with ! prefix
+	for _, v := range ms.Not {
+		vals = append(vals, "!"+v)
+	}
+	if len(vals) == 0 {
+		return ""
+	}
+	return name + "=" + strings.Join(vals, ",")
 }

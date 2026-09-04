@@ -10,7 +10,7 @@ describe("Footer", () => {
 
   it("renders the tagline", () => {
     render(<Footer />);
-    expect(screen.getByText("Evaluate AI code generation quality for Azure SDKs.")).toBeInTheDocument();
+    expect(screen.getByText("Evaluate AI agent output quality across any domain.")).toBeInTheDocument();
   });
 
   it("renders the copyright with current year", () => {

@@ -15,6 +15,7 @@ func TestRerenderRun(t *testing.T) {
 
 	// Create a report.json
 	r := &report.EvalReport{
+		SchemaVersion:  report.CurrentSchemaVersion,
 		PromptID:       "test-prompt",
 		ConfigName:     "baseline",
 		Timestamp:      "2024-01-15T10:00:00Z",
@@ -42,23 +43,12 @@ func TestRerenderRun(t *testing.T) {
 		t.Fatalf("rerender failed: %v", err)
 	}
 
-	// Check HTML report was generated (now includes promptID in path)
-	htmlPath := filepath.Join(dir, runID, "results", "storage", "data-plane", "go", "auth", "test-prompt", "baseline", "report.html")
-	if _, err := os.Stat(htmlPath); os.IsNotExist(err) {
-		t.Error("expected report.html to exist")
-	}
-
 	// Check MD report was generated
 	mdPath := filepath.Join(dir, runID, "results", "storage", "data-plane", "go", "auth", "test-prompt", "baseline", "report.md")
 	if _, err := os.Stat(mdPath); os.IsNotExist(err) {
 		t.Error("expected report.md to exist")
 	}
 
-	// Check summary HTML was generated
-	summaryHTML := filepath.Join(dir, runID, "summary.html")
-	if _, err := os.Stat(summaryHTML); os.IsNotExist(err) {
-		t.Error("expected summary.html to exist")
-	}
 }
 
 func TestRerenderAll(t *testing.T) {
@@ -71,6 +61,7 @@ func TestRerenderAll(t *testing.T) {
 			t.Fatal(err)
 		}
 		r := &report.EvalReport{
+			SchemaVersion: report.CurrentSchemaVersion,
 			PromptID:   "test-prompt",
 			ConfigName: "baseline",
 			Timestamp:  "2024-01-01T10:00:00Z",
@@ -89,9 +80,9 @@ func TestRerenderAll(t *testing.T) {
 
 	// Check both runs got re-rendered
 	for _, runID := range []string{"20240101-100000", "20240102-100000"} {
-		summaryHTML := filepath.Join(dir, runID, "summary.html")
-		if _, err := os.Stat(summaryHTML); os.IsNotExist(err) {
-			t.Errorf("expected summary.html for run %s", runID)
+		summaryMD := filepath.Join(dir, runID, "summary.md")
+		if _, err := os.Stat(summaryMD); os.IsNotExist(err) {
+			t.Errorf("expected summary.md for run %s", runID)
 		}
 	}
 }
@@ -106,9 +97,9 @@ func TestRerenderNoRunFound(t *testing.T) {
 
 func TestBuildSummaryFromReports(t *testing.T) {
 	reports := []*report.EvalReport{
-		{PromptID: "p1", ConfigName: "c1", Success: true, Duration: 10},
-		{PromptID: "p1", ConfigName: "c2", Success: false, Duration: 20},
-		{PromptID: "p2", ConfigName: "c1", Success: true, Error: "", Duration: 15},
+		{SchemaVersion: report.CurrentSchemaVersion, PromptID: "p1", ConfigName: "c1", Success: true, Duration: 10},
+		{SchemaVersion: report.CurrentSchemaVersion, PromptID: "p1", ConfigName: "c2", Success: false, Duration: 20},
+		{SchemaVersion: report.CurrentSchemaVersion, PromptID: "p2", ConfigName: "c1", Success: true, Error: "", Duration: 15},
 	}
 
 	s := buildSummaryFromReports("run1", reports)

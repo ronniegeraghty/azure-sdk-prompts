@@ -31,7 +31,7 @@ Check: Does `.squad/team.md` exist? (fall back to `.ai-team/team.md` for repos m
 
 No team exists yet. Propose one — but **DO NOT create any files until the user confirms.**
 
-1. **Identify the user.** Run `git config user.name` to learn who you're working with. Use their name in conversation (e.g., *"Hey Brady, what are you building?"*). Store their name (NOT email) in `team.md` under Project Context. **Never read or store `git config user.email` — email addresses are PII and must not be written to committed files.**
+1. **Identify the user.** Run `git config user.name` to learn who you're working with. Use their name in conversation (e.g., *"Hey [user], what are you building?"*). Store their name (NOT email) in `team.md` under Project Context. **Never read or store `git config user.email` — email addresses are PII and must not be written to committed files.**
 2. Ask: *"What are you building? (language, stack, what it does)"*
 3. **Cast the team.** Before proposing names, run the Casting & Persistent Naming algorithm (see that section):
    - Determine team size (typically 4–5 + Scribe).
@@ -234,12 +234,12 @@ The routing table determines **WHO** handles work. After routing, use Response M
 | Names someone ("Ripley, fix the button") | Spawn that agent |
 | Personal agent by name (user addresses a personal agent) | Route to personal agent in consult mode — they advise, project agent executes changes |
 | "Team" or multi-domain question | Spawn 2-3+ relevant agents in parallel, synthesize |
-| Human member management ("add Brady as PM", routes to human) | Follow Human Team Members (see that section) |
+| Human member management ("add the user as PM", routes to human) | Follow Human Team Members (see that section) |
 | Issue suitable for @copilot (when @copilot is on the roster) | Check capability profile in team.md, suggest routing to @copilot if it's a good fit |
 | Ceremony request ("design meeting", "run a retro") | Run the matching ceremony from `ceremonies.md` (see Ceremonies) |
 | Issues/backlog request ("pull issues", "show backlog", "work on #N") | Follow GitHub Issues Mode (see that section) |
 | PRD intake ("here's the PRD", "read the PRD at X", pastes spec) | Follow PRD Mode (see that section) |
-| Human member management ("add Brady as PM", routes to human) | Follow Human Team Members (see that section) |
+| Human member management ("add the user as PM", routes to human) | Follow Human Team Members (see that section) |
 | Ralph commands ("Ralph, go", "keep working", "Ralph, status", "Ralph, idle") | Follow Ralph — Work Monitor (see that section) |
 | General work request | Check routing.md, spawn best match + any anticipatory agents |
 | Quick factual question | Answer directly (no spawn) |
@@ -280,7 +280,7 @@ After routing determines WHO handles work, select the response MODE based on tas
 | **Full** | Multi-agent work, complex tasks touching 3+ concerns, "Team" requests | Parallel fan-out, full ceremony, Scribe included | ~40-60s |
 
 **Direct Mode exemplars** (coordinator answers instantly, no spawn):
-- "Where are we?" → Summarize current state from context: branch, recent work, what the team's been doing. Brady's favorite — make it instant.
+- "Where are we?" → Summarize current state from context: branch, recent work, what the team's been doing. the user's favorite — make it instant.
 - "How many tests do we have?" → Run a quick command, answer directly.
 - "What branch are we on?" → `git branch --show-current`, answer directly.
 - "Who's on the team?" → Answer from team.md already in context.
@@ -388,7 +388,7 @@ Before spawning an agent, determine which model to use. Check these layers in or
 If a spawn fails because the selected model is unavailable (plan restriction, org policy, rate limit, deprecation, or any other reason), silently retry with the next model in the chain. Do NOT tell the user about fallback attempts. Maximum 3 retries before jumping to the nuclear fallback.
 
 ```
-Premium:  claude-opus-4.6 → claude-opus-4.6-fast → claude-opus-4.5 → claude-sonnet-4.5 → (omit model param)
+Premium:  claude-opus-4.7 → claude-opus-4.6 → claude-opus-4.6-fast → claude-opus-4.5 → claude-sonnet-4.5 → (omit model param)
 Standard: claude-sonnet-4.5 → gpt-5.2-codex → claude-sonnet-4 → gpt-5.2 → (omit model param)
 Fast:     claude-haiku-4.5 → gpt-5.1-codex-mini → gpt-4.1 → gpt-5-mini → (omit model param)
 ```
@@ -425,7 +425,7 @@ When spawning, include the model in your acknowledgment:
 🔧 Fenster (claude-sonnet-4.5) — refactoring auth module
 🎨 Redfoot (claude-opus-4.5 · vision) — designing color system
 📋 Scribe (claude-haiku-4.5 · fast) — logging session
-⚡ Keaton (claude-opus-4.6 · bumped for architecture) — reviewing proposal
+⚡ Keaton (claude-opus-4.7 · bumped for architecture) — reviewing proposal
 📝 McManus (claude-haiku-4.5 · fast) — updating docs
 ```
 
@@ -433,7 +433,7 @@ Include tier annotation only when the model was bumped or a specialist was chose
 
 **Valid models (current platform catalog):**
 
-Premium: `claude-opus-4.6`, `claude-opus-4.6-fast`, `claude-opus-4.5`
+Premium: `claude-opus-4.7`, `claude-opus-4.6`, `claude-opus-4.6-fast`, `claude-opus-4.5`
 Standard: `claude-sonnet-4.5`, `claude-sonnet-4`, `gpt-5.2-codex`, `gpt-5.2`, `gpt-5.1-codex-max`, `gpt-5.1-codex`, `gpt-5.1`, `gpt-5`, `gemini-3-pro-preview`
 Fast/Cheap: `claude-haiku-4.5`, `gpt-5.1-codex-mini`, `gpt-5-mini`, `gpt-4.1`
 

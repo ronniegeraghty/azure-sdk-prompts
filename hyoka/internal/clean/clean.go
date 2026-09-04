@@ -337,10 +337,16 @@ func cleanLogs(logsDir string, opts Options, result *Result) error {
 }
 
 // isHyokaSession checks if a session directory was created by hyoka.
-// It looks for workspace.yaml files referencing hyoka report directories
-// or temp directories with hyoka prefixes.
+// It first checks for the .hyoka-session marker file (written by the eval
+// engine since v0.3.1), then falls back to inspecting workspace manifests
+// for hyoka-related paths.
 func isHyokaSession(sessionPath string) bool {
-	// Check workspace.yaml for hyoka working directories
+	// Preferred: check for explicit marker file (#336).
+	if _, err := os.Stat(filepath.Join(sessionPath, ".hyoka-session")); err == nil {
+		return true
+	}
+
+	// Fallback: check workspace.yaml for hyoka working directories
 	wsYaml := filepath.Join(sessionPath, "workspace.yaml")
 	data, err := os.ReadFile(wsYaml)
 	if err == nil {

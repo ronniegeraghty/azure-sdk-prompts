@@ -2,16 +2,19 @@ when:
   service: storage
 graders:
   - name: Storage Account URL Format
+    type: prompt
     weight: 1.0
     prompt: >
       Storage account URL follows the correct pattern
       (https://{account}.blob.core.windows.net) and is parameterized.
   - name: Container/Blob Path Handling
+    type: prompt
     weight: 1.0
     prompt: >
       Container and blob names are properly parameterized
       and validated, not hardcoded.
   - name: SAS Token vs RBAC
+    type: prompt
     weight: 1.0
     prompt: >
       Prefers RBAC-based authentication (DefaultAzureCredential)

@@ -308,35 +308,36 @@ func TestActionTimeline_ToGraderActionLog(t *testing.T) {
 	tl := BuildActionTimeline(records)
 	log := tl.ToGraderActionLog()
 
-	if len(log) != 3 {
-		t.Fatalf("expected 3 grader events, got %d", len(log))
+	// All event types are forwarded; only "complete" half of tool start/complete pairs is dropped.
+	// Expected 6 events: turn_start, file_read view, file_write create, bash, message, turn_end.
+	if len(log) != 6 {
+		t.Fatalf("expected 6 grader events, got %d", len(log))
 	}
 
-	// First: file_read from view
-	if log[0].Tool != "view" {
-		t.Errorf("expected tool 'view', got %s", log[0].Tool)
+	// Spot-check that tool events are still present and typed correctly.
+	var sawView, sawCreate, sawBash, sawMessage bool
+	for _, e := range log {
+		switch e.Type {
+		case "file_read":
+			if e.Tool == "view" {
+				sawView = true
+			}
+		case "file_write":
+			if e.Tool == "create" {
+				sawCreate = true
+			}
+		case "bash":
+			sawBash = true
+		case "message":
+			sawMessage = true
+			if e.Text != "Done" {
+				t.Errorf("expected message Text 'Done', got %q", e.Text)
+			}
+		}
 	}
-	if log[0].Action != "file_read" {
-		t.Errorf("expected action 'file_read', got %s", log[0].Action)
-	}
-	if log[0].TurnNumber != 1 {
-		t.Errorf("expected turn 1, got %d", log[0].TurnNumber)
-	}
-
-	// Second: file_write from create
-	if log[1].Tool != "create" {
-		t.Errorf("expected tool 'create', got %s", log[1].Tool)
-	}
-	if log[1].Action != "file_write" {
-		t.Errorf("expected action 'file_write', got %s", log[1].Action)
-	}
-
-	// Third: bash
-	if log[2].Tool != "bash" {
-		t.Errorf("expected tool 'bash', got %s", log[2].Tool)
-	}
-	if log[2].Action != "bash" {
-		t.Errorf("expected action 'bash', got %s", log[2].Action)
+	if !sawView || !sawCreate || !sawBash || !sawMessage {
+		t.Errorf("missing expected events: view=%v create=%v bash=%v message=%v",
+			sawView, sawCreate, sawBash, sawMessage)
 	}
 }
 
@@ -344,6 +345,49 @@ func TestActionTimeline_ToGraderActionLog_Nil(t *testing.T) {
 	var tl *ActionTimeline
 	if log := tl.ToGraderActionLog(); log != nil {
 		t.Errorf("expected nil for nil timeline, got %v", log)
+	}
+}
+
+// TestActionTimeline_ToGraderActionLog_SkillEvents verifies that tool_call
+// events with Tool="skill" are filtered out, while skill.invoked events with
+// individual skill names are preserved.
+func TestActionTimeline_ToGraderActionLog_SkillEvents(t *testing.T) {
+	records := []report.SessionEventRecord{
+		{Type: "assistant.turn_start", TurnNumber: 1},
+		{Type: "tool.execution_start", ToolName: "skill"}, // Should be filtered
+		{Type: "skill.invoked", SkillName: "markdown-headings"},
+		{Type: "tool.execution_complete", ToolName: "skill"},
+		{Type: "tool.execution_start", ToolName: "skill"}, // Should be filtered
+		{Type: "skill.invoked", SkillName: "markdown-lists"},
+		{Type: "tool.execution_complete", ToolName: "skill"},
+		{Type: "assistant.turn_end", TurnNumber: 1},
+	}
+
+	tl := BuildActionTimeline(records)
+	log := tl.ToGraderActionLog()
+
+	// Should have: turn_start, 2 skill events (not tool_call), turn_end = 4 events
+	if len(log) != 4 {
+		t.Fatalf("expected 4 events, got %d", len(log))
+	}
+
+	// Verify the skill events have individual skill names, not "skill"
+	var sawHeadings, sawLists bool
+	for _, e := range log {
+		if e.Type == "skill" {
+			if e.Tool == "markdown-headings" {
+				sawHeadings = true
+			}
+			if e.Tool == "markdown-lists" {
+				sawLists = true
+			}
+			if e.Tool == "skill" {
+				t.Errorf("found tool_call event with Tool='skill'; should be filtered")
+			}
+		}
+	}
+	if !sawHeadings || !sawLists {
+		t.Errorf("missing skill events: headings=%v lists=%v", sawHeadings, sawLists)
 	}
 }
 

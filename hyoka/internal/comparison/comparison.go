@@ -1,6 +1,8 @@
 // Package comparison provides config-vs-config, run-vs-run, and temporal diff
-// analysis for hyoka evaluation reports. It operates on EvalReport data and
-// produces structured diffs suitable for display or further aggregation.
+// analysis for hyoka evaluation reports. It is the single source of truth for
+// comparison logic: the `hyoka compare` CLI, the serve API, and report
+// auto-generation all share this engine. See ComparisonResult (result.go) for
+// the canonical payload.
 package comparison
 
 import (
@@ -30,57 +32,32 @@ type GraderDiff struct {
 
 // PromptDiff holds the per-prompt aggregate delta between two evaluations.
 type PromptDiff struct {
-	PromptID    string      `json:"prompt_id"`
-	ScoreA      float64     `json:"score_a"`
-	ScoreB      float64     `json:"score_b"`
-	Delta       float64     `json:"delta"` // B − A
+	PromptID    string       `json:"prompt_id"`
+	ScoreA      float64      `json:"score_a"`
+	ScoreB      float64      `json:"score_b"`
+	Delta       float64      `json:"delta"` // B − A
 	GraderDiffs []GraderDiff `json:"grader_diffs,omitempty"`
-	OnlyInA     bool        `json:"only_in_a,omitempty"`
-	OnlyInB     bool        `json:"only_in_b,omitempty"`
+	OnlyInA     bool         `json:"only_in_a,omitempty"`
+	OnlyInB     bool         `json:"only_in_b,omitempty"`
 }
 
 // ComparisonSummary aggregates high-level comparison metrics.
 type ComparisonSummary struct {
-	AvgDelta      float64      `json:"avg_delta"`
-	Improved      int          `json:"improved"`
-	Regressed     int          `json:"regressed"`
-	Unchanged     int          `json:"unchanged"`
-	TopImproved   []PromptDiff `json:"top_improved,omitempty"`
-	TopRegressed  []PromptDiff `json:"top_regressed,omitempty"`
+	AvgDelta     float64      `json:"avg_delta"`
+	Improved     int          `json:"improved"`
+	Regressed    int          `json:"regressed"`
+	Unchanged    int          `json:"unchanged"`
+	TopImproved  []PromptDiff `json:"top_improved,omitempty"`
+	TopRegressed []PromptDiff `json:"top_regressed,omitempty"`
 }
 
-// ConfigComparison holds the result of comparing two configs across a shared prompt set.
-type ConfigComparison struct {
-	ConfigA   string            `json:"config_a"`
-	ConfigB   string            `json:"config_b"`
-	PerPrompt []PromptDiff      `json:"per_prompt"`
-	Summary   ComparisonSummary `json:"summary"`
-}
-
-// RunComparison holds the result of comparing two specific runs.
-type RunComparison struct {
-	RunA      string            `json:"run_a"`
-	RunB      string            `json:"run_b"`
-	PerPrompt []PromptDiff      `json:"per_prompt"`
-	Summary   ComparisonSummary `json:"summary"`
-}
-
-// TemporalComparison holds the result of comparing the latest run against a historical baseline.
-type TemporalComparison struct {
-	Config    string            `json:"config"`
-	LatestRun string            `json:"latest_run"`
-	BaseRun   string            `json:"base_run"`
-	Since     time.Time         `json:"since"`
-	PerPrompt []PromptDiff      `json:"per_prompt"`
-	Summary   ComparisonSummary `json:"summary"`
-}
-
-// ---------- Public API ----------
+// ---------- Public API (disk-backed) ----------
 
 // CompareConfigs loads all reports from reportsDir for the two given config
-// names, matches them by prompt ID, and produces a ConfigComparison.
-func CompareConfigs(reportsDir, configA, configB string) (*ConfigComparison, error) {
-	lg := slog.With("role", "comparison")
+// names, matches them by prompt ID, and produces a ComparisonResult.
+// For each config, the latest report per prompt is used.
+func CompareConfigs(reportsDir, configA, configB string) (*ComparisonResult, error) {
+	lg := slog.With("role", "comparison", "kind", "configs")
 	lg.Debug("Comparing configs", "config_a", configA, "config_b", configB)
 
 	reportsA, err := loadReportsByConfig(reportsDir, configA)
@@ -96,32 +73,22 @@ func CompareConfigs(reportsDir, configA, configB string) (*ConfigComparison, err
 		return nil, fmt.Errorf("no reports found for either config %q or %q", configA, configB)
 	}
 
-	// Use latest report per prompt for each config.
-	latestA := latestByPrompt(reportsA)
-	latestB := latestByPrompt(reportsB)
-
-	diffs := diffPromptMaps(latestA, latestB)
-	summary := buildSummary(diffs)
+	result := CompareReports(KindConfigs, configA, configB, reportsA, reportsB)
 
 	lg.Info("Config comparison complete",
 		"config_a", configA, "config_b", configB,
-		"prompts", len(diffs),
-		"improved", summary.Improved,
-		"regressed", summary.Regressed,
+		"prompts", len(result.PerPrompt),
+		"improved", result.Summary.Improved,
+		"regressed", result.Summary.Regressed,
 	)
-
-	return &ConfigComparison{
-		ConfigA:   configA,
-		ConfigB:   configB,
-		PerPrompt: diffs,
-		Summary:   summary,
-	}, nil
+	return result, nil
 }
 
 // CompareRuns loads all reports from two specific run directories and produces
-// a RunComparison. Run IDs are the timestamp-based directory names under reportsDir.
-func CompareRuns(reportsDir, runA, runB string) (*RunComparison, error) {
-	lg := slog.With("role", "comparison")
+// a ComparisonResult. Run IDs are the timestamp-based directory names under
+// reportsDir.
+func CompareRuns(reportsDir, runA, runB string) (*ComparisonResult, error) {
+	lg := slog.With("role", "comparison", "kind", "runs")
 	lg.Debug("Comparing runs", "run_a", runA, "run_b", runB)
 
 	reportsA, err := loadReportsFromRun(reportsDir, runA)
@@ -137,31 +104,22 @@ func CompareRuns(reportsDir, runA, runB string) (*RunComparison, error) {
 		return nil, fmt.Errorf("no reports found for either run %q or %q", runA, runB)
 	}
 
-	mapA := indexByPromptConfig(reportsA)
-	mapB := indexByPromptConfig(reportsB)
-
-	diffs := diffPromptMaps(mapA, mapB)
-	summary := buildSummary(diffs)
+	result := CompareReports(KindRuns, runA, runB, reportsA, reportsB)
 
 	lg.Info("Run comparison complete",
 		"run_a", runA, "run_b", runB,
-		"prompts", len(diffs),
-		"improved", summary.Improved,
-		"regressed", summary.Regressed,
+		"prompts", len(result.PerPrompt),
+		"improved", result.Summary.Improved,
+		"regressed", result.Summary.Regressed,
 	)
-
-	return &RunComparison{
-		RunA:      runA,
-		RunB:      runB,
-		PerPrompt: diffs,
-		Summary:   summary,
-	}, nil
+	return result, nil
 }
 
-// TemporalDiff compares the latest run for a config against the most recent run
-// at or before `since`. This enables "how has this config changed since date X?"
-func TemporalDiff(reportsDir, config string, since time.Time) (*TemporalComparison, error) {
-	lg := slog.With("role", "comparison")
+// TemporalDiff compares the latest run for a config against the most recent
+// run at or before `since`. Produces a ComparisonResult with Kind == KindTemporal
+// and Config/Since populated.
+func TemporalDiff(reportsDir, config string, since time.Time) (*ComparisonResult, error) {
+	lg := slog.With("role", "comparison", "kind", "temporal")
 	lg.Debug("Temporal diff", "config", config, "since", since)
 
 	all, err := loadReportsByConfig(reportsDir, config)
@@ -175,13 +133,9 @@ func TemporalDiff(reportsDir, config string, since time.Time) (*TemporalComparis
 	// Partition into base (≤ since) and recent (> since).
 	var base, recent []report.EvalReport
 	for _, r := range all {
-		ts, err := time.Parse(time.RFC3339, r.Timestamp)
+		ts, err := parseReportTimestamp(r.Timestamp)
 		if err != nil {
-			// Try fallback format (some reports use a compact timestamp).
-			ts, err = time.Parse("2006-01-02T15:04:05", r.Timestamp)
-			if err != nil {
-				continue
-			}
+			continue
 		}
 		if ts.Before(since) || ts.Equal(since) {
 			base = append(base, r)
@@ -197,38 +151,97 @@ func TemporalDiff(reportsDir, config string, since time.Time) (*TemporalComparis
 		return nil, fmt.Errorf("no reports found for config %q after %s", config, since.Format(time.RFC3339))
 	}
 
-	latestBase := latestByPrompt(base)
-	latestRecent := latestByPrompt(recent)
+	baseRun := runIDFromReport(base[len(base)-1])
+	latestRun := runIDFromReport(recent[len(recent)-1])
 
-	diffs := diffPromptMaps(latestBase, latestRecent)
-	summary := buildSummary(diffs)
-
-	// Determine run IDs from the partitioned reports.
-	baseRun := runIDFromReport(base[len(base)-1], reportsDir)
-	latestRun := runIDFromReport(recent[len(recent)-1], reportsDir)
+	result := CompareReports(KindTemporal, baseRun, latestRun, base, recent)
+	result.Config = config
+	sinceCopy := since
+	result.Since = &sinceCopy
 
 	lg.Info("Temporal diff complete",
 		"config", config, "since", since,
 		"base_run", baseRun, "latest_run", latestRun,
-		"prompts", len(diffs),
-		"improved", summary.Improved,
-		"regressed", summary.Regressed,
+		"prompts", len(result.PerPrompt),
+		"improved", result.Summary.Improved,
+		"regressed", result.Summary.Regressed,
 	)
+	return result, nil
+}
 
-	return &TemporalComparison{
-		Config:    config,
-		LatestRun: latestRun,
-		BaseRun:   baseRun,
-		Since:     since,
+// ---------- Public API (in-memory) ----------
+
+// CompareReports is the core in-memory comparison primitive. Given two slices
+// of EvalReport values, it produces a ComparisonResult. This is the single
+// function used by every comparison surface:
+//
+//   - CompareConfigs / CompareRuns / TemporalDiff call it after loading from disk.
+//   - AutoGenerateForRun calls it to produce pairwise comparisons during
+//     multi-config runs (attached to RunSummary.Comparisons).
+//   - Callers who already have reports in memory can call it directly.
+//
+// For configs comparison, reports are keyed by prompt ID (latest wins). For
+// runs comparison, reports are keyed by prompt+config composite key so
+// multiple configs within a single run each produce their own entry.
+func CompareReports(kind ComparisonKind, labelA, labelB string, reportsA, reportsB []report.EvalReport) *ComparisonResult {
+	var mapA, mapB map[string]*report.EvalReport
+	if kind == KindRuns {
+		mapA = indexByPromptConfig(reportsA)
+		mapB = indexByPromptConfig(reportsB)
+	} else {
+		mapA = latestByPrompt(reportsA)
+		mapB = latestByPrompt(reportsB)
+	}
+
+	diffs := diffPromptMaps(mapA, mapB)
+	summary := buildSummary(diffs)
+
+	return &ComparisonResult{
+		Kind:      kind,
+		LabelA:    labelA,
+		LabelB:    labelB,
 		PerPrompt: diffs,
 		Summary:   summary,
-	}, nil
+	}
+}
+
+// AutoGenerateForRun produces pairwise config comparisons for all config pairs
+// present in the given reports. This is the entry point called at the end of a
+// multi-config run to attach comparisons to the run summary.
+//
+// Returns nil when fewer than two distinct configs are present (nothing to
+// compare). Pairs are emitted in deterministic alphabetical order (A<B).
+func AutoGenerateForRun(reports []report.EvalReport) []ComparisonResult {
+	// Group reports by config name.
+	byConfig := make(map[string][]report.EvalReport)
+	for _, r := range reports {
+		byConfig[r.ConfigName] = append(byConfig[r.ConfigName], r)
+	}
+	if len(byConfig) < 2 {
+		return nil
+	}
+
+	configs := make([]string, 0, len(byConfig))
+	for c := range byConfig {
+		configs = append(configs, c)
+	}
+	sort.Strings(configs)
+
+	var out []ComparisonResult
+	for i := 0; i < len(configs); i++ {
+		for j := i + 1; j < len(configs); j++ {
+			a, b := configs[i], configs[j]
+			res := CompareReports(KindConfigs, a, b, byConfig[a], byConfig[b])
+			out = append(out, *res)
+		}
+	}
+	return out
 }
 
 // ---------- Internal helpers ----------
 
-// loadReportsByConfig walks reportsDir and loads all report.json files
-// whose ConfigName matches the given config.
+// loadReportsByConfig walks reportsDir and loads all report.json files whose
+// ConfigName matches the given config.
 func loadReportsByConfig(reportsDir, config string) ([]report.EvalReport, error) {
 	var reports []report.EvalReport
 	err := filepath.Walk(reportsDir, func(path string, info os.FileInfo, err error) error {
@@ -287,7 +300,6 @@ func loadReport(path string) (*report.EvalReport, error) {
 }
 
 // latestByPrompt selects the most recent report per prompt ID (by timestamp).
-// The returned map key is "{promptID}|{configName}" to uniquely identify entries.
 func latestByPrompt(reports []report.EvalReport) map[string]*report.EvalReport {
 	result := make(map[string]*report.EvalReport)
 	for i := range reports {
@@ -302,7 +314,7 @@ func latestByPrompt(reports []report.EvalReport) map[string]*report.EvalReport {
 }
 
 // indexByPromptConfig indexes reports by a composite key of promptID + configName.
-// For run-vs-run comparison where both runs may have different configs.
+// For run-vs-run comparison where both runs may span multiple configs.
 func indexByPromptConfig(reports []report.EvalReport) map[string]*report.EvalReport {
 	result := make(map[string]*report.EvalReport)
 	for i := range reports {
@@ -323,14 +335,12 @@ func scoreFromReport(r *report.EvalReport) float64 {
 	if r.ScoreBreakdown != nil {
 		return r.ScoreBreakdown.FinalScore
 	}
-	// Compute from grader results if present.
 	if len(r.GraderResults) > 0 {
 		sb := report.BuildScoreBreakdown(r.GraderResults)
 		if sb != nil {
 			return sb.FinalScore
 		}
 	}
-	// Legacy review-based scoring.
 	if r.Review != nil && r.Review.MaxScore > 0 {
 		return float64(r.Review.OverallScore) / float64(r.Review.MaxScore)
 	}
@@ -348,7 +358,7 @@ func graderDiffs(a, b *report.EvalReport) []GraderDiff {
 		indexB[b.GraderResults[i].GraderName] = &b.GraderResults[i]
 	}
 
-	// Collect all grader names in deterministic order.
+	// Deterministic ordering: graders from A first (in order), then new ones from B.
 	seen := make(map[string]bool)
 	var names []string
 	for _, g := range a.GraderResults {
@@ -369,11 +379,11 @@ func graderDiffs(a, b *report.EvalReport) []GraderDiff {
 		gd := GraderDiff{Name: name}
 		if ga, ok := indexA[name]; ok {
 			gd.ScoreA = ga.Score
-			gd.PassA = ga.Pass != nil && *ga.Pass
+			gd.PassA = ga.Pass
 		}
 		if gb, ok := indexB[name]; ok {
 			gd.ScoreB = gb.Score
-			gd.PassB = gb.Pass != nil && *gb.Pass
+			gd.PassB = gb.Pass
 		}
 		gd.Delta = gd.ScoreB - gd.ScoreA
 		diffs = append(diffs, gd)
@@ -386,7 +396,6 @@ func diffPromptMaps(mapA, mapB map[string]*report.EvalReport) []PromptDiff {
 	seen := make(map[string]bool)
 	var keys []string
 	for k := range mapA {
-		// Strip config suffix from composite keys if present.
 		pid := promptIDFromKey(k)
 		if !seen[pid] {
 			seen[pid] = true
@@ -426,7 +435,7 @@ func diffPromptMaps(mapA, mapB map[string]*report.EvalReport) []PromptDiff {
 	return diffs
 }
 
-// buildSummary computes aggregate metrics and top N lists from prompt diffs.
+// buildSummary computes aggregate metrics and top-N lists from prompt diffs.
 func buildSummary(diffs []PromptDiff) ComparisonSummary {
 	const topN = 5
 	const unchangedThreshold = 0.001
@@ -455,12 +464,10 @@ func buildSummary(diffs []PromptDiff) ComparisonSummary {
 		s.AvgDelta = totalDelta / float64(paired)
 	}
 
-	// Top improved — largest positive delta first.
 	improved := filterPaired(diffs, func(d PromptDiff) bool { return d.Delta > unchangedThreshold })
 	sort.Slice(improved, func(i, j int) bool { return improved[i].Delta > improved[j].Delta })
 	s.TopImproved = take(improved, topN)
 
-	// Top regressed — largest negative delta first (most negative = worst).
 	regressed := filterPaired(diffs, func(d PromptDiff) bool { return d.Delta < -unchangedThreshold })
 	sort.Slice(regressed, func(i, j int) bool { return regressed[i].Delta < regressed[j].Delta })
 	s.TopRegressed = take(regressed, topN)
@@ -476,14 +483,12 @@ func promptIDFromKey(key string) string {
 	return key
 }
 
-// findByPromptID finds the first entry in a map whose key starts with the given
-// prompt ID (handling both bare keys and composite "promptID|config" keys).
+// findByPromptID finds the first entry in a map whose key starts with the
+// given prompt ID (handles both bare keys and composite keys).
 func findByPromptID(m map[string]*report.EvalReport, promptID string) *report.EvalReport {
-	// Direct lookup (simple key).
 	if r, ok := m[promptID]; ok {
 		return r
 	}
-	// Composite key scan.
 	for k, r := range m {
 		if promptIDFromKey(k) == promptID {
 			return r
@@ -492,13 +497,22 @@ func findByPromptID(m map[string]*report.EvalReport, promptID string) *report.Ev
 	return nil
 }
 
-// runIDFromReport attempts to extract the run ID from a report's timestamp.
-func runIDFromReport(r report.EvalReport, _ string) string {
-	ts, err := time.Parse(time.RFC3339, r.Timestamp)
+// runIDFromReport formats the report's timestamp as a run ID.
+func runIDFromReport(r report.EvalReport) string {
+	ts, err := parseReportTimestamp(r.Timestamp)
 	if err != nil {
 		return r.Timestamp
 	}
 	return ts.Format("20060102-150405")
+}
+
+// parseReportTimestamp parses a report timestamp in either RFC3339 or compact
+// form.
+func parseReportTimestamp(ts string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, ts); err == nil {
+		return t, nil
+	}
+	return time.Parse("2006-01-02T15:04:05", ts)
 }
 
 // filterPaired returns only diffs that appear in both sides.
@@ -522,5 +536,3 @@ func take(s []PromptDiff, n int) []PromptDiff {
 	}
 	return s[:n]
 }
-
-

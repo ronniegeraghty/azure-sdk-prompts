@@ -1,0 +1,14 @@
+chore(review): drop dead text-keyed legacy parser path
+
+The legacy parseReviewResponse function used text-based criterion keying,
+which is non-deterministic (paraphrase variance). After C1+C2, the panel
+path always provides checks[] to runSingleReview, so the parseReviewResponse
+fallback branch is unreachable.
+
+This commit:
+- Updates CopilotReviewer to use parseReviewResponseV2 with id-aware parsing
+- Removes the else-branch fallback in runSingleReview (no-checks path)
+- Deletes parseReviewResponse function entirely
+- Removes tests that exercised the legacy parser
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

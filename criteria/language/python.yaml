@@ -2,11 +2,13 @@ when:
   language: python
 graders:
   - name: Correct Package Imports
+    type: prompt
     weight: 1.0
     prompt: >
       Imports use the latest azure-sdk-for-python package structure
       (azure.*), not deprecated packages.
   - name: DefaultAzureCredential Usage
+    type: prompt
     weight: 1.0
     prompt: >
       Authentication matches what the prompt asks for. If the prompt
@@ -19,17 +21,36 @@ graders:
       always fail — required values should come from environment
       variables or a secret store.
   - name: Context Manager for Clients
+    type: prompt
     weight: 1.0
     prompt: >
       Azure SDK clients that support context managers are used with
       `with` statements or explicitly closed.
   - name: Async Client Usage
+    type: prompt
     weight: 1.0
     prompt: >
       If async operations are requested, code uses the async client
       variant with proper await patterns.
   - name: Proper Exception Handling
+    type: prompt
     weight: 1.0
     prompt: >
       Azure SDK exceptions (HttpResponseError and subclasses) are
       caught and handled appropriately.
+  - name: Output Files Exist
+    type: workspace
+    weight: 1.0
+    checks:
+      - kind: file
+        name: "*.py"
+        state: present
+        min_bytes: 1
+  - name: Tool Usage Verification
+    type: tool
+    weight: 1.0
+    checks:
+      - kind: tool_used
+        tool: azure
+        source: mcp
+        mcp_server: azure

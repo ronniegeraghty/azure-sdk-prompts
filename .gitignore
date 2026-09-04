@@ -1,12 +1,7 @@
 # Go
-/tool/sdk-eval
-/tool/sdk-eval.exe
-/tool/azsdk-prompt-eval
-/tool/azsdk-prompt-eval.exe
 bin/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -38,13 +33,8 @@ logs/
 skills-lock.json
 
 # Node modules
-site/node_modules/
+node_modules/
 
-# Site build output (embedded copy lives in hyoka/internal/serve/site/)
-site/dist/
-
-# Built binary
-/hyoka/azsdk-prompt-eval
 # Squad: ignore runtime state (logs, inbox, sessions)
 .squad/orchestration-log/
 .squad/log/
@@ -56,5 +46,14 @@ site/dist/
 # Playwright MCP snapshots
 .playwright-mcp/
 
-# Remote skill cache (populated on first run / dry-run by internal/skills/fetcher.go)
+# Local Playwright debug artifacts
+.morpheus-screenshots/
+.playwright-cli/
+.trinity-screenshots/
+
+# Skill fetch cache
 .skills-cache/
+
+# Smoke test artifacts
+smoke-test-output/
+test_output.txt

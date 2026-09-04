@@ -17,3 +17,57 @@ Agent Ralph initialized as Work Monitor for hyoka. Tracks GitHub issues, PR stat
 ## Learnings
 
 Initial setup complete.
+
+## 2026-04-17: Phase 4 Verified — Ready for v0.3.1 Release
+
+Morpheus 🕶️ completed Phase 4 dogfood verification (6/6 checks PASSED, zero blockers). All subsystems verified: build, live eval, comparison auto-generation, serve endpoints, hierarchical criteria, cleanup. Recommendation: **Promote dev → main and cut v0.3.1 tag.**
+
+Decision: .squad/decisions.md | Orchestration Log: .squad/orchestration-log/2026-04-17T20:53:40Z-morpheus.md
+
+---
+
+### 2026-04-23: Learnings — Squad Default Model = claude-opus-4.7
+
+- **Model default:** Every squad agent (including Scribe and Ralph) now runs on **claude-opus-4.7** until the user clears the preference. Set via `defaultModel` in `.squad/config.json`. Layer 0 override — beats Layer 3 task-aware selection.
+- **Source:** User directive 2026-04-23; merged into `.squad/decisions.md`.
+---
+
+## 2026-04-24T06:00Z: TEAM DIRECTIVE — Work on `ronniegeraghty/dev`
+
+**By:** Ronnie (User directive captured by Copilot)  
+**Status:** Active
+
+Going forward, the team works directly on the `ronniegeraghty/dev` branch with frequent commit points. No more transient feature branches like `ronniegeraghty/prompt-grader-checks` for in-flight squad work — merge to dev and keep moving.
+
+**Rationale:** User request — streamline workflow, reduce branch proliferation, enable continuous integration of squad work.
+
+**Action:** Update your local branch strategy. All future work targets dev with regular commits.
+
+
+---
+
+## 2026-04-24: 🚨 Team default model is now claude-opus-4.7
+
+Per `.squad/config.json` (`defaultModel: claude-opus-4.7`) and the standing policy at the top of `.squad/decisions.md`:
+
+- **Every agent spawn defaults to `claude-opus-4.7`.**
+- **`claude-haiku-4.5` is FORBIDDEN.** Even if your charter says "preferred: claude-haiku-4.5", that line is overridden. No Haiku, ever.
+- **`claude-sonnet-4.5`** (latest Sonnet) is allowed only for trivial mechanical work where opus-4.7 would be wasteful.
+- This affects what every future spawn looks like — expect opus-4.7 as your model.
+
+- **Windows filenames:** Never use `:` in any filename. For ISO 8601 timestamps, use hyphens: `2026-04-24T23-58-37Z` not `2026-04-24T23:58:37Z`. Commit 8148ba13 renamed 83 files. See `.squad/decisions.md` and `.squad/skills/windows-compatibility/SKILL.md`.
+
+## 2026-04-29: Site PR review directive — Flag missing `site/dist/` rebuilds
+
+**From .squad/decisions.md (2026-04-29)**
+
+When reviewing PRs that touch `site/`, check:
+1. **Is `site/dist/` rebuilt?** Run `cd site && npm run build` and verify dist changes are committed
+2. **Does PR include both source and dist?** Incomplete site PRs lack rebuilt dist
+
+Flag as incomplete if:
+- PR touches `site/` but dist is unchanged or missing
+- `npm run build` would fail (type errors, broken imports)
+
+**Rationale:** Multiple PRs shipped stale dist, causing "I don't see my change" issues. Now a gating check.
+

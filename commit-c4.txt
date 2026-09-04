@@ -1,0 +1,14 @@
+docs(skill): update deterministic-llm-panel skill with retry-then-synthesize contract
+
+Previously documented "retry-then-drop" (2 retries, drop reviewer on failure).
+After C2 (1f3c9ec9), the actual behavior is "retry-then-synthesize":
+- 3 retries with precise id-mismatch feedback
+- Synthesize failing CriterionResult for missing IDs after 3 strikes
+- Never drop reviewer (panel size stays constant)
+- MaxScore = len(expected) always (no variable scores)
+
+Updated:
+- Section 3: Validator Retry-Then-Synthesize (new behavior + code example)
+- Frontmatter: confidence=high (validated across multiple runs)
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

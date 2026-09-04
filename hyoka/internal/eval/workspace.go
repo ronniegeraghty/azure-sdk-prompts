@@ -182,7 +182,7 @@ func resolveStarterDir(p *prompt.Prompt) string {
 	return dir
 }
 
-// listFiles is a helper used by Workspace and CopilotSDKEvaluator.
+// listFiles is a helper used by Workspace and PromptRunner implementations.
 func listFiles(dir string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -193,7 +193,7 @@ func listFiles(dir string) ([]string, error) {
 			if strings.HasPrefix(info.Name(), ".") && path != dir {
 				return filepath.SkipDir
 			}
-			if utils.IsBuildArtifactDir(info.Name()) {
+			if utils.IsDefaultExcludedDir(info.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -258,8 +258,8 @@ func copyDir(src, dst string) error {
 			if strings.HasPrefix(name, ".") && path != src {
 				return filepath.SkipDir
 			}
-			if utils.IsBuildArtifactDir(name) {
-				slog.Debug("Skipping build artifact directory", "dir", name)
+			if utils.IsDefaultExcludedDir(name) {
+				slog.Debug("Skipping excluded directory", "dir", name)
 				return filepath.SkipDir
 			}
 		}
@@ -280,7 +280,7 @@ func copyDir(src, dst string) error {
 }
 
 // NewIsolatedConfigDir creates an empty temporary directory to serve as the
-// Copilot CLI configuration directory. By pointing ConfigDir at this empty
+// Copilot CLI configuration directory. By pointing ConfigDirectory at this empty
 // directory, user-level skills and settings from ~/.config/github-copilot/
 // are excluded from eval sessions. Only skills explicitly listed in the eval
 // config's SkillDirectories are loaded (fixes #21).
@@ -291,6 +291,19 @@ func NewIsolatedConfigDir() (string, error) {
 		return "", fmt.Errorf("creating isolated config dir: %w", err)
 	}
 	return dir, nil
+}
+
+// IsolateGraderWorkspace creates an ephemeral copy of sourceDir and returns
+// the path together with a cleanup function. Each grader is given its own
+// isolated copy so mutating graders (e.g. program graders running `make` or
+// `npm install`) cannot pollute the workspace seen by subsequent graders.
+// The original sourceDir is the canonical snapshot and remains untouched.
+func IsolateGraderWorkspace(sourceDir string) (string, func(), error) {
+	dir, err := NewReviewerWorkspace(sourceDir)
+	if err != nil {
+		return "", func() {}, err
+	}
+	return dir, func() { _ = os.RemoveAll(dir) }, nil
 }
 
 // NewReviewerWorkspace creates an ephemeral temporary workspace and copies
@@ -333,7 +346,7 @@ func ValidateWorkspaceContainment(dir string, preSnapshot map[string]bool) []str
 	return escaped
 }
 
-// codeFileExts lists extensions that indicate generated code files.
+// codeFileExts lists extensions that indicate output files.
 var codeFileExts = map[string]bool{
 	".py": true, ".cs": true, ".java": true, ".go": true, ".rs": true,
 	".ts": true, ".js": true, ".cpp": true, ".c": true, ".h": true,

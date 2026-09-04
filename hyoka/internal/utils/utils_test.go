@@ -45,10 +45,10 @@ t.Errorf("ExtractJSON(%q) = %q, want %q", tt.input, got, tt.want)
 }
 
 // ---------------------------------------------------------------------------
-// IsBuildArtifactDir tests
+// IsDefaultExcludedDir tests
 // ---------------------------------------------------------------------------
 
-func TestIsBuildArtifactDir(t *testing.T) {
+func TestIsDefaultExcludedDir(t *testing.T) {
 tests := []struct {
 name string
 want bool
@@ -81,9 +81,33 @@ want bool
 
 for _, tt := range tests {
 t.Run(tt.name, func(t *testing.T) {
-got := IsBuildArtifactDir(tt.name)
+got := IsDefaultExcludedDir(tt.name)
 if got != tt.want {
-t.Errorf("IsBuildArtifactDir(%q) = %v, want %v", tt.name, got, tt.want)
+t.Errorf("IsDefaultExcludedDir(%q) = %v, want %v", tt.name, got, tt.want)
+}
+})
+}
+}
+
+func TestShouldExcludeDir(t *testing.T) {
+tests := []struct {
+name  string
+extra []string
+want  bool
+}{
+{"node_modules", nil, true},
+{"vendor", nil, true},
+{"src", nil, false},
+{"custom_dir", []string{"custom_dir", "another"}, true},
+{"another", []string{"custom_dir", "another"}, true},
+{"src", []string{"custom_dir"}, false},
+{"target", []string{"custom_dir"}, true},
+}
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+got := ShouldExcludeDir(tt.name, tt.extra)
+if got != tt.want {
+t.Errorf("ShouldExcludeDir(%q, %v) = %v, want %v", tt.name, tt.extra, got, tt.want)
 }
 })
 }

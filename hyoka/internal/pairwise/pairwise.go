@@ -6,10 +6,13 @@ package pairwise
 import (
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/ronniegeraghty/hyoka/hyoka/internal/config"
+	"github.com/ronniegeraghty/hyoka/hyoka/internal/plugin"
 )
 
 // ExpandPairwise generates N+1 config variants from a base config.
@@ -19,8 +22,12 @@ import (
 // Tools with AlwaysOn: true in Generator.Tools are never toggled.
 // Entries marked pairwise: off are excluded. MCP entries can opt into deep
 // toggling, which expands their mcp_tools list into individual variants.
-func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
-	togglable := collectTogglable(base)
+// Skill_dir entries with pairwise: deep expand each subdirectory skill into
+// its own variant.
+//
+// The baseDir parameter is used to resolve relative paths in skill_dir entries.
+func ExpandPairwise(base config.ToolConfig, baseDir string) []config.ToolConfig {
+	togglable := collectTogglable(base, baseDir)
 
 	variants := make([]config.ToolConfig, 0, len(togglable)+1)
 
@@ -41,7 +48,9 @@ func ExpandPairwise(base config.ToolConfig) []config.ToolConfig {
 }
 
 // collectTogglable returns deduplicated tool names eligible for toggling.
-func collectTogglable(cfg config.ToolConfig) []string {
+// For skill_dir entries with pairwise: deep, each subdirectory skill is
+// enumerated and returned as "{entry-name}/{skill-name}".
+func collectTogglable(cfg config.ToolConfig, baseDir string) []string {
 	if cfg.Generator == nil {
 		return nil
 	}
@@ -53,6 +62,7 @@ func collectTogglable(cfg config.ToolConfig) []string {
 		if te.ResolvedPairwise() == "off" {
 			continue
 		}
+		// MCP deep mode: enumerate mcp_tools
 		if te.ResolvedPairwise() == "deep" && te.ResolvedType() == "mcp" {
 			if len(te.MCPTools) == 0 || containsWildcard(te.MCPTools) {
 				if !seen[te.Name] {
@@ -71,6 +81,33 @@ func collectTogglable(cfg config.ToolConfig) []string {
 			}
 			continue
 		}
+		// Skill_dir deep mode: enumerate subdirectory skills
+		if te.ResolvedPairwise() == "deep" && te.ResolvedType() == "skill" && te.SkillDir {
+			skills := enumerateSkillDir(te, baseDir)
+			for _, skill := range skills {
+				name := fmt.Sprintf("%s/%s", te.Name, skill)
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				tools = append(tools, name)
+			}
+			continue
+		}
+		// Plugin deep mode: enumerate plugin tools (skills and MCP servers)
+		if te.ResolvedPairwise() == "deep" && te.ResolvedType() == "tool" {
+			pluginTools := enumeratePluginTools(te, baseDir)
+			for _, toolName := range pluginTools {
+				name := fmt.Sprintf("%s/%s", te.Name, toolName)
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				tools = append(tools, name)
+			}
+			continue
+		}
+		// Shallow mode (default): toggle the entire entry
 		if !seen[te.Name] {
 			seen[te.Name] = true
 			tools = append(tools, te.Name)
@@ -80,26 +117,111 @@ func collectTogglable(cfg config.ToolConfig) []string {
 	return tools
 }
 
+// enumerateSkillDir returns the list of skill subdirectory names in the given
+// skill_dir entry. Each subdirectory containing SKILL.md is treated as a skill.
+// The returned names are subdirectory basenames (e.g., "markdown-headings").
+func enumerateSkillDir(entry config.ToolEntry, baseDir string) []string {
+	if entry.Path == "" {
+		return nil
+	}
+
+	// Resolve path relative to baseDir
+	path := entry.Path
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(baseDir, path)
+	}
+
+	// Read directory
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		// Silently skip — resolution failures are handled elsewhere
+		return nil
+	}
+
+	var skills []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		subDir := filepath.Join(path, e.Name())
+		if _, err := os.Stat(filepath.Join(subDir, "SKILL.md")); err == nil {
+			skills = append(skills, e.Name())
+		}
+	}
+
+	return skills
+}
+
+// enumeratePluginTools returns the list of tool names (skills + MCP servers)
+// exposed by a plugin. Each tool is returned as its bare name (e.g., "azure-search").
+// Resolution silently skips missing plugins.
+func enumeratePluginTools(entry config.ToolEntry, baseDir string) []string {
+	// Try loading the plugin from the registry
+	reg := plugin.NewRegistry()
+	if entry.Path != "" {
+		path := entry.Path
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(baseDir, path)
+		}
+		if err := reg.LoadDir(path); err != nil {
+			return nil
+		}
+	}
+	
+	p, err := reg.Get(entry.Name)
+	if err != nil || p == nil {
+		return nil
+	}
+	
+	var tools []string
+	for _, toolEntry := range p.ToToolEntries() {
+		tools = append(tools, toolEntry.Name)
+	}
+	return tools
+}
+
 // removeTool removes a named tool from Generator.Tools in the given config.
+// For skill_dir deep variants ("{entry}/{skill}"), it adds the skill to the
+// entry's ExcludedSkills list instead of removing the entire entry.
 func removeTool(cfg *config.ToolConfig, name string) {
 	if cfg.Generator == nil {
 		return
 	}
 
 	if strings.Contains(name, "/") {
-		mcpName, toolName, ok := strings.Cut(name, "/")
-		if ok {
-			for i, te := range cfg.Generator.Tools {
-				if te.ResolvedType() != "mcp" || te.Name != mcpName {
-					continue
-				}
-				te.MCPTools = removeMCPTool(te.MCPTools, toolName)
+		entryName, subName, ok := strings.Cut(name, "/")
+		if !ok {
+			return
+		}
+		// Check if this is an MCP deep variant
+		for i, te := range cfg.Generator.Tools {
+			if te.ResolvedType() == "mcp" && te.Name == entryName {
+				te.MCPTools = removeMCPTool(te.MCPTools, subName)
+				cfg.Generator.Tools[i] = te
+				return
+			}
+		}
+		// Check if this is a skill_dir deep variant
+		for i, te := range cfg.Generator.Tools {
+			if te.ResolvedType() == "skill" && te.SkillDir && te.Name == entryName {
+				// Add to exclusion list
+				te.ExcludedSkills = append(te.ExcludedSkills, subName)
+				cfg.Generator.Tools[i] = te
+				return
+			}
+		}
+		// Check if this is a plugin deep variant
+		for i, te := range cfg.Generator.Tools {
+			if te.ResolvedType() == "tool" && te.Name == entryName {
+				// Add to exclusion list
+				te.ExcludedTools = append(te.ExcludedTools, subName)
 				cfg.Generator.Tools[i] = te
 				return
 			}
 		}
 	}
 
+	// Shallow removal: remove the entire entry
 	var tools []config.ToolEntry
 	for _, te := range cfg.Generator.Tools {
 		if te.Name != name {
@@ -137,6 +259,16 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 					tools := make([]string, len(te.MCPTools))
 					copy(tools, te.MCPTools)
 					gen.Tools[i].MCPTools = tools
+				}
+				if te.ExcludedSkills != nil {
+					excluded := make([]string, len(te.ExcludedSkills))
+					copy(excluded, te.ExcludedSkills)
+					gen.Tools[i].ExcludedSkills = excluded
+				}
+				if te.ExcludedTools != nil {
+					excluded := make([]string, len(te.ExcludedTools))
+					copy(excluded, te.ExcludedTools)
+					gen.Tools[i].ExcludedTools = excluded
 				}
 			}
 		}
@@ -176,6 +308,16 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 					copy(tools, te.MCPTools)
 					rev.Tools[i].MCPTools = tools
 				}
+				if te.ExcludedSkills != nil {
+					excluded := make([]string, len(te.ExcludedSkills))
+					copy(excluded, te.ExcludedSkills)
+					rev.Tools[i].ExcludedSkills = excluded
+				}
+				if te.ExcludedTools != nil {
+					excluded := make([]string, len(te.ExcludedTools))
+					copy(excluded, te.ExcludedTools)
+					rev.Tools[i].ExcludedTools = excluded
+				}
 			}
 		}
 		if len(src.Reviewer.Models) > 0 {
@@ -183,11 +325,6 @@ func cloneToolConfig(src config.ToolConfig) config.ToolConfig {
 			copy(rev.Models, src.Reviewer.Models)
 		}
 		dst.Reviewer = &rev
-	}
-
-	if len(src.Plugins) > 0 {
-		dst.Plugins = make([]string, len(src.Plugins))
-		copy(dst.Plugins, src.Plugins)
 	}
 
 	return dst
@@ -242,12 +379,25 @@ type ToolImpact struct {
 	WithoutPass   bool    `json:"without_pass"`
 }
 
+// PairwiseCheckDiff represents a single check comparison between baseline and variant.
+type PairwiseCheckDiff struct {
+	GraderName     string `json:"grader_name"`  // grader the check belongs to
+	GraderType     string `json:"grader_type"`  // kind of grader
+	CheckID        string `json:"check_id"`     // stable id (e.g., check_1)
+	CheckLabel     string `json:"check_label"`  // human label
+	BaselinePassed bool   `json:"baseline_passed"`
+	VariantPassed  bool   `json:"variant_passed"`
+	Movement       string `json:"movement"`     // "improved" | "regressed" | "unchanged"
+	Reasoning      string `json:"reasoning,omitempty"` // optional — variant reviewer's reasoning if it failed
+}
+
 // PairwiseReport holds the complete pairwise comparison results for a prompt.
 type PairwiseReport struct {
-	PromptID string          `json:"prompt_id"`
-	Baseline VariantResult   `json:"baseline"`
-	Variants []VariantResult `json:"variants"`
-	Impacts  []ToolImpact    `json:"impacts"`
+	PromptID   string                       `json:"prompt_id"`
+	Baseline   VariantResult                `json:"baseline"`
+	Variants   []VariantResult              `json:"variants"`
+	Impacts    []ToolImpact                 `json:"impacts"`
+	CheckDiffs map[string][]PairwiseCheckDiff `json:"check_diffs,omitempty"` // keyed by variant config name
 }
 
 // normalizeScore converts a raw score/maxScore pair to a 0-100 scale.
@@ -308,6 +458,165 @@ func SortByImpact(impacts []ToolImpact) {
 		}
 		return impacts[i].ToolName < impacts[j].ToolName
 	})
+}
+
+// EvalReportData is the minimal data needed from an EvalReport to compute check diffs.
+// This avoids an import cycle (pairwise → report → pairwise).
+type EvalReportData struct {
+	ConfigName string
+	Graders    []GraderData
+}
+
+// GraderData mirrors the essential fields from report.GraderResult.
+type GraderData struct {
+	Name   string
+	Type   string
+	Checks []PointData
+}
+
+// PointData mirrors the essential fields from report.GraderCheck.
+type PointData struct {
+	Label   string
+	Pass    bool
+	Message string
+}
+
+// ComputeCheckDiffs compares grader points between baseline and variants.
+// Returns a map keyed by variant config name, each containing per-check diffs.
+func ComputeCheckDiffs(baseline *EvalReportData, variants []*EvalReportData) map[string][]PairwiseCheckDiff {
+	if baseline == nil || len(variants) == 0 {
+		return nil
+	}
+
+	// Build baseline check index: graderName → checkIndex → point
+	baselineChecks := indexPoints(baseline)
+	
+	result := make(map[string][]PairwiseCheckDiff)
+	
+	for _, variant := range variants {
+		variantChecks := indexPoints(variant)
+		var diffs []PairwiseCheckDiff
+		
+		// Sort grader names for deterministic iteration order
+		var graderNames []string
+		for name := range baselineChecks {
+			graderNames = append(graderNames, name)
+		}
+		sort.Strings(graderNames)
+		
+		// Compare each grader in sorted order
+		for _, graderName := range graderNames {
+			baselinePoints := baselineChecks[graderName]
+			variantPoints, hasVariant := variantChecks[graderName]
+
+			// Iterate baseline check indices in sorted order so diff
+			// ordering is deterministic (map iteration is randomized).
+			baseIdxs := make([]int, 0, len(baselinePoints))
+			for idx := range baselinePoints {
+				baseIdxs = append(baseIdxs, idx)
+			}
+			sort.Ints(baseIdxs)
+
+			for _, checkIdx := range baseIdxs {
+				basePoint := baselinePoints[checkIdx]
+				varPoint, hasCheck := variantPoints[checkIdx]
+				
+				var movement string
+				varPassed := false
+				varReasoning := ""
+				
+				if hasCheck {
+					varPassed = varPoint.Pass
+					varReasoning = varPoint.Message
+					
+					// Determine movement
+					if !basePoint.Pass && varPassed {
+						movement = "improved"
+					} else if basePoint.Pass && !varPassed {
+						movement = "regressed"
+					} else {
+						movement = "unchanged"
+					}
+				} else {
+					// Missing check in variant — treat as unchanged
+					movement = "unchanged"
+				}
+				
+				diffs = append(diffs, PairwiseCheckDiff{
+					GraderName:     graderName,
+					GraderType:     basePoint.Type,
+					CheckID:        fmt.Sprintf("check_%d", checkIdx),
+					CheckLabel:     basePoint.Label,
+					BaselinePassed: basePoint.Pass,
+					VariantPassed:  varPassed,
+					Movement:       movement,
+					Reasoning:      varReasoning,
+				})
+			}
+			
+			// Handle checks that exist in variant but not in baseline (rare)
+			if hasVariant {
+				varIdxs := make([]int, 0, len(variantPoints))
+				for idx := range variantPoints {
+					varIdxs = append(varIdxs, idx)
+				}
+				sort.Ints(varIdxs)
+				for _, checkIdx := range varIdxs {
+					varPoint := variantPoints[checkIdx]
+					if _, exists := baselinePoints[checkIdx]; !exists {
+						diffs = append(diffs, PairwiseCheckDiff{
+							GraderName:     graderName,
+							GraderType:     varPoint.Type,
+							CheckID:        fmt.Sprintf("check_%d", checkIdx),
+							CheckLabel:     varPoint.Label,
+							BaselinePassed: false,
+							VariantPassed:  varPoint.Pass,
+							Movement:       "unchanged", // New check, treat as unchanged
+							Reasoning:      varPoint.Message,
+						})
+					}
+				}
+			}
+		}
+		
+		result[variant.ConfigName] = diffs
+	}
+	
+	return result
+}
+
+// indexedPointData holds point data for comparison.
+type indexedPointData struct {
+	Label   string
+	Pass    bool
+	Message string
+	Type    string
+}
+
+// indexPoints builds a map of graderName → checkIndex → point data.
+func indexPoints(data *EvalReportData) map[string]map[int]indexedPointData {
+	if data == nil {
+		return nil
+	}
+	
+	result := make(map[string]map[int]indexedPointData)
+	
+	for _, grader := range data.Graders {
+		if _, exists := result[grader.Name]; !exists {
+			result[grader.Name] = make(map[int]indexedPointData)
+		}
+		
+		for i, point := range grader.Checks {
+			result[grader.Name][i] = indexedPointData{
+				Label:   point.Label,
+				Pass:    point.Pass,
+				Message: point.Message,
+				Type:    grader.Type,
+			}
+		}
+	}
+	
+	return result
 }
 
 // AggregateImpacts merges impacts from multiple prompts into a single per-tool summary.

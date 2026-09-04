@@ -1,5 +1,7 @@
 package prompt
 
+import "github.com/ronniegeraghty/hyoka/hyoka/internal/criteria"
+
 // Prompt represents a parsed prompt file (.prompt.md, .prompt.yaml, or .prompt.yml)
 // with metadata and prompt text.
 //
@@ -19,6 +21,13 @@ MaxTurns          int               `yaml:"max_turns" json:"max_turns,omitempty"
 ExpectedPkgs      []string          `yaml:"expected_packages" json:"expected_packages,omitempty"`
 ExpectedTools     []string          `yaml:"expected_tools" json:"expected_tools,omitempty"`
 
+// Group is an optional logical grouping label used by reports/site to
+// cluster related prompt evaluations (e.g., "crud-operations",
+// "auth-flows"). Empty string means ungrouped. Validation rules:
+// kebab-case (lowercase ASCII letters/digits/hyphens), 1-64 chars,
+// must start with a letter, no leading/trailing/consecutive hyphens.
+Group string `yaml:"group" json:"group,omitempty"`
+
 // Properties holds all metadata string fields (service, language, plane, etc.).
 // Keys must be snake_case.
 Properties map[string]string `yaml:"properties" json:"properties"`
@@ -31,8 +40,29 @@ PromptText string `yaml:"-" json:"prompt_text"`
 // or from the evaluation_criteria field (.prompt.yaml/.prompt.yml)
 EvaluationCriteria string `yaml:"-" json:"evaluation_criteria,omitempty"`
 
+// ParsedCriteria is the structured representation of EvaluationCriteria,
+// extracted by ParseEvaluationCriteria during prompt parsing.
+ParsedCriteria []CriterionEntry `yaml:"-" json:"parsed_criteria,omitempty"`
+
+// Graders defined inline on the prompt file. Same schema as criteria/**.yaml.
+// Both .prompt.yaml and .prompt.md frontmatter support this field.
+// Parsed during prompt loading and validated to forbid `when:` clauses.
+Graders []criteria.UnifiedGraderEntry `yaml:"graders,omitempty" json:"graders,omitempty"`
+
 // Source file path
 FilePath string `yaml:"-" json:"file_path"`
+}
+
+// CriterionEntry represents the parsed evaluation criteria from a prompt
+// file. After the grader-redesign rewrite of ParseEvaluationCriteria, exactly
+// one CriterionEntry is produced per prompt: the leading non-bullet text is
+// captured as Prompt (preamble) and every "- " bullet becomes one entry in
+// Checks. SubPoints is preserved for back-compat with on-disk reports/tests
+// but is no longer populated by the parser.
+type CriterionEntry struct {
+Prompt    string   `json:"prompt"`
+Checks    []string `json:"checks,omitempty"`
+SubPoints []string `json:"sub_points,omitempty"`
 }
 
 // Property returns the value of a metadata property by key.

@@ -1,0 +1,525 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - link "hyoka logo hyoka" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img "hyoka logo" [ref=e8]
+          - generic [ref=e15]: hyoka
+        - generic [ref=e16]:
+          - link "Home" [ref=e17] [cursor=pointer]:
+            - /url: /
+          - link "How It Works" [ref=e18] [cursor=pointer]:
+            - /url: /how-it-works
+          - link "Runs" [active] [ref=e19] [cursor=pointer]:
+            - /url: /runs
+          - link "Prompts" [ref=e20] [cursor=pointer]:
+            - /url: /prompts
+          - link "Pairwise" [ref=e21] [cursor=pointer]:
+            - /url: /pairwise
+          - link "Compare" [ref=e22] [cursor=pointer]:
+            - /url: /compare
+          - link "Dashboard" [ref=e23] [cursor=pointer]:
+            - /url: /dashboard
+          - link "Docs" [ref=e24] [cursor=pointer]:
+            - /url: /docs
+        - link "Get Started" [ref=e25] [cursor=pointer]:
+          - /url: https://github.com/ronniegeraghty/hyoka
+    - generic [ref=e447]:
+      - generic [ref=e448]:
+        - heading "Evaluation Runs" [level=1] [ref=e449]
+        - paragraph [ref=e450]: Browse all evaluation runs and drill into individual results.
+      - generic [ref=e451]:
+        - link "Apr 18, 2026, 12:59 AM 1 evaluations 1 0 100.0% 2m 2s" [ref=e453] [cursor=pointer]:
+          - /url: /runs/20260418-005921
+          - generic [ref=e454]:
+            - generic [ref=e455]:
+              - generic [ref=e456]: Apr 18, 2026, 12:59 AM
+              - paragraph [ref=e457]: 1 evaluations
+            - generic [ref=e458]:
+              - generic [ref=e459]:
+                - generic [ref=e460]:
+                  - img [ref=e461]
+                  - generic [ref=e464]: "1"
+                - generic [ref=e465]:
+                  - img [ref=e466]
+                  - generic [ref=e470]: "0"
+              - generic [ref=e474]: 100.0%
+              - generic [ref=e475]:
+                - img [ref=e476]
+                - generic [ref=e479]: 2m 2s
+              - img [ref=e480]
+        - link "Apr 17, 2026, 08:46 PM 2 evaluations 2 0 100.0% 1m 17s" [ref=e483] [cursor=pointer]:
+          - /url: /runs/20260417-204611
+          - generic [ref=e484]:
+            - generic [ref=e485]:
+              - generic [ref=e486]: Apr 17, 2026, 08:46 PM
+              - paragraph [ref=e487]: 2 evaluations
+            - generic [ref=e488]:
+              - generic [ref=e489]:
+                - generic [ref=e490]:
+                  - img [ref=e491]
+                  - generic [ref=e494]: "2"
+                - generic [ref=e495]:
+                  - img [ref=e496]
+                  - generic [ref=e500]: "0"
+              - generic [ref=e504]: 100.0%
+              - generic [ref=e505]:
+                - img [ref=e506]
+                - generic [ref=e509]: 1m 17s
+              - img [ref=e510]
+        - link "Unknown evaluations 0.0% N/A" [ref=e513] [cursor=pointer]:
+          - /url: /runs/20260416-203830
+          - generic [ref=e514]:
+            - generic [ref=e515]:
+              - generic [ref=e516]: Unknown
+              - paragraph [ref=e517]: evaluations
+            - generic [ref=e518]:
+              - generic [ref=e519]:
+                - img [ref=e521]
+                - img [ref=e525]
+              - generic [ref=e531]: 0.0%
+              - generic [ref=e532]:
+                - img [ref=e533]
+                - generic [ref=e536]: N/A
+              - img [ref=e537]
+        - link "Apr 16, 2026, 08:36 PM 1 evaluations 0 0 1 0.0% 1.0s" [ref=e540] [cursor=pointer]:
+          - /url: /runs/20260416-203647
+          - generic [ref=e541]:
+            - generic [ref=e542]:
+              - generic [ref=e543]: Apr 16, 2026, 08:36 PM
+              - paragraph [ref=e544]: 1 evaluations
+            - generic [ref=e545]:
+              - generic [ref=e546]:
+                - generic [ref=e547]:
+                  - img [ref=e548]
+                  - generic [ref=e551]: "0"
+                - generic [ref=e552]:
+                  - img [ref=e553]
+                  - generic [ref=e557]: "0"
+                - generic [ref=e558]:
+                  - img [ref=e559]
+                  - generic [ref=e561]: "1"
+              - generic [ref=e564]: 0.0%
+              - generic [ref=e565]:
+                - img [ref=e566]
+                - generic [ref=e569]: 1.0s
+              - img [ref=e570]
+        - link "Apr 15, 2026, 10:56 PM 1 evaluations 1 0 100.0% 1m 7s" [ref=e573] [cursor=pointer]:
+          - /url: /runs/20260415-225618
+          - generic [ref=e574]:
+            - generic [ref=e575]:
+              - generic [ref=e576]: Apr 15, 2026, 10:56 PM
+              - paragraph [ref=e577]: 1 evaluations
+            - generic [ref=e578]:
+              - generic [ref=e579]:
+                - generic [ref=e580]:
+                  - img [ref=e581]
+                  - generic [ref=e584]: "1"
+                - generic [ref=e585]:
+                  - img [ref=e586]
+                  - generic [ref=e590]: "0"
+              - generic [ref=e594]: 100.0%
+              - generic [ref=e595]:
+                - img [ref=e596]
+                - generic [ref=e599]: 1m 7s
+              - img [ref=e600]
+        - link "Apr 15, 2026, 10:55 PM 1 evaluations 1 0 100.0% 1m 15s" [ref=e603] [cursor=pointer]:
+          - /url: /runs/20260415-225535
+          - generic [ref=e604]:
+            - generic [ref=e605]:
+              - generic [ref=e606]: Apr 15, 2026, 10:55 PM
+              - paragraph [ref=e607]: 1 evaluations
+            - generic [ref=e608]:
+              - generic [ref=e609]:
+                - generic [ref=e610]:
+                  - img [ref=e611]
+                  - generic [ref=e614]: "1"
+                - generic [ref=e615]:
+                  - img [ref=e616]
+                  - generic [ref=e620]: "0"
+              - generic [ref=e624]: 100.0%
+              - generic [ref=e625]:
+                - img [ref=e626]
+                - generic [ref=e629]: 1m 15s
+              - img [ref=e630]
+        - link "Apr 15, 2026, 08:24 PM 1 evaluations 1 0 100.0% 1m 16s" [ref=e633] [cursor=pointer]:
+          - /url: /runs/20260415-202417
+          - generic [ref=e634]:
+            - generic [ref=e635]:
+              - generic [ref=e636]: Apr 15, 2026, 08:24 PM
+              - paragraph [ref=e637]: 1 evaluations
+            - generic [ref=e638]:
+              - generic [ref=e639]:
+                - generic [ref=e640]:
+                  - img [ref=e641]
+                  - generic [ref=e644]: "1"
+                - generic [ref=e645]:
+                  - img [ref=e646]
+                  - generic [ref=e650]: "0"
+              - generic [ref=e654]: 100.0%
+              - generic [ref=e655]:
+                - img [ref=e656]
+                - generic [ref=e659]: 1m 16s
+              - img [ref=e660]
+        - link "Apr 9, 2026, 06:07 PM 6 evaluations 3 3 50.0% 4m 26s" [ref=e663] [cursor=pointer]:
+          - /url: /runs/20260409-180743
+          - generic [ref=e664]:
+            - generic [ref=e665]:
+              - generic [ref=e666]: Apr 9, 2026, 06:07 PM
+              - paragraph [ref=e667]: 6 evaluations
+            - generic [ref=e668]:
+              - generic [ref=e669]:
+                - generic [ref=e670]:
+                  - img [ref=e671]
+                  - generic [ref=e674]: "3"
+                - generic [ref=e675]:
+                  - img [ref=e676]
+                  - generic [ref=e680]: "3"
+              - generic [ref=e684]: 50.0%
+              - generic [ref=e685]:
+                - img [ref=e686]
+                - generic [ref=e689]: 4m 26s
+              - img [ref=e690]
+        - link "Apr 9, 2026, 06:06 PM 6 evaluations 0 0 6 0.0% 34.2s" [ref=e693] [cursor=pointer]:
+          - /url: /runs/20260409-180654
+          - generic [ref=e694]:
+            - generic [ref=e695]:
+              - generic [ref=e696]: Apr 9, 2026, 06:06 PM
+              - paragraph [ref=e697]: 6 evaluations
+            - generic [ref=e698]:
+              - generic [ref=e699]:
+                - generic [ref=e700]:
+                  - img [ref=e701]
+                  - generic [ref=e704]: "0"
+                - generic [ref=e705]:
+                  - img [ref=e706]
+                  - generic [ref=e710]: "0"
+                - generic [ref=e711]:
+                  - img [ref=e712]
+                  - generic [ref=e714]: "6"
+              - generic [ref=e717]: 0.0%
+              - generic [ref=e718]:
+                - img [ref=e719]
+                - generic [ref=e722]: 34.2s
+              - img [ref=e723]
+        - link "Apr 7, 2026, 04:27 PM 6 evaluations 5 1 83.3% 4m 8s" [ref=e726] [cursor=pointer]:
+          - /url: /runs/20260407-162723
+          - generic [ref=e727]:
+            - generic [ref=e728]:
+              - generic [ref=e729]: Apr 7, 2026, 04:27 PM
+              - paragraph [ref=e730]: 6 evaluations
+            - generic [ref=e731]:
+              - generic [ref=e732]:
+                - generic [ref=e733]:
+                  - img [ref=e734]
+                  - generic [ref=e737]: "5"
+                - generic [ref=e738]:
+                  - img [ref=e739]
+                  - generic [ref=e743]: "1"
+              - generic [ref=e747]: 83.3%
+              - generic [ref=e748]:
+                - img [ref=e749]
+                - generic [ref=e752]: 4m 8s
+              - img [ref=e753]
+        - link "Apr 7, 2026, 04:07 PM 2 evaluations 2 0 100.0% 2m 49s" [ref=e756] [cursor=pointer]:
+          - /url: /runs/20260407-160753
+          - generic [ref=e757]:
+            - generic [ref=e758]:
+              - generic [ref=e759]: Apr 7, 2026, 04:07 PM
+              - paragraph [ref=e760]: 2 evaluations
+            - generic [ref=e761]:
+              - generic [ref=e762]:
+                - generic [ref=e763]:
+                  - img [ref=e764]
+                  - generic [ref=e767]: "2"
+                - generic [ref=e768]:
+                  - img [ref=e769]
+                  - generic [ref=e773]: "0"
+              - generic [ref=e777]: 100.0%
+              - generic [ref=e778]:
+                - img [ref=e779]
+                - generic [ref=e782]: 2m 49s
+              - img [ref=e783]
+        - link "Apr 7, 2026, 04:38 AM 1 evaluations 1 0 100.0% 4m 11s" [ref=e786] [cursor=pointer]:
+          - /url: /runs/20260407-043842
+          - generic [ref=e787]:
+            - generic [ref=e788]:
+              - generic [ref=e789]: Apr 7, 2026, 04:38 AM
+              - paragraph [ref=e790]: 1 evaluations
+            - generic [ref=e791]:
+              - generic [ref=e792]:
+                - generic [ref=e793]:
+                  - img [ref=e794]
+                  - generic [ref=e797]: "1"
+                - generic [ref=e798]:
+                  - img [ref=e799]
+                  - generic [ref=e803]: "0"
+              - generic [ref=e807]: 100.0%
+              - generic [ref=e808]:
+                - img [ref=e809]
+                - generic [ref=e812]: 4m 11s
+              - img [ref=e813]
+        - link "Apr 7, 2026, 04:37 AM 1 evaluations 0 0 1 0.0% 43.4s" [ref=e816] [cursor=pointer]:
+          - /url: /runs/20260407-043721
+          - generic [ref=e817]:
+            - generic [ref=e818]:
+              - generic [ref=e819]: Apr 7, 2026, 04:37 AM
+              - paragraph [ref=e820]: 1 evaluations
+            - generic [ref=e821]:
+              - generic [ref=e822]:
+                - generic [ref=e823]:
+                  - img [ref=e824]
+                  - generic [ref=e827]: "0"
+                - generic [ref=e828]:
+                  - img [ref=e829]
+                  - generic [ref=e833]: "0"
+                - generic [ref=e834]:
+                  - img [ref=e835]
+                  - generic [ref=e837]: "1"
+              - generic [ref=e840]: 0.0%
+              - generic [ref=e841]:
+                - img [ref=e842]
+                - generic [ref=e845]: 43.4s
+              - img [ref=e846]
+        - link "Apr 7, 2026, 04:17 AM 44 evaluations 0 0 8 0.0% 26.5s" [ref=e849] [cursor=pointer]:
+          - /url: /runs/20260407-041759
+          - generic [ref=e850]:
+            - generic [ref=e851]:
+              - generic [ref=e852]: Apr 7, 2026, 04:17 AM
+              - paragraph [ref=e853]: 44 evaluations
+            - generic [ref=e854]:
+              - generic [ref=e855]:
+                - generic [ref=e856]:
+                  - img [ref=e857]
+                  - generic [ref=e860]: "0"
+                - generic [ref=e861]:
+                  - img [ref=e862]
+                  - generic [ref=e866]: "0"
+                - generic [ref=e867]:
+                  - img [ref=e868]
+                  - generic [ref=e870]: "8"
+              - generic [ref=e873]: 0.0%
+              - generic [ref=e874]:
+                - img [ref=e875]
+                - generic [ref=e878]: 26.5s
+              - img [ref=e879]
+        - link "Apr 7, 2026, 02:49 AM 1 evaluations 0 0 1 0.0% 51.1s" [ref=e882] [cursor=pointer]:
+          - /url: /runs/20260407-024947
+          - generic [ref=e883]:
+            - generic [ref=e884]:
+              - generic [ref=e885]: Apr 7, 2026, 02:49 AM
+              - paragraph [ref=e886]: 1 evaluations
+            - generic [ref=e887]:
+              - generic [ref=e888]:
+                - generic [ref=e889]:
+                  - img [ref=e890]
+                  - generic [ref=e893]: "0"
+                - generic [ref=e894]:
+                  - img [ref=e895]
+                  - generic [ref=e899]: "0"
+                - generic [ref=e900]:
+                  - img [ref=e901]
+                  - generic [ref=e903]: "1"
+              - generic [ref=e906]: 0.0%
+              - generic [ref=e907]:
+                - img [ref=e908]
+                - generic [ref=e911]: 51.1s
+              - img [ref=e912]
+        - link "Apr 7, 2026, 02:48 AM 1 evaluations 0 0 1 0.0% 27.1s" [ref=e915] [cursor=pointer]:
+          - /url: /runs/20260407-024800
+          - generic [ref=e916]:
+            - generic [ref=e917]:
+              - generic [ref=e918]: Apr 7, 2026, 02:48 AM
+              - paragraph [ref=e919]: 1 evaluations
+            - generic [ref=e920]:
+              - generic [ref=e921]:
+                - generic [ref=e922]:
+                  - img [ref=e923]
+                  - generic [ref=e926]: "0"
+                - generic [ref=e927]:
+                  - img [ref=e928]
+                  - generic [ref=e932]: "0"
+                - generic [ref=e933]:
+                  - img [ref=e934]
+                  - generic [ref=e936]: "1"
+              - generic [ref=e939]: 0.0%
+              - generic [ref=e940]:
+                - img [ref=e941]
+                - generic [ref=e944]: 27.1s
+              - img [ref=e945]
+        - link "Apr 7, 2026, 02:10 AM 1 evaluations 0 0 1 0.0% 6m 6s" [ref=e948] [cursor=pointer]:
+          - /url: /runs/20260407-021059
+          - generic [ref=e949]:
+            - generic [ref=e950]:
+              - generic [ref=e951]: Apr 7, 2026, 02:10 AM
+              - paragraph [ref=e952]: 1 evaluations
+            - generic [ref=e953]:
+              - generic [ref=e954]:
+                - generic [ref=e955]:
+                  - img [ref=e956]
+                  - generic [ref=e959]: "0"
+                - generic [ref=e960]:
+                  - img [ref=e961]
+                  - generic [ref=e965]: "0"
+                - generic [ref=e966]:
+                  - img [ref=e967]
+                  - generic [ref=e969]: "1"
+              - generic [ref=e972]: 0.0%
+              - generic [ref=e973]:
+                - img [ref=e974]
+                - generic [ref=e977]: 6m 6s
+              - img [ref=e978]
+        - link "Apr 7, 2026, 01:18 AM 1 evaluations 1 0 100.0% 0.0s" [ref=e981] [cursor=pointer]:
+          - /url: /runs/20260407-011815
+          - generic [ref=e982]:
+            - generic [ref=e983]:
+              - generic [ref=e984]: Apr 7, 2026, 01:18 AM
+              - paragraph [ref=e985]: 1 evaluations
+            - generic [ref=e986]:
+              - generic [ref=e987]:
+                - generic [ref=e988]:
+                  - img [ref=e989]
+                  - generic [ref=e992]: "1"
+                - generic [ref=e993]:
+                  - img [ref=e994]
+                  - generic [ref=e998]: "0"
+              - generic [ref=e1002]: 100.0%
+              - generic [ref=e1003]:
+                - img [ref=e1004]
+                - generic [ref=e1007]: 0.0s
+              - img [ref=e1008]
+        - link "Apr 7, 2026, 01:18 AM 1 evaluations 1 0 100.0% 0.0s" [ref=e1011] [cursor=pointer]:
+          - /url: /runs/20260407-011814
+          - generic [ref=e1012]:
+            - generic [ref=e1013]:
+              - generic [ref=e1014]: Apr 7, 2026, 01:18 AM
+              - paragraph [ref=e1015]: 1 evaluations
+            - generic [ref=e1016]:
+              - generic [ref=e1017]:
+                - generic [ref=e1018]:
+                  - img [ref=e1019]
+                  - generic [ref=e1022]: "1"
+                - generic [ref=e1023]:
+                  - img [ref=e1024]
+                  - generic [ref=e1028]: "0"
+              - generic [ref=e1032]: 100.0%
+              - generic [ref=e1033]:
+                - img [ref=e1034]
+                - generic [ref=e1037]: 0.0s
+              - img [ref=e1038]
+        - link "Apr 7, 2026, 01:10 AM 1 evaluations 0 0 1 0.0% 51.2s" [ref=e1041] [cursor=pointer]:
+          - /url: /runs/20260407-011026
+          - generic [ref=e1042]:
+            - generic [ref=e1043]:
+              - generic [ref=e1044]: Apr 7, 2026, 01:10 AM
+              - paragraph [ref=e1045]: 1 evaluations
+            - generic [ref=e1046]:
+              - generic [ref=e1047]:
+                - generic [ref=e1048]:
+                  - img [ref=e1049]
+                  - generic [ref=e1052]: "0"
+                - generic [ref=e1053]:
+                  - img [ref=e1054]
+                  - generic [ref=e1058]: "0"
+                - generic [ref=e1059]:
+                  - img [ref=e1060]
+                  - generic [ref=e1062]: "1"
+              - generic [ref=e1065]: 0.0%
+              - generic [ref=e1066]:
+                - img [ref=e1067]
+                - generic [ref=e1070]: 51.2s
+              - img [ref=e1071]
+        - link "Apr 7, 2026, 01:00 AM 1 evaluations 1 0 100.0% 3m 20s" [ref=e1074] [cursor=pointer]:
+          - /url: /runs/20260407-010021
+          - generic [ref=e1075]:
+            - generic [ref=e1076]:
+              - generic [ref=e1077]: Apr 7, 2026, 01:00 AM
+              - paragraph [ref=e1078]: 1 evaluations
+            - generic [ref=e1079]:
+              - generic [ref=e1080]:
+                - generic [ref=e1081]:
+                  - img [ref=e1082]
+                  - generic [ref=e1085]: "1"
+                - generic [ref=e1086]:
+                  - img [ref=e1087]
+                  - generic [ref=e1091]: "0"
+              - generic [ref=e1095]: 100.0%
+              - generic [ref=e1096]:
+                - img [ref=e1097]
+                - generic [ref=e1100]: 3m 20s
+              - img [ref=e1101]
+        - link "Apr 7, 2026, 12:58 AM 1 evaluations 0 0 1 0.0% 1.0s" [ref=e1104] [cursor=pointer]:
+          - /url: /runs/20260407-005856
+          - generic [ref=e1105]:
+            - generic [ref=e1106]:
+              - generic [ref=e1107]: Apr 7, 2026, 12:58 AM
+              - paragraph [ref=e1108]: 1 evaluations
+            - generic [ref=e1109]:
+              - generic [ref=e1110]:
+                - generic [ref=e1111]:
+                  - img [ref=e1112]
+                  - generic [ref=e1115]: "0"
+                - generic [ref=e1116]:
+                  - img [ref=e1117]
+                  - generic [ref=e1121]: "0"
+                - generic [ref=e1122]:
+                  - img [ref=e1123]
+                  - generic [ref=e1125]: "1"
+              - generic [ref=e1128]: 0.0%
+              - generic [ref=e1129]:
+                - img [ref=e1130]
+                - generic [ref=e1133]: 1.0s
+              - img [ref=e1134]
+        - link "Apr 7, 2026, 12:57 AM 1 evaluations 0 0 1 0.0% 1.0s" [ref=e1137] [cursor=pointer]:
+          - /url: /runs/20260407-005754
+          - generic [ref=e1138]:
+            - generic [ref=e1139]:
+              - generic [ref=e1140]: Apr 7, 2026, 12:57 AM
+              - paragraph [ref=e1141]: 1 evaluations
+            - generic [ref=e1142]:
+              - generic [ref=e1143]:
+                - generic [ref=e1144]:
+                  - img [ref=e1145]
+                  - generic [ref=e1148]: "0"
+                - generic [ref=e1149]:
+                  - img [ref=e1150]
+                  - generic [ref=e1154]: "0"
+                - generic [ref=e1155]:
+                  - img [ref=e1156]
+                  - generic [ref=e1158]: "1"
+              - generic [ref=e1161]: 0.0%
+              - generic [ref=e1162]:
+                - img [ref=e1163]
+                - generic [ref=e1166]: 1.0s
+              - img [ref=e1167]
+        - link "Apr 7, 2026, 12:57 AM 1 evaluations 0 0 1 0.0% 1.0s" [ref=e1170] [cursor=pointer]:
+          - /url: /runs/20260407-005717
+          - generic [ref=e1171]:
+            - generic [ref=e1172]:
+              - generic [ref=e1173]: Apr 7, 2026, 12:57 AM
+              - paragraph [ref=e1174]: 1 evaluations
+            - generic [ref=e1175]:
+              - generic [ref=e1176]:
+                - generic [ref=e1177]:
+                  - img [ref=e1178]
+                  - generic [ref=e1181]: "0"
+                - generic [ref=e1182]:
+                  - img [ref=e1183]
+                  - generic [ref=e1187]: "0"
+                - generic [ref=e1188]:
+                  - img [ref=e1189]
+                  - generic [ref=e1191]: "1"
+              - generic [ref=e1194]: 0.0%
+              - generic [ref=e1195]:
+                - img [ref=e1196]
+                - generic [ref=e1199]: 1.0s
+              - img [ref=e1200]
+    - contentinfo [ref=e144]:
+      - generic [ref=e146]:
+        - generic [ref=e147]:
+          - img "hyoka logo" [ref=e149]
+          - generic [ref=e156]: hyoka
+        - paragraph [ref=e157]: Evaluate AI agent output quality across any domain.
+        - paragraph [ref=e158]: © 2026 hyoka · MIT License
+  - generic [ref=e445]: "4"

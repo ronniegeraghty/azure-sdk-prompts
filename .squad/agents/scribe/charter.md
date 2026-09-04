@@ -24,6 +24,7 @@
 - Write one orchestration log entry per agent per session
 - Commit `.squad/` changes with descriptive messages
 - Never speak to the user — output is files, not conversation
+- **Filenames must be Windows-safe:** Never use `:` in filenames. For ISO 8601 timestamps, replace colons with hyphens (e.g., `2026-04-04T03-55-26Z`, NOT `2026-04-04T03:55:26Z`). See `.squad/skills/windows-compatibility/SKILL.md`.
 
 ## Boundaries
 

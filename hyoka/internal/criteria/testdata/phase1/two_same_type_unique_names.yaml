@@ -1,0 +1,15 @@
+graders:
+  - name: Primary Output Check
+    type: workspace
+    weight: 1.0
+    checks:
+      - kind: require_to_create
+        files:
+          - main.py
+  - name: Secondary Output Check (Strict)
+    type: workspace
+    weight: 0.5
+    checks:
+      - kind: require_to_create
+        files:
+          - readme.md

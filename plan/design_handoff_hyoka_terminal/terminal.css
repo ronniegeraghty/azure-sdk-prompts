@@ -1,0 +1,94 @@
+/* hyoka terminal design system */
+
+:root {
+  --term-bg: #0e1013;
+  --term-bg-alt: #14171c;
+  --term-fg: #d4d7dc;
+  --term-fg-dim: #8a8f98;
+  --term-fg-dimmer: #565b64;
+  --term-fg-bright: #ffffff;
+
+  --term-green: #7ec77a;
+  --term-green-bg: rgba(126, 199, 122, 0.08);
+  --term-red: #e35f5f;
+  --term-red-bg: rgba(227, 95, 95, 0.10);
+  --term-yellow: #e0b457;
+  --term-blue: #6ca4d8;
+  --term-magenta: #c381c0;
+  --term-cyan: #5fb3b3;
+
+  --term-rule: #22262d;
+}
+
+.term {
+  font-family: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  padding: 28px 32px 32px;
+  white-space: pre;
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0;
+  tab-size: 2;
+  letter-spacing: 0;
+}
+
+.term-sm {
+  font-size: 12px;
+  padding: 24px 28px 28px;
+}
+
+/* --- semantic colors --- */
+.c-fg      { color: var(--term-fg); }
+.c-dim     { color: var(--term-fg-dim); }
+.c-dimmer  { color: var(--term-fg-dimmer); }
+.c-bright  { color: var(--term-fg-bright); }
+.c-green   { color: var(--term-green); }
+.c-red     { color: var(--term-red); }
+.c-yellow  { color: var(--term-yellow); }
+.c-blue    { color: var(--term-blue); }
+.c-magenta { color: var(--term-magenta); }
+.c-cyan    { color: var(--term-cyan); }
+.b         { font-weight: 600; color: var(--term-fg-bright); }
+
+/* --- pill / label --- */
+.pill {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: var(--term-bg-alt);
+  color: var(--term-fg-dim);
+}
+.pill.pass { background: var(--term-green-bg); color: var(--term-green); }
+.pill.fail { background: var(--term-red-bg);   color: var(--term-red); }
+
+/* --- failure block --- */
+.fail-block {
+  background: var(--term-red-bg);
+  border-left: 2px solid var(--term-red);
+  padding: 4px 10px;
+  margin: 2px 0;
+  display: block;
+  white-space: pre-wrap;
+}
+
+.hairline {
+  color: var(--term-rule);
+}
+
+/* spinner element */
+.spin { color: var(--term-yellow); display: inline-block; width: 1ch; }
+
+/* prompt glyph */
+.prompt::before {
+  content: "❯ ";
+  color: var(--term-fg-dimmer);
+}
+
+/* scroll containers for artboards */
+.term-scroll {
+  overflow: auto;
+  height: 100%;
+  background: var(--term-bg);
+}

@@ -1,15 +1,40 @@
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { fetchRun } from "../data/api";
-import type { RunSummary, EvalResult } from "../data/types";
-import { CheckCircle2, XCircle, Clock, FileCode2, Cpu, ArrowLeft, Loader2 } from "lucide-react";
+import type { RunSummary, EvalResult, EvalReport } from "../data/types";
+import { CheckCircle2, XCircle, Clock, FileCode2, ArrowLeft, Loader2, Tag, Zap } from "lucide-react";
+import { GraderResultRow } from "./GraderResultRow";
+import { evalPassFromPoints, evalPointTotals, graderPasses } from "../lib/evalPass";
+import { RunCrossEvalSummary } from "./RunCrossEvalSummary";
 
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
-function ScoreBadge({ score, max = 100 }: { score: number; max?: number }) {
-  const pct = (score / max) * 100;
-  const color = pct >= 80 ? "text-emerald-400" : pct >= 60 ? "text-amber-400" : "text-red-400";
-  return <span className={color} style={{ ...mono, fontSize: 13 }}>{score}/{max}</span>;
+// Tri-state aware pass detection lives in lib/evalPass.ts. This file
+// previously shipped a local `isPass` stop-gap (Phase 4.1); Phase 6.4
+// replaced it with the canonical helper so every page agrees on the
+// rollup. Do NOT reintroduce a local copy.
+
+function ScoreBadge({
+  passed,
+  total,
+  display,
+  tone,
+}: {
+  passed: number;
+  total: number;
+  display?: string;
+  tone?: "pass" | "fail" | "neutral";
+}) {
+  const allPassed = passed === total && total > 0;
+  const resolvedTone = tone ?? (allPassed ? "pass" : "fail");
+  const color =
+    resolvedTone === "pass"
+      ? "text-emerald-400"
+      : resolvedTone === "neutral"
+      ? "text-white/40"
+      : "text-red-400";
+  const label = display ?? `${passed}/${total}`;
+  return <span className={color} style={{ ...mono, fontSize: 13 }}>{label}</span>;
 }
 
 function formatDuration(s: number | undefined | null): string {
@@ -20,14 +45,30 @@ function formatDuration(s: number | undefined | null): string {
   return `${m}m ${sec}s`;
 }
 
+function formatTimestamp(ts: string | undefined | null): string {
+  if (!ts) return "Unknown";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return "Unknown";
+  return d.toLocaleDateString("en-US", { 
+    month: "short", 
+    day: "numeric", 
+    year: "numeric", 
+    hour: "2-digit", 
+    minute: "2-digit",
+    hour12: true
+  });
+}
+
 export function RunDetailPage() {
   const { runId } = useParams();
+  const navigate = useNavigate();
   const [run, setRun] = useState<RunSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "pass" | "fail">("all");
   const [filterService, setFilterService] = useState<string>("all");
   const [filterLang, setFilterLang] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"table" | "matrix">("table");
 
   useEffect(() => {
     if (!runId) return;
@@ -65,17 +106,29 @@ export function RunDetailPage() {
   const langs = [...new Set(results.map(r => r.prompt_metadata?.language).filter(Boolean))];
 
   const filtered = results.filter((r: EvalResult) => {
-    if (filterStatus === "pass" && !r.success) return false;
-    if (filterStatus === "fail" && r.success) return false;
+    if (filterStatus === "pass" && !evalPassFromPoints(r as EvalReport)) return false;
+    if (filterStatus === "fail" && evalPassFromPoints(r as EvalReport)) return false;
     if (filterService !== "all" && r.prompt_metadata?.service !== filterService) return false;
     if (filterLang !== "all" && r.prompt_metadata?.language !== filterLang) return false;
     return true;
   });
 
+  const totalFiles = results.reduce((s, r) => s + (r.generated_files?.length || 0), 0);
+
+  const promptIds = [...new Set(results.map(r => r.prompt_id))];
+  const configs = [...new Set(results.map(r => r.config_name))];
+  const matrixData = new Map<string, Map<string, EvalResult>>();
+  
+  for (const r of results) {
+    if (!matrixData.has(r.prompt_id)) {
+      matrixData.set(r.prompt_id, new Map());
+    }
+    matrixData.get(r.prompt_id)!.set(r.config_name, r);
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] px-4 py-8 sm:px-6" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="mx-auto max-w-7xl">
-        {/* Header */}
         <Link to="/runs" className="mb-6 inline-flex items-center gap-1.5 text-white/40 no-underline transition hover:text-emerald-400" style={{ fontSize: 13 }}>
           <ArrowLeft className="h-3.5 w-3.5" /> All Runs
         </Link>
@@ -83,10 +136,10 @@ export function RunDetailPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="mb-1 text-white" style={{ ...mono, fontSize: "clamp(1.25rem, 3vw, 1.75rem)" }}>
-              Run {run.run_id}
+              {formatTimestamp(run.timestamp)}
             </h1>
             <p className="text-white/40" style={{ fontSize: 13 }}>
-              {run.timestamp && !isNaN(new Date(run.timestamp).getTime()) ? new Date(run.timestamp).toLocaleString() : "N/A"} · {run.total_evaluations ?? 0} evaluations · {formatDuration(run.duration_seconds)}
+              Run ID: {run.run_id} · {run.total_evaluations ?? 0} evaluations · {formatDuration(run.duration_seconds)}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2">
@@ -95,13 +148,12 @@ export function RunDetailPage() {
           </div>
         </div>
 
-        {/* Summary cards */}
-        <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className={`mb-8 grid gap-3 ${totalFiles > 0 ? "grid-cols-2 md:grid-cols-4" : "grid-cols-3"}`}>
           {[
             { label: "Passed", value: run.passed, icon: CheckCircle2, color: "text-emerald-400" },
             { label: "Failed", value: run.failed, icon: XCircle, color: "text-red-400" },
             { label: "Duration", value: formatDuration(run.duration_seconds), icon: Clock, color: "text-blue-400" },
-            { label: "Files", value: results.reduce((s, r) => s + (r.generated_files?.length || 0), 0), icon: FileCode2, color: "text-amber-400" },
+            ...(totalFiles > 0 ? [{ label: "Files", value: totalFiles, icon: FileCode2, color: "text-amber-400" }] : []),
           ].map(s => (
             <div key={s.label} className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
               <div className="mb-2 flex items-center gap-1.5">
@@ -113,101 +165,307 @@ export function RunDetailPage() {
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value as "all" | "pass" | "fail")}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/70"
-            style={{ fontSize: 12 }}
+        {run.analysis && (
+          <div className="mb-8 rounded-xl border border-white/8 bg-white/[0.03] p-5">
+            <div className="mb-2 text-white/40" style={{ fontSize: 11 }}>Run Summary</div>
+            <p className="text-white/70" style={{ fontSize: 13, lineHeight: 1.6 }}>
+              {run.analysis}
+            </p>
+          </div>
+        )}
+
+        {run.pairwise_results && run.pairwise_results.length > 0 && (
+          <Link
+            to={`/pairwise?run=${encodeURIComponent(run.run_id)}`}
+            className="mb-8 flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 no-underline transition hover:border-emerald-500/40 hover:bg-emerald-500/[0.08]"
           >
-            <option value="all">All Status</option>
-            <option value="pass">Passed</option>
-            <option value="fail">Failed</option>
-          </select>
-          <select
-            value={filterService}
-            onChange={e => setFilterService(e.target.value)}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/70"
-            style={{ fontSize: 12 }}
-          >
-            <option value="all">All Services</option>
-            {services.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select
-            value={filterLang}
-            onChange={e => setFilterLang(e.target.value)}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/70"
-            style={{ fontSize: 12 }}
-          >
-            <option value="all">All Languages</option>
-            {langs.map(l => <option key={l} value={l}>{l}</option>)}
-          </select>
-          <span className="self-center text-white/30" style={{ fontSize: 12 }}>{filtered.length} results</span>
+            <div className="flex items-center gap-3">
+              <Zap className="h-4 w-4 text-emerald-400" />
+              <div>
+                <div className="text-emerald-400" style={{ fontSize: 13, fontWeight: 500 }}>
+                  Pairwise tool-ablation available
+                </div>
+                <div className="text-white/40" style={{ fontSize: 12 }}>
+                  {run.pairwise_results.length} prompt{run.pairwise_results.length === 1 ? "" : "s"} with per-tool impact analysis
+                </div>
+              </div>
+            </div>
+            <span className="text-emerald-400/70" style={{ ...mono, fontSize: 12 }}>View →</span>
+          </Link>
+        )}
+
+        {/* Cross-evaluation summary views */}
+        <RunCrossEvalSummary run={run} />
+
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value as "all" | "pass" | "fail")}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/70"
+              style={{ fontSize: 12 }}
+            >
+              <option value="all">All Status</option>
+              <option value="pass">Passed</option>
+              <option value="fail">Failed</option>
+            </select>
+            <select
+              value={filterService}
+              onChange={e => setFilterService(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/70"
+              style={{ fontSize: 12 }}
+            >
+              <option value="all">All Services</option>
+              {services.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select
+              value={filterLang}
+              onChange={e => setFilterLang(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/70"
+              style={{ fontSize: 12 }}
+            >
+              <option value="all">All Languages</option>
+              {langs.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+            <span className="self-center text-white/30" style={{ fontSize: 12 }}>{filtered.length} results</span>
+          </div>
+
+          <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+            <button
+              onClick={() => setViewMode("table")}
+              className={`rounded px-3 py-1 transition ${viewMode === "table" ? "bg-emerald-500/20 text-emerald-400" : "text-white/40 hover:text-white/70"}`}
+              style={{ fontSize: 12 }}
+            >
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode("matrix")}
+              className={`rounded px-3 py-1 transition ${viewMode === "matrix" ? "bg-emerald-500/20 text-emerald-400" : "text-white/40 hover:text-white/70"}`}
+              style={{ fontSize: 12 }}
+            >
+              Matrix
+            </button>
+          </div>
         </div>
 
-        {/* Results table */}
-        <div className="overflow-x-auto rounded-xl border border-white/8 bg-white/[0.03]">
-          <table className="w-full" style={{ fontSize: 13 }}>
-            <thead>
-              <tr className="border-b border-white/8">
-                {["Status", "Prompt", "Config", "Service", "Lang", "Difficulty", "Score", "Duration", "Error", ""].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/30" style={{ fontWeight: 500, fontSize: 11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r, i) => (
-                <tr key={`${r.prompt_id}-${r.config_name}-${i}`} className="border-b border-white/5 transition hover:bg-white/[0.02]">
-                  <td className="px-4 py-3">
-                    {r.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}
-                  </td>
-                  <td className="max-w-[200px] truncate px-4 py-3">
-                    <span className="text-emerald-400/80" style={{ ...mono, fontSize: 12 }}>
-                      {r.prompt_id}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-white/50" style={{ ...mono, fontSize: 12 }}>{r.config_name}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-md bg-white/5 px-2 py-0.5 text-white/50" style={{ fontSize: 11 }}>{r.prompt_metadata?.service}</span>
-                  </td>
-                  <td className="px-4 py-3 text-white/50" style={{ fontSize: 12 }}>{r.prompt_metadata?.language}</td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-md px-2 py-0.5 ${
-                      r.prompt_metadata?.difficulty === "basic" ? "bg-emerald-500/10 text-emerald-400/70" :
-                      r.prompt_metadata?.difficulty === "intermediate" ? "bg-amber-500/10 text-amber-400/70" :
-                      "bg-red-500/10 text-red-400/70"
-                    }`} style={{ fontSize: 11 }}>
-                      {r.prompt_metadata?.difficulty}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <ScoreBadge score={r.review?.overall_score ?? 0} max={r.review?.max_score ?? 100} />
-                  </td>
-                  <td className="px-4 py-3 text-white/40" style={{ ...mono, fontSize: 12 }}>
-                    {r.duration_seconds != null && !isNaN(r.duration_seconds) ? `${r.duration_seconds.toFixed(1)}s` : "N/A"}
-                  </td>
-                  <td className="max-w-[200px] px-4 py-3">
-                    {!r.success && r.error ? (
-                      <span className="text-red-400/80" style={{ fontSize: 11 }} title={r.error}>
-                        {r.error.length > 100 ? r.error.slice(0, 100) + "…" : r.error}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/runs/${run.run_id}/eval/${encodeURIComponent(r.prompt_id)}/${encodeURIComponent(r.config_name)}`}
-                      className="text-white/30 no-underline transition hover:text-emerald-400"
-                      style={{ fontSize: 12 }}
-                    >
-                      View →
-                    </Link>
-                  </td>
+        {viewMode === "table" && (
+          <div className="overflow-x-auto rounded-xl border border-white/8 bg-white/[0.03]">
+            <table className="w-full" style={{ fontSize: 13 }}>
+              <thead>
+                <tr className="border-b border-white/8">
+                  {["Score", "Prompt", "Model", "Tools", "Service", "Lang", "Difficulty", "Duration", ""].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-white/30" style={{ fontWeight: 500, fontSize: 11 }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => {
+                  const evalReport = r as EvalReport;
+                  const totals = evalPointTotals(evalReport);
+                  const gradersTotal = totals.total;
+                  const gradersPassed = totals.passed;
+                  const evalPassed = evalPassFromPoints(evalReport);
+
+                  // When no graders ran (e.g. gpt-5.3-codex no-files case),
+                  // fall back to the engine's success bit so the row doesn't
+                  // render a misleading red `0/0`.
+                  const noGraders = gradersTotal === 0;
+                  const badgeDisplay = noGraders
+                    ? evalPassed
+                      ? "—"
+                      : "✗"
+                    : undefined;
+                  const badgeTone: "pass" | "fail" | "neutral" | undefined = noGraders
+                    ? evalPassed
+                      ? "neutral"
+                      : "fail"
+                    : evalPassed
+                    ? "pass"
+                    : "fail";
+
+                  const model = evalReport.config_used?.model || evalReport.environment?.model || r.config_name;
+                  const tools = evalReport.environment?.mcp_servers || [];
+                  const skills = evalReport.environment?.skills_loaded || [];
+
+                  // Check if eval is complete - incomplete evals don't have a detail page yet
+                  const isComplete = r.duration_seconds != null && r.duration_seconds > 0;
+
+                  return (
+                    <tr 
+                      key={`${r.prompt_id}-${r.config_name}-${i}`} 
+                      onClick={isComplete ? () => navigate(`/runs/${run.run_id}/eval/${encodeURIComponent(r.prompt_id)}/${r.config_name}`) : undefined}
+                      className={`border-b border-white/5 transition ${isComplete ? "cursor-pointer hover:bg-white/[0.02]" : "cursor-default opacity-60"}`}
+                    >
+                      <td className="px-4 py-3">
+                        <ScoreBadge
+                          passed={gradersPassed}
+                          total={gradersTotal}
+                          display={badgeDisplay}
+                          tone={badgeTone}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-emerald-400/80" style={{ ...mono, fontSize: 12 }}>
+                          {r.prompt_id}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-blue-400/80" style={{ fontSize: 11 }}>
+                          {model}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {tools.slice(0, 2).map((t, idx) => (
+                            <span key={idx} className="flex items-center gap-1 rounded-md bg-purple-500/10 px-2 py-0.5 text-purple-400/80" style={{ fontSize: 10 }}>
+                              <Tag className="h-2.5 w-2.5" />
+                              {t}
+                            </span>
+                          ))}
+                          {skills.slice(0, 1).map((s, idx) => (
+                            <span key={idx} className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-amber-400/80" style={{ fontSize: 10 }}>
+                              {s}
+                            </span>
+                          ))}
+                          {(tools.length + skills.length > 3) && (
+                            <span className="text-white/30" style={{ fontSize: 10 }}>+{tools.length + skills.length - 3}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-md bg-white/5 px-2 py-0.5 text-white/50" style={{ fontSize: 11 }}>{r.prompt_metadata?.service}</span>
+                      </td>
+                      <td className="px-4 py-3 text-white/50" style={{ fontSize: 12 }}>{r.prompt_metadata?.language}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-md px-2 py-0.5 ${
+                          r.prompt_metadata?.difficulty === "basic" ? "bg-emerald-500/10 text-emerald-400/70" :
+                          r.prompt_metadata?.difficulty === "intermediate" ? "bg-amber-500/10 text-amber-400/70" :
+                          "bg-red-500/10 text-red-400/70"
+                        }`} style={{ fontSize: 11 }}>
+                          {r.prompt_metadata?.difficulty}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-white/40" style={{ ...mono, fontSize: 12 }}>
+                        {r.duration_seconds != null && !isNaN(r.duration_seconds) ? `${r.duration_seconds.toFixed(1)}s` : "N/A"}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {isComplete ? (
+                          <span className="text-white/30 text-xs">→</span>
+                        ) : (
+                          <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {viewMode === "matrix" && (
+          <div className="space-y-8">
+            {promptIds.map(promptId => {
+              const promptResults = matrixData.get(promptId)!;
+              const firstResult = Array.from(promptResults.values())[0];
+              
+              return (
+                <div key={promptId} className="rounded-xl border border-white/8 bg-white/[0.03] p-5">
+                  <div className="mb-4 border-b border-white/5 pb-3">
+                    <div className="mb-1 text-emerald-400/90" style={{ ...mono, fontSize: 14 }}>
+                      {promptId}
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-white/40" style={{ fontSize: 11 }}>
+                      <span>{firstResult.prompt_metadata?.service}</span>
+                      <span>·</span>
+                      <span>{firstResult.prompt_metadata?.language}</span>
+                      <span>·</span>
+                      <span>{firstResult.prompt_metadata?.plane}</span>
+                      <span>·</span>
+                      <span className={`${
+                        firstResult.prompt_metadata?.difficulty === "basic" ? "text-emerald-400/70" :
+                        firstResult.prompt_metadata?.difficulty === "intermediate" ? "text-amber-400/70" :
+                        "text-red-400/70"
+                      }`}>
+                        {firstResult.prompt_metadata?.difficulty}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {configs.map(configName => {
+                      const result = promptResults.get(configName);
+                      if (!result) {
+                        return (
+                          <div key={configName} className="rounded-lg border border-white/5 bg-white/[0.01] p-3">
+                            <div className="mb-2 text-white/30" style={{ fontSize: 11 }}>{configName}</div>
+                            <p className="text-white/20" style={{ fontSize: 12 }}>No data</p>
+                          </div>
+                        );
+                      }
+
+                      const evalReport = result as EvalReport;
+                      const graders = evalReport.grader_results || [];
+                      const model = evalReport.config_used?.model || configName;
+                      const evalPassed = evalPassFromPoints(evalReport);
+                      
+                      // Check if eval is complete - incomplete evals don't have a detail page yet
+                      const isComplete = result.duration_seconds != null && result.duration_seconds > 0;
+
+                      return (
+                        <div key={configName} className={`rounded-lg border border-white/5 bg-white/[0.01] ${!isComplete ? "opacity-60" : ""}`}>
+                          <div className="border-b border-white/5 p-3">
+                            <div className="mb-1 flex items-center gap-2">
+                              <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-blue-400/80" style={{ fontSize: 11 }}>
+                                {model}
+                              </span>
+                              {isComplete ? (
+                                evalPassed ? (
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <XCircle className="h-3 w-3 text-red-400" />
+                                )
+                              ) : (
+                                <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                              )}
+                            </div>
+                            <div className="text-white/30" style={{ fontSize: 10 }}>{configName}</div>
+                          </div>
+
+                          <div className="space-y-2 p-3">
+                            {graders.length > 0 ? (
+                              graders.map((grader, idx) => (
+                                <GraderResultRow key={idx} result={grader} />
+                              ))
+                            ) : (
+                              <p className="text-white/30" style={{ fontSize: 11 }}>No grader results</p>
+                            )}
+                          </div>
+
+                          <div className="border-t border-white/5 p-3">
+                            {isComplete ? (
+                              <Link
+                                to={`/runs/${run.run_id}/eval/${encodeURIComponent(result.prompt_id)}/${result.config_name}`}
+                                className="text-emerald-400/80 no-underline transition hover:text-emerald-400"
+                                style={{ fontSize: 12 }}
+                              >
+                                View full detail →
+                              </Link>
+                            ) : (
+                              <span className="text-amber-400/60" style={{ fontSize: 12 }}>
+                                Running...
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

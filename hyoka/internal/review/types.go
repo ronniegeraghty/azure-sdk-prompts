@@ -1,10 +1,34 @@
 package review
 
+// ReviewCheck represents a single check with a stable ID, canonical text,
+// and optional preamble. Used to construct id-aware reviewer prompts and
+// validate reviewer responses.
+type ReviewCheck struct {
+	ID       string // Stable identifier (e.g., "check_1")
+	Text     string // Canonical check text (source of truth for labels)
+	Preamble string // Optional context/preamble shown before this check
+}
+
 // CriterionResult holds the pass/fail outcome for a single evaluation criterion.
 type CriterionResult struct {
-	Name   string `json:"name"`
+	ID     string `json:"id,omitempty"`     // Stable check id (e.g., "check_1"), for vote keying
+	Name   string `json:"name"`             // Display label (canonical YAML text, possibly bucket-prefixed)
 	Passed bool   `json:"passed"`
 	Reason string `json:"reason,omitempty"`
+}
+
+// ReviewerResponse is the structured JSON schema that reviewers must return.
+// Each criterion from the prompt is judged individually as pass/fail.
+type ReviewerResponse struct {
+	Criteria []CriterionJudgment `json:"criteria"`
+}
+
+// CriterionJudgment holds a single criterion evaluation from one reviewer.
+type CriterionJudgment struct {
+	ID        string `json:"id"`        // stable check id (e.g., "check_1")
+	Criterion string `json:"criterion"` // DEPRECATED: original criteria text (v1 only)
+	Passed    bool   `json:"passed"`
+	Reasoning string `json:"reasoning"`
 }
 
 // ReviewScores holds pass/fail results for each evaluation criterion.
@@ -52,12 +76,13 @@ type SkippedReviewer struct {
 
 // ReviewResult holds the full output from an LLM-as-judge code review.
 type ReviewResult struct {
-	Model        string        `json:"model,omitempty"`
-	Scores       ReviewScores  `json:"scores"`
-	OverallScore int           `json:"overall_score"` // count of passed criteria
-	MaxScore     int           `json:"max_score"`     // total criteria count
-	Summary      string        `json:"summary"`
-	Issues       []string      `json:"issues"`
-	Strengths    []string      `json:"strengths"`
-	Events       []ReviewEvent `json:"events,omitempty"`
+	Model            string            `json:"model,omitempty"`
+	Scores           ReviewScores      `json:"scores"`
+	OverallScore     int               `json:"overall_score"` // count of passed criteria
+	MaxScore         int               `json:"max_score"`     // total criteria count
+	Summary          string            `json:"summary"`
+	Issues           []string          `json:"issues"`
+	Strengths        []string          `json:"strengths"`
+	Events           []ReviewEvent     `json:"events,omitempty"`
+	SkippedReviewers []SkippedReviewer `json:"skipped_reviewers,omitempty"`
 }

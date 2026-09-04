@@ -25,7 +25,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 		"Program.cs": "using Azure.Storage.Blobs;\n// reference",
 	}
 
-	result := BuildReviewPrompt(prompt, generated, reference, "")
+	result := BuildReviewPrompt(prompt, generated, reference, nil, nil)
 
 	if result == "" {
 		t.Fatal("expected non-empty review prompt")
@@ -35,7 +35,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 		"Original Prompt",
 		"Generated Code",
 		"Reference Answer",
-		"Scoring Rubric",
+		"Scoring Instructions",
 		"passed",
 		"Program.cs",
 	}
@@ -50,7 +50,7 @@ func TestBuildReviewPromptNoReference(t *testing.T) {
 	prompt := "Write code"
 	generated := map[string]string{"main.go": "package main"}
 
-	result := BuildReviewPrompt(prompt, generated, nil, "")
+	result := BuildReviewPrompt(prompt, generated, nil, nil, nil)
 
 	if !strings.Contains(result, "No reference answer provided") {
 		t.Error("expected 'No reference answer provided' when no reference given")
@@ -58,7 +58,7 @@ func TestBuildReviewPromptNoReference(t *testing.T) {
 }
 
 func TestBuildReviewPromptEmptyReference(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, map[string]string{}, "")
+	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, map[string]string{}, nil, nil)
 	if !strings.Contains(result, "No reference answer provided") {
 		t.Error("empty reference map should show 'No reference answer provided'")
 	}
@@ -67,29 +67,26 @@ func TestBuildReviewPromptEmptyReference(t *testing.T) {
 func TestBuildReviewPromptWithEvaluationCriteria(t *testing.T) {
 	prompt := "Write Azure code"
 	generated := map[string]string{"main.go": "package main"}
-	criteria := "- Must use DefaultAzureCredential\n- Must handle errors"
+	checks := []ReviewCheck{
+		{ID: "check_1", Text: "Must use DefaultAzureCredential"},
+		{ID: "check_2", Text: "Must handle errors"},
+	}
 
-	result := BuildReviewPrompt(prompt, generated, nil, criteria)
+	result := BuildReviewPrompt(prompt, generated, nil, checks, nil)
 
-	if !strings.Contains(result, "Prompt-Specific Evaluation Criteria") {
+	if !strings.Contains(result, "Evaluation Criteria") {
 		t.Error("expected evaluation criteria section")
 	}
-	if !strings.Contains(result, "DefaultAzureCredential") {
+	if !strings.Contains(result, "check_1") || !strings.Contains(result, "DefaultAzureCredential") {
 		t.Error("expected criteria content in prompt")
 	}
 }
 
 func TestBuildReviewPromptNoCriteria(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, nil, "")
-	// The rubric may mention criteria, but the dynamic section header should
-	// not appear before the rubric when no criteria are passed.
-	rubricIdx := strings.Index(result, "# Review Scoring Rubric")
-	if rubricIdx < 0 {
-		rubricIdx = len(result)
-	}
-	beforeRubric := result[:rubricIdx]
-	if strings.Contains(beforeRubric, "## Prompt-Specific Evaluation Criteria") {
-		t.Error("should not contain criteria section header before rubric when criteria is empty")
+	result := BuildReviewPrompt("prompt", map[string]string{"a.go": "code"}, nil, nil, nil)
+	// When no criteria are passed, the "Evaluation Criteria" section should not appear.
+	if strings.Contains(result, "## Evaluation Criteria") {
+		t.Error("should not contain criteria section header when criteria is empty")
 	}
 }
 
@@ -104,7 +101,7 @@ func TestBuildReviewPromptMultipleFiles(t *testing.T) {
 		"ref_help.go": "package helper // ref",
 	}
 
-	result := BuildReviewPrompt("prompt", generated, reference, "criteria")
+	result := BuildReviewPrompt("prompt", generated, reference, nil, nil)
 
 	for name := range generated {
 		if !strings.Contains(result, name) {
@@ -119,166 +116,24 @@ func TestBuildReviewPromptMultipleFiles(t *testing.T) {
 }
 
 func TestBuildReviewPromptEmptyGeneratedFiles(t *testing.T) {
-	result := BuildReviewPrompt("prompt", map[string]string{}, nil, "")
+	result := BuildReviewPrompt("prompt", map[string]string{}, nil, nil, nil)
 	if !strings.Contains(result, "Generated Code") {
 		t.Error("should still contain Generated Code header even with empty files")
 	}
 }
 
-func TestBuildReviewPromptContainsRubric(t *testing.T) {
-	result := BuildReviewPrompt("p", map[string]string{"f": "c"}, nil, "")
-	if !strings.Contains(result, "Scoring Rubric") {
-		t.Error("prompt should contain the embedded rubric")
+func TestBuildReviewPromptContainsScoringInstructions(t *testing.T) {
+	result := BuildReviewPrompt("p", map[string]string{"f": "c"}, nil, nil, nil)
+	if !strings.Contains(result, "Scoring Instructions") {
+		t.Error("prompt should contain scoring instructions")
 	}
 }
 
 func TestBuildReviewPromptPreservesOriginalPrompt(t *testing.T) {
 	original := "Write a Python script that uses azure-identity DefaultAzureCredential"
-	result := BuildReviewPrompt(original, map[string]string{"main.py": "pass"}, nil, "")
+	result := BuildReviewPrompt(original, map[string]string{"main.py": "pass"}, nil, nil, nil)
 	if !strings.Contains(result, original) {
 		t.Error("prompt should contain the original prompt verbatim")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// parseReviewResponse tests
-// ---------------------------------------------------------------------------
-
-func TestParseReviewResponse(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     string
-		wantErr   bool
-		score     int
-		maxScore  int
-		criteria  int
-		summary   string
-		issues    int
-		strengths int
-	}{
-		{
-			name:      "clean json with criteria",
-			input:     `{"scores":{"criteria":[{"name":"Code Builds","passed":true,"reason":"OK"},{"name":"Best Practices","passed":true,"reason":"Good"},{"name":"Error Handling","passed":false,"reason":"Missing"}]},"overall_score":2,"max_score":3,"summary":"Good code","issues":["Missing retry"],"strengths":["Clean"]}`,
-			score:     2,
-			maxScore:  3,
-			criteria:  3,
-			summary:   "Good code",
-			issues:    1,
-			strengths: 1,
-		},
-		{
-			name:     "wrapped in markdown json fence",
-			input:    "```json\n" + `{"scores":{"criteria":[{"name":"Code Builds","passed":true}]},"overall_score":1,"max_score":1,"summary":"Good","issues":[],"strengths":[]}` + "\n```",
-			score:    1,
-			maxScore: 1,
-			criteria: 1,
-			summary:  "Good",
-		},
-		{
-			name:     "wrapped in plain markdown fence",
-			input:    "```\n" + `{"scores":{"criteria":[{"name":"X","passed":false}]},"overall_score":0,"max_score":1,"summary":"Bad","issues":["everything"],"strengths":[]}` + "\n```",
-			score:    0,
-			maxScore: 1,
-			criteria: 1,
-			issues:   1,
-		},
-		{
-			name:    "no json",
-			input:   "I cannot review this code because...",
-			wantErr: true,
-		},
-		{
-			name:    "empty",
-			input:   "",
-			wantErr: true,
-		},
-		{
-			name:    "only whitespace",
-			input:   "   \n\t  \n  ",
-			wantErr: true,
-		},
-		{
-			name:     "auto-fill max_score from criteria count",
-			input:    `{"scores":{"criteria":[{"name":"A","passed":true},{"name":"B","passed":true},{"name":"C","passed":false}]},"overall_score":0,"max_score":0,"summary":"test","issues":[],"strengths":[]}`,
-			score:    2,
-			maxScore: 3,
-			criteria: 3,
-		},
-		{
-			name:     "auto-fill overall_score from criteria",
-			input:    `{"scores":{"criteria":[{"name":"A","passed":true},{"name":"B","passed":false}]},"summary":"test","issues":[],"strengths":[]}`,
-			score:    1,
-			maxScore: 2,
-			criteria: 2,
-		},
-		{
-			name:     "json with surrounding text",
-			input:    `Here is my review: {"scores":{"criteria":[{"name":"Build","passed":true}]},"overall_score":1,"max_score":1,"summary":"ok","issues":[],"strengths":[]} End of review.`,
-			score:    1,
-			maxScore: 1,
-			criteria: 1,
-		},
-		{
-			name:      "all criteria passed",
-			input:     `{"scores":{"criteria":[{"name":"A","passed":true},{"name":"B","passed":true}]},"overall_score":2,"max_score":2,"summary":"Perfect","issues":[],"strengths":["Great"]}`,
-			score:     2,
-			maxScore:  2,
-			criteria:  2,
-			strengths: 1,
-		},
-		{
-			name:     "all criteria failed",
-			input:    `{"scores":{"criteria":[{"name":"A","passed":false},{"name":"B","passed":false}]},"overall_score":0,"max_score":2,"summary":"Bad","issues":["A failed","B failed"],"strengths":[]}`,
-			score:    0,
-			maxScore: 2,
-			criteria: 2,
-			issues:   2,
-		},
-		{
-			name:    "invalid json structure",
-			input:   `{"scores": "not an object"}`,
-			wantErr: true,
-		},
-		{
-			name:     "empty criteria list",
-			input:    `{"scores":{"criteria":[]},"overall_score":0,"max_score":0,"summary":"Nothing to evaluate","issues":[],"strengths":[]}`,
-			score:    0,
-			maxScore: 0,
-			criteria: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseReviewResponse(tt.input)
-			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if result.OverallScore != tt.score {
-				t.Errorf("OverallScore = %d, want %d", result.OverallScore, tt.score)
-			}
-			if tt.maxScore > 0 && result.MaxScore != tt.maxScore {
-				t.Errorf("MaxScore = %d, want %d", result.MaxScore, tt.maxScore)
-			}
-			if tt.criteria > 0 && len(result.Scores.Criteria) != tt.criteria {
-				t.Errorf("Criteria count = %d, want %d", len(result.Scores.Criteria), tt.criteria)
-			}
-			if tt.summary != "" && result.Summary != tt.summary {
-				t.Errorf("Summary = %q, want %q", result.Summary, tt.summary)
-			}
-			if tt.issues > 0 && len(result.Issues) != tt.issues {
-				t.Errorf("Issues count = %d, want %d", len(result.Issues), tt.issues)
-			}
-			if tt.strengths > 0 && len(result.Strengths) != tt.strengths {
-				t.Errorf("Strengths count = %d, want %d", len(result.Strengths), tt.strengths)
-			}
-		})
 	}
 }
 
@@ -377,7 +232,7 @@ func TestReviewScoresAllPassed(t *testing.T) {
 
 func TestStubReviewer(t *testing.T) {
 	s := &StubReviewer{}
-	result, err := s.Review(nil, "test prompt", "some-dir", "", "")
+	result, err := s.Review(nil, "test prompt", "some-dir", "", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -388,7 +243,7 @@ func TestStubReviewer(t *testing.T) {
 
 func TestStubReviewerScores(t *testing.T) {
 	s := &StubReviewer{}
-	result, err := s.Review(nil, "prompt", "dir", "", "")
+	result, err := s.Review(nil, "prompt", "dir", "", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -418,8 +273,8 @@ func TestStubReviewerScores(t *testing.T) {
 
 func TestStubReviewerIgnoresInputs(t *testing.T) {
 	s := &StubReviewer{}
-	r1, _ := s.Review(nil, "prompt1", "dir1", "ref1", "criteria1")
-	r2, _ := s.Review(nil, "prompt2", "dir2", "ref2", "criteria2")
+	r1, _ := s.Review(nil, "prompt1", "dir1", "ref1", "criteria1", nil)
+	r2, _ := s.Review(nil, "prompt2", "dir2", "ref2", "criteria2", nil)
 
 	if r1.Summary != r2.Summary {
 		t.Error("stub reviewer should return identical results regardless of inputs")
@@ -524,7 +379,7 @@ func TestPanelReviewerSetSessionTimeout(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAverageReviewEmpty(t *testing.T) {
-	result := averageReview(nil)
+	result := averageReview(nil, nil)
 	if result.Summary != "No reviews to consolidate" {
 		t.Errorf("Summary = %q, want %q", result.Summary, "No reviews to consolidate")
 	}
@@ -544,7 +399,7 @@ func TestAverageReviewSingleReviewer(t *testing.T) {
 		Strengths:    []string{"compiles"},
 	}}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if result.OverallScore != 1 {
 		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
@@ -605,7 +460,7 @@ func TestAverageReviewMajorityVoting(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	criteriaMap := map[string]bool{}
 	for _, c := range result.Scores.Criteria {
@@ -614,20 +469,20 @@ func TestAverageReviewMajorityVoting(t *testing.T) {
 
 	// Build: 3/3 pass → pass
 	if !criteriaMap["Build"] {
-		t.Error("Build should pass (3/3 majority)")
+		t.Error("Build should pass (0/3 failed)")
 	}
-	// Style: 1/3 pass → fail (1 > 1 is false)
+	// Style: 1/3 pass → fail (strict: any fail = fail)
 	if criteriaMap["Style"] {
-		t.Error("Style should fail (1/3 majority)")
+		t.Error("Style should fail (2/3 failed, strict voting)")
 	}
-	// Errors: 2/3 pass → pass (2 > 1 is true)
-	if !criteriaMap["Errors"] {
-		t.Error("Errors should pass (2/3 majority)")
+	// Errors: 2/3 pass → fail (strict: any fail = fail)
+	if criteriaMap["Errors"] {
+		t.Error("Errors should fail (1/3 failed, strict any-fail voting)")
 	}
 
-	// Verify correct overall score: Build + Errors = 2 passed
-	if result.OverallScore != 2 {
-		t.Errorf("OverallScore = %d, want 2", result.OverallScore)
+	// Verify correct overall score: only Build passes = 1
+	if result.OverallScore != 1 {
+		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
 	}
 	if result.MaxScore != 3 {
 		t.Errorf("MaxScore = %d, want 3", result.MaxScore)
@@ -648,7 +503,7 @@ func TestAverageReviewDeduplicatesIssuesAndStrengths(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if len(result.Issues) != 3 {
 		t.Errorf("Issues count = %d, want 3 (dedup 'dup issue')", len(result.Issues))
@@ -672,7 +527,7 @@ func TestAverageReviewDisjointCriteria(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if len(result.Scores.Criteria) != 2 {
 		t.Errorf("Criteria count = %d, want 2 (union of disjoint sets)", len(result.Scores.Criteria))
@@ -704,13 +559,13 @@ func TestAverageReviewSummaryFormat(t *testing.T) {
 		},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if !strings.Contains(result.Summary, "2 reviewers") {
 		t.Errorf("Summary should mention reviewer count, got: %q", result.Summary)
 	}
-	if result.Model != "consensus (average)" {
-		t.Errorf("Model = %q, want %q", result.Model, "consensus (average)")
+	if result.Model != "consensus (strict-vote)" {
+		t.Errorf("Model = %q, want %q", result.Model, "consensus (strict-vote)")
 	}
 }
 
@@ -724,7 +579,7 @@ func TestAverageReviewPreservesCriteriaOrder(t *testing.T) {
 		}},
 	}}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	expected := []string{"Build", "Style", "Errors", "Docs"}
 	for i, c := range result.Scores.Criteria {
@@ -735,19 +590,19 @@ func TestAverageReviewPreservesCriteriaOrder(t *testing.T) {
 }
 
 func TestAverageReviewEvenSplitFailsByCriteria(t *testing.T) {
-	// With 2 reviewers, 1 pass + 1 fail → passCount=1, total=2 → 1 > 2/2=1 → false (tie fails)
+	// With 2 reviewers, 1 pass + 1 fail → strict any-fail = fail
 	panel := []ReviewResult{
 		{Scores: ReviewScores{Criteria: []CriterionResult{{Name: "X", Passed: true}}}},
 		{Scores: ReviewScores{Criteria: []CriterionResult{{Name: "X", Passed: false}}}},
 	}
 
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 
 	if len(result.Scores.Criteria) != 1 {
 		t.Fatal("expected 1 criterion")
 	}
 	if result.Scores.Criteria[0].Passed {
-		t.Error("tie (1/2) should fail — majority requires strictly more than half")
+		t.Error("tie (1/2) should fail — strict any-fail voting")
 	}
 }
 
@@ -928,7 +783,7 @@ func TestPanelReviewer_SetSystemPrompt(t *testing.T) {
 func TestCopilotReviewerReviewNoGeneratedFiles(t *testing.T) {
 	emptyDir := t.TempDir()
 	r := NewCopilotReviewer(nil, "test-model", 50)
-	_, err := r.Review(context.Background(), "prompt", emptyDir, "", "")
+	_, err := r.Review(context.Background(), "prompt", emptyDir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty workDir")
 	}
@@ -939,7 +794,7 @@ func TestCopilotReviewerReviewNoGeneratedFiles(t *testing.T) {
 
 func TestCopilotReviewerReviewNonexistentWorkDir(t *testing.T) {
 	r := NewCopilotReviewer(nil, "test-model", 50)
-	_, err := r.Review(context.Background(), "prompt", "/nonexistent/dir/abc", "", "")
+	_, err := r.Review(context.Background(), "prompt", "/nonexistent/dir/abc", "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for nonexistent workDir")
 	}
@@ -994,7 +849,7 @@ func TestCopilotReviewerSettersEdgeCases(t *testing.T) {
 
 func TestPanelReviewerReviewPanelNoModels(t *testing.T) {
 	p := NewPanelReviewer(nil, []string{}, 50)
-	_, _, _, err := p.ReviewPanel(context.Background(), "prompt", t.TempDir(), "", "")
+	_, _, err := p.ReviewPanel(context.Background(), "prompt", t.TempDir(), "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty models")
 	}
@@ -1006,7 +861,7 @@ func TestPanelReviewerReviewPanelNoModels(t *testing.T) {
 func TestPanelReviewerReviewPanelNoGeneratedFiles(t *testing.T) {
 	emptyDir := t.TempDir()
 	p := NewPanelReviewer(nil, []string{"model-a"}, 50)
-	_, _, _, err := p.ReviewPanel(context.Background(), "prompt", emptyDir, "", "")
+	_, _, err := p.ReviewPanel(context.Background(), "prompt", emptyDir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty workDir")
 	}
@@ -1017,7 +872,7 @@ func TestPanelReviewerReviewPanelNoGeneratedFiles(t *testing.T) {
 
 func TestPanelReviewerReviewDelegatesToReviewPanel(t *testing.T) {
 	p := NewPanelReviewer(nil, []string{}, 50)
-	_, err := p.Review(context.Background(), "prompt", t.TempDir(), "", "")
+	_, err := p.Review(context.Background(), "prompt", t.TempDir(), "", "", nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1034,76 +889,12 @@ func TestPanelReviewerReviewPanelCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, _, err := p.ReviewPanel(ctx, "prompt", workDir, "", "")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
 	if !strings.Contains(err.Error(), "all reviewers failed") {
 		t.Errorf("error = %q, want 'all reviewers failed'", err.Error())
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Additional parseReviewResponse edge cases
-// ---------------------------------------------------------------------------
-
-func TestParseReviewResponseEdgeCases(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-		check   func(t *testing.T, r *ReviewResult)
-	}{
-		{
-			name:  "extra fields ignored",
-			input: `{"scores":{"criteria":[{"name":"A","passed":true}]},"overall_score":1,"max_score":1,"summary":"ok","issues":[],"strengths":[],"extra_field":"ignored"}`,
-			check: func(t *testing.T, r *ReviewResult) {
-				if r.OverallScore != 1 {
-					t.Errorf("OverallScore = %d, want 1", r.OverallScore)
-				}
-			},
-		},
-		{
-			name:  "criteria with empty reason",
-			input: `{"scores":{"criteria":[{"name":"Build","passed":true,"reason":""}]},"overall_score":1,"max_score":1,"summary":"good","issues":[],"strengths":[]}`,
-			check: func(t *testing.T, r *ReviewResult) {
-				if r.Scores.Criteria[0].Reason != "" {
-					t.Errorf("expected empty reason, got %q", r.Scores.Criteria[0].Reason)
-				}
-			},
-		},
-		{
-			name:    "truncated json",
-			input:   `{"scores":{"criteria":[{"name":"A","pas`,
-			wantErr: true,
-		},
-		{
-			name:  "explicit max_score preserved",
-			input: `{"scores":{"criteria":[{"name":"A","passed":true}]},"overall_score":1,"max_score":5,"summary":"test","issues":[],"strengths":[]}`,
-			check: func(t *testing.T, r *ReviewResult) {
-				if r.MaxScore != 5 {
-					t.Errorf("MaxScore = %d, want 5", r.MaxScore)
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseReviewResponse(tt.input)
-			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if tt.check != nil {
-				tt.check(t, result)
-			}
-		})
 	}
 }
 
@@ -1116,7 +907,7 @@ func TestAverageReviewAllEmptyCriteria(t *testing.T) {
 		{Scores: ReviewScores{Criteria: nil}},
 		{Scores: ReviewScores{Criteria: nil}},
 	}
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 	if len(result.Scores.Criteria) != 0 {
 		t.Errorf("expected 0 criteria, got %d", len(result.Scores.Criteria))
 	}
@@ -1133,7 +924,7 @@ func TestAverageReviewNilIssuesAndStrengths(t *testing.T) {
 			Strengths: nil,
 		},
 	}
-	result := averageReview(panel)
+	result := averageReview(panel, nil)
 	if result.OverallScore != 1 {
 		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
 	}
@@ -1223,7 +1014,7 @@ func TestBuildReviewPromptSpecialChars(t *testing.T) {
 	generated := map[string]string{
 		"test.go": "package main\nfunc main() { fmt.Println(\"hello\") }",
 	}
-	result := BuildReviewPrompt(prompt, generated, nil, "")
+	result := BuildReviewPrompt(prompt, generated, nil, nil, nil)
 	if !strings.Contains(result, "backticks") {
 		t.Error("should preserve special characters in prompt")
 	}
@@ -1289,7 +1080,7 @@ func TestPanelReviewerReviewPanelWithReferenceDir(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "some criteria")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "some criteria", nil)
 	if err == nil {
 		t.Fatal("expected error (cancelled context)")
 	}
@@ -1305,7 +1096,7 @@ func TestPanelReviewerReviewPanelWithInvalidReferenceDir(t *testing.T) {
 	cancel()
 
 	// Non-fatal: reference read failure should not prevent the run
-	_, _, _, err := p.ReviewPanel(ctx, "prompt", workDir, "/nonexistent/ref/dir", "criteria")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, "/nonexistent/ref/dir", "criteria", nil)
 	if err == nil {
 		t.Fatal("expected error (cancelled context, not ref failure)")
 	}
@@ -1326,7 +1117,7 @@ func TestPanelReviewerReviewPanelWithEmptyReferenceDir(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "")
+	_, _, err := p.ReviewPanel(ctx, "prompt", workDir, refDir, "", nil)
 	if err == nil {
 		t.Fatal("expected error (cancelled context)")
 	}
@@ -1337,7 +1128,7 @@ func TestCopilotReviewerReviewWithOnlyHiddenFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.pyc"), 0644)
 
 	r := NewCopilotReviewer(nil, "test-model", 50)
-	_, err := r.Review(context.Background(), "prompt", dir, "", "")
+	_, err := r.Review(context.Background(), "prompt", dir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for dir with only hidden files")
 	}
@@ -1351,7 +1142,7 @@ func TestPanelReviewerReviewPanelWithOnlyHiddenFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.pyc"), 0644)
 
 	p := NewPanelReviewer(nil, []string{"model-a"}, 50)
-	_, _, _, err := p.ReviewPanel(context.Background(), "prompt", dir, "", "")
+	_, _, err := p.ReviewPanel(context.Background(), "prompt", dir, "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for dir with only hidden files")
 	}
@@ -1364,16 +1155,36 @@ func TestPanelReviewerReviewPanelWithOnlyHiddenFiles(t *testing.T) {
 // eventCollector tests
 // ---------------------------------------------------------------------------
 
+func assistantMessageEvent(content string) copilot.SessionEvent {
+	return copilot.SessionEvent{Data: &copilot.AssistantMessageData{Content: content}}
+}
+
+func assistantReasoningEvent() copilot.SessionEvent {
+	return copilot.SessionEvent{Data: &copilot.AssistantReasoningData{}}
+}
+
+func toolStartEvent(name string, arguments any) copilot.SessionEvent {
+	return copilot.SessionEvent{Data: &copilot.ToolExecutionStartData{
+		ToolName:  name,
+		Arguments: arguments,
+	}}
+}
+
+func toolCompleteEvent(result string, err *copilot.ToolExecutionCompleteError) copilot.SessionEvent {
+	return copilot.SessionEvent{Data: &copilot.ToolExecutionCompleteData{
+		Error:   err,
+		Result:  &copilot.ToolExecutionCompleteResult{Content: result},
+		Success: err == nil,
+	}}
+}
+
 func TestEventCollectorHandleAssistantMessage(t *testing.T) {
 	cancelled := false
 	cancel := func() { cancelled = true }
 	c := newEventCollector("test-model", 100, cancel)
 
 	content := "Hello, world!"
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantMessage,
-		Data: copilot.Data{Content: &content},
-	})
+	c.handleEvent(assistantMessageEvent(content))
 
 	text, events := c.response()
 	if text != "Hello, world!" {
@@ -1398,14 +1209,8 @@ func TestEventCollectorAccumulatesContent(t *testing.T) {
 
 	part1 := "Hello, "
 	part2 := "world!"
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantMessage,
-		Data: copilot.Data{Content: &part1},
-	})
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantMessage,
-		Data: copilot.Data{Content: &part2},
-	})
+	c.handleEvent(assistantMessageEvent(part1))
+	c.handleEvent(assistantMessageEvent(part2))
 
 	text, events := c.response()
 	if text != "Hello, world!" {
@@ -1423,10 +1228,7 @@ func TestEventCollectorActionLimit(t *testing.T) {
 
 	// Send 3 action events — limit is 2, so 3rd should trigger cancel
 	for i := 0; i < 3; i++ {
-		c.handleEvent(copilot.SessionEvent{
-			Type: copilot.SessionEventTypeAssistantMessage,
-			Data: copilot.Data{},
-		})
+		c.handleEvent(assistantMessageEvent(""))
 	}
 
 	if !cancelled {
@@ -1443,10 +1245,7 @@ func TestEventCollectorNoLimitWhenZero(t *testing.T) {
 	c := newEventCollector("model", 0, cancel)
 
 	for i := 0; i < 100; i++ {
-		c.handleEvent(copilot.SessionEvent{
-			Type: copilot.SessionEventTypeAssistantMessage,
-			Data: copilot.Data{},
-		})
+		c.handleEvent(assistantMessageEvent(""))
 	}
 
 	if cancelled {
@@ -1460,22 +1259,13 @@ func TestEventCollectorToolEvents(t *testing.T) {
 	toolName := "read_file"
 	args := map[string]string{"path": "main.go"}
 	resultContent := "file content"
-	dur := 42.5
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeToolExecutionStart,
-		Data: copilot.Data{
-			ToolName:  &toolName,
-			Arguments: args,
-		},
-	})
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeToolExecutionComplete,
-		Data: copilot.Data{
-			ToolName: &toolName,
-			Result:   &copilot.Result{Content: &resultContent},
-			Duration: &dur,
-		},
-	})
+	startedAt := time.Date(2026, time.August, 27, 1, 2, 3, 0, time.UTC)
+	start := toolStartEvent(toolName, args)
+	start.Timestamp = startedAt
+	complete := toolCompleteEvent(resultContent, nil)
+	complete.Timestamp = startedAt.Add(42_500 * time.Microsecond)
+	c.handleEvent(start)
+	c.handleEvent(complete)
 
 	_, events := c.response()
 	if len(events) != 2 {
@@ -1491,44 +1281,50 @@ func TestEventCollectorToolEvents(t *testing.T) {
 		t.Errorf("complete event result = %q", events[1].Result)
 	}
 	if events[1].Duration != 42.5 {
-		t.Errorf("complete event duration = %f", events[1].Duration)
+		t.Errorf("complete event duration = %f, want 42.5", events[1].Duration)
+	}
+}
+
+func TestEventCollectorUnmatchedCompletionHasZeroDuration(t *testing.T) {
+	c := newEventCollector("model", 100, func() {})
+	complete := toolCompleteEvent("file content", nil)
+	complete.Timestamp = time.Now()
+
+	c.handleEvent(complete)
+
+	_, events := c.response()
+	if len(events) != 1 {
+		t.Fatalf("events count = %d, want 1", len(events))
+	}
+	if events[0].Duration != 0 {
+		t.Errorf("complete event duration = %f, want 0", events[0].Duration)
 	}
 }
 
 func TestEventCollectorErrorEvents(t *testing.T) {
 	tests := []struct {
-		name      string
-		errorData *copilot.ErrorUnion
-		wantError string
+		name string
+		err  *copilot.ToolExecutionCompleteError
+		want string
 	}{
 		{
-			name: "error class",
-			errorData: &copilot.ErrorUnion{
-				ErrorClass: &copilot.ErrorClass{Message: "something broke"},
-			},
-			wantError: "something broke",
-		},
-		{
-			name:      "error string",
-			errorData: &copilot.ErrorUnion{String: strPtr("string error")},
-			wantError: "string error",
+			name: "tool error",
+			err:  &copilot.ToolExecutionCompleteError{Message: "something broke"},
+			want: "something broke",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := newEventCollector("model", 100, func() {})
-			c.handleEvent(copilot.SessionEvent{
-				Type: copilot.SessionEventTypeToolExecutionComplete,
-				Data: copilot.Data{Error: tt.errorData},
-			})
+			c.handleEvent(toolCompleteEvent("", tt.err))
 
 			_, events := c.response()
 			if len(events) != 1 {
 				t.Fatalf("events = %d, want 1", len(events))
 			}
-			if events[0].Error != tt.wantError {
-				t.Errorf("error = %q, want %q", events[0].Error, tt.wantError)
+			if events[0].Error != tt.want {
+				t.Errorf("error = %q, want %q", events[0].Error, tt.want)
 			}
 		})
 	}
@@ -1537,14 +1333,8 @@ func TestEventCollectorErrorEvents(t *testing.T) {
 func TestEventCollectorTurnEvents(t *testing.T) {
 	c := newEventCollector("model", 100, func() {})
 
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantTurnStart,
-		Data: copilot.Data{},
-	})
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantTurnEnd,
-		Data: copilot.Data{},
-	})
+	c.handleEvent(copilot.SessionEvent{Data: &copilot.AssistantTurnStartData{TurnID: "1"}})
+	c.handleEvent(copilot.SessionEvent{Data: &copilot.AssistantTurnEndData{TurnID: "1"}})
 
 	_, events := c.response()
 	if len(events) != 2 {
@@ -1560,10 +1350,7 @@ func TestEventCollectorTurnEvents(t *testing.T) {
 
 func TestEventCollectorUsageEvent(t *testing.T) {
 	c := newEventCollector("model", 100, func() {})
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantUsage,
-		Data: copilot.Data{},
-	})
+	c.handleEvent(copilot.SessionEvent{Data: &copilot.AssistantUsageData{}})
 
 	_, events := c.response()
 	if len(events) != 1 {
@@ -1575,14 +1362,8 @@ func TestEventCollectorReasoningCountsAsAction(t *testing.T) {
 	cancelled := false
 	c := newEventCollector("model", 1, func() { cancelled = true })
 
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantReasoning,
-		Data: copilot.Data{},
-	})
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantReasoning,
-		Data: copilot.Data{},
-	})
+	c.handleEvent(assistantReasoningEvent())
+	c.handleEvent(assistantReasoningEvent())
 
 	if !cancelled {
 		t.Error("reasoning events should count toward action limit")
@@ -1593,14 +1374,8 @@ func TestEventCollectorToolStartCountsAsAction(t *testing.T) {
 	cancelled := false
 	c := newEventCollector("model", 1, func() { cancelled = true })
 
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeToolExecutionStart,
-		Data: copilot.Data{},
-	})
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeToolExecutionStart,
-		Data: copilot.Data{},
-	})
+	c.handleEvent(toolStartEvent("", nil))
+	c.handleEvent(toolStartEvent("", nil))
 
 	if !cancelled {
 		t.Error("tool start events should count toward action limit")
@@ -1610,10 +1385,7 @@ func TestEventCollectorToolStartCountsAsAction(t *testing.T) {
 func TestEventCollectorNilContentNotAccumulated(t *testing.T) {
 	c := newEventCollector("model", 100, func() {})
 
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantMessage,
-		Data: copilot.Data{Content: nil},
-	})
+	c.handleEvent(assistantMessageEvent(""))
 
 	text, _ := c.response()
 	if text != "" {
@@ -1624,10 +1396,7 @@ func TestEventCollectorNilContentNotAccumulated(t *testing.T) {
 func TestEventCollectorResponseCopiesEvents(t *testing.T) {
 	c := newEventCollector("model", 100, func() {})
 	content := "test"
-	c.handleEvent(copilot.SessionEvent{
-		Type: copilot.SessionEventTypeAssistantMessage,
-		Data: copilot.Data{Content: &content},
-	})
+	c.handleEvent(assistantMessageEvent(content))
 
 	_, events1 := c.response()
 	_, events2 := c.response()
@@ -1639,79 +1408,512 @@ func TestEventCollectorResponseCopiesEvents(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// buildConsolidationPrompt tests
+
+// ---------------------------------------------------------------------------
+// Reviewer validation tests
 // ---------------------------------------------------------------------------
 
-func TestBuildConsolidationPrompt(t *testing.T) {
+func TestValidateReviewerResponseValid(t *testing.T) {
+	result := &ReviewResult{
+		Scores: ReviewScores{Criteria: []CriterionResult{
+			{Name: "A", Passed: true},
+			{Name: "B", Passed: false, Reason: "missing"},
+		}},
+	}
+	errs := validateReviewerResponse(result)
+	if len(errs) > 0 {
+		t.Errorf("expected no errors, got %v", errs)
+	}
+}
+
+func TestValidateReviewerResponseNoCriteria(t *testing.T) {
+	result := &ReviewResult{Scores: ReviewScores{}}
+	errs := validateReviewerResponse(result)
+	if len(errs) == 0 {
+		t.Error("expected error for missing criteria")
+	}
+}
+
+func TestValidateReviewerResponseEmptyName(t *testing.T) {
+	result := &ReviewResult{
+		Scores: ReviewScores{Criteria: []CriterionResult{
+			{Name: "", Passed: true},
+		}},
+	}
+	errs := validateReviewerResponse(result)
+	if len(errs) == 0 {
+		t.Error("expected error for empty criterion name")
+	}
+}
+
+func TestValidateReviewerResponseNil(t *testing.T) {
+	errs := validateReviewerResponse(nil)
+	if len(errs) == 0 {
+		t.Error("expected error for nil result")
+	}
+}
+
+func TestDeterministicVoteStrictFailure(t *testing.T) {
 	panel := []ReviewResult{
 		{
-			Model:        "model-a",
-			OverallScore: 2,
-			MaxScore:     3,
-			Summary:      "Good overall",
+			Model: "m1",
 			Scores: ReviewScores{Criteria: []CriterionResult{
+				{Name: "Auth", Passed: true},
 				{Name: "Build", Passed: true},
-				{Name: "Style", Passed: true},
-				{Name: "Errors", Passed: false},
 			}},
 		},
 		{
-			Model:        "model-b",
-			OverallScore: 1,
-			MaxScore:     3,
-			Summary:      "Needs work",
+			Model: "m2",
 			Scores: ReviewScores{Criteria: []CriterionResult{
-				{Name: "Build", Passed: true},
-				{Name: "Style", Passed: false},
-				{Name: "Errors", Passed: false},
+				{Name: "Auth", Passed: true},
+				{Name: "Build", Passed: false, Reason: "compile error"},
 			}},
 		},
 	}
 
-	prompt := buildConsolidationPrompt("Write Azure code", panel)
+	result := deterministicVote(panel, nil)
 
-	checks := []string{
-		"senior review consolidator",
-		"Original Prompt",
-		"Write Azure code",
-		"Individual Reviews",
-		"Reviewer 1 (model-a)",
-		"Reviewer 2 (model-b)",
-		"Instructions",
-		"consensus review",
-		"majority",
-		"JSON object",
+	criteriaMap := map[string]bool{}
+	for _, c := range result.Scores.Criteria {
+		criteriaMap[c.Name] = c.Passed
+	}
+	// Auth: both pass → pass
+	if !criteriaMap["Auth"] {
+		t.Error("Auth should pass (0 failures)")
+	}
+	// Build: one fail → fail (any-fail voting)
+	if criteriaMap["Build"] {
+		t.Error("Build should fail (any-fail voting)")
+	}
+	if result.OverallScore != 1 {
+		t.Errorf("OverallScore = %d, want 1", result.OverallScore)
+	}
+}
+
+func TestCriterionJudgmentJSONRoundTrip(t *testing.T) {
+	resp := ReviewerResponse{
+		Criteria: []CriterionJudgment{
+			{Criterion: "test criterion", Passed: true, Reasoning: "looks good"},
+		},
+	}
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded ReviewerResponse
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Criteria) != 1 {
+		t.Fatalf("expected 1 criterion, got %d", len(decoded.Criteria))
+	}
+	if decoded.Criteria[0].Criterion != "test criterion" {
+		t.Error("criterion text should round-trip")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GeneratorArtifact integration tests
+// ---------------------------------------------------------------------------
+
+// TestBuildReviewPrompt_WithArtifactAndFiles verifies that when both generated
+// files AND a final response artifact are present, the prompt includes BOTH
+// sections unconditionally.
+func TestBuildReviewPrompt_WithArtifactAndFiles(t *testing.T) {
+	prompt := "Write a Python script"
+	files := map[string]string{
+		"main.py": "print('hello')",
+	}
+	artifact := &GeneratorArtifact{
+		FinalResponse: "I have created the script as requested.",
 	}
 
-	for _, check := range checks {
-		if !strings.Contains(prompt, check) {
-			t.Errorf("consolidation prompt missing %q", check)
+	result := BuildReviewPrompt(prompt, files, nil, criteriaStringToChecks("Must run without errors"), artifact)
+
+	// Both sections must appear
+	if !strings.Contains(result, "## Generated Code") {
+		t.Error("prompt must include Generated Code section when files present")
+	}
+	if !strings.Contains(result, "main.py") {
+		t.Error("prompt must include file content")
+	}
+	if !strings.Contains(result, "## Agent's Final Response") {
+		t.Error("prompt must include Agent's Final Response section when artifact present")
+	}
+	if !strings.Contains(result, "I have created the script") {
+		t.Error("prompt must include artifact's final response text")
+	}
+}
+
+// TestBuildReviewPrompt_WithArtifactNoFiles verifies that when no files are
+// generated but an artifact with a final response exists, the prompt includes
+// the agent's response and indicates no files were created.
+func TestBuildReviewPrompt_WithArtifactNoFiles(t *testing.T) {
+	prompt := "Explain how to use DefaultAzureCredential"
+	artifact := &GeneratorArtifact{
+		FinalResponse: "DefaultAzureCredential is a chained credential...",
+	}
+
+	result := BuildReviewPrompt(prompt, nil, nil, criteriaStringToChecks("Must be accurate"), artifact)
+
+	if !strings.Contains(result, "## Generated Code") {
+		t.Error("prompt must include Generated Code section header")
+	}
+	if !strings.Contains(result, "No files were created") {
+		t.Error("prompt must indicate no files when workspace is empty")
+	}
+	if !strings.Contains(result, "## Agent's Final Response") {
+		t.Error("prompt must include Agent's Final Response section")
+	}
+	if !strings.Contains(result, "DefaultAzureCredential is a chained") {
+		t.Error("prompt must include artifact response")
+	}
+}
+
+// TestBuildReviewPrompt_NoArtifactWithFiles verifies that when files are
+// generated but no artifact is provided, the prompt still works (legacy behavior).
+func TestBuildReviewPrompt_NoArtifactWithFiles(t *testing.T) {
+	prompt := "Write code"
+	files := map[string]string{"test.py": "code"}
+
+	result := BuildReviewPrompt(prompt, files, nil, nil, nil)
+
+	if !strings.Contains(result, "## Generated Code") {
+		t.Error("prompt must include Generated Code section")
+	}
+	if !strings.Contains(result, "test.py") {
+		t.Error("prompt must include file content")
+	}
+	if strings.Contains(result, "## Agent's Final Response") {
+		t.Error("prompt should not include Agent's Final Response when artifact is nil")
+	}
+}
+
+// TestBuildReviewPrompt_EmptyArtifactResponse verifies that an artifact with
+// an empty FinalResponse field does not add the Agent's Final Response section.
+func TestBuildReviewPrompt_EmptyArtifactResponse(t *testing.T) {
+	prompt := "Write code"
+	files := map[string]string{"test.py": "code"}
+	artifact := &GeneratorArtifact{
+		FinalResponse: "", // empty
+	}
+
+	result := BuildReviewPrompt(prompt, files, nil, nil, artifact)
+
+	if strings.Contains(result, "## Agent's Final Response") {
+		t.Error("prompt should not include Agent's Final Response when FinalResponse is empty")
+	}
+}
+
+// TestCopilotReviewer_EmptyWorkspaceWithArtifact verifies that the reviewer
+// accepts an empty workspace when a non-nil artifact with a response is provided.
+func TestCopilotReviewer_EmptyWorkspaceWithArtifact(t *testing.T) {
+	artifact := &GeneratorArtifact{
+		FinalResponse: "Here is my explanation of how to use the SDK...",
+	}
+
+	// We can't actually invoke the real reviewer without Copilot, but we can
+	// test that BuildReviewPrompt doesn't error and includes the response
+	prompt := BuildReviewPrompt("Explain Azure SDK", map[string]string{}, nil, criteriaStringToChecks("Must be clear"), artifact)
+
+	if !strings.Contains(prompt, "Here is my explanation") {
+		t.Error("prompt must include artifact response when no files present")
+	}
+}
+
+// TestCopilotReviewer_EmptyWorkspaceNoArtifact verifies that the reviewer
+// errors when BOTH workspace is empty AND no artifact is provided (nothing to review).
+func TestCopilotReviewer_EmptyWorkspaceNoArtifact(t *testing.T) {
+	emptyDir := t.TempDir()
+	r := NewCopilotReviewer(nil, "test-model", 50)
+
+	// This should error because there's nothing to review
+	_, err := r.Review(context.Background(), "prompt", emptyDir, "", "criteria", nil)
+	if err == nil {
+		t.Fatal("expected error when workspace is empty and no artifact provided")
+	}
+	if !strings.Contains(err.Error(), "no generated files") && !strings.Contains(err.Error(), "no agent response") {
+		t.Errorf("error should mention missing files or response, got: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ID-aware parser and validator tests
+// ---------------------------------------------------------------------------
+
+func TestParseReviewResponseV2_GoodIDs(t *testing.T) {
+	expected := []ReviewCheck{
+		{ID: "check_1", Text: "Build succeeds"},
+		{ID: "check_2", Text: "Tests pass"},
+	}
+	response := `{
+"criteria": [
+{"id": "check_1", "passed": true, "reasoning": "builds"},
+{"id": "check_2", "passed": false, "reasoning": "1 test failed"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+	result, errs := parseReviewResponseV2(response, expected)
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if result == nil {
+		t.Fatal("result is nil")
+	}
+	if len(result.Scores.Criteria) != 2 {
+		t.Fatalf("expected 2 criteria, got %d", len(result.Scores.Criteria))
+	}
+	if result.Scores.Criteria[0].ID != "check_1" {
+		t.Errorf("criterion 0 id = %q, want check_1", result.Scores.Criteria[0].ID)
+	}
+	if result.Scores.Criteria[0].Name != "Build succeeds" {
+		t.Errorf("criterion 0 name = %q, want canonical label", result.Scores.Criteria[0].Name)
+	}
+	if !result.Scores.Criteria[0].Passed {
+		t.Error("criterion 0 should be passed")
+	}
+}
+
+func TestParseReviewResponseV2_MissingID(t *testing.T) {
+	expected := []ReviewCheck{
+		{ID: "check_1", Text: "A"},
+		{ID: "check_2", Text: "B"},
+	}
+	response := `{
+"criteria": [
+{"id": "check_1", "passed": true, "reasoning": "ok"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+	_, errs := parseReviewResponseV2(response, expected)
+	if len(errs) == 0 {
+		t.Fatal("expected validation errors for missing id")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "missing") && strings.Contains(e, "check_2") {
+			found = true
+			break
 		}
 	}
-}
-
-func TestBuildConsolidationPromptSingleReviewer(t *testing.T) {
-	panel := []ReviewResult{{
-		Model:   "model-a",
-		Summary: "Test",
-		Scores:  ReviewScores{Criteria: []CriterionResult{{Name: "A", Passed: true}}},
-	}}
-
-	prompt := buildConsolidationPrompt("prompt", panel)
-	if !strings.Contains(prompt, "Reviewer 1 (model-a)") {
-		t.Error("should contain reviewer label")
+	if !found {
+		t.Errorf("expected 'missing ids' error, got %v", errs)
 	}
 }
 
-func TestBuildConsolidationPromptEmpty(t *testing.T) {
-	prompt := buildConsolidationPrompt("prompt", nil)
-	if !strings.Contains(prompt, "Original Prompt") {
-		t.Error("should contain prompt section even with empty panel")
+func TestParseReviewResponseV2_ExtraID(t *testing.T) {
+	expected := []ReviewCheck{
+		{ID: "check_1", Text: "A"},
 	}
-	if !strings.Contains(prompt, "Individual Reviews") {
-		t.Error("should contain reviews section even with empty panel")
+	response := `{
+"criteria": [
+{"id": "check_1", "passed": true, "reasoning": "ok"},
+{"id": "check_99", "passed": false, "reasoning": "extra"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+	_, errs := parseReviewResponseV2(response, expected)
+	if len(errs) == 0 {
+		t.Fatal("expected validation errors for extra id")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "unexpected") && strings.Contains(e, "check_99") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected 'unexpected id' error, got %v", errs)
 	}
 }
 
-// helper
-func strPtr(s string) *string { return &s }
+func TestParseReviewResponseV2_MalformedShape(t *testing.T) {
+	expected := []ReviewCheck{{ID: "check_1", Text: "A"}}
+	response := `{"criteria": "not an array"}`
+	_, errs := parseReviewResponseV2(response, expected)
+	if len(errs) == 0 {
+		t.Fatal("expected validation errors for malformed response")
+	}
+}
+
+func TestAverageReview_KeysByID_NotName(t *testing.T) {
+	expected := []ReviewCheck{
+		{ID: "check_1", Text: "Build succeeds"},
+	}
+	panel := []ReviewResult{
+		{
+			Model: "m1",
+			Scores: ReviewScores{Criteria: []CriterionResult{
+				{ID: "check_1", Name: "Build succeeds", Passed: true, Reason: "compiles fine"},
+			}},
+		},
+		{
+			Model: "m2",
+			Scores: ReviewScores{Criteria: []CriterionResult{
+				{ID: "check_1", Name: "Build succeeds", Passed: true, Reason: "no errors"},
+			}},
+		},
+	}
+	result := averageReview(panel, expected)
+	if len(result.Scores.Criteria) != 1 {
+		t.Fatalf("expected 1 criterion, got %d", len(result.Scores.Criteria))
+	}
+	c := result.Scores.Criteria[0]
+	if c.Name != "Build succeeds" {
+		t.Errorf("name = %q, want canonical label", c.Name)
+	}
+	if !strings.Contains(c.Reason, "2/2") {
+		t.Errorf("reason = %q, want 2/2 reviewers", c.Reason)
+	}
+}
+
+func TestAverageReview_BucketScoping(t *testing.T) {
+	expected := []ReviewCheck{
+		{ID: "check_1", Text: "A"},
+	}
+	panel := []ReviewResult{
+		{
+			Model: "m1",
+			Scores: ReviewScores{Criteria: []CriterionResult{
+				{ID: "check_1", Name: "[bucketA] A", Passed: true},
+				{ID: "check_1", Name: "[bucketB] A", Passed: false},
+			}},
+		},
+	}
+	result := averageReview(panel, expected)
+	if len(result.Scores.Criteria) != 2 {
+		t.Fatalf("expected 2 criteria (bucket-scoped), got %d", len(result.Scores.Criteria))
+	}
+	names := make(map[string]bool)
+	for _, c := range result.Scores.Criteria {
+		names[c.Name] = true
+	}
+	if !names["[bucketA] A"] || !names["[bucketB] A"] {
+		t.Errorf("expected both bucket-prefixed entries, got %v", names)
+	}
+}
+
+func TestBuildReviewPrompt_RendersIDs(t *testing.T) {
+	checks := []ReviewCheck{
+		{ID: "check_1", Text: "File exists"},
+		{ID: "check_2", Text: "Tests pass"},
+	}
+	prompt := BuildReviewPrompt("Write code", nil, nil, checks, nil)
+	if !strings.Contains(prompt, "check_1:") {
+		t.Error("prompt missing 'check_1:' id rendering")
+	}
+	if !strings.Contains(prompt, "check_2:") {
+		t.Error("prompt missing 'check_2:' id rendering")
+	}
+	if !strings.Contains(prompt, "File exists") {
+		t.Error("prompt missing check text")
+	}
+	if !strings.Contains(prompt, "Do NOT") {
+		t.Error("prompt missing id-contract rule")
+	}
+	if !strings.Contains(prompt, `"id"`) {
+		t.Error("prompt missing schema example with id field")
+	}
+}
+
+func TestParseReviewResponseV2_RejectsLegacyText(t *testing.T) {
+	expected := []ReviewCheck{{ID: "check_1", Text: "A"}}
+	// Response with only "criterion" field (no "id")
+	response := `{
+"criteria": [
+{"criterion": "A", "passed": true, "reasoning": "ok"}
+],
+"summary": "ok",
+"issues": [],
+"strengths": []
+}`
+	_, errs := parseReviewResponseV2(response, expected)
+	if len(errs) == 0 {
+		t.Fatal("expected validation errors for legacy criterion-only response")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "empty id") || strings.Contains(e, "missing") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected empty/missing id error, got %v", errs)
+	}
+}
+
+// TestAverageReview_AnchoredToExpectedCheckIDs verifies that consensus
+// is anchored to the expected check list, marking missing checks as failed.
+func TestAverageReview_AnchoredToExpectedCheckIDs(t *testing.T) {
+	expected := []ReviewCheck{
+		{ID: "check_1", Text: "Uses DefaultAzureCredential"},
+		{ID: "check_2", Text: "Handles errors properly"},
+		{ID: "check_3", Text: "Uses environment variables"},
+	}
+
+	// Panel where reviewer 2 has no vote for check_3
+	panel := []ReviewResult{
+		{
+			Model: "reviewer-1",
+			Scores: ReviewScores{
+				Criteria: []CriterionResult{
+					{ID: "check_1", Name: "Uses DefaultAzureCredential", Passed: true},
+					{ID: "check_2", Name: "Handles errors properly", Passed: true},
+					{ID: "check_3", Name: "Uses environment variables", Passed: false},
+				},
+			},
+		},
+		{
+			Model: "reviewer-2",
+			Scores: ReviewScores{
+				Criteria: []CriterionResult{
+					{ID: "check_1", Name: "Uses DefaultAzureCredential", Passed: true},
+					{ID: "check_2", Name: "Handles errors properly", Passed: false},
+					// check_3 missing → should appear in consensus as failed
+				},
+			},
+		},
+	}
+
+	consensus := averageReview(panel, expected)
+
+	if consensus == nil {
+		t.Fatal("consensus is nil")
+	}
+	if len(consensus.Scores.Criteria) != 3 {
+		t.Errorf("consensus has %d criteria, want 3", len(consensus.Scores.Criteria))
+	}
+	if consensus.MaxScore != 3 {
+		t.Errorf("MaxScore = %d, want 3", consensus.MaxScore)
+	}
+
+	// check_1: both passed → should pass
+	c1 := consensus.Scores.Criteria[0]
+	if c1.ID != "check_1" || !c1.Passed {
+		t.Errorf("check_1: ID=%q Passed=%t, want ID=check_1 Passed=true", c1.ID, c1.Passed)
+	}
+
+	// check_2: reviewer-2 failed → should fail (any-fail voting)
+	c2 := consensus.Scores.Criteria[1]
+	if c2.ID != "check_2" || c2.Passed {
+		t.Errorf("check_2: ID=%q Passed=%t, want ID=check_2 Passed=false", c2.ID, c2.Passed)
+	}
+
+	// check_3: reviewer-1 failed it, reviewer-2 didn't vote → should fail (any-fail voting)
+	// The key test is that it APPEARS in the consensus with the correct ID in expected order
+	c3 := consensus.Scores.Criteria[2]
+	if c3.ID != "check_3" {
+		t.Errorf("check_3: ID=%q, want check_3", c3.ID)
+	}
+	if c3.Passed {
+		t.Errorf("check_3 should fail (any-fail voting)")
+	}
+}

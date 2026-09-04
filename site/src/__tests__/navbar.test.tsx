@@ -42,7 +42,7 @@ describe("Navbar", () => {
     }
   });
 
-  it("renders the Get Started link", () => {
+  it("renders the Get Started link to docs", () => {
     render(
       <MemoryRouter>
         <Navbar />
@@ -50,6 +50,17 @@ describe("Navbar", () => {
     );
     expect(screen.getByText("Get Started")).toBeInTheDocument();
     const link = screen.getByText("Get Started").closest("a");
+    expect(link).toHaveAttribute("href", "/docs");
+  });
+
+  it("renders the GitHub link", () => {
+    render(
+      <MemoryRouter>
+        <Navbar />
+      </MemoryRouter>
+    );
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    const link = screen.getByText("GitHub").closest("a");
     expect(link).toHaveAttribute("href", "https://github.com/ronniegeraghty/hyoka");
   });
 });

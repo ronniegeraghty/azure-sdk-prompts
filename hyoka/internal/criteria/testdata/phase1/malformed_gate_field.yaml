@@ -1,0 +1,6 @@
+graders:
+  - name: Has A Gate Field
+    type: prompt
+    weight: 1.0
+    gate: true
+    prompt: Gate field was removed from the unified schema — KnownFields(true) must reject it.

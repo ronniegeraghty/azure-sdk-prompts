@@ -1,0 +1,67 @@
+# Test fixture in pure-YAML prompt format.
+#
+# Companion to hello-markdown.prompt.md / hello-markdown-with-code.prompt.md
+# that exercises the .prompt.yaml loader path. Generates a tiny markdown file
+# so the existing test-language graders in criteria/language/test.yaml apply.
+
+id: test-dp-test-hello-yaml
+
+properties:
+  service: test
+  plane: data-plane
+  language: test
+  category: test
+  difficulty: basic
+  description: >
+    YAML-format test fixture that asks the agent to write a minimal hello.md
+    so the test-language criteria suite runs end-to-end against the .prompt.yaml
+    loader path.
+  created: '2026-05-06'
+  author: neo
+
+tags:
+  - test-fixture
+  - markdown
+  - yaml-format
+
+prompt_text: |
+  Write a file called `hello.md` to the workspace containing:
+  - A level-1 heading with the text "Hello"
+  - A single bullet list with exactly three items: "First", "Second", "Third"
+
+  Do not write any other files. Complete this task in one turn.
+
+# Inline graders — specific to THIS prompt's contract (basic markdown
+# with three exact bullets, no other files, no code blocks). Distinct
+# from the generic test-language graders in criteria/language/test.yaml.
+graders:
+  - type: workspace
+    name: YAML-prompt contract
+    weight: 1.0
+    checks:
+      - kind: require_to_create
+        files: [hello.md]
+      # hello.md must contain each of the three exact bullet labels the
+      # prompt asks for, AND must NOT contain a fenced code block (the
+      # companion hello-markdown-with-code prompt covers that case).
+      - kind: file
+        name: hello.md
+        state: present
+        min_bytes: 30
+        max_bytes: 200
+        contains: "First"
+      - kind: file
+        name: hello.md
+        state: present
+        contains: "Second"
+      - kind: file
+        name: hello.md
+        state: present
+        contains: "Third"
+      - kind: file
+        name: hello.md
+        state: present
+        excludes: "```"
+      # Prompt explicitly says "Do not write any other files."
+      - kind: forbidden_to_create
+        files: [README.md, notes.md, hello.txt, main.rs, main.py]

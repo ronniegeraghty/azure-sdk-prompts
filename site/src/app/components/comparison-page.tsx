@@ -1,305 +1,119 @@
-import { useState, useEffect, useMemo } from "react";
-import { fetchRuns, fetchCompareConfigs } from "../data/api";
-import type { RunSummary, ConfigComparison, PromptDiff, GraderDiff } from "../data/types";
+// Comparison page — group-based comparison tool (#365 / WI-047).
+//
+// Replaces the old A vs B config picker with a flexible system:
+//   • Users define named ComparisonGroups by filtering on any prompt or
+//     config attribute (catalog is computed from real eval data).
+//   • Multiple charts can be toggled to visualize differences across groups.
+//   • Group definitions and chart selections persist in localStorage.
+
+import { useEffect, useMemo, useState } from "react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+import { GitCompareArrows, Loader2, Plus, Settings2 } from "lucide-react";
+import { fetchRuns } from "../data/api";
+import type { RunSummary } from "../data/types";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "./ui/table";
-import {
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus,
-  Loader2,
-  GitCompareArrows,
-  TrendingUp,
-  TrendingDown,
-  Equal,
-  ChevronDown,
-  ChevronRight,
-  Filter,
-} from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+  buildCatalog,
+  CHART_OPTIONS,
+  computeMetrics,
+  type ChartId,
+  type ComparisonGroup,
+  type GroupMetrics,
+  filterGroup,
+  flattenResults,
+  loadState,
+  newGroupId,
+  nextGroupColor,
+  saveState,
+} from "../lib/comparison-groups";
+import { GroupBuilder } from "./group-builder";
 
-function formatScore(score: number): string {
-  return (score * 100).toFixed(1) + "%";
+const mono = { fontFamily: "'JetBrains Mono', monospace" };
+
+const DEFAULT_CHARTS: ChartId[] = ["pass_rate", "avg_score", "by_service"];
+
+function pct(v: number): string {
+  return `${(v * 100).toFixed(1)}%`;
 }
 
-function formatDelta(delta: number): string {
-  const pct = (delta * 100).toFixed(1);
-  if (delta > 0) return `+${pct}%`;
-  return `${pct}%`;
-}
-
-function deltaColor(delta: number): string {
-  if (delta > 0.001) return "text-emerald-400";
-  if (delta < -0.001) return "text-red-400";
-  return "text-white/40";
-}
-
-function deltaBg(delta: number): string {
-  if (delta > 0.001) return "bg-emerald-500/10";
-  if (delta < -0.001) return "bg-red-500/10";
-  return "bg-white/5";
-}
-
-function DeltaIcon({ delta }: { delta: number }) {
-  if (delta > 0.001)
-    return <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400" />;
-  if (delta < -0.001)
-    return <ArrowDownRight className="h-3.5 w-3.5 text-red-400" />;
-  return <Minus className="h-3.5 w-3.5 text-white/30" />;
-}
-
-function extractConfigNames(runs: RunSummary[]): string[] {
-  const names = new Set<string>();
-  for (const run of runs) {
-    if (!run.results) continue;
-    for (const r of run.results) {
-      if (r.config_name) names.add(r.config_name);
-    }
-  }
-  return Array.from(names).sort();
-}
-
-function extractFilterValues(
-  diffs: PromptDiff[]
-): { languages: string[]; services: string[] } {
-  const languages = new Set<string>();
-  const services = new Set<string>();
-  for (const d of diffs) {
-    const parts = d.prompt_id.split("-");
-    // Pattern: {service}-{plane}-{language}-{rest}
-    if (parts.length >= 3) {
-      services.add(parts[0]);
-      // Language is after the plane abbreviation (dp/mp)
-      languages.add(parts[2]);
-    }
-  }
-  return {
-    languages: Array.from(languages).sort(),
-    services: Array.from(services).sort(),
-  };
-}
-
-function GraderDiffRow({ diff }: { diff: GraderDiff }) {
-  return (
-    <TableRow className="border-white/5 bg-white/[0.01]">
-      <TableCell className="pl-10 text-white/50" style={{ fontSize: 12 }}>
-        {diff.name}
-      </TableCell>
-      <TableCell
-        className="text-white/60"
-        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
-      >
-        {diff.score_a.toFixed(2)}
-        <span className="ml-1.5 text-white/30">
-          {diff.pass_a ? "✓" : "✗"}
-        </span>
-      </TableCell>
-      <TableCell
-        className="text-white/60"
-        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
-      >
-        {diff.score_b.toFixed(2)}
-        <span className="ml-1.5 text-white/30">
-          {diff.pass_b ? "✓" : "✗"}
-        </span>
-      </TableCell>
-      <TableCell>
-        <span
-          className={`inline-flex items-center gap-1 ${deltaColor(diff.delta)}`}
-          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
-        >
-          <DeltaIcon delta={diff.delta} />
-          {diff.delta > 0 ? "+" : ""}
-          {diff.delta.toFixed(2)}
-        </span>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-function PromptDiffRow({ diff }: { diff: PromptDiff }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasGraders = diff.grader_diffs && diff.grader_diffs.length > 0;
-  const isOneSided = diff.only_in_a || diff.only_in_b;
-
-  return (
-    <>
-      <TableRow
-        className={`cursor-pointer border-white/5 transition-colors hover:bg-white/[0.04] ${
-          hasGraders ? "" : "cursor-default"
-        }`}
-        onClick={() => hasGraders && setExpanded(!expanded)}
-      >
-        <TableCell>
-          <div className="flex items-center gap-2">
-            {hasGraders ? (
-              expanded ? (
-                <ChevronDown className="h-3.5 w-3.5 text-white/30" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5 text-white/30" />
-              )
-            ) : (
-              <span className="w-3.5" />
-            )}
-            <span
-              className="text-emerald-400"
-              style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: 13,
-              }}
-            >
-              {diff.prompt_id}
-            </span>
-            {isOneSided && (
-              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-400" style={{ fontSize: 10 }}>
-                {diff.only_in_a ? "Only in A" : "Only in B"}
-              </span>
-            )}
-          </div>
-        </TableCell>
-        <TableCell
-          className="text-white/60"
-          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}
-        >
-          {isOneSided && diff.only_in_b ? "—" : formatScore(diff.score_a)}
-        </TableCell>
-        <TableCell
-          className="text-white/60"
-          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}
-        >
-          {isOneSided && diff.only_in_a ? "—" : formatScore(diff.score_b)}
-        </TableCell>
-        <TableCell>
-          {!isOneSided ? (
-            <span
-              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${deltaBg(diff.delta)} ${deltaColor(diff.delta)}`}
-              style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: 13,
-              }}
-            >
-              <DeltaIcon delta={diff.delta} />
-              {formatDelta(diff.delta)}
-            </span>
-          ) : (
-            <span className="text-white/20">—</span>
-          )}
-        </TableCell>
-      </TableRow>
-      <AnimatePresence>
-        {expanded && hasGraders && (
-          <motion.tr
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <td colSpan={4} className="p-0">
-              <Table>
-                <TableBody>
-                  {diff.grader_diffs!.map((gd) => (
-                    <GraderDiffRow key={gd.name} diff={gd} />
-                  ))}
-                </TableBody>
-              </Table>
-            </td>
-          </motion.tr>
-        )}
-      </AnimatePresence>
-    </>
-  );
+interface NamedMetrics {
+  group: ComparisonGroup;
+  metrics: GroupMetrics;
 }
 
 export function ComparisonPage() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
-  const [configNames, setConfigNames] = useState<string[]>([]);
-  const [configA, setConfigA] = useState<string>("");
-  const [configB, setConfigB] = useState<string>("");
-  const [comparison, setComparison] = useState<ConfigComparison | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [runsLoading, setRunsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
-  const [filterLanguage, setFilterLanguage] = useState<string>("all");
-  const [filterService, setFilterService] = useState<string>("all");
+  const [groups, setGroups] = useState<ComparisonGroup[]>([]);
+  const [charts, setCharts] = useState<ChartId[]>(DEFAULT_CHARTS);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate from localStorage on mount.
+  useEffect(() => {
+    const persisted = loadState();
+    if (persisted) {
+      setGroups(persisted.groups);
+      if (persisted.charts.length > 0) setCharts(persisted.charts);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist whenever groups or charts change (after initial hydration).
+  useEffect(() => {
+    if (!hydrated) return;
+    saveState({ groups, charts });
+  }, [groups, charts, hydrated]);
 
   useEffect(() => {
     fetchRuns()
-      .then((data) => {
-        setRuns(data);
-        setConfigNames(extractConfigNames(data));
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setRunsLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!configA || !configB || configA === configB) {
-      setComparison(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    fetchCompareConfigs(configA, configB)
-      .then(setComparison)
+      .then((data) => setRuns(data))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [configA, configB]);
+  }, []);
 
-  const filterValues = useMemo(
-    () => extractFilterValues(comparison?.per_prompt ?? []),
-    [comparison]
+  const allResults = useMemo(() => flattenResults(runs), [runs]);
+  const catalog = useMemo(() => buildCatalog(allResults), [allResults]);
+
+  const namedMetrics: NamedMetrics[] = useMemo(
+    () =>
+      groups.map((g) => ({
+        group: g,
+        metrics: computeMetrics(filterGroup(allResults, g)),
+      })),
+    [groups, allResults]
   );
 
-  const filteredDiffs = useMemo(() => {
-    if (!comparison) return [];
-    return comparison.per_prompt.filter((d) => {
-      const parts = d.prompt_id.split("-");
-      if (filterLanguage !== "all" && parts.length >= 3 && parts[2] !== filterLanguage)
-        return false;
-      if (filterService !== "all" && parts.length >= 1 && parts[0] !== filterService)
-        return false;
-      return true;
-    });
-  }, [comparison, filterLanguage, filterService]);
-
-  const filteredSummary = useMemo(() => {
-    let improved = 0,
-      regressed = 0,
-      unchanged = 0,
-      totalDelta = 0,
-      paired = 0;
-    for (const d of filteredDiffs) {
-      if (d.only_in_a || d.only_in_b) continue;
-      paired++;
-      totalDelta += d.delta;
-      if (d.delta > 0.001) improved++;
-      else if (d.delta < -0.001) regressed++;
-      else unchanged++;
-    }
-    return {
-      avg_delta: paired > 0 ? totalDelta / paired : 0,
-      improved,
-      regressed,
-      unchanged,
+  function addGroup() {
+    const next: ComparisonGroup = {
+      id: newGroupId(),
+      name: `Group ${groups.length + 1}`,
+      color: nextGroupColor(groups),
+      filters: {},
     };
-  }, [filteredDiffs]);
+    setGroups([...groups, next]);
+  }
+  function updateGroup(id: string, next: ComparisonGroup) {
+    setGroups(groups.map((g) => (g.id === id ? next : g)));
+  }
+  function removeGroup(id: string) {
+    setGroups(groups.filter((g) => g.id !== id));
+  }
+  function toggleChart(id: ChartId) {
+    setCharts((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+  }
 
-  if (runsLoading) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
         <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
@@ -312,265 +126,441 @@ export function ComparisonPage() {
       className="min-h-screen bg-[#0a0a0f] px-4 py-8 sm:px-6"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-8">
           <div className="mb-2 flex items-center gap-3">
             <GitCompareArrows className="h-6 w-6 text-emerald-400" />
-            <h1
-              className="text-white"
-              style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: "clamp(1.5rem, 3vw, 2rem)",
-              }}
-            >
-              Config Comparison
+            <h1 className="text-white" style={{ ...mono, fontSize: "clamp(1.5rem, 3vw, 2rem)" }}>
+              Compare
             </h1>
           </div>
           <p className="text-white/40" style={{ fontSize: 14 }}>
-            Compare evaluation scores between two configurations side-by-side.
+            Define one or more groups by filtering on any property — model, service, language, plane,
+            category, or difficulty — then compare metrics across them. Group definitions persist in
+            your browser.
           </p>
         </div>
 
-        {/* Config selectors */}
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              className="mb-1.5 block text-white/50"
-              style={{ fontSize: 12 }}
-            >
-              Config A (baseline)
-            </label>
-            <Select value={configA} onValueChange={setConfigA}>
-              <SelectTrigger className="border-white/10 bg-white/[0.03] text-white">
-                <SelectValue placeholder="Select config A…" />
-              </SelectTrigger>
-              <SelectContent className="border-white/10 bg-[#1a1a2e] text-white">
-                {configNames.map((name) => (
-                  <SelectItem key={name} value={name} disabled={name === configB}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label
-              className="mb-1.5 block text-white/50"
-              style={{ fontSize: 12 }}
-            >
-              Config B (comparison)
-            </label>
-            <Select value={configB} onValueChange={setConfigB}>
-              <SelectTrigger className="border-white/10 bg-white/[0.03] text-white">
-                <SelectValue placeholder="Select config B…" />
-              </SelectTrigger>
-              <SelectContent className="border-white/10 bg-[#1a1a2e] text-white">
-                {configNames.map((name) => (
-                  <SelectItem key={name} value={name} disabled={name === configA}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
-          </div>
-        )}
-
-        {/* Error */}
-        {error && !loading && (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-center">
-            <p className="mb-1 text-red-400">Comparison failed</p>
-            <p className="text-white/40" style={{ fontSize: 13 }}>
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-red-400" style={{ fontSize: 13 }}>
               {error}
             </p>
           </div>
         )}
 
-        {/* Empty state */}
-        {!loading && !error && !comparison && configA && configB && configA === configB && (
+        {allResults.length === 0 && !error && (
           <div className="rounded-xl border border-white/8 bg-white/[0.03] p-8 text-center">
-            <p className="text-white/40">Please select two different configurations to compare.</p>
+            <p className="text-white/40">No evaluations available yet. Run an evaluation first.</p>
           </div>
         )}
 
-        {!loading && !error && !comparison && (!configA || !configB) && (
-          <div className="rounded-xl border border-white/8 bg-white/[0.03] p-8 text-center">
-            <GitCompareArrows className="mx-auto mb-3 h-8 w-8 text-white/20" />
-            <p className="text-white/40">
-              Select two configurations above to see a side-by-side comparison.
-            </p>
-          </div>
-        )}
-
-        {/* Results */}
-        {comparison && !loading && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            {/* Summary stats */}
-            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
-                <div className="mb-1 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-400" />
-                  <span className="text-white/40" style={{ fontSize: 12 }}>
-                    Avg Delta
-                  </span>
-                </div>
-                <span
-                  className={`${deltaColor(filteredSummary.avg_delta)}`}
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 20,
-                  }}
-                >
-                  {formatDelta(filteredSummary.avg_delta)}
-                </span>
-              </div>
-              <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
-                <div className="mb-1 flex items-center gap-2">
-                  <ArrowUpRight className="h-4 w-4 text-emerald-400" />
-                  <span className="text-white/40" style={{ fontSize: 12 }}>
-                    Improved
-                  </span>
-                </div>
-                <span
-                  className="text-emerald-400"
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 20,
-                  }}
-                >
-                  {filteredSummary.improved}
-                </span>
-              </div>
-              <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
-                <div className="mb-1 flex items-center gap-2">
-                  <ArrowDownRight className="h-4 w-4 text-red-400" />
-                  <span className="text-white/40" style={{ fontSize: 12 }}>
-                    Regressed
-                  </span>
-                </div>
-                <span
-                  className="text-red-400"
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 20,
-                  }}
-                >
-                  {filteredSummary.regressed}
-                </span>
-              </div>
-              <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4">
-                <div className="mb-1 flex items-center gap-2">
-                  <Equal className="h-4 w-4 text-white/30" />
-                  <span className="text-white/40" style={{ fontSize: 12 }}>
-                    Unchanged
-                  </span>
-                </div>
-                <span
-                  className="text-white/50"
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 20,
-                  }}
-                >
-                  {filteredSummary.unchanged}
-                </span>
-              </div>
-            </div>
-
-            {/* Filter controls */}
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <Filter className="h-4 w-4 text-white/30" />
-              <Select value={filterService} onValueChange={setFilterService}>
-                <SelectTrigger className="w-40 border-white/10 bg-white/[0.03] text-white" size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border-white/10 bg-[#1a1a2e] text-white">
-                  <SelectItem value="all">All Services</SelectItem>
-                  {filterValues.services.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterLanguage} onValueChange={setFilterLanguage}>
-                <SelectTrigger className="w-40 border-white/10 bg-white/[0.03] text-white" size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border-white/10 bg-[#1a1a2e] text-white">
-                  <SelectItem value="all">All Languages</SelectItem>
-                  {filterValues.languages.map((l) => (
-                    <SelectItem key={l} value={l}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(filterLanguage !== "all" || filterService !== "all") && (
+        {allResults.length > 0 && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+            {/* Left column: groups + chart toggles */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-white/80" style={{ ...mono, fontSize: 14 }}>
+                  Groups ({groups.length})
+                </h2>
                 <button
-                  onClick={() => {
-                    setFilterLanguage("all");
-                    setFilterService("all");
-                  }}
-                  className="rounded-md px-2 py-1 text-white/40 transition-colors hover:bg-white/5 hover:text-white/60"
+                  onClick={addGroup}
+                  className="inline-flex items-center gap-1 rounded-md border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-emerald-300 transition-colors hover:bg-emerald-500/20"
                   style={{ fontSize: 12 }}
                 >
-                  Clear filters
+                  <Plus className="h-3.5 w-3.5" /> Add group
                 </button>
+              </div>
+
+              {groups.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
+                  <p className="mb-3 text-white/50" style={{ fontSize: 13 }}>
+                    No groups yet. Add one to start comparing.
+                  </p>
+                  <button
+                    onClick={addGroup}
+                    className="inline-flex items-center gap-1 rounded-md bg-emerald-500/20 px-3 py-1.5 text-emerald-300 hover:bg-emerald-500/30"
+                    style={{ fontSize: 12 }}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Create first group
+                  </button>
+                </div>
+              ) : (
+                groups.map((g) => (
+                  <GroupBuilder
+                    key={g.id}
+                    group={g}
+                    catalog={catalog}
+                    matchCount={namedMetrics.find((nm) => nm.group.id === g.id)?.metrics.count ?? 0}
+                    totalCount={allResults.length}
+                    onChange={(next) => updateGroup(g.id, next)}
+                    onRemove={() => removeGroup(g.id)}
+                  />
+                ))
               )}
-              <span className="ml-auto text-white/30" style={{ fontSize: 12 }}>
-                {filteredDiffs.length} prompt{filteredDiffs.length !== 1 ? "s" : ""}
-              </span>
+
+              {/* Chart toggles */}
+              <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-white/40" />
+                  <h3 className="text-white/70" style={{ ...mono, fontSize: 13 }}>
+                    Visualizations
+                  </h3>
+                </div>
+                <div className="space-y-2">
+                  {CHART_OPTIONS.map((c) => {
+                    const on = charts.includes(c.id);
+                    return (
+                      <label
+                        key={c.id}
+                        className="flex cursor-pointer items-start gap-2 rounded-md p-1 hover:bg-white/[0.02]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          onChange={() => toggleChart(c.id)}
+                          aria-label={c.label}
+                          className="mt-0.5 h-3.5 w-3.5 accent-emerald-400"
+                        />
+                        <span className="flex-1">
+                          <span className="block text-white/80" style={{ fontSize: 12 }}>
+                            {c.label}
+                          </span>
+                          <span className="block text-white/40" style={{ fontSize: 11 }}>
+                            {c.description}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
-            {/* Comparison table */}
-            <div className="overflow-hidden rounded-xl border border-white/8 bg-white/[0.02]">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/8 hover:bg-transparent">
-                    <TableHead className="text-white/50" style={{ fontSize: 12 }}>
-                      Prompt
-                    </TableHead>
-                    <TableHead className="text-white/50" style={{ fontSize: 12 }}>
-                      {comparison.config_a}
-                    </TableHead>
-                    <TableHead className="text-white/50" style={{ fontSize: 12 }}>
-                      {comparison.config_b}
-                    </TableHead>
-                    <TableHead className="text-white/50" style={{ fontSize: 12 }}>
-                      Delta (B − A)
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDiffs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center text-white/30">
-                        No prompts match the current filters.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredDiffs.map((d) => (
-                      <PromptDiffRow key={d.prompt_id} diff={d} />
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+            {/* Right column: comparison output */}
+            <div className="space-y-6">
+              <ComparisonOutput groups={groups} metrics={namedMetrics} charts={charts} />
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
+  );
+}
+
+// ── Comparison output ────────────────────────────────────────────────
+
+function ComparisonOutput({
+  groups,
+  metrics,
+  charts,
+}: {
+  groups: ComparisonGroup[];
+  metrics: NamedMetrics[];
+  charts: ChartId[];
+}) {
+  if (groups.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/8 bg-white/[0.03] p-8 text-center">
+        <GitCompareArrows className="mx-auto mb-3 h-8 w-8 text-white/20" />
+        <p className="text-white/40">Add a comparison group to begin.</p>
+      </div>
+    );
+  }
+
+  const counts = metrics.map((m) => m.metrics.count);
+  const allEmpty = counts.every((c) => c === 0);
+  const someEmpty = counts.some((c) => c === 0);
+  const uneven =
+    counts.length > 1 &&
+    Math.max(...counts) > 0 &&
+    Math.min(...counts) / Math.max(...counts) < 0.5;
+
+  return (
+    <>
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {metrics.map(({ group, metrics: m }) => (
+          <SummaryCard key={group.id} group={group} metrics={m} />
+        ))}
+      </div>
+
+      {/* Notices */}
+      {groups.length === 1 && (
+        <div
+          className="rounded-md border border-sky-400/30 bg-sky-500/5 px-3 py-2 text-sky-200"
+          style={{ fontSize: 12 }}
+        >
+          Only one group defined — add another to see side-by-side comparisons.
+        </div>
+      )}
+      {allEmpty && (
+        <div
+          className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-200"
+          style={{ fontSize: 12 }}
+        >
+          None of the defined groups match any evals. Adjust filters to see comparisons.
+        </div>
+      )}
+      {!allEmpty && someEmpty && (
+        <div
+          className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-200"
+          style={{ fontSize: 12 }}
+        >
+          Some groups have no matching evals. Their bars are hidden from charts.
+        </div>
+      )}
+      {!allEmpty && !someEmpty && uneven && (
+        <div
+          className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-white/50"
+          style={{ fontSize: 12 }}
+        >
+          Groups have uneven eval counts ({counts.join(" / ")}). Pass-rate and average-score charts
+          are normalized, but raw counts vary — interpret with care.
+        </div>
+      )}
+
+      {/* Charts */}
+      {charts.length === 0 ? (
+        <div
+          className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center text-white/40"
+          style={{ fontSize: 13 }}
+        >
+          No visualizations selected. Pick at least one from the Visualizations panel.
+        </div>
+      ) : (
+        charts.map((c) => <ChartPanel key={c} chartId={c} metrics={metrics} />)
+      )}
+    </>
+  );
+}
+
+function SummaryCard({ group, metrics: m }: { group: ComparisonGroup; metrics: GroupMetrics }) {
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4" data-testid="summary-card">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: group.color }} />
+        <span className="truncate text-white" style={{ ...mono, fontSize: 13 }}>
+          {group.name}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Metric label="Pass rate" value={pct(m.pass_rate)} mono />
+        <Metric label="Avg score" value={pct(m.avg_score)} mono />
+        <Metric label="Evals" value={String(m.count)} mono />
+        <Metric label="Avg duration" value={`${m.avg_duration.toFixed(1)}s`} mono />
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value, mono: useMono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-white/40" style={{ fontSize: 11 }}>
+        {label}
+      </div>
+      <div className="text-white" style={useMono ? { ...mono, fontSize: 16 } : { fontSize: 16 }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ── Chart panels ────────────────────────────────────────────────────
+
+interface ChartRow {
+  name: string;
+  [groupId: string]: string | number;
+}
+
+const tooltipStyle = {
+  background: "#1a1a2e",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 8,
+  color: "#fff",
+  fontSize: 13,
+};
+
+function ChartPanel({ chartId, metrics }: { chartId: ChartId; metrics: NamedMetrics[] }) {
+  const opt = CHART_OPTIONS.find((c) => c.id === chartId)!;
+  const populated = metrics.filter((m) => m.metrics.count > 0);
+
+  let chart: React.ReactNode = null;
+  if (populated.length === 0) {
+    chart = (
+      <div className="flex h-32 items-center justify-center text-white/30" style={{ fontSize: 12 }}>
+        No data — none of the groups match any evals.
+      </div>
+    );
+  } else if (chartId === "pass_rate") {
+    chart = renderSingleMetricBar(populated, (m) => m.pass_rate * 100, "Pass %", true);
+  } else if (chartId === "avg_score") {
+    chart = renderSingleMetricBar(populated, (m) => m.avg_score * 100, "Score %", true);
+  } else if (chartId === "eval_count") {
+    chart = renderSingleMetricBar(populated, (m) => m.count, "Evals", false);
+  } else if (chartId === "by_service") {
+    chart = renderBreakdown(populated, "by_service");
+  } else if (chartId === "by_language") {
+    chart = renderBreakdown(populated, "by_language");
+  } else if (chartId === "score_distribution") {
+    chart = renderDistribution(populated);
+  }
+
+  return (
+    <div
+      className="rounded-xl border border-white/8 bg-white/[0.03] p-5"
+      data-testid={`chart-${chartId}`}
+    >
+      <h3 className="mb-1 text-white" style={{ ...mono, fontSize: 14 }}>
+        {opt.label}
+      </h3>
+      <p className="mb-4 text-white/40" style={{ fontSize: 12 }}>
+        {opt.description}
+      </p>
+      {chart}
+    </div>
+  );
+}
+
+function renderSingleMetricBar(
+  populated: NamedMetrics[],
+  selector: (m: GroupMetrics) => number,
+  label: string,
+  percent: boolean
+) {
+  const data = populated.map((m) => ({
+    name: m.group.name,
+    value: Number(selector(m.metrics).toFixed(2)),
+    color: m.group.color,
+  }));
+  return (
+    <ResponsiveContainer width="100%" height={240}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+        <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <XAxis
+          dataKey="name"
+          tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          domain={percent ? [0, 100] : ["auto", "auto"]}
+          tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          formatter={(v: number) => (percent ? `${v.toFixed(1)}%` : String(v))}
+        />
+        <Bar dataKey="value" name={label} radius={[6, 6, 0, 0]}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.color} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// Grouped breakdown chart (pass-rate per category, with one series per group).
+function renderBreakdown(populated: NamedMetrics[], dim: "by_service" | "by_language") {
+  const cats = new Set<string>();
+  for (const m of populated) for (const k of Object.keys(m.metrics[dim])) cats.add(k);
+  const sortedCats = Array.from(cats).sort();
+
+  const data: ChartRow[] = sortedCats.map((cat) => {
+    const row: ChartRow = { name: cat };
+    for (const m of populated) {
+      const stat = m.metrics[dim][cat];
+      row[m.group.id] = stat ? Number(((stat.passed / stat.total) * 100).toFixed(1)) : 0;
+    }
+    return row;
+  });
+
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(260, sortedCats.length * 36)}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }} layout="vertical">
+        <CartesianGrid stroke="rgba(255,255,255,0.05)" horizontal={false} />
+        <XAxis
+          type="number"
+          domain={[0, 100]}
+          tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          type="category"
+          dataKey="name"
+          tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          width={120}
+        />
+        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `${v.toFixed(1)}%`} />
+        <Legend wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }} />
+        {populated.map((m) => (
+          <Bar
+            key={m.group.id}
+            dataKey={m.group.id}
+            name={m.group.name}
+            fill={m.group.color}
+            radius={[0, 4, 4, 0]}
+          />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function renderDistribution(populated: NamedMetrics[]) {
+  const bins = [
+    "0–10%",
+    "10–20%",
+    "20–30%",
+    "30–40%",
+    "40–50%",
+    "50–60%",
+    "60–70%",
+    "70–80%",
+    "80–90%",
+    "90–100%",
+  ];
+  const data: ChartRow[] = bins.map((label, i) => {
+    const row: ChartRow = { name: label };
+    for (const m of populated) row[m.group.id] = m.metrics.score_distribution[i];
+    return row;
+  });
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+        <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <XAxis
+          dataKey="name"
+          tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 10 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          allowDecimals={false}
+        />
+        <Tooltip contentStyle={tooltipStyle} />
+        <Legend wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }} />
+        {populated.map((m) => (
+          <Bar
+            key={m.group.id}
+            dataKey={m.group.id}
+            name={m.group.name}
+            fill={m.group.color}
+            radius={[4, 4, 0, 0]}
+          />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
   );
 }

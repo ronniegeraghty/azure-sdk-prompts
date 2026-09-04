@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { RunsPage } from "../app/components/runs-page";
 
@@ -8,6 +8,23 @@ vi.mock("../app/data/api", () => ({
 }));
 
 import { fetchRuns } from "../app/data/api";
+
+function evalRow(opts: { config: string; language: string; success: boolean }) {
+  return {
+    prompt_id: "p",
+    config_name: opts.config,
+    success: opts.success,
+    review: { overall_score: 0, max_score: 0, summary: "" },
+    duration_seconds: 0,
+    prompt_metadata: {
+      service: "identity",
+      plane: "data-plane",
+      language: opts.language,
+      category: "auth",
+      difficulty: "easy",
+    },
+  };
+}
 
 const mockRuns = [
   {
@@ -18,7 +35,7 @@ const mockRuns = [
     failed: 1,
     errors: 1,
     duration_seconds: 120.5,
-    results: [],
+    results: [evalRow({ config: "baseline/claude-opus-4.6", language: "python", success: true })],
   },
   {
     run_id: "run-def456",
@@ -28,7 +45,7 @@ const mockRuns = [
     failed: 0,
     errors: 0,
     duration_seconds: 55.3,
-    results: [],
+    results: [evalRow({ config: "azure-mcp/claude-opus-4.6", language: "go", success: true })],
   },
 ];
 
@@ -59,8 +76,12 @@ describe("RunsPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/run-abc123/)).toBeInTheDocument();
-      expect(screen.getByText(/run-def456/)).toBeInTheDocument();
+      // Timestamps are now displayed as run names
+      expect(screen.getByText(/Mar 29, 2026/)).toBeInTheDocument();
+      expect(screen.getByText(/Mar 28, 2026/)).toBeInTheDocument();
+      // Eval counts shown
+      expect(screen.getByText(/10 evaluations/)).toBeInTheDocument();
+      expect(screen.getByText(/5 evaluations/)).toBeInTheDocument();
     });
   });
 
@@ -100,10 +121,10 @@ describe("RunsPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/run-baddate/)).toBeInTheDocument();
+      expect(screen.getByText(/3 evaluations/)).toBeInTheDocument();
     });
-    // Invalid timestamp renders "N/A" instead of "Invalid Date"
-    expect(screen.getByText("N/A")).toBeInTheDocument();
+    // Invalid timestamp renders "Unknown" instead of "Invalid Date"
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
   });
 
   it("handles missing duration and pass counts gracefully", async () => {
@@ -126,12 +147,89 @@ describe("RunsPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/run-missing/)).toBeInTheDocument();
+      expect(screen.getByText(/0 evaluations/)).toBeInTheDocument();
     });
-    // Missing duration and timestamp both render "N/A"
-    const naElements = screen.getAllByText("N/A");
-    expect(naElements.length).toBeGreaterThanOrEqual(2);
+    // Missing timestamp renders "Unknown"
+    const unknownElements = screen.getAllByText("Unknown");
+    expect(unknownElements.length).toBeGreaterThanOrEqual(1);
     // Pass rate should show 0.0% (not NaN%)
     expect(screen.getByText("0.0%")).toBeInTheDocument();
+  });
+
+  it("renders filter bar populated from run data", async () => {
+    vi.mocked(fetchRuns).mockResolvedValue(mockRuns as any);
+
+    render(
+      <MemoryRouter>
+        <RunsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Filter by Config")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Filter by Language")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Status")).toBeInTheDocument();
+    // Initially shows total run count
+    expect(screen.getByText("2 runs")).toBeInTheDocument();
+  });
+
+  it("filters runs when a language is selected and shows reset", async () => {
+    vi.mocked(fetchRuns).mockResolvedValue(mockRuns as any);
+
+    render(
+      <MemoryRouter>
+        <RunsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText("2 runs")).toBeInTheDocument());
+
+    // Open the language dropdown and select "go"
+    fireEvent.click(screen.getByLabelText("Filter by Language"));
+    const listbox = await screen.findByRole("listbox", { name: "Language" });
+    fireEvent.click(within(listbox).getByRole("option", { name: "go" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    });
+    // run-def456 is the go run; abc123 (python) should be hidden
+    expect(screen.getByText(/Mar 28, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 29, 2026/)).not.toBeInTheDocument();
+
+    // Reset button should clear filters
+    fireEvent.click(screen.getByLabelText("Reset filters"));
+    await waitFor(() => expect(screen.getByText("2 runs")).toBeInTheDocument());
+  });
+
+  it("shows no-matches empty state when filters exclude every run", async () => {
+    vi.mocked(fetchRuns).mockResolvedValue(mockRuns as any);
+
+    render(
+      <MemoryRouter initialEntries={["/runs?lang=rust"]}>
+        <RunsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/No runs match the current filters/)).toBeInTheDocument();
+    });
+  });
+
+  it("hydrates filters from URL query params", async () => {
+    vi.mocked(fetchRuns).mockResolvedValue(mockRuns as any);
+
+    render(
+      <MemoryRouter initialEntries={["/runs?lang=python&status=failing"]}>
+        <RunsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      // python + failing matches run-abc123 (has 1 fail + 1 error → status=errors? No, errors take precedence)
+      // run-abc123 has errors=1, so its status is "errors", not "failing".
+      // Therefore the filter should match nothing → empty state.
+      expect(screen.getByText(/No runs match the current filters/)).toBeInTheDocument();
+    });
   });
 });

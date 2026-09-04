@@ -1,0 +1,15 @@
+when:
+  language: python
+graders:
+  - name: Uses Logging
+    type: prompt
+    weight: 1.0
+    prompt: Uses a structured logger (log/slog, logging module).
+  - name: Error Handling
+    type: prompt
+    weight: 1.0
+    prompt: Wraps errors with context; no bare re-raises.
+  - name: Docstrings Present
+    type: prompt
+    weight: 0.5
+    prompt: Public functions carry docstrings describing purpose + returns.

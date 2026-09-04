@@ -1,9 +1,22 @@
-import { Link } from "react-router";
-import { useState, useEffect } from "react";
+import { Link, useSearchParams } from "react-router";
+import { useState, useEffect, useMemo } from "react";
 import { fetchRuns } from "../data/api";
 import type { RunSummary } from "../data/types";
-import { CheckCircle2, XCircle, AlertTriangle, Clock, ChevronRight, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, Clock, ChevronRight, Loader2, X } from "lucide-react";
 import { motion } from "motion/react";
+import { MultiSelectFilter } from "./ui/multi-select-filter";
+import {
+  EMPTY_FILTERS,
+  STATUS_LABEL,
+  activeFilterCount,
+  applyFilters,
+  applyFiltersToSearchParams,
+  buildCatalog,
+  filtersFromSearchParams,
+  hasActiveFilters,
+  type RunFilters,
+  type RunStatus,
+} from "../lib/run-filters";
 
 function formatDuration(s: number | undefined | null): string {
   if (s == null || isNaN(s)) return "N/A";
@@ -13,17 +26,25 @@ function formatDuration(s: number | undefined | null): string {
   return `${m}m ${sec}s`;
 }
 
-function formatDate(ts: string | undefined | null): string {
-  if (!ts) return "N/A";
+function formatTimestamp(ts: string | undefined | null): string {
+  if (!ts) return "Unknown";
   const d = new Date(ts);
-  if (isNaN(d.getTime())) return "N/A";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (isNaN(d.getTime())) return "Unknown";
+  return d.toLocaleDateString("en-US", { 
+    month: "short", 
+    day: "numeric", 
+    year: "numeric", 
+    hour: "2-digit", 
+    minute: "2-digit",
+    hour12: true
+  });
 }
 
 export function RunsPage() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     fetchRuns()
@@ -31,6 +52,24 @@ export function RunsPage() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  // Filters live in the URL so reload + share preserves state.
+  const filters: RunFilters = useMemo(
+    () => filtersFromSearchParams(searchParams),
+    [searchParams],
+  );
+  const catalog = useMemo(() => buildCatalog(runs), [runs]);
+  const filteredRuns = useMemo(() => applyFilters(runs, filters), [runs, filters]);
+
+  function updateFilters(next: RunFilters) {
+    const params = new URLSearchParams(searchParams);
+    applyFiltersToSearchParams(params, next);
+    setSearchParams(params, { replace: true });
+  }
+
+  function resetFilters() {
+    updateFilters(EMPTY_FILTERS);
+  }
 
   if (loading) {
     return (
@@ -68,11 +107,89 @@ export function RunsPage() {
             <p className="text-white/40">No runs found.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {runs.map((run, i) => {
+          <>
+            <FilterBar
+              catalog={catalog}
+              filters={filters}
+              onChange={updateFilters}
+              onReset={resetFilters}
+              filteredCount={filteredRuns.length}
+              totalCount={runs.length}
+            />
+            {filteredRuns.length === 0 ? (
+              <div
+                role="status"
+                className="rounded-xl border border-white/8 bg-white/[0.03] p-8 text-center"
+              >
+                <p className="mb-2 text-white/60">No runs match the current filters.</p>
+                <button
+                  onClick={resetFilters}
+                  className="text-emerald-400 hover:text-emerald-300"
+                  style={{ fontSize: 13 }}
+                >
+                  Reset filters
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredRuns.map((run, i) => {
+              // Runs without total_evaluations haven't finalized a summary.json
+              // yet (in-progress, crashed, or aborted). Render a separate
+              // in-progress card with a spinner so they don't render in the
+              // same shape as a finished run with `Unknown … 0.0% N/A`.
+              const inProgress = run.total_evaluations == null;
+              if (inProgress) {
+                return (
+                  <motion.div
+                    key={run.run_id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <div
+                      className="block rounded-xl border border-white/8 bg-white/[0.03] p-5 opacity-70 cursor-default"
+                      aria-disabled="true"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1">
+                          <div className="mb-1 flex items-center gap-2 text-white/80" style={{ fontSize: 15 }}>
+                            {run.run_id}
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/[0.08] px-1.5 py-0.5 text-amber-300"
+                              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+                            >
+                              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                              In progress
+                            </span>
+                          </div>
+                          <p className="text-white/40" style={{ fontSize: 12 }}>
+                            no summary yet — run is still writing or never finalized
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 text-white/30" style={{ fontSize: 12 }}>
+                          <Clock className="h-3.5 w-3.5" />
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span>
+                          <Loader2 className="h-4 w-4 animate-spin text-amber-400/60" />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              }
+
               const passed = run.passed ?? 0;
               const total = run.total_evaluations ?? 0;
-              const rate = total > 0 ? ((passed / total) * 100).toFixed(1) : "0.0";
+              const errors = run.errors ?? 0;
+              // Errored evaluations never produced a result — exclude from
+              // the denominator so an all-errored run doesn't render as a
+              // smug emerald `0.0%`. Falls back to total when no errors.
+              const effectiveTotal = Math.max(total - errors, 0);
+              const rate = effectiveTotal > 0
+                ? ((passed / effectiveTotal) * 100).toFixed(1)
+                : "0.0";
+              const hasErrors = errors > 0;
+              const barColor = hasErrors ? "bg-amber-500" : "bg-emerald-500";
+              const rateColor = hasErrors ? "text-amber-300" : "text-white/50";
               return (
                 <motion.div
                   key={run.run_id}
@@ -86,16 +203,20 @@ export function RunsPage() {
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex-1">
-                        <div className="mb-1 flex items-center gap-3">
-                          <span className="text-emerald-400" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15 }}>
-                            {run.run_id}
-                          </span>
-                          <span className="rounded-md bg-white/5 px-2 py-0.5 text-white/30" style={{ fontSize: 11 }}>
-                            {run.total_evaluations} evals
-                          </span>
+                        <div className="mb-1 flex items-center gap-2 text-white/80" style={{ fontSize: 15 }}>
+                          {formatTimestamp(run.timestamp)}
+                          {hasErrors && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/[0.08] px-1.5 py-0.5 text-amber-300"
+                              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+                            >
+                              <AlertTriangle className="h-2.5 w-2.5" />
+                              run errored
+                            </span>
+                          )}
                         </div>
-                        <p className="text-white/40" style={{ fontSize: 13 }}>
-                          {formatDate(run.timestamp)}
+                        <p className="text-white/40" style={{ fontSize: 12 }}>
+                          {run.total_evaluations} evaluations
                         </p>
                       </div>
 
@@ -119,9 +240,9 @@ export function RunsPage() {
 
                         <div className="hidden items-center gap-2 sm:flex">
                           <div className="h-2 w-24 overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${rate}%` }} />
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${rate}%` }} />
                           </div>
-                          <span className="text-white/50" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                          <span className={rateColor} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {rate}%
                           </span>
                         </div>
@@ -138,8 +259,78 @@ export function RunsPage() {
                 </motion.div>
               );
             })}
-          </div>
+              </div>
+            )}
+          </>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface FilterBarProps {
+  catalog: ReturnType<typeof buildCatalog>;
+  filters: RunFilters;
+  onChange: (next: RunFilters) => void;
+  onReset: () => void;
+  filteredCount: number;
+  totalCount: number;
+}
+
+function FilterBar({
+  catalog,
+  filters,
+  onChange,
+  onReset,
+  filteredCount,
+  totalCount,
+}: FilterBarProps) {
+  const active = hasActiveFilters(filters);
+  const count = activeFilterCount(filters);
+  return (
+    <div className="mb-5 rounded-xl border border-white/8 bg-white/[0.02] p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <MultiSelectFilter
+          label="Config"
+          options={catalog.configs.map((c) => ({ value: c, label: c }))}
+          selected={filters.configs}
+          onChange={(configs) => onChange({ ...filters, configs })}
+        />
+        <MultiSelectFilter
+          label="Language"
+          options={catalog.languages.map((l) => ({ value: l, label: l }))}
+          selected={filters.languages}
+          onChange={(languages) => onChange({ ...filters, languages })}
+        />
+        <MultiSelectFilter
+          label="Status"
+          options={catalog.statuses.map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
+          selected={filters.statuses}
+          onChange={(values) =>
+            onChange({ ...filters, statuses: values as RunStatus[] })
+          }
+        />
+
+        <div className="ml-auto flex items-center gap-3">
+          <span
+            className="text-white/40"
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
+          >
+            {active ? `${filteredCount} of ${totalCount}` : `${totalCount} runs`}
+          </span>
+          {active && (
+            <button
+              type="button"
+              onClick={onReset}
+              aria-label="Reset filters"
+              className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-white/70 transition hover:border-white/20 hover:text-white"
+              style={{ fontSize: 12 }}
+            >
+              <X className="h-3 w-3" />
+              Reset{count > 0 ? ` (${count})` : ""}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -16,18 +16,20 @@ var ValidServices = []string{
 "storage", "key-vault", "cosmos-db", "event-hubs",
 "app-configuration", "purview", "digital-twins",
 "identity", "resource-manager", "service-bus",
+"test", // Test fixture service
 }
 
 // ValidPlanes is the canonical list of valid plane values.
 var ValidPlanes = []string{"data-plane", "management-plane"}
 
 // ValidLanguages is the canonical list of valid language values.
-var ValidLanguages = []string{"dotnet", "java", "js-ts", "python", "go", "rust", "cpp"}
+var ValidLanguages = []string{"dotnet", "java", "js-ts", "python", "go", "rust", "cpp", "test"}
 
 // ValidCategories is the canonical list of valid category values.
 var ValidCategories = []string{
 "authentication", "best-practices", "pagination", "polling", "retries",
 "error-handling", "crud", "batch", "streaming", "auth", "provisioning",
+"test", // Test fixture category
 }
 
 // ValidDifficulties is the canonical list of valid difficulty values.
@@ -124,6 +126,11 @@ addErr(fmt.Sprintf("invalid category %q; must be one of: %s", p.Category(), join
 }
 if p.Difficulty() != "" && !validDifficultiesMap[p.Difficulty()] {
 addErr(fmt.Sprintf("invalid difficulty %q; must be one of: %s", p.Difficulty(), joinKeys(validDifficultiesMap)))
+}
+
+// Optional group field (#599): kebab-case, max 64 chars, starts with a letter.
+if p.Group != "" && !IsValidGroupName(p.Group) {
+addErr(fmt.Sprintf("invalid group %q; must be kebab-case (lowercase letters/digits/hyphens, start with a letter, no leading/trailing/consecutive hyphens, max 64 chars)", p.Group))
 }
 
 // ID naming convention: {service}-{dp|mp}-{language}-

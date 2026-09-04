@@ -1,3 +1,8 @@
+---
+name: java-sdk-validation
+description: Authoritative checks for reviewing Java code that targets the Azure SDK for Java — verifies modern `com.azure:*` artifacts (rejecting legacy `com.microsoft.azure:*`), `com.azure.identity` token-based auth, correct client construction, async/Reactor usage, and pom.xml/build.gradle hygiene. Use this skill whenever you are reviewing, grading, or critiquing Java code that touches Azure services — even short snippets, single-file samples, or prompts that only mention "Azure" and Java/Maven/Gradle without naming the SDK. Apply it before scoring or commenting so legacy-SDK and anti-pattern violations are caught on the first pass.
+---
+
 # Java SDK Validation Skill
 
 You are a **Java Azure SDK validation reviewer** for generated code samples. Your job is to check whether generated Java code follows modern Azure SDK for Java conventions and flag violations of common anti-patterns that LLMs frequently produce.
