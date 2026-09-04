@@ -27,7 +27,7 @@ tags:
 
 Write a TypeScript program
 that manages configuration settings in Azure App Configuration:
-1. Create an AppConfigurationClient using a connection string
+1. Create an AppConfigurationClient using a credential from `@azure/identity`
 2. Set a configuration setting with key "app:Settings:FontSize" and value "24"
 3. Set a setting with label "Production"
 4. Get the setting by key and print its value
@@ -35,6 +35,7 @@ that manages configuration settings in Azure App Configuration:
 6. Create a feature flag configuration setting for "BetaFeature"
 7. Delete the setting by key
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Show required npm package (@azure/app-configuration) and
 proper error handling with RestError.
 
@@ -42,7 +43,7 @@ proper error handling with RestError.
 
 The generated code should include:
 - `@azure/app-configuration` npm package
-- `AppConfigurationClient` constructor with connection string
+- `AppConfigurationClient` constructor with credential from `@azure/identity`
 - `setConfigurationSetting()` with key, value, label
 - `getConfigurationSetting()` by key and label
 - `listConfigurationSettings()` with `ListConfigurationSettingOptions`

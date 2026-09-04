@@ -36,7 +36,7 @@ The project needs:
 
 - A **service class** that wraps blob operations: upload (with optional metadata and blob index tags for later querying), download, list blobs in a container, and delete. The upload method should handle large files efficiently using streaming — uploading a multi-gigabyte file should not load the entire thing into memory. The service should also prevent concurrent writers from overwriting each other's changes when updating the same blob by acquiring a lease before writing.
 
-- A **configuration module** that connects to Azure securely using the storage account endpoint (from an environment variable). No connection strings or account keys should be used — the app will run in Azure with managed identity. The configuration should set up a custom retry policy (exponential backoff, configurable max retries and delay) and enable SDK logging at a configurable level for debugging.
+- A **configuration module** that connects to Azure securely using the storage account endpoint (from an environment variable). No connection strings or account keys should be used — the app will run in Azure with managed identity. The configuration should set up a custom retry policy (exponential backoff, configurable max retries and delay) and enable SDK logging at a configurable level for debugging. Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks (e.g., 404 for blob not found, 409 for lease conflicts).
 
 - A **main script** that wires everything together and demos each operation: uploads a sample file with some index tags, lists all blobs in the container, downloads the file back and prints its content, acquires a lease and overwrites the blob, then finally deletes it. Print status at each step.
 

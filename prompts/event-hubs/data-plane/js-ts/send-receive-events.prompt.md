@@ -26,7 +26,7 @@ tags:
 
 Write a TypeScript program
 that demonstrates sending and receiving events with Azure Event Hubs:
-1. Create an EventHubProducerClient using a connection string
+1. Create an EventHubProducerClient
 2. Create a batch with createBatch() and add 10 events with custom properties
 3. Send the batch using sendBatch()
 4. Create an EventHubConsumerClient with a BlobCheckpointStore
@@ -34,8 +34,10 @@ that demonstrates sending and receiving events with Azure Event Hubs:
 6. Print received event bodies and update checkpoints
 7. Implement graceful shutdown with close()
 
-Show required npm packages (@azure/event-hubs and
-@azure/eventhubs-checkpointstore-blob) and proper async/await patterns.
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks.
+Show required npm packages (@azure/event-hubs,
+@azure/eventhubs-checkpointstore-blob, and @azure/core-rest-pipeline) and proper async/await patterns.
 
 ## Evaluation Criteria
 

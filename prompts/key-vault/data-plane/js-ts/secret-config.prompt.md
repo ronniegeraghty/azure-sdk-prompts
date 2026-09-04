@@ -34,7 +34,7 @@ Create a TypeScript Node.js project that implements an application configuration
 
 The project needs:
 
-- A **secret provider class** that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing). It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.
+- A **secret provider class** that retrieves secrets from Key Vault by name, with graceful handling when a secret doesn't exist (return a default value instead of crashing) — use `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks (e.g., 404) to detect not-found vs other failures. It should also be able to retrieve a specific version of a secret (not just the latest), and inspect a secret's expiry date so the caller can tell if a secret is about to expire.
 
 - A **caching layer** on top of the provider that stores secret values in memory after first retrieval. It should support bulk-loading a predefined set of required config keys at startup, on-demand refresh of individual keys, and automatic re-fetch of any secret whose expiry date is within a configurable warning window (e.g., 7 days out).
 
@@ -43,6 +43,8 @@ The project needs:
 - A **secret rotation helper** that safely rotates a secret: create a new version of the secret with an updated value and expiry date (since Key Vault supports multiple versions per secret name), then optionally clean up old versions by deleting and purging the previous secret if full name reuse is needed. The cleanup must be safe — use the long-running delete operation and wait for completion before purging, since Key Vault's soft-delete feature means the secret is not immediately gone.
 
 - A **main script** that demos the full flow: loading several config keys at startup, reading them from cache, refreshing one, printing a warning if any secret is near expiry, and performing a secret rotation (creating a new version, then demonstrating the delete-and-purge cleanup flow). Print results at each step.
+
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level for debugging.
 
 Include a complete `package.json` with the necessary Azure SDK dependencies and a `tsconfig.json`.
 

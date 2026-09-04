@@ -35,8 +35,9 @@ that manages Azure Resource Groups using the management plane SDK:
 6. Update the resource group by adding a tag
 7. Delete the resource group using beginDeleteAndWait
 
-Show required npm packages and proper async/await patterns.
-Use the @azure/arm-resources package.
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks.
+Show required npm packages (@azure/arm-resources and @azure/core-rest-pipeline) and proper async/await patterns.
 
 ## Evaluation Criteria
 

@@ -31,6 +31,8 @@ uses Managed Identity to authenticate Azure SDK clients. The program should:
 4. Pass the credential to an Azure SDK client and perform an operation
 5. Handle CredentialUnavailableError when not running in Azure
 
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
+Handle errors using `RestError` from `@azure/core-rest-pipeline` with `statusCode` checks for service call failures.
 Include a package.json with all dependencies and use async/await throughout.
 
 ## Evaluation Criteria

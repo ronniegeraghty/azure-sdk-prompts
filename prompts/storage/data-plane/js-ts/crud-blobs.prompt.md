@@ -34,6 +34,7 @@ performs CRUD operations on Azure Blob Storage:
 6. Delete the blob and then delete the container
 
 Show required npm packages and proper error handling with RestError.
+Enable SDK diagnostic logging using `@azure/logger` with a configurable log level.
 Use async/await throughout.
 
 ## Evaluation Criteria
